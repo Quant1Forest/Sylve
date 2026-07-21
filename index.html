@@ -1,0 +1,2637 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#17251F">
+<title>BordCub — bordereau de cubage</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icone.svg" type="image/svg+xml">
+<link rel="icon" href="icone-192.png" sizes="192x192" type="image/png">
+<link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="%2317251F"/><g fill="none" stroke="%23E6EAE1" stroke-width="3"><circle cx="32" cy="32" r="21"/><circle cx="32" cy="32" r="13"/><circle cx="32" cy="32" r="5.5"/></g><path d="M11 32h42" stroke="%23C4611B" stroke-width="3.5" stroke-linecap="round"/></svg>'>
+<link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0BAMAAADP4xsBAAAAMFBMVEX09+7r7+bn6uHm6uHm6uDk6uHk6N+usqjCYh5TQioZJyEYJR8XJR8VJR8RIBoJGBJiz4FrAAANtElEQVR42u2ba1BUZ5qAn3MaEYzQB4jj5tJ0i0E3SgMR71dmjFZG1KioSTSaUbxEzY5uTUqxZpJNtiYXdZLV7CQZNO6YiSYWM9HoeKmoSUAnVkVtOJCY3c2Gti+ythfgNJiIXM63P043IGA3oK7zg/5hVVunH9/zfu/9e5XOcKc+Mt3obnQ3uhvdje5Gd6O70d3ovwt0REcfFFUaAFKccnvRlZrpp3EAVF1RpX63D627hvar36s5gSSpz5zKz2RbB34ldaAIdj70SH6l69IOASiRi+R+Sys+T7odaOGe+N2eS3+U4rMBOH1O+8mi5MVnqpVbRuvnH9/6/Rv3zqIscIxD+J8vRvxs2T3HbbeI1suzXsgzZQe4gd8MOa2uHZm133ZLx6iXj/7NpkkWx40qcvTIydOqng7DDi21Xj769S1LgmBJQQSlzzhy7bUw7NBSn8/KfXuxI6BijpYhzcZQumPA/eulLE+X0a5puW8vKAbIaMjXlLnANiElZzqACu3nuQyWu6gQvf+GzQtUoH/vPT/+s2yTFISmuy6+nzyhCDAN6rmuyNYlqfVyx+8WqUDGkfO/6p+cSRUQR8Oevl9tX+KAxm8vxb8cQt0hpPb8/P7sYiAj/4khc81nXIFjlCeat5VtWuoAEk7/cpWnC2g9fe3JRiBj67p/fOaYvzkkVfof7fXihmUOIH3n7kZb59HeC2vGaZCxLXf4mIIbQ4YzYur29XMdIKVEbyntNLpywmNJKiScWrH2sqd1vBCemXkrc4rB5NzUu18nj1H0ePdsNZhOrVh7NKlNJJKsf1nOysUqjdNWVhcqnZNaGxPzjIqUEv3q0fbjp3P2H9aM0zD1mjBV6hRaRLx/tRjSdu1+4GZe4Zq+9lAMJBT+UKB0Bl011mwHk2tDCF/2ZD0rq2C3jo3rDNpbWKOC/b6Xj9884ovzvtV2MJXUlHYCrafF2CGh8HBlS6sVGlLLf0nv98rVYrBPiLF1HO11H6hCqljwXLM6xDkiMmkoIL6Z7hk1+BGNuC/9pR1G69Ynk1SUk/7mCOGMmCmuFBDxU+Vys//o5e6dApNzY6yto2hP7RoLUsPqJm8Qrkfr9zqFhqQk9ZlxTFaa/KpXpkZq9EuejqK9hTUqysmm99TPz8g7t1WTFIQmLYtfW9+Ucr3uneJmB9keWreb7ZA6Png6wjv1hU9LlqK7kG3k1zw/ckypEjxviwXsVrutY2iP94MbRPFkvbBxeGpx4FuCZfvykU3mbrzgtyWejqGlD2pU7ImpAUnOPb7+zaUtc3pG/sDce+IDYlusdkwlZ7W2GNOytvpIyRaYzjzfM8r4OvRP/7K4qOUDF5Kr6xYUB1QSfz3OJya6eyodiXznzyRC71kpgXcsd6xaXAyQYAP0YqAi8iPlZUNd0onkN814osd7OqIQb2GN2uxiVeOXRxQDpvSj54D42Y0qkFCQ92Bcs+O2ayNt0XqaxdL8rH7vWx9agIxTJcsUQGytyXEAqR/+7xe2ZkmazSkk2mK1E/twwAs8o6wLVMjIH/izR+YAf674/s2lDjANSgxEAU/tL60tDj0U2uspbdaHbnu1RoWEU0+MWFT5GTC036U3NuUUg6nkI93WrBGvuzQ82nO8RjW5z7oA8A+y2sF06anJKV/EK4A4d++491YtUsGeuMBvdFofVKumEq8nLNpQ9dcBJ6/eX6OCPXrtZU/whXXPzLw1djCVnHcHnP3rdpXdFm0325tUZ7h8xvt/uKG4c01b96Oj2b11i9Xenq+3yXxX9yYCgZBXnrcATPnrsm54zHZw3bZ0+Hbj9IDXAJ7LE8IqxFtY06Q53Zorq6RGbWlV2enlF16yYHK9bsRpz/EatR3LbiN1ogQEArKk71IxHRzeumaUH8jJSqdxiivwmA1Qwh6jnmaxkHrfYq35gKLaqb28F15qPmzpu9WWds6xjdS6BqKHCiDGlLhADN/fNs48kKOBHnNAA2icoYFwhYt8cvkehbKpfaMAYZlnxnTso+vBdHWhSguUHJLjJ/E+xtaaFYCoyxepffCx2tAK8ZRvVoJH4infAfbE8UowPyqIYF4UD1rtELnPEzx60XOfJ7RCpLLMpr+UytKRTtq0QBbLPpKb+96w1MBX+WkFU1EgStsgokjpQKXakOk3VL3fg+x92jhEz7T1F3cQWTZycDWAfDJVUnXzgVgFMEe0V/a10rWwHHPXpj0c1aRq+2OBsDzhNxt/zM5I+b1irlIAzA+vNweVHTlyi5nryUSFklqY/2pFSJoCSBogklw2gPIzv1tW5kBa9qls2KKepFlAKABC0SxisF8oIXWtVBuqA2r+YkE6lGjEiSm/XuzQQDgG7N7lApA98xVKj6Y1UaxSGG/UQTppmJS/LBPZP84IJu/2CRQLFTNXGqHjG7ONiCIzgOR/WgFX+LGW7DfQAmgY4jeE/tdxRpMO3/yDIba5fwGgGWizLezErOYTBbRxAGKs30XqpBKAmo8jVMhoVDOgMfN0GkDMbC+6+W8awDcCpPq0kMYnCV1SoAoQqQdT45CqBHD11HQXcn7k9G05LsoLNxcCIoU47P5GERikuaIVfyi0dnnI5XMySUAjVU7pyoQkBYjZX6IR+0SGuc8bViTzgTRAyI2VWm/kJKDUdrw4e+9LoaXmHoad0BwAMXGPQu8ygHEHZ4D7sd78Vq+GerUBwJkD9edSHECEfG/2x5Gt4mqrGOJ1/2fHhnjt9LD/3qo5aG0h7q6SiV8Yxvh6dn2GGibtClvX0bI/JFrpOhlx1+bX2i2gwoQnyXULbHPYyNfVT2UYXd/fZbHFW2Fyo/SVUKozNYDYAgWMpln5XAFtaKzf+pkE4iHDGJwgIqwAUoNbHA2TdgXD8qn9vR8QveYpiH+boICI2Z0PIr6f2blJgYitaQqI3lEKYvUkBfDv20pyaxtohVZq9wyzvd/oAERanxnUuXorwFVrtozr3cisHTkyrsKsQkCM6zGHeqtDAa665uhlM6XQUktyhQZxgJCyyjS7iFMAefgaC8w9vX+pA1Jz3HHGdMQheabFKsBVGtVURQt5jDEzNFBOAEh/M9uCeTUmuyEdHKZ0B5gKhpUEs7LsH6sApEggepSE9Ubd7NeCLhDIq/KhF08YgkKKb74tmJUDkUGY/a7wt0kyiNEG2ty/AN18wqhMV1x+JND9733HqFxT/K5gVhbmnVrYyIcWSzDtx8z2IqZ4jKrj0Cv/kaGAlPHdk4bQeuIuLZiV0QG3CG18kn+aR5OCNREgOR83xM5ybRyQScPW5ZONHkF2GhVW8E/prNkcsuaTvvf18vn8K/wA0Rev1175ZPNFAOnUirr47Y6zz2cOjjZSnUPxSWeWmKOAmuNFUSb3Dn/4SjWiwKiJvjTbVN2y0+iFEg+89ue+9J9Tbwxw9NF/dSP7p5YC+Bsy1fDjWtF/sxKMUaL/DsRo13jjfSwfT57bXLpL+k47jUMCpuyChiFamDZJqptmpSY3UQk2pC26tkqNpks7Y7Jh9KEicX0JsWN+oYXuZfS0l/syFKPqi754vVZMrL4WCDzRcXHB6ak+bpYgqGqROK8vA+Ja1cBtXUZWQKpPN5SdZgPp1PS2eizfroBcM1UBMH2iBJrH0N2utLNaDTaE4kGrHZNrQ5vOXk97VlabOiiv+2vV5P5SC5d2PSLQPAJCnp9OY9ap6a7W1yrbD6qYDgU7KBegJYadmEnmHVFiYt01BZDORl3ycaXw+pwbTdY7auKTPmSv0VHq42YJYieP8oeTuvdMD3Au0NQu/wAa5244eEPKdGVtWKrCoLX7m5NiYp/C/8dRS1uFnImN98m1Sww11s5c1BcqSuoShxdLUYA4FzF523PP+CAla6DRYccdv+4zHXtXCj+drJYv+sSY64YxR8bXxvsQln38MF8pqqqqemjMPb/9dY4KpmPP+QyXt88UyPXrL97VYdwdHCHetsFnO0FVDHjTjOfUy8b7xh0asXKxCo2O5EmA7gAwnfrV/NKWw93FWofm10bAc3+kG+FGf2j3Py0qvuGJhEujXvncFqj1X61W2x+7tzO/lq70jPeJMVXmQGQumvfDO1MvtByNH+n7zJX7Aq8YM09gOpYXddcH+nfwGuI2XZ60e5Uphq+x4B+4K3jlI1s+frK+f4srnyC5ckqvTI3BQ7W/h4uqO3i9dicvBe/gVeZtuYBtxxsBoiojE3yI8a+NiLnJfTOuaes+r4KEA5+6ozrS7Ta9TMVrO9Kh9Kkjyc72n3DOeu8dC5jqcotvorObSE1PZ9p2M1QU1i10tPe+ztl5q37hAvunh/87qnNo6YfZRx72IZL31S1svNj6x8KTnbcyRwXTV1uc99E5NNGOxI0Da7k26S0pcljxjYI7r07btn5hEUiD09bW0Vk0MVO0MgEXpm6xVc0762uGV/omDX5x/UIHkP7huv+6qXXeldUT9HLfqnYXZoq+Or7EAZguPdXFhZlbXfMJuVLlmpb79gIVIKNhT6vlJEyDDr/e5eUk8GTlvr2wGAIrVVrzShUJ9x9+PfRK1V1bBJMfOJnbY9Mki9G6iaomk03Nf2JEuPW1m9u1IWjMt8/W7f9u4rWW1zlShvfw6szZ4Zbu7uKq4J1ccOQOrmXSepl0xm1cJqVrK7BSR/+z1h1b3AUpPv7WJsF3cMjcje5Gd6O70d3obnQ3uhvdjQ75+T+xHanfFTrv3gAAAABJRU5ErkJggg==">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="BordCub">
+<style>
+/* ===================================================================
+   Palette : papier NCR vert pâle du bordereau carbone, encre vert-noir
+   d'écorce mouillée. L'accent reprend la couleur des plaquettes du lot.
+   =================================================================== */
+:root{
+  --encre:#17251F; --papier:#E6EAE1; --carte:#F5F6F0; --carte2:#EDF0E8;
+  --trait:#C4CCBE; --trait-fort:#9BA795; --gris:#69735F; --gris-clair:#8A9382;
+  --alerte:#A4451F; --alerte-fond:#F6E7DF;
+  --accent:#1F5FA9; --accent-doux:#E3EBF5; --accent-texte:#fff;
+  --r:10px; --r-s:7px;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --ombre:0 1px 2px rgba(23,37,31,.07),0 4px 14px rgba(23,37,31,.05);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:var(--sans); font-size:15px; line-height:1.45;
+  color:var(--encre); background:var(--papier);
+  -webkit-text-size-adjust:100%; overscroll-behavior-y:none;
+}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:none}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.eyebrow{
+  font-size:10.5px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;
+  color:var(--gris);
+}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.muted{color:var(--gris)}
+
+/* ------------------------------------------------------ structure ---- */
+#app{display:flex;flex-direction:column;min-height:100vh;min-height:100dvh}
+main{flex:1;padding:14px 14px 96px;max-width:1240px;width:100%;margin:0 auto}
+.vue{display:none}
+.vue.actif{display:block}
+
+/* --------------------------------------------------------- bandeau --- */
+.bandeau{
+  position:sticky;top:0;z-index:40;background:var(--encre);color:#EAEFE6;
+  border-bottom:3px solid var(--accent);
+  padding:9px 14px calc(9px + env(safe-area-inset-bottom,0px)*0);
+}
+.bandeau-in{max-width:1240px;margin:0 auto;display:flex;align-items:center;gap:12px}
+.bandeau-id{min-width:0;flex:1}
+.bandeau-t{
+  font-weight:650;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.bandeau-s{font-size:12px;color:#A9B7A4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bandeau-tot{text-align:right;line-height:1.05;flex:none}
+.bandeau-tot b{font-family:var(--mono);font-size:23px;font-weight:600;letter-spacing:-.02em}
+.bandeau-tot span{display:block;font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:#93A28E}
+.pastille{
+  width:15px;height:15px;border-radius:50%;flex:none;background:var(--accent);
+  box-shadow:0 0 0 2px rgba(255,255,255,.28);
+}
+.bandeau-btn{
+  color:#DDE5D8;border:1px solid rgba(255,255,255,.22);border-radius:var(--r-s);
+  padding:5px 9px;font-size:12.5px;flex:none;
+}
+.bandeau-btn:hover{background:rgba(255,255,255,.1)}
+
+/* ------------------------------------------------------------ onglets */
+.onglets{
+  position:fixed;left:0;right:0;bottom:0;z-index:45;display:flex;
+  background:var(--carte);border-top:1px solid var(--trait);
+  padding-bottom:env(safe-area-inset-bottom,0px);box-shadow:0 -2px 12px rgba(23,37,31,.06);
+}
+.onglets button{
+  flex:1;padding:9px 2px 8px;font-size:11px;font-weight:600;color:var(--gris);
+  border-top:2.5px solid transparent;letter-spacing:.02em;
+}
+.onglets button .ic{display:block;font-size:17px;line-height:1.15;margin-bottom:1px}
+.onglets button[aria-selected=true]{color:var(--accent);border-top-color:var(--accent)}
+
+/* -------------------------------------------------------------- cartes */
+.carte{
+  background:var(--carte);border:1px solid var(--trait);border-radius:var(--r);
+  padding:14px;margin-bottom:12px;box-shadow:var(--ombre);
+}
+.carte>h2{
+  margin:0 0 10px;font-size:12px;font-weight:700;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--gris);
+}
+.carte-titre{display:flex;align-items:center;gap:10px;margin:0 0 10px}
+.carte-titre h2{margin:0;flex:1}
+
+/* -------------------------------------------------------------- champs */
+.champ{margin-bottom:11px}
+.champ>label,.champ>.lab{display:block;margin-bottom:4px}
+.grille{display:grid;gap:11px}
+.g2{grid-template-columns:1fr 1fr}
+.g3{grid-template-columns:1fr 1fr 1fr}
+input[type=text],input[type=number],input[type=search],select,textarea{
+  width:100%;padding:9px 10px;background:#fff;border:1px solid var(--trait-fort);
+  border-radius:var(--r-s);
+}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--accent-doux)}
+input.gros{font-family:var(--mono);font-size:24px;font-weight:600;text-align:center;padding:8px 6px;letter-spacing:.01em}
+input.err{border-color:var(--alerte);background:var(--alerte-fond)}
+textarea{resize:vertical;min-height:56px}
+
+.pas{display:flex;gap:7px;align-items:stretch}
+.pas input{flex:1}
+.pas button{
+  width:46px;flex:none;border:1px solid var(--trait-fort);border-radius:var(--r-s);
+  background:var(--carte2);font-size:17px;font-weight:600;color:var(--encre);
+}
+.pas button:active{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+/* --------------------------------------------------------------- chips */
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{
+  padding:7px 11px;border:1px solid var(--trait-fort);border-radius:99px;
+  background:var(--carte2);font-size:13.5px;font-weight:600;white-space:nowrap;
+}
+.chip small{font-weight:400;color:var(--gris);margin-left:5px;font-size:11.5px}
+.chip:hover{border-color:var(--accent)}
+.chip[aria-pressed=true]{background:var(--accent);color:var(--accent-texte);border-color:var(--accent)}
+.chip[aria-pressed=true] small{color:rgba(255,255,255,.8)}
+.chip.nul[aria-pressed=true]{background:var(--alerte);border-color:var(--alerte)}
+.chip.plus{background:none;border-style:dashed;font-weight:500;color:var(--gris)}
+
+/* -------------------------------------------------------------- boutons */
+.btn{
+  padding:10px 15px;border-radius:var(--r-s);border:1px solid var(--trait-fort);
+  background:var(--carte2);font-weight:600;font-size:14px;
+}
+.btn:hover{border-color:var(--gris)}
+.btn.primaire{background:var(--accent);border-color:var(--accent);color:var(--accent-texte)}
+.btn.primaire:hover{filter:brightness(1.08)}
+.btn.danger{color:var(--alerte);border-color:#D9BCAE}
+.btn.danger:hover{background:var(--alerte-fond)}
+.btn.plein{width:100%}
+.btn:disabled{opacity:.42;cursor:not-allowed}
+.btn-rang{display:flex;gap:9px;flex-wrap:wrap}
+.btn-rang>.btn{flex:1;min-width:132px}
+.btn-min{padding:5px 9px;font-size:12.5px;border-radius:6px;border:1px solid var(--trait);background:var(--carte2);font-weight:600}
+
+/* ------------------------------------------- ruban de plaquettes (signature) */
+.ruban{
+  display:flex;gap:5px;overflow-x:auto;padding:2px 0 8px;margin-bottom:2px;
+  scrollbar-width:thin;
+}
+.plaq{
+  flex:none;min-width:56px;padding:5px 8px 6px;border-radius:4px 4px 7px 7px;
+  background:var(--accent);color:var(--accent-texte);text-align:center;
+  font-family:var(--mono);font-size:12.5px;font-weight:600;line-height:1.15;
+  position:relative;box-shadow:0 1px 2px rgba(23,37,31,.2);
+}
+.plaq::before{
+  content:"";position:absolute;top:3px;left:50%;transform:translateX(-50%);
+  width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.45);
+}
+.plaq{padding-top:13px}
+.plaq em{display:block;font-style:normal;font-size:9.5px;opacity:.85;font-family:var(--sans)}
+.plaq.suiv{background:none;color:var(--gris);border:1.5px dashed var(--trait-fort);box-shadow:none}
+.plaq.suiv::before{background:var(--trait)}
+
+/* -------------------------------------------------------------- tableaux */
+.tab-boite{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:var(--r-s)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:5px 8px;border-bottom:1px solid var(--trait);text-align:right;white-space:nowrap}
+th{
+  background:var(--encre);color:#E4EBE0;font-size:10px;font-weight:700;letter-spacing:.055em;
+  text-transform:uppercase;position:sticky;top:0;z-index:2;text-align:right;
+}
+th.g,td.g{text-align:left}
+td.num,th.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+tbody tr:nth-child(even){background:rgba(0,0,0,.018)}
+tbody tr.tot{background:var(--carte2);font-weight:700}
+tbody tr.tot td{border-top:1.5px solid var(--trait-fort)}
+tbody tr.tot-gen{background:var(--accent-doux);font-weight:700}
+tr.nulle td{color:var(--alerte)}
+td.act{width:1%;padding:3px 6px}
+.tab-boite table td:first-child,.tab-boite table th:first-child{padding-left:11px}
+
+/* -------------------------------------------------------------- divers */
+.stat-rang{display:flex;flex-wrap:wrap;gap:9px}
+.stat{
+  flex:1;min-width:104px;background:var(--carte2);border:1px solid var(--trait);
+  border-radius:var(--r-s);padding:8px 10px;
+}
+.stat b{display:block;font-family:var(--mono);font-size:19px;font-weight:600;letter-spacing:-.01em}
+.avis{
+  border-radius:var(--r-s);padding:9px 11px;font-size:13.5px;margin-bottom:11px;
+  background:var(--accent-doux);border:1px solid var(--trait);
+}
+.avis.rouge{background:var(--alerte-fond);border-color:#DFC2B3;color:#7A3315}
+.vide{text-align:center;padding:34px 14px;color:var(--gris)}
+.vide p{margin:0 0 14px}
+.repli{border-top:1px solid var(--trait);margin-top:11px;padding-top:10px}
+.repli>summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--gris);list-style:none}
+.repli>summary::-webkit-details-marker{display:none}
+.repli>summary::before{content:"▸ ";display:inline-block;transition:transform .15s}
+.repli[open]>summary::before{content:"▾ "}
+.repli>div{padding-top:11px}
+.sous-onglets{display:flex;gap:5px;overflow-x:auto;margin-bottom:12px;padding-bottom:2px}
+.sous-onglets button{
+  padding:7px 13px;border-radius:99px;border:1px solid var(--trait-fort);
+  background:var(--carte);font-size:13px;font-weight:600;white-space:nowrap;
+}
+.sous-onglets button[aria-selected=true]{background:var(--encre);color:#EAEFE6;border-color:var(--encre)}
+.liste-item{
+  display:flex;align-items:center;gap:11px;padding:11px;border:1px solid var(--trait);
+  border-radius:var(--r-s);background:var(--carte);margin-bottom:8px;text-align:left;width:100%;
+}
+.liste-item:hover{border-color:var(--accent)}
+.liste-item .li-c{flex:1;min-width:0}
+.liste-item b{display:block;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.liste-item small{color:var(--gris);font-size:12px}
+.liste-item.actif{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-doux)}
+
+/* --------------------------------------------------------------- modale */
+.modale{
+  position:fixed;inset:0;z-index:60;background:rgba(23,37,31,.45);
+  display:flex;align-items:flex-end;justify-content:center;padding:0;
+}
+.modale[hidden]{display:none}
+.modale-in{
+  background:var(--papier);width:100%;max-width:660px;max-height:92vh;overflow:auto;
+  border-radius:14px 14px 0 0;padding:16px 15px calc(20px + env(safe-area-inset-bottom,0px));
+}
+.modale-tete{display:flex;align-items:center;gap:10px;margin-bottom:13px}
+.modale-tete h2{margin:0;font-size:17px;flex:1}
+.x{font-size:23px;line-height:1;padding:2px 9px;color:var(--gris);border-radius:6px}
+.x:hover{background:var(--carte2)}
+@media(min-width:700px){
+  .modale{align-items:center;padding:20px}
+  .modale-in{border-radius:14px}
+}
+
+/* ------------------------------------------------------------- toast */
+#toast{
+  position:fixed;left:50%;transform:translateX(-50%);bottom:78px;z-index:80;
+  background:var(--encre);color:#EAEFE6;padding:9px 15px;border-radius:99px;
+  font-size:13.5px;box-shadow:0 4px 18px rgba(0,0,0,.28);max-width:88vw;text-align:center;
+}
+#toast[hidden]{display:none}
+
+/* --------------------------------------------------------- bureau ---- */
+@media(min-width:900px){
+  main{padding:18px 20px 30px}
+  .onglets{
+    position:sticky;top:59px;bottom:auto;border-top:none;border-bottom:1px solid var(--trait);
+    box-shadow:none;background:var(--papier);max-width:1240px;margin:0 auto;padding:0;
+  }
+  .onglets button{flex:none;padding:11px 18px;font-size:13px;border-top:none;border-bottom:2.5px solid transparent}
+  .onglets button .ic{display:none}
+  .onglets button[aria-selected=true]{border-bottom-color:var(--accent)}
+  #vue-saisie .saisie-grille{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
+}
+
+/* -------------------------------------------------------- impression -- */
+@media print{
+  body{background:#fff;font-size:10.5px}
+  .bandeau,.onglets,#toast,.no-print,.modale{display:none !important}
+  main{padding:0;max-width:none}
+  .vue{display:none !important}
+  .vue.impression{display:block !important}
+  .carte{border:none;box-shadow:none;padding:0;margin:0 0 14px;background:none}
+  table{font-size:9.5px}
+  th{background:#e8e8e8 !important;color:#000 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  th,td{border:1px solid #999;padding:2px 4px}
+  tbody tr:nth-child(even){background:none}
+  tbody tr.tot,tbody tr.tot-gen{background:#efefef !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .tab-boite{overflow:visible}
+  .saut{page-break-before:always}
+  .imp-tete{margin-bottom:8px}
+  .imp-tete h1{font-size:15px;margin:0 0 3px}
+  .imp-tete dl{display:grid;grid-template-columns:auto 1fr auto 1fr;gap:1px 8px;margin:0;font-size:10px}
+  .imp-tete dt{font-weight:700}
+  .imp-tete dd{margin:0}
+}
+@media(prefers-reduced-motion:reduce){*{transition:none !important;animation:none !important}}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ========================================================= bandeau -->
+  <header class="bandeau no-print">
+    <div class="bandeau-in">
+      <span class="pastille" id="b-pastille"></span>
+      <div class="bandeau-id">
+        <div class="bandeau-t" id="b-titre">Aucun bordereau</div>
+        <div class="bandeau-s" id="b-sous">Créez ou ouvrez un bordereau pour commencer</div>
+      </div>
+      <div class="bandeau-tot"><b class="num" id="b-total">—</b><span>m³ marchand</span></div>
+      <button class="bandeau-btn" id="b-entete" title="Modifier l'en-tête du bordereau">En-tête</button>
+    </div>
+  </header>
+
+  <!-- ========================================================== onglets -->
+  <nav class="onglets no-print" role="tablist" aria-label="Sections">
+    <button role="tab" data-vue="saisie"    aria-selected="true"><span class="ic">✎</span>Saisie</button>
+    <button role="tab" data-vue="bordereau" aria-selected="false"><span class="ic">▤</span>Bordereau</button>
+    <button role="tab" data-vue="syntheses" aria-selected="false"><span class="ic">∑</span>Synthèses</button>
+    <button role="tab" data-vue="fichiers"  aria-selected="false"><span class="ic">▣</span>Bordereaux</button>
+    <button role="tab" data-vue="reglages"  aria-selected="false"><span class="ic">⚙</span>Réglages</button>
+  </nav>
+
+  <main>
+    <!-- ======================================================== saisie -->
+    <section class="vue actif" id="vue-saisie" role="tabpanel">
+      <div class="saisie-grille">
+        <div>
+          <div class="carte">
+            <div class="ruban" id="ruban"></div>
+
+            <div class="champ">
+              <label class="eyebrow" for="f-num">N° de plaquette</label>
+              <input type="text" id="f-num" class="gros" inputmode="decimal" autocomplete="off">
+            </div>
+
+            <div class="champ">
+              <span class="eyebrow lab">Essence</span>
+              <div class="chips" id="f-ess"></div>
+            </div>
+
+            <div class="champ">
+              <span class="eyebrow lab">Qualité</span>
+              <div class="chips" id="f-qual"></div>
+            </div>
+
+            <div class="grille g2">
+              <div class="champ">
+                <label class="eyebrow" for="f-lon">Longueur (m)</label>
+                <div class="pas">
+                  <button type="button" data-pas="f-lon:-0.5" aria-label="Diminuer la longueur">−</button>
+                  <input type="text" id="f-lon" class="gros" inputmode="decimal" autocomplete="off">
+                  <button type="button" data-pas="f-lon:0.5" aria-label="Augmenter la longueur">+</button>
+                </div>
+              </div>
+              <div class="champ">
+                <label class="eyebrow" for="f-dia">Ø médian (cm)</label>
+                <div class="pas">
+                  <button type="button" data-pas="f-dia:-1" aria-label="Diminuer le diamètre">−</button>
+                  <input type="text" id="f-dia" class="gros" inputmode="decimal" autocomplete="off">
+                  <button type="button" data-pas="f-dia:1" aria-label="Augmenter le diamètre">+</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="champ">
+              <div class="chips">
+                <button type="button" class="chip" id="f-bp" aria-pressed="false">Bille de pied</button>
+                <input type="text" id="f-d130" inputmode="decimal" placeholder="Ø à 1,30 m" autocomplete="off"
+                       style="width:130px;flex:none" aria-label="Diamètre à 1,30 m">
+              </div>
+            </div>
+
+            <details class="repli" id="f-plus">
+              <summary>Réfaction, parcelle, remarque</summary>
+              <div>
+                <div class="grille g2">
+                  <div class="champ">
+                    <label class="eyebrow" for="f-refl">Réfaction (m)</label>
+                    <input type="text" id="f-refl" inputmode="decimal" autocomplete="off">
+                  </div>
+                  <div class="champ">
+                    <label class="eyebrow" for="f-refn">Nature du défaut</label>
+                    <input type="text" id="f-refn" autocomplete="off" placeholder="D+D, P, …">
+                  </div>
+                </div>
+                <div class="grille g2">
+                  <div class="champ">
+                    <label class="eyebrow" for="f-parc">Parcelle</label>
+                    <input type="text" id="f-parc" autocomplete="off">
+                  </div>
+                  <div class="champ">
+                    <label class="eyebrow" for="f-obs">Date / remarque</label>
+                    <input type="text" id="f-obs" autocomplete="off">
+                  </div>
+                </div>
+              </div>
+            </details>
+          </div>
+        </div>
+
+        <div>
+          <div class="carte" id="apercu-carte">
+            <h2>Volume du billon</h2>
+            <div class="stat-rang">
+              <div class="stat"><span class="eyebrow">Bûcheron sur</span><b class="num" id="a-vsur">—</b></div>
+              <div class="stat"><span class="eyebrow">Bûcheron sous</span><b class="num" id="a-vsous">—</b></div>
+              <div class="stat"><span class="eyebrow">Marchand sous</span><b class="num" id="a-vmarch">—</b></div>
+              <div class="stat"><span class="eyebrow">Classe Ø</span><b class="num" id="a-cl">—</b></div>
+            </div>
+            <div id="a-avis" style="margin-top:11px"></div>
+            <div class="btn-rang" style="margin-top:13px">
+              <button class="btn primaire" id="f-billon">Billon suivant</button>
+              <button class="btn primaire" id="f-grume">Grume suivante</button>
+            </div>
+            <div class="btn-rang" style="margin-top:9px">
+              <button class="btn" id="f-valider">Enregistrer</button>
+              <button class="btn" id="f-annuler" hidden>Annuler la modification</button>
+              <button class="btn danger" id="f-defaire">Défaire le dernier</button>
+            </div>
+          </div>
+
+          <div class="carte">
+            <div class="carte-titre"><h2>Dernières saisies</h2>
+              <button class="btn-min" data-aller="bordereau">Tout voir</button></div>
+            <div class="tab-boite"><table id="t-dernieres"><tbody></tbody></table></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================== bordereau -->
+    <section class="vue" id="vue-bordereau" role="tabpanel">
+      <div class="carte no-print">
+        <div class="carte-titre">
+          <h2>Billons saisis</h2>
+          <button class="btn-min" id="b-nuls">Contrôler les billons nuls</button>
+          <button class="btn-min" id="b-imprimer">Imprimer</button>
+        </div>
+        <div class="stat-rang" id="b-stats"></div>
+        <div class="champ" style="margin:11px 0 0">
+          <input type="search" id="b-filtre" placeholder="Filtrer : n°, essence, qualité, parcelle, remarque…">
+        </div>
+      </div>
+      <div class="carte" style="padding:0;overflow:hidden">
+        <div class="tab-boite" style="max-height:66vh"><table id="t-bordereau"></table></div>
+      </div>
+    </section>
+
+    <!-- ===================================================== synthèses -->
+    <section class="vue" id="vue-syntheses" role="tabpanel">
+      <div class="sous-onglets no-print" id="s-onglets" role="tablist">
+        <button role="tab" data-s="synthese"   aria-selected="true">Synthèse</button>
+        <button role="tab" data-s="financiere" aria-selected="false">Financière</button>
+        <button role="tab" data-s="bucheron"   aria-selected="false">Bûcheron</button>
+        <button role="tab" data-s="martelage"  aria-selected="false">Martelage</button>
+      </div>
+      <div id="s-contenu"></div>
+    </section>
+
+    <!-- ====================================================== fichiers -->
+    <section class="vue" id="vue-fichiers" role="tabpanel">
+      <div class="carte">
+        <div class="carte-titre"><h2>Mes bordereaux</h2>
+          <button class="btn primaire btn-min" id="n-nouveau">Nouveau bordereau</button></div>
+        <div id="liste-bordereaux"></div>
+      </div>
+      <div class="carte">
+        <h2>Échanger des fichiers</h2>
+        <div class="btn-rang">
+          <button class="btn" id="e-xlsx">Exporter en Excel</button>
+          <button class="btn" id="e-csv">Exporter en CSV</button>
+          <button class="btn" id="e-json">Sauvegarde (.json)</button>
+        </div>
+        <div class="btn-rang" style="margin-top:9px">
+          <button class="btn" id="i-json">Restaurer une sauvegarde</button>
+          <button class="btn" id="i-coller">Coller depuis Excel</button>
+        </div>
+        <p class="muted" style="font-size:12.5px;margin:11px 0 0">
+          L'export Excel reprend les cinq feuilles de Bord-Cub : Volumes, Synthèse,
+          Synthèse Financière, Bûcheron, Martelage.
+        </p>
+      </div>
+    </section>
+
+    <!-- ====================================================== réglages -->
+    <section class="vue" id="vue-reglages" role="tabpanel">
+      <div class="carte">
+        <h2>Mode de calcul</h2>
+        <div class="chips" id="r-mode">
+          <button class="chip" data-mode="historique" aria-pressed="true">Identique à Bord-Cub</button>
+          <button class="chip" data-mode="corrige" aria-pressed="false">Corrigé</button>
+        </div>
+        <p class="muted" style="font-size:12.5px;margin:10px 0 0" id="r-mode-txt"></p>
+      </div>
+      <div class="carte">
+        <h2>Seuils des billons de valeur nulle</h2>
+        <div class="grille g3">
+          <div class="champ"><label class="eyebrow" for="r-slon">Longueur mini (m)</label>
+            <input type="text" id="r-slon" inputmode="decimal"></div>
+          <div class="champ"><label class="eyebrow" for="r-ssap">Ø mini sapin (cm)</label>
+            <input type="text" id="r-ssap" inputmode="decimal"></div>
+          <div class="champ"><label class="eyebrow" for="r-sepc">Ø mini épicéa (cm)</label>
+            <input type="text" id="r-sepc" inputmode="decimal"></div>
+        </div>
+        <p class="muted" style="font-size:12.5px;margin:0" id="r-seuils-txt"></p>
+      </div>
+      <div class="carte">
+        <div class="carte-titre"><h2>Essences et taux d'écorce</h2>
+          <button class="btn-min" id="r-ess-add">Ajouter</button></div>
+        <div class="tab-boite" style="max-height:340px"><table id="t-essences"></table></div>
+      </div>
+      <div class="carte">
+        <div class="carte-titre"><h2>Qualités</h2></div>
+        <div class="sous-onglets" id="r-cl-onglets" role="tablist"></div>
+        <div class="tab-boite" style="max-height:340px"><table id="t-qualites"></table></div>
+        <button class="btn-min" id="r-qual-add" style="margin-top:9px">Ajouter une qualité</button>
+      </div>
+      <div class="carte" id="c-appli">
+        <h2>Application</h2>
+        <p class="muted" style="font-size:12.5px;margin:0 0 10px" id="r-appli-etat"></p>
+        <div class="btn-rang">
+          <button class="btn primaire" id="r-installer" hidden>Installer sur l'écran d'accueil</button>
+          <button class="btn" id="r-persist" hidden>Protéger les données</button>
+          <button class="btn" id="r-maj">Vérifier les mises à jour</button>
+        </div>
+        <p class="muted" style="font-size:12px;margin:10px 0 0" id="r-version"></p>
+      </div>
+      <div class="carte">
+        <h2>Remise à zéro</h2>
+        <div class="btn-rang">
+          <button class="btn danger" id="r-reset-cfg">Rétablir les listes d'origine</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================== impression --- -->
+    <section class="vue" id="vue-impression" aria-hidden="true"></section>
+  </main>
+</div>
+
+<!-- ============================================================ modale -->
+<div class="modale" id="modale" hidden>
+  <div class="modale-in" role="dialog" aria-modal="true" aria-labelledby="modale-titre">
+    <div class="modale-tete">
+      <h2 id="modale-titre"></h2>
+      <button class="x" id="modale-x" aria-label="Fermer">×</button>
+    </div>
+    <div id="modale-corps"></div>
+  </div>
+</div>
+<div id="toast" hidden role="status"></div>
+
+<script>
+/* ==========================================================================
+   BordCub — moteur de calcul
+   Portage fidèle de Bord-Cub V3-2 (Bord_prg_v3.xls, modules M_Cubage,
+   M_Synthèse, M_Synthèse_Bûcheron, M_Synthèse_Financière,
+   M_Synthèse_Martelage). Aucune dépendance au DOM : testable seul.
+   ========================================================================== */
+
+var PI_BC = 3.141593; // valeur littérale utilisée par le VBA d'origine
+
+/* -------------------------------------------------- utilitaires numériques */
+
+// Équivalent de MyVal() : tolère la virgule décimale, les espaces insécables,
+// et s'arrête au premier caractère non numérique (comme Val()).
+function toNum(v) {
+  if (v === null || v === undefined || v === true || v === false) return 0;
+  if (typeof v === 'number') return isFinite(v) ? v : 0;
+  var s = String(v).replace(/[\s\u00A0]/g, '').replace(/,/g, '.');
+  var m = s.match(/^[+-]?(\d+(\.\d*)?|\.\d+)/);
+  if (!m) return 0;
+  var n = parseFloat(m[0]);
+  return isFinite(n) ? n : 0;
+}
+
+// Application.WorksheetFunction.Round : arrondi au plus proche, 0,5 s'éloigne
+// de zéro (différent de Math.round pour les négatifs).
+function round2(x) {
+  if (!isFinite(x)) return 0;
+  var s = x < 0 ? -1 : 1;
+  return s * Math.floor(Math.abs(x) * 100 + 0.5) / 100;
+}
+function roundN(x, n) {
+  if (!isFinite(x)) return 0;
+  var p = Math.pow(10, n), s = x < 0 ? -1 : 1;
+  return s * Math.floor(Math.abs(x) * p + 0.5) / p;
+}
+
+// Affichage FR : virgule décimale, nombre de décimales fixe.
+function fmt(x, n) {
+  if (n === undefined) n = 2;
+  if (x === null || x === undefined || x === '' || !isFinite(x)) return '';
+  return roundN(x, n).toFixed(n).replace('.', ',');
+}
+function fmt0(x) { return fmt(x, 0); }
+
+/* ------------------------------------------------------ données de base */
+
+var ESSENCES_DEF = [
+  ['EPC', 'EPICEA COMMUN', 0.08], ['S.P', 'SAPIN PECTINE', 0.12],
+  ['S.V', 'A.GRANDIS', 0.12], ['ALB', 'ALI.BLANC', 0],
+  ['ALT', 'ALI.TORMINAL', 0], ['ALI', 'ALISIERS', 0],
+  ['AUL', 'AULNES DIVERS', 0], ['A.F', 'AUT.FEUILLUS', 0],
+  ['A.R', 'AUT.RESINEUX', 0], ['EPI', 'AUTRES EPICEA', 0.08],
+  ['BOU', 'BOULEAUX DIVERS', 0], ['CED', 'CEDRE', 0],
+  ['CHA', 'CHARME', 0], ['CHT', 'CHATAIGNIER', 0],
+  ['CHE', 'CHENE', 0], ['DOU', 'DOUGLAS', 0.13],
+  ['ERC', 'ER.CHAMPETRE', 0], ['ERO', 'ER.OBIER', 0],
+  ['ERP', 'ER.PLANE', 0], ['ERS', 'ER.SYCOMORE', 0],
+  ['FRE', 'FRENE', 0], ['FRU', 'FRUITIERS DIV.', 0],
+  ['HET', 'HETRE', 0], ['MEL', 'MELEZE', 0.18],
+  ['MER', 'MERISIER', 0], ['S.N', 'NORDMANN', 0.12],
+  ['NOY', 'NOYER', 0], ['ORM', 'ORME', 0],
+  ['PEU', 'PEUPLIER', 0], ['P.N', 'PIN NOIR', 0.20],
+  ['P.S', 'PIN SYLVESTRE', 0.14], ['P.W', 'PIN WEYMOUTH', 0.20],
+  ['PPP', 'POIRIER-POMMIER', 0], ['ROB', 'ROBINIER', 0],
+  ['SAU', 'SAULE', 0], ['SOR', 'SORBIER', 0],
+  ['TIL', 'TILLEUL', 0], ['TRE', 'TREMBLE', 0]
+].map(function (e) { return { code: e[0], nom: e[1], tx: e[2] }; });
+
+var CLASSEMENTS = ['Class. Comt', 'Class. Qualitatif', 'Class. Chablis', 'Sans Class.'];
+
+var QUALITES_DEF = {
+  'Class. Comt': [
+    ['V', 'Vert'], ['V1', 'Vert (autre prix)'], ['VS', 'Vert-Sec'],
+    ['R', 'Rouge'], ['S', 'Sec'], ['S1', 'Sec2'], ['DG', 'Dorgeux'],
+    ['F', 'Foudroyé'], ['Y', 'Scolyté "vert"'], ['G', 'Guité'],
+    ['FF', 'Fentes fortes'], ['U1', 'Roulé 1x'], ['U2', 'Roulé 2x'],
+    ['U3', 'Roulé 3x'], ['GL', 'Gélivé'], ['CB', 'Courbure'],
+    ['Z', 'Nul - hors dimension'], ['Z1', 'Nul']
+  ],
+  'Class. Qualitatif': [
+    ['A', 'Actba'], ['B', 'Bctba'], ['C', 'Cctba'], ['D', 'Dctba'],
+    ['S', 'Sec'], ['F', 'Foudroyé'],
+    ['Z', 'Nul - hors dimension'], ['Z1', 'Nul']
+  ],
+  'Class. Chablis': [
+    ['V', 'Vert'], ['V1', 'Vert (autre prix)'], ['VS', 'Vert-Sec'],
+    ['R', 'Rouge'], ['S', 'Sec'], ['S1', 'Sec2'], ['F', 'Foudroyé'],
+    ['Y', 'Scolyté "vert"'],
+    ['Z', 'Nul - hors dimension'], ['Z1', 'Nul']
+  ],
+  'Sans Class.': [
+    ['NC', 'Non classé'],
+    ['Z', 'Nul - hors dimension'], ['Z1', 'Nul']
+  ]
+};
+Object.keys(QUALITES_DEF).forEach(function (k) {
+  QUALITES_DEF[k] = QUALITES_DEF[k].map(function (q) { return { code: q[0], nom: q[1] }; });
+});
+
+var CLASSES_DIAM = ['Cl 1', 'Cl 2a', 'Cl 2b', 'Cl 3a', 'Cl 3b', 'Cl 4', 'Cl 5', 'Cl 6', 'Cl 7 et +'];
+// Classes de diamètre à 1,30 m de la fiche de martelage (feuille Martelage, ligne 8)
+var CLASSES_MART = [15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80,
+  85, 90, 95, 100, 105, 110, 115, 120, 125, 130];
+
+function configDefaut() {
+  return {
+    essences: ESSENCES_DEF.map(function (e) { return { code: e.code, nom: e.nom, tx: e.tx }; }),
+    qualites: JSON.parse(JSON.stringify(QUALITES_DEF)),
+    seuilDiamSAP: 18,
+    seuilDiamEPC: 18,
+    seuilLongueur: 4,
+    mode: 'historique',      // 'historique' | 'corrige'
+    favoris: ['EPC', 'S.P', 'DOU', 'HET', 'CHE', 'FRE']
+  };
+}
+
+function txEcorce(code, cfg) {
+  var e = (cfg.essences || []).filter(function (x) { return x.code === code; })[0];
+  return e ? (toNum(e.tx) || 0) : 0;
+}
+function nomEssence(code, cfg) {
+  var e = (cfg.essences || []).filter(function (x) { return x.code === code; })[0];
+  return e ? e.nom : code;
+}
+function nomQualite(code, classement, cfg) {
+  var l = (cfg.qualites || {})[classement] || [];
+  var q = l.filter(function (x) { return x.code === code; })[0];
+  return q ? q.nom : code;
+}
+
+/* ---------------------------------------------------------------- cubage */
+
+// Classe de diamètre médian sous écorce.
+// dRef = diamètre servant à la coupure a/b :
+//   mode 'historique'  -> diamètre saisi (reproduit Bord-Cub)
+//   mode 'corrige'     -> diamètre sous écorce (cohérent avec l'intitulé)
+function classeDiam(dSous, dRef) {
+  var c = Math.floor(dSous / 10);
+  if (c < 1) c = 1;                       // corrige : Cl 0 laissait la cellule vide
+  if (c > 6) return 'Cl 7 et +';
+  if (c === 2) return dRef < 26 ? 'Cl 2a' : 'Cl 2b';
+  if (c === 3) return dRef < 36 ? 'Cl 3a' : 'Cl 3b';
+  return 'Cl ' + c;
+}
+
+// Cube un billon. meta.mesures vaut 'sur' ou 'sous'.
+function cuber(l, meta, cfg) {
+  var tx = txEcorce(l.ess, cfg);
+  var L = toNum(l.lon), D = toNum(l.dia);
+  var ref = Math.abs(toNum(l.refl));
+  if (ref > L) ref = L;                   // corrige : évitait un volume négatif
+  var base = PI_BC * Math.pow(D / 200, 2);
+  var sous = meta.mesures === 'sous';
+  var k = 1 - tx;
+  var vsur = sous ? (k ? base * L / k : 0) : base * L;
+  var vsous = sous ? base * L : base * L * k;
+  var vmarch = sous ? base * (L - ref) : base * (L - ref) * k;
+  var dSous = sous ? D : D * Math.sqrt(k);
+  var dRef = (cfg.mode === 'corrige') ? dSous : D;
+  return {
+    vsur: round2(vsur), vsous: round2(vsous), vmarch: round2(vmarch),
+    dSous: dSous,
+    clDiam: D > 0 ? classeDiam(dSous, dRef) : '',
+    clMini: D > 0 ? 'Cl ' + Math.floor(D / 10) : ''
+  };
+}
+
+// Cube tout le bordereau : renvoie les lignes enrichies (champ .c).
+function cuberTout(bord, cfg) {
+  return (bord.lignes || []).map(function (l) {
+    var o = Object.assign({}, l);
+    o.c = cuber(l, bord.meta, cfg);
+    return o;
+  });
+}
+
+/* ------------------------------------------- billons de valeur nulle (Z) */
+
+// Seuils effectifs. En mode historique on reproduit Bord-Cub, qui applique
+// toujours l'abattement d'écorce (le test lisait la cellule F2, vide, au lieu
+// de J1) et tronque le résultat à l'entier (variables déclarées As Integer).
+function seuilsNuls(bord, cfg) {
+  var sL = toNum(cfg.seuilLongueur), sSAP = toNum(cfg.seuilDiamSAP), sEPC = toNum(cfg.seuilDiamEPC);
+  var appliquer = (cfg.mode === 'corrige') ? (bord.meta.mesures === 'sous') : true;
+  if (appliquer) {
+    sSAP = Math.round(sSAP * (1 - txEcorce('S.P', cfg) / 2));
+    sEPC = Math.round(sEPC * (1 - txEcorce('EPC', cfg) / 2));
+  }
+  return { lon: sL, 'S.P': sSAP, 'EPC': sEPC };
+}
+
+// Repère les incohérences et les billons à passer en Z.
+function analyserNuls(bord, cfg) {
+  var s = seuilsNuls(bord, cfg);
+  var faussementZ = [], aPasserZ = [], dejaZ = 0;
+  (bord.lignes || []).forEach(function (l, i) {
+    var L = toNum(l.lon), D = toNum(l.dia), seuil = s[l.ess];
+    var nul = false;
+    if (L < s.lon) nul = true;
+    else if (seuil !== undefined) nul = (D <= seuil);
+    if (l.qual === 'Z' && !nul && seuil !== undefined) faussementZ.push(l.num);
+    if (nul) { if (l.qual === 'Z') dejaZ++; else aPasserZ.push({ i: i, num: l.num }); }
+  });
+  return { seuils: s, faussementZ: faussementZ, aPasserZ: aPasserZ, dejaZ: dejaZ };
+}
+
+/* ------------------------------------------------------------- synthèses */
+
+function nbGrumes(lignes) {
+  return lignes.filter(function (l) { return String(l.bp === true ? 'VRAI' : (l.bp == null ? '' : l.bp)).trim() !== ''; }).length;
+}
+
+// Nb de plaquettes : NB_PLAQ() = nb de lignes + nb de tirets dans les n°.
+function nbPlaquettes(lignes) {
+  return lignes.reduce(function (a, l) {
+    return a + 1 + (String(l.num == null ? '' : l.num).split('-').length - 1);
+  }, 0);
+}
+
+// Couples essence/qualité présents, triés (comme Call tri()).
+function couples(lignes) {
+  var vus = {}, out = [];
+  lignes.forEach(function (l) {
+    var k = (l.ess || '') + '\u0000' + (l.qual || '');
+    if (!vus[k]) { vus[k] = 1; out.push({ ess: l.ess || '', qual: l.qual || '' }); }
+  });
+  out.sort(function (a, b) {
+    return (a.ess + a.qual).localeCompare(b.ess + b.qual, 'fr');
+  });
+  return out;
+}
+function essencesPresentes(lignes) {
+  var vus = {}, out = [];
+  couples(lignes).forEach(function (c) { if (!vus[c.ess]) { vus[c.ess] = 1; out.push(c.ess); } });
+  return out;
+}
+
+// Feuille « Synthèse » : essence × qualité × classe de diamètre.
+function synthese(bord, cfg) {
+  var L = cuberTout(bord, cfg);
+  var lignes = [], totalGen = 0;
+  var essL = essencesPresentes(L);
+  var volEss = {}, grumesEss = {};
+  essL.forEach(function (e) {
+    var sub = L.filter(function (x) { return x.ess === e; });
+    volEss[e] = round2(sub.reduce(function (a, x) { return a + x.c.vmarch; }, 0));
+    grumesEss[e] = nbGrumes(sub);
+  });
+  couples(L).forEach(function (c, idx, arr) {
+    var sub = L.filter(function (x) { return x.ess === c.ess && x.qual === c.qual; });
+    var cells = CLASSES_DIAM.map(function (cl) {
+      var s = sub.filter(function (x) { return x.c.clDiam === cl; });
+      return { nb: s.length, vol: round2(s.reduce(function (a, x) { return a + x.c.vmarch; }, 0)) };
+    });
+    var volQual = round2(cells.reduce(function (a, x) { return a + x.vol; }, 0));
+    lignes.push({
+      type: 'detail', ess: c.ess, qual: c.qual, nbBillons: sub.length,
+      cells: cells, volQual: volQual,
+      pct: volEss[c.ess] ? volQual / volEss[c.ess] : 0
+    });
+    var suivant = arr[idx + 1];
+    if (!suivant || suivant.ess !== c.ess) {
+      var subE = L.filter(function (x) { return x.ess === c.ess; });
+      lignes.push({
+        type: 'total', ess: c.ess, nbGrumes: grumesEss[c.ess], nbBillons: subE.length,
+        volEss: volEss[c.ess], vam: grumesEss[c.ess] ? volEss[c.ess] / grumesEss[c.ess] : 0
+      });
+    }
+  });
+  totalGen = round2(L.reduce(function (a, x) { return a + x.c.vmarch; }, 0));
+  return {
+    lignes: lignes, totalGen: totalGen, nbGrumes: nbGrumes(L),
+    nbBillons: L.length, nbPlaq: nbPlaquettes(L)
+  };
+}
+
+// Feuille « Bûcheron » : volumes sur / sous / marchand par essence et qualité.
+function syntheseBucheron(bord, cfg) {
+  var L = cuberTout(bord, cfg), lignes = [];
+  couples(L).forEach(function (c, idx, arr) {
+    var sub = L.filter(function (x) { return x.ess === c.ess && x.qual === c.qual; });
+    lignes.push({
+      type: 'detail', ess: c.ess, qual: c.qual,
+      vsur: round2(sub.reduce(function (a, x) { return a + x.c.vsur; }, 0)),
+      vsous: round2(sub.reduce(function (a, x) { return a + x.c.vsous; }, 0)),
+      vmarch: round2(sub.reduce(function (a, x) { return a + x.c.vmarch; }, 0))
+    });
+    var suivant = arr[idx + 1];
+    if (!suivant || suivant.ess !== c.ess) {
+      var subE = L.filter(function (x) { return x.ess === c.ess; });
+      lignes.push({
+        type: 'total', ess: c.ess, nbGrumes: nbGrumes(subE),
+        vsur: round2(subE.reduce(function (a, x) { return a + x.c.vsur; }, 0)),
+        vsous: round2(subE.reduce(function (a, x) { return a + x.c.vsous; }, 0)),
+        vmarch: round2(subE.reduce(function (a, x) { return a + x.c.vmarch; }, 0))
+      });
+    }
+  });
+  return {
+    lignes: lignes, nbGrumes: nbGrumes(L),
+    vsur: round2(L.reduce(function (a, x) { return a + x.c.vsur; }, 0)),
+    vsous: round2(L.reduce(function (a, x) { return a + x.c.vsous; }, 0)),
+    vmarch: round2(L.reduce(function (a, x) { return a + x.c.vmarch; }, 0))
+  };
+}
+
+// Feuille « Martelage » : tiges par parcelle × essence × classe de D 1,30.
+// Bord-Cub exigeait un multiple exact de 5 et perdait silencieusement les
+// autres valeurs : on classe désormais à la classe de 5 cm la plus proche.
+function classeMartelage(d) {
+  if (!(d > 0)) return null;
+  var c = Math.round(d / 5) * 5;
+  if (c < CLASSES_MART[0]) c = CLASSES_MART[0];
+  if (c > CLASSES_MART[CLASSES_MART.length - 1]) c = CLASSES_MART[CLASSES_MART.length - 1];
+  return c;
+}
+function syntheseMartelage(bord, cfg) {
+  var L = cuberTout(bord, cfg);
+  var tiges = [];
+  L.forEach(function (l) {
+    if (typeof l.bp === 'number' || (l.bp !== true && l.bp !== '' && l.bp != null && isFinite(toNum(l.bp)) && toNum(l.bp) > 0)) {
+      var c = classeMartelage(toNum(l.bp));
+      if (c) tiges.push({ parc: String(l.parc || bord.meta.parcelles || '').trim(), ess: l.ess, cl: c });
+    }
+  });
+  var cles = [], vus = {};
+  tiges.forEach(function (t) {
+    var k = t.parc + '\u0000' + t.ess;
+    if (!vus[k]) { vus[k] = 1; cles.push({ parc: t.parc, ess: t.ess }); }
+  });
+  cles.sort(function (a, b) { return (a.parc + a.ess).localeCompare(b.parc + b.ess, 'fr'); });
+  var lignes = [];
+  cles.forEach(function (c, idx, arr) {
+    var sub = tiges.filter(function (t) { return t.parc === c.parc && t.ess === c.ess; });
+    var cells = CLASSES_MART.map(function (cl) { return sub.filter(function (t) { return t.cl === cl; }).length; });
+    lignes.push({ type: 'detail', parc: c.parc, ess: c.ess, cells: cells, total: sub.length });
+    var suivant = arr[idx + 1];
+    if (!suivant || suivant.parc !== c.parc) {
+      var subP = tiges.filter(function (t) { return t.parc === c.parc; });
+      lignes.push({
+        type: 'total', parc: c.parc,
+        cells: CLASSES_MART.map(function (cl) { return subP.filter(function (t) { return t.cl === cl; }).length; }),
+        total: subP.length
+      });
+    }
+  });
+  return {
+    lignes: lignes,
+    cells: CLASSES_MART.map(function (cl) { return tiges.filter(function (t) { return t.cl === cl; }).length; }),
+    total: tiges.length
+  };
+}
+
+// Feuille « Synthèse Financière ».
+// Le prix peut être saisi à trois niveaux ; Bord-Cub retient le MAX des trois
+// montants possibles (formule MAX(...) de la colonne N, ligne « Total »).
+function syntheseFinanciere(bord, cfg) {
+  var L = cuberTout(bord, cfg);
+  var prix = bord.prix || {};
+  var lignes = [], essL = essencesPresentes(L), totaux = {}, montantGen = 0;
+  couples(L).forEach(function (c, idx, arr) {
+    var sub = L.filter(function (x) { return x.ess === c.ess && x.qual === c.qual; });
+    var cells = CLASSES_DIAM.map(function (cl) {
+      return round2(sub.filter(function (x) { return x.c.clDiam === cl; })
+        .reduce(function (a, x) { return a + x.c.vmarch; }, 0));
+    });
+    lignes.push({
+      type: 'detail', ess: c.ess, qual: c.qual, nbBillons: sub.length,
+      cells: cells, volQual: round2(cells.reduce(function (a, x) { return a + x; }, 0))
+    });
+    var suivant = arr[idx + 1];
+    if (!suivant || suivant.ess !== c.ess) {
+      var subE = L.filter(function (x) { return x.ess === c.ess; });
+      var volE = round2(subE.reduce(function (a, x) { return a + x.c.vmarch; }, 0));
+      var nbG = nbGrumes(subE);
+      // trois montants candidats
+      var mGrille = 0, mQual = 0;
+      lignes.filter(function (r) { return r.type === 'detail' && r.ess === c.ess; }).forEach(function (r) {
+        var p = prix[r.ess + '|' + r.qual] || {};
+        CLASSES_DIAM.forEach(function (cl, k) { mGrille += toNum((p.cl || {})[cl]) * r.cells[k]; });
+        mQual += toNum(p.qual) * r.volQual;
+      });
+      var mEss = toNum((prix[c.ess + '|*'] || {}).ess) * volE;
+      var montant = Math.max(mGrille, mQual, mEss);
+      totaux[c.ess] = { volEss: volE, montant: montant };
+      montantGen += montant;
+      lignes.push({
+        type: 'total', ess: c.ess, nbGrumes: nbG, nbBillons: subE.length,
+        volEss: volE, vam: nbG ? volE / nbG : 0,
+        montant: montant, pu: volE ? montant / volE : 0,
+        niveau: montant === 0 ? '' : (montant === mGrille ? 'grille' : (montant === mQual ? 'qualité' : 'essence'))
+      });
+    }
+  });
+  var volGen = round2(L.reduce(function (a, x) { return a + x.c.vmarch; }, 0));
+  return {
+    lignes: lignes, essences: essL, totaux: totaux,
+    volGen: volGen, montantGen: montantGen,
+    puGen: volGen ? montantGen / volGen : 0,
+    nbGrumes: nbGrumes(L), nbPlaq: nbPlaquettes(L)
+  };
+}
+
+/* ------------------------------------------------- numérotation plaquettes */
+
+// « A-125 » -> {prefixe:'A-', n:125, m:0}
+function parseNum(v) {
+  var s = String(v == null ? '' : v).trim();
+  var i = s.lastIndexOf('-');
+  var prefixe = i >= 0 ? s.slice(0, i + 1) : '';
+  var reste = i >= 0 ? s.slice(i + 1) : s;
+  var m = reste.replace(',', '.').match(/^(\d+)(?:\.(\d+))?/);
+  if (!m) return { prefixe: prefixe, n: null, m: 0, brut: s };
+  return { prefixe: prefixe, n: parseInt(m[1], 10), m: m[2] ? parseInt(m[2], 10) : 0, brut: s };
+}
+function formatNum(p) {
+  if (p.n === null) return p.brut;
+  return p.prefixe + p.n + (p.m ? '.' + p.m : '');
+}
+// Numéro suivant. qualitatif : une plaquette par grume, billons en décimales.
+function numSuivant(v, qualitatif, memeGrume) {
+  var p = parseNum(v);
+  if (p.n === null) return '';
+  if (!qualitatif) return formatNum({ prefixe: p.prefixe, n: p.n + 1, m: 0 });
+  if (memeGrume) return formatNum({ prefixe: p.prefixe, n: p.n, m: (p.m || 1) + 1 });
+  return formatNum({ prefixe: p.prefixe, n: p.n + 1, m: 1 });
+}
+
+/* ------------------------------------------------------------ exports */
+var BC_API = {
+    toNum: toNum, round2: round2, roundN: roundN, fmt: fmt,
+    ESSENCES_DEF: ESSENCES_DEF, QUALITES_DEF: QUALITES_DEF, CLASSEMENTS: CLASSEMENTS,
+    CLASSES_DIAM: CLASSES_DIAM, CLASSES_MART: CLASSES_MART,
+    configDefaut: configDefaut, txEcorce: txEcorce, nomEssence: nomEssence, nomQualite: nomQualite,
+    classeDiam: classeDiam, cuber: cuber, cuberTout: cuberTout,
+    seuilsNuls: seuilsNuls, analyserNuls: analyserNuls,
+    nbGrumes: nbGrumes, nbPlaquettes: nbPlaquettes, couples: couples,
+    synthese: synthese, syntheseBucheron: syntheseBucheron,
+    syntheseMartelage: syntheseMartelage, syntheseFinanciere: syntheseFinanciere,
+  parseNum: parseNum, formatNum: formatNum, numSuivant: numSuivant
+};
+if (typeof module !== 'undefined' && module.exports) module.exports = BC_API;
+if (typeof window !== 'undefined') window.BC = BC_API;
+
+</script>
+<script>
+/* ==========================================================================
+   Écriture de classeurs .xlsx sans aucune bibliothèque externe.
+   Un .xlsx est une archive ZIP : on écrit les entrées en « stored » (sans
+   compression), ce qui évite d'embarquer un compresseur. Le fichier reste
+   parfaitement lisible par Excel et LibreOffice.
+   ========================================================================== */
+
+var _crcTable = null;
+function crcTable() {
+  if (_crcTable) return _crcTable;
+  var t = new Uint32Array(256);
+  for (var n = 0; n < 256; n++) {
+    var c = n;
+    for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c >>> 0;
+  }
+  _crcTable = t;
+  return t;
+}
+function crc32(buf) {
+  var t = crcTable(), crc = 0xFFFFFFFF;
+  for (var i = 0; i < buf.length; i++) crc = (crc >>> 8) ^ t[(crc ^ buf[i]) & 0xFF];
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+function utf8(s) { return new TextEncoder().encode(s); }
+
+function zipStore(files) {
+  var enc = files.map(function (f) {
+    var name = utf8(f.name), data = (f.data instanceof Uint8Array) ? f.data : utf8(f.data);
+    return { name: name, data: data, crc: crc32(data) };
+  });
+  var size = 0;
+  enc.forEach(function (f) { size += 30 + f.name.length + f.data.length + 46 + f.name.length; });
+  size += 22;
+  var out = new Uint8Array(size), dv = new DataView(out.buffer), p = 0;
+  function u32(v) { dv.setUint32(p, v, true); p += 4; }
+  function u16(v) { dv.setUint16(p, v, true); p += 2; }
+  function raw(b) { out.set(b, p); p += b.length; }
+
+  enc.forEach(function (f) {
+    f.offset = p;
+    u32(0x04034b50); u16(20); u16(0x0800); u16(0);   // sig, version, flags(UTF-8), stored
+    u16(0); u16(33);                                  // heure, date DOS = 1980-01-01
+    u32(f.crc); u32(f.data.length); u32(f.data.length);
+    u16(f.name.length); u16(0);
+    raw(f.name); raw(f.data);
+  });
+  var cdStart = p;
+  enc.forEach(function (f) {
+    u32(0x02014b50); u16(20); u16(20); u16(0x0800); u16(0);
+    u16(0); u16(33);
+    u32(f.crc); u32(f.data.length); u32(f.data.length);
+    u16(f.name.length); u16(0); u16(0);
+    u16(0); u16(0); u32(0); u32(f.offset);
+    raw(f.name);
+  });
+  var cdSize = p - cdStart;
+  u32(0x06054b50); u16(0); u16(0); u16(enc.length); u16(enc.length);
+  u32(cdSize); u32(cdStart); u16(0);
+  return out;
+}
+
+/* ------------------------------------------------------------------- XML */
+
+function xesc(s) {
+  return String(s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[c];
+  }).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+}
+function colName(n) {                     // 1 -> A, 27 -> AA
+  var s = '';
+  while (n > 0) { var m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = (n - m - 1) / 26; }
+  return s;
+}
+
+/* Styles. L'ordre des remplissages est imposé par Excel : 0 = none, 1 = gray125. */
+var STYLES_XML =
+  '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+  '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+  '<numFmts count="3">' +
+  '<numFmt numFmtId="164" formatCode="0.00"/>' +
+  '<numFmt numFmtId="165" formatCode="0.0%"/>' +
+  '<numFmt numFmtId="166" formatCode="#,##0.00\\ &quot;€&quot;"/>' +
+  '</numFmts>' +
+  '<fonts count="5">' +
+  '<font><sz val="10"/><name val="Arial"/></font>' +
+  '<font><b/><sz val="10"/><name val="Arial"/></font>' +
+  '<font><b/><sz val="14"/><name val="Arial"/></font>' +
+  '<font><sz val="9"/><color rgb="FF555555"/><name val="Arial"/></font>' +
+  '<font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Arial"/></font>' +
+  '</fonts>' +
+  '<fills count="5">' +
+  '<fill><patternFill patternType="none"/></fill>' +
+  '<fill><patternFill patternType="gray125"/></fill>' +
+  '<fill><patternFill patternType="solid"><fgColor rgb="FFDDE5DA"/><bgColor indexed="64"/></patternFill></fill>' +
+  '<fill><patternFill patternType="solid"><fgColor rgb="FFEFEDE3"/><bgColor indexed="64"/></patternFill></fill>' +
+  '<fill><patternFill patternType="solid"><fgColor rgb="FF2E4A3C"/><bgColor indexed="64"/></patternFill></fill>' +
+  '</fills>' +
+  '<borders count="2">' +
+  '<border><left/><right/><top/><bottom/><diagonal/></border>' +
+  '<border><left style="thin"><color rgb="FFAAAAAA"/></left><right style="thin"><color rgb="FFAAAAAA"/></right>' +
+  '<top style="thin"><color rgb="FFAAAAAA"/></top><bottom style="thin"><color rgb="FFAAAAAA"/></bottom><diagonal/></border>' +
+  '</borders>' +
+  '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+  '<cellXfs count="13">' +
+  /* 0  normal            */ '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
+  /* 1  gras              */ '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>' +
+  /* 2  titre             */ '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>' +
+  /* 3  en-tête colonne   */ '<xf numFmtId="0" fontId="4" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' +
+  /* 4  texte bordé       */ '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/>' +
+  /* 5  nombre 0,00       */ '<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"/>' +
+  /* 6  entier            */ '<xf numFmtId="1" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"/>' +
+  /* 7  total texte       */ '<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>' +
+  /* 8  total 0,00        */ '<xf numFmtId="164" fontId="1" fillId="2" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1"/>' +
+  /* 9  total entier      */ '<xf numFmtId="1" fontId="1" fillId="2" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1"/>' +
+  /* 10 pourcentage       */ '<xf numFmtId="165" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"/>' +
+  /* 11 euros             */ '<xf numFmtId="166" fontId="1" fillId="2" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1"/>' +
+  /* 12 saisie (prix)     */ '<xf numFmtId="164" fontId="0" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyFill="1" applyBorder="1"/>' +
+  '</cellXfs>' +
+  '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
+  '</styleSheet>';
+
+// cell : null | string | number | {v, s, t:'n'|'s'}
+function cellXml(ref, cell) {
+  if (cell === null || cell === undefined || cell === '') return '';
+  var v = cell, s = 0, t = null;
+  if (typeof cell === 'object') { v = cell.v; s = cell.s || 0; t = cell.t || null; }
+  if (v === null || v === undefined || v === '') {
+    return s ? '<c r="' + ref + '" s="' + s + '"/>' : '';
+  }
+  var isNum = (t === 'n') || (t !== 's' && typeof v === 'number' && isFinite(v));
+  if (isNum) return '<c r="' + ref + '"' + (s ? ' s="' + s + '"' : '') + '><v>' + (+v) + '</v></c>';
+  return '<c r="' + ref + '"' + (s ? ' s="' + s + '"' : '') + ' t="inlineStr"><is><t xml:space="preserve">' +
+    xesc(v) + '</t></is></c>';
+}
+
+function sheetXml(sheet) {
+  var x = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">';
+  if (sheet.cols && sheet.cols.length) {
+    x += '<cols>';
+    sheet.cols.forEach(function (w, i) {
+      x += '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>';
+    });
+    x += '</cols>';
+  }
+  x += '<sheetData>';
+  (sheet.rows || []).forEach(function (row, ri) {
+    if (!row || !row.length) return;
+    var cells = '';
+    for (var ci = 0; ci < row.length; ci++) cells += cellXml(colName(ci + 1) + (ri + 1), row[ci]);
+    if (cells) x += '<row r="' + (ri + 1) + '">' + cells + '</row>';
+  });
+  x += '</sheetData>';
+  if (sheet.merges && sheet.merges.length) {
+    x += '<mergeCells count="' + sheet.merges.length + '">';
+    sheet.merges.forEach(function (m) { x += '<mergeCell ref="' + m + '"/>'; });
+    x += '</mergeCells>';
+  }
+  x += '<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/>';
+  if (sheet.paysage) x += '<pageSetup orientation="landscape" paperSize="9" fitToWidth="1" fitToHeight="0"/>';
+  x += '</worksheet>';
+  return x;
+}
+
+function xlsxBuild(sheets) {
+  var files = [];
+  var ct = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+    '<Default Extension="xml" ContentType="application/xml"/>' +
+    '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+    '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>';
+  sheets.forEach(function (s, i) {
+    ct += '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>';
+  });
+  ct += '</Types>';
+  files.push({ name: '[Content_Types].xml', data: ct });
+
+  files.push({
+    name: '_rels/.rels', data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>' +
+      '</Relationships>'
+  });
+
+  var wb = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ' +
+    'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>';
+  sheets.forEach(function (s, i) {
+    wb += '<sheet name="' + xesc(s.name) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>';
+  });
+  wb += '</sheets></workbook>';
+  files.push({ name: 'xl/workbook.xml', data: wb });
+
+  var rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">';
+  sheets.forEach(function (s, i) {
+    rels += '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>';
+  });
+  rels += '<Relationship Id="rId' + (sheets.length + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>';
+  rels += '</Relationships>';
+  files.push({ name: 'xl/_rels/workbook.xml.rels', data: rels });
+  files.push({ name: 'xl/styles.xml', data: STYLES_XML });
+  sheets.forEach(function (s, i) {
+    files.push({ name: 'xl/worksheets/sheet' + (i + 1) + '.xml', data: sheetXml(s) });
+  });
+  return zipStore(files);
+}
+
+var BCX_API = { xlsxBuild: xlsxBuild, zipStore: zipStore, crc32: crc32, colName: colName };
+if (typeof module !== 'undefined' && module.exports) module.exports = BCX_API;
+if (typeof window !== 'undefined') window.BCX = BCX_API;
+
+</script>
+<script>
+/* ==========================================================================
+   Construction du classeur d'export : reprend les cinq feuilles de Bord-Cub
+   (Volumes, Synthèse, Synthèse Financière, Bûcheron, Martelage) avec la même
+   disposition, pour que les fichiers restent lisibles par les destinataires
+   habitués à l'ancien logiciel.
+   ========================================================================== */
+
+var S_NORM = 0, S_GRAS = 1, S_TITRE = 2, S_TETE = 3, S_TXT = 4, S_NUM = 5,
+  S_INT = 6, S_TOTTXT = 7, S_TOTNUM = 8, S_TOTINT = 9, S_PCT = 10, S_EUR = 11, S_SAISIE = 12;
+
+function _enteteFeuille(m, colDroite) {
+  var r = [[], [], [], []];
+  var g = [['Article :', m.article], ['Client :', m.client], ['Forêt :', m.foret], ['Parcelle (s) :', m.parcelles]];
+  var d = [['Mesures :', m.mesures === 'sous' ? 'sous' : 'sur'], ['Plaquettes :', m.plaqCouleur],
+  ['Type bordereau :', m.classement], ['ETF :', m.etf]];
+  for (var i = 0; i < 4; i++) {
+    r[i][1] = { v: g[i][0], s: S_GRAS };
+    r[i][2] = g[i][1] || '';
+    r[i][colDroite - 1] = { v: d[i][0], s: S_GRAS };
+    r[i][colDroite] = d[i][1] || '';
+  }
+  return r;
+}
+
+function feuilleVolumes(bord, cfg, E) {
+  var m = bord.meta;
+  var rows = _enteteFeuille(m, 9);
+  rows[4] = ['N°', 'BP ou D1,30', 'Ess.', 'Qual', 'Long.', 'Diam', 'Parcelle', 'Date / Obs',
+    'Réfact°', 'Défaut', 'VolBûch\nSur', 'VolBûch\nSous', 'VolMarch\nSous', 'ClasseDiam\nSous', 'ClasseMINI']
+    .map(function (t) { return { v: t, s: S_TETE }; });
+  E.cuberTout(bord, cfg).forEach(function (l) {
+    rows.push([
+      { v: l.num, s: S_TXT },
+      { v: (l.bp === true ? 'VRAI' : (l.bp === '' || l.bp == null ? '' : E.toNum(l.bp))), s: S_TXT },
+      { v: l.ess, s: S_TXT }, { v: l.qual, s: S_TXT },
+      { v: E.toNum(l.lon), s: S_NUM }, { v: E.toNum(l.dia), s: S_NUM },
+      { v: l.parc || '', s: S_TXT }, { v: l.obs || '', s: S_TXT },
+      { v: l.refl === '' || l.refl == null ? '' : E.toNum(l.refl), s: S_NUM },
+      { v: l.refn || '', s: S_TXT },
+      { v: l.c.vsur, s: S_NUM }, { v: l.c.vsous, s: S_NUM }, { v: l.c.vmarch, s: S_NUM },
+      { v: l.c.clDiam, s: S_TXT }, { v: l.c.clMini, s: S_TXT }
+    ]);
+  });
+  return {
+    name: 'Volumes', paysage: true,
+    cols: [11, 11, 7, 7, 8, 8, 12, 16, 9, 9, 10, 10, 10, 12, 11],
+    rows: rows
+  };
+}
+
+function feuilleSynthese(bord, cfg, E) {
+  var S = E.synthese(bord, cfg);
+  var rows = _enteteFeuille(bord.meta, 9);
+  rows[5] = [{ v: 'Tous les volumes ci-dessous sont des volumes marchands sous écorce', s: S_GRAS }];
+  var h1 = ['Essence', 'Nb Grumes', 'Nb Billons cubés', 'Qualités'];
+  var r7 = h1.map(function (t) { return { v: t, s: S_TETE }; });
+  var r8 = [{ v: '', s: S_TETE }, { v: '', s: S_TETE }, { v: '', s: S_TETE }, { v: '', s: S_TETE }];
+  E.CLASSES_DIAM.forEach(function (cl, i) {
+    r7.push({ v: i === 0 ? 'Nombre de billons et volume par catégorie de diamètre médian sous écorce' : '', s: S_TETE });
+    r7.push({ v: '', s: S_TETE });
+    r8.push({ v: cl, s: S_TETE }); r8.push({ v: 'm³', s: S_TETE });
+  });
+  r7.push({ v: 'Volume par qualité', s: S_TETE }); r7.push({ v: '%', s: S_TETE });
+  r7.push({ v: 'Volume par essence', s: S_TETE }); r7.push({ v: 'VAM par essence', s: S_TETE });
+  r8.push({ v: '', s: S_TETE }, { v: '', s: S_TETE }, { v: '', s: S_TETE }, { v: '', s: S_TETE });
+  rows[6] = r7; rows[7] = r8;
+
+  S.lignes.forEach(function (l) {
+    var r = [];
+    if (l.type === 'detail') {
+      r[0] = { v: l.ess, s: S_TXT }; r[1] = { v: '', s: S_TXT };
+      r[2] = { v: l.nbBillons, s: S_INT }; r[3] = { v: l.qual, s: S_TXT };
+      l.cells.forEach(function (c, i) {
+        r[4 + i * 2] = { v: c.nb, s: S_INT };
+        r[5 + i * 2] = { v: c.vol, s: S_NUM };
+      });
+      r[22] = { v: l.volQual, s: S_NUM }; r[23] = { v: l.pct, s: S_PCT };
+    } else {
+      for (var i = 0; i < 26; i++) r[i] = { v: '', s: S_TOTTXT };
+      r[0] = { v: 'Total ' + l.ess, s: S_TOTTXT };
+      r[1] = { v: l.nbGrumes, s: S_TOTINT }; r[2] = { v: l.nbBillons, s: S_TOTINT };
+      r[24] = { v: l.volEss, s: S_TOTNUM }; r[25] = { v: E.roundN(l.vam, 2), s: S_TOTNUM };
+    }
+    rows.push(r);
+  });
+  var t = [];
+  for (var i = 0; i < 26; i++) t[i] = { v: '', s: S_TOTTXT };
+  t[0] = { v: 'Total Général', s: S_TOTTXT };
+  t[1] = { v: S.nbGrumes, s: S_TOTINT };
+  t[24] = { v: S.totalGen, s: S_TOTNUM };
+  rows.push(t);
+  rows.push([{ v: 'Nb plaquettes dans le bordereau :', s: S_GRAS }, '', '', { v: S.nbPlaq, s: S_GRAS }]);
+
+  var cols = [13, 10, 10, 8];
+  E.CLASSES_DIAM.forEach(function () { cols.push(6, 8); });
+  cols.push(11, 7, 11, 11);
+  return { name: 'Synthèse', paysage: true, cols: cols, rows: rows, merges: ['E7:V7'] };
+}
+
+function feuilleFinanciere(bord, cfg, E) {
+  var F = E.syntheseFinanciere(bord, cfg);
+  var rows = _enteteFeuille(bord.meta, 9);
+  rows[5] = [{ v: 'Tous les volumes ci-dessous sont des volumes marchands sous écorce', s: S_GRAS }];
+  var r7 = ['Essence', 'Nb Grumes', 'Nb Billons cubés', 'Qualités'].map(function (t) { return { v: t, s: S_TETE }; });
+  var r8 = [{ v: '', s: S_TETE }, { v: '', s: S_TETE }, { v: '', s: S_TETE }, { v: '', s: S_TETE }];
+  E.CLASSES_DIAM.forEach(function (cl, i) {
+    r7.push({ v: i === 0 ? 'Volume par catégorie de diamètre médian sous écorce' : '', s: S_TETE });
+    r8.push({ v: cl, s: S_TETE });
+  });
+  r7.push({ v: 'Volume par qualité', s: S_TETE }, { v: 'Volume par essence', s: S_TETE }, { v: 'VAM par essence', s: S_TETE });
+  r8.push({ v: '', s: S_TETE }, { v: '', s: S_TETE }, { v: '', s: S_TETE });
+  rows[6] = r7; rows[7] = r8;
+  F.lignes.forEach(function (l) {
+    var r = [];
+    if (l.type === 'detail') {
+      r[0] = { v: l.ess, s: S_TXT }; r[1] = { v: '', s: S_TXT };
+      r[2] = { v: l.nbBillons, s: S_INT }; r[3] = { v: l.qual, s: S_TXT };
+      l.cells.forEach(function (v, i) { r[4 + i] = { v: v, s: S_NUM }; });
+      r[13] = { v: l.volQual, s: S_NUM };
+    } else {
+      for (var i = 0; i < 16; i++) r[i] = { v: '', s: S_TOTTXT };
+      r[0] = { v: 'Total ' + l.ess, s: S_TOTTXT };
+      r[1] = { v: l.nbGrumes, s: S_TOTINT }; r[2] = { v: l.nbBillons, s: S_TOTINT };
+      r[14] = { v: l.volEss, s: S_TOTNUM }; r[15] = { v: E.roundN(l.vam, 2), s: S_TOTNUM };
+    }
+    rows.push(r);
+  });
+  var t = [];
+  for (var i = 0; i < 16; i++) t[i] = { v: '', s: S_TOTTXT };
+  t[0] = { v: 'Total Général', s: S_TOTTXT };
+  t[1] = { v: F.nbGrumes, s: S_TOTINT }; t[14] = { v: F.volGen, s: S_TOTNUM };
+  rows.push(t);
+  rows.push([{ v: 'Nb plaquettes dans le bordereau :', s: S_GRAS }, '', '', { v: F.nbPlaq, s: S_GRAS }]);
+
+  // Bloc prix, à partir de la ligne 100 comme dans l'original
+  rows[99] = [{ v: 'Tous les prix ci-dessous sont des prix sous écorce', s: S_GRAS }];
+  var p101 = [{ v: 'Essence', s: S_TETE }, { v: 'Qualités', s: S_TETE }];
+  var p102 = [{ v: '', s: S_TETE }, { v: '', s: S_TETE }];
+  E.CLASSES_DIAM.forEach(function (cl, i) {
+    p101.push({ v: i === 0 ? 'Prix unitaires par catégorie de diamètre médian sous écorce' : '', s: S_TETE });
+    p102.push({ v: cl, s: S_TETE });
+  });
+  p101.push({ v: 'PU par qualité', s: S_TETE }, { v: 'PU par essence', s: S_TETE },
+    { v: 'Montant', s: S_TETE }, { v: 'PU calculé', s: S_TETE });
+  p102.push({ v: '', s: S_TETE }, { v: '', s: S_TETE }, { v: '', s: S_TETE }, { v: '', s: S_TETE });
+  rows[100] = p101; rows[101] = p102;
+  var li = 102;
+  var prix = bord.prix || {};
+  F.lignes.forEach(function (l) {
+    var r = [];
+    if (l.type === 'detail') {
+      var p = prix[l.ess + '|' + l.qual] || {};
+      r[0] = { v: l.ess, s: S_TXT }; r[1] = { v: l.qual, s: S_TXT };
+      E.CLASSES_DIAM.forEach(function (cl, i) {
+        var v = E.toNum((p.cl || {})[cl]);
+        r[2 + i] = { v: v || '', s: S_SAISIE };
+      });
+      r[11] = { v: E.toNum(p.qual) || '', s: S_SAISIE };
+      r[12] = { v: '', s: S_SAISIE };
+    } else {
+      var pe = prix[l.ess + '|*'] || {};
+      for (var i = 0; i < 15; i++) r[i] = { v: '', s: S_TOTTXT };
+      r[0] = { v: 'Total ' + l.ess, s: S_TOTTXT };
+      r[12] = { v: E.toNum(pe.ess) || '', s: S_SAISIE };
+      r[13] = { v: E.roundN(l.montant, 2), s: S_EUR };
+      r[14] = { v: E.roundN(l.pu, 2), s: S_TOTNUM };
+    }
+    rows[li++] = r;
+  });
+  var tg = [];
+  for (var i = 0; i < 15; i++) tg[i] = { v: '', s: S_TOTTXT };
+  tg[0] = { v: 'Total Général', s: S_TOTTXT };
+  tg[13] = { v: E.roundN(F.montantGen, 2), s: S_EUR };
+  tg[14] = { v: E.roundN(F.puGen, 2), s: S_TOTNUM };
+  rows[li] = tg;
+
+  var cols = [13, 10, 10, 9];
+  E.CLASSES_DIAM.forEach(function () { cols.push(9); });
+  cols.push(11, 11, 11);
+  return { name: 'Synthèse Financière', paysage: true, cols: cols, rows: rows, merges: ['E7:M7', 'C101:K101'] };
+}
+
+function feuilleBucheron(bord, cfg, E) {
+  var B = E.syntheseBucheron(bord, cfg);
+  var rows = _enteteFeuille(bord.meta, 9);
+  rows[6] = ['Essence', 'Nb Tiges', 'Qualité', 'VolBûchSur', 'VolBûchSous', 'VolMarchSous']
+    .map(function (t) { return { v: t, s: S_TETE }; });
+  rows[7] = [];
+  B.lignes.forEach(function (l) {
+    if (l.type === 'detail') {
+      rows.push([{ v: l.ess, s: S_TXT }, { v: '', s: S_TXT }, { v: l.qual, s: S_TXT },
+      { v: l.vsur, s: S_NUM }, { v: l.vsous, s: S_NUM }, { v: l.vmarch, s: S_NUM }]);
+    } else {
+      rows.push([{ v: 'Total ' + l.ess, s: S_TOTTXT }, { v: l.nbGrumes, s: S_TOTINT }, { v: '', s: S_TOTTXT },
+      { v: l.vsur, s: S_TOTNUM }, { v: l.vsous, s: S_TOTNUM }, { v: l.vmarch, s: S_TOTNUM }]);
+    }
+  });
+  rows.push([{ v: 'Total Général', s: S_TOTTXT }, { v: B.nbGrumes, s: S_TOTINT }, { v: '', s: S_TOTTXT },
+  { v: B.vsur, s: S_TOTNUM }, { v: B.vsous, s: S_TOTNUM }, { v: B.vmarch, s: S_TOTNUM }]);
+  return { name: 'Bûcheron', cols: [14, 10, 9, 12, 12, 13], rows: rows };
+}
+
+function feuilleMartelage(bord, cfg, E) {
+  var M = E.syntheseMartelage(bord, cfg);
+  var rows = _enteteFeuille(bord.meta, 14);
+  var r7 = [{ v: 'Parc', s: S_TETE }, { v: 'Ess', s: S_TETE }];
+  var r8 = [{ v: '', s: S_TETE }, { v: '', s: S_TETE }];
+  E.CLASSES_MART.forEach(function (c, i) { r7.push({ v: i === 0 ? 'Diamètres à 1,30 m' : '', s: S_TETE }); r8.push({ v: c, s: S_TETE }); });
+  r7.push({ v: 'Total', s: S_TETE }); r8.push({ v: '', s: S_TETE });
+  rows[6] = r7; rows[7] = r8;
+  M.lignes.forEach(function (l) {
+    var r = [];
+    if (l.type === 'detail') {
+      r[0] = { v: l.parc, s: S_TXT }; r[1] = { v: l.ess, s: S_TXT };
+      l.cells.forEach(function (v, i) { r[2 + i] = { v: v, s: S_INT }; });
+      r[26] = { v: l.total, s: S_INT };
+    } else {
+      r[0] = { v: 'Total ' + l.parc, s: S_TOTTXT }; r[1] = { v: '', s: S_TOTTXT };
+      l.cells.forEach(function (v, i) { r[2 + i] = { v: v, s: S_TOTINT }; });
+      r[26] = { v: l.total, s: S_TOTINT };
+    }
+    rows.push(r);
+  });
+  var t = [{ v: 'Total Général', s: S_TOTTXT }, { v: '', s: S_TOTTXT }];
+  M.cells.forEach(function (v) { t.push({ v: v, s: S_TOTINT }); });
+  t.push({ v: M.total, s: S_TOTINT });
+  rows.push(t);
+  var cols = [14, 7];
+  E.CLASSES_MART.forEach(function () { cols.push(5); });
+  cols.push(8);
+  return { name: 'Martelage', paysage: true, cols: cols, rows: rows, merges: ['C7:Z7'] };
+}
+
+function construireClasseur(bord, cfg, E) {
+  return [
+    feuilleVolumes(bord, cfg, E),
+    feuilleSynthese(bord, cfg, E),
+    feuilleFinanciere(bord, cfg, E),
+    feuilleBucheron(bord, cfg, E),
+    feuilleMartelage(bord, cfg, E)
+  ];
+}
+
+var BCW_API = { construireClasseur: construireClasseur };
+if (typeof module !== 'undefined' && module.exports) module.exports = BCW_API;
+if (typeof window !== 'undefined') window.BCW = BCW_API;
+
+</script>
+<script>
+/* ==========================================================================
+   BordCub — interface
+   ========================================================================== */
+(function () {
+'use strict';
+
+var $ = function (s, r) { return (r || document).querySelector(s); };
+var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+var E = window.BC;   // moteur
+
+/* ------------------------------------------------------------ stockage */
+var Store = (function () {
+  var mem = {}, mode = 'memoire';
+  if (typeof window.storage === 'object' && window.storage && typeof window.storage.get === 'function') mode = 'hote';
+  else { try { localStorage.setItem('__bc', '1'); localStorage.removeItem('__bc'); mode = 'local'; } catch (e) { } }
+  return {
+    mode: mode,
+    get: function (k) {
+      if (mode === 'hote') return window.storage.get(k).then(function (r) { return r ? r.value : null; }, function () { return null; });
+      if (mode === 'local') { try { return Promise.resolve(localStorage.getItem(k)); } catch (e) { return Promise.resolve(null); } }
+      return Promise.resolve(mem[k] === undefined ? null : mem[k]);
+    },
+    set: function (k, v) {
+      if (mode === 'hote') return window.storage.set(k, v).catch(function () { });
+      if (mode === 'local') { try { localStorage.setItem(k, v); } catch (e) { toast('Mémoire pleine : exportez vos bordereaux.'); } return Promise.resolve(); }
+      mem[k] = v; return Promise.resolve();
+    },
+    del: function (k) {
+      if (mode === 'hote') return window.storage.delete(k).catch(function () { });
+      if (mode === 'local') { try { localStorage.removeItem(k); } catch (e) { } return Promise.resolve(); }
+      delete mem[k]; return Promise.resolve();
+    }
+  };
+})();
+function lire(k, def) { return Store.get(k).then(function (v) { try { return v ? JSON.parse(v) : def; } catch (e) { return def; } }); }
+function ecrire(k, o) { return Store.set(k, JSON.stringify(o)); }
+
+/* ---------------------------------------------------------------- état */
+var A = {
+  cfg: null, index: [], bord: null,
+  vue: 'saisie', sousVue: 'synthese', edition: null,
+  memeGrume: false, classementRegl: 'Class. Comt', filtre: ''
+};
+var COULEURS = {
+  'bleu': '#1F5FA9', 'rouge': '#B4231F', 'jaune': '#B98A00', 'vert': '#2E7D46',
+  'orange': '#C4611B', 'rose': '#B0407A', 'blanc': '#4A5560', 'noir': '#39433A'
+};
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function toast(m) {
+  var t = $('#toast'); t.textContent = m; t.hidden = false;
+  clearTimeout(toast._t); toast._t = setTimeout(function () { t.hidden = true; }, 2600);
+}
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+  });
+}
+var sauveT = null;
+function sauver() {
+  if (!A.bord) return;
+  clearTimeout(sauveT);
+  sauveT = setTimeout(function () {
+    A.bord.maj = Date.now();
+    ecrire('bordcub.b.' + A.bord.id, A.bord);
+    var S = E.synthese(A.bord, A.cfg);
+    var e = A.index.filter(function (x) { return x.id === A.bord.id; })[0];
+    if (e) {
+      e.meta = A.bord.meta; e.maj = A.bord.maj;
+      e.nb = A.bord.lignes.length; e.vol = S.totalGen;
+      ecrire('bordcub.index', A.index);
+    }
+  }, 350);
+}
+function sauverCfg() { ecrire('bordcub.cfg', A.cfg); }
+
+/* ------------------------------------------------------------- couleur */
+function appliquerCouleur() {
+  var c = A.bord ? String(A.bord.meta.plaqCouleur || '').toLowerCase().trim() : '';
+  var k = Object.keys(COULEURS).filter(function (x) { return c.indexOf(x) === 0 || x.indexOf(c) === 0 && c; })[0];
+  var col = COULEURS[k] || '#2E4A3C';
+  document.documentElement.style.setProperty('--accent', col);
+  document.documentElement.style.setProperty('--accent-doux', col + '1F');
+  document.documentElement.style.setProperty('--accent-texte', (k === 'jaune' || k === 'blanc') ? '#fff' : '#fff');
+}
+
+/* ------------------------------------------------------------- bandeau */
+function majBandeau() {
+  if (!A.bord) {
+    $('#b-titre').textContent = 'Aucun bordereau';
+    $('#b-sous').textContent = 'Créez ou ouvrez un bordereau pour commencer';
+    $('#b-total').textContent = '—';
+    return;
+  }
+  var m = A.bord.meta, S = E.synthese(A.bord, A.cfg);
+  $('#b-titre').textContent = (m.article ? 'Art. ' + m.article + ' · ' : '') + (m.foret || 'Sans forêt');
+  $('#b-sous').textContent = [m.client, (m.mesures === 'sous' ? 'sous écorce' : 'sur écorce'),
+  A.bord.lignes.length + ' billon' + (A.bord.lignes.length > 1 ? 's' : '')].filter(Boolean).join(' · ');
+  $('#b-total').textContent = E.fmt(S.totalGen, 2);
+}
+
+/* ============================================================== SAISIE */
+var F = {};
+function champs() {
+  F = {
+    num: $('#f-num'), lon: $('#f-lon'), dia: $('#f-dia'), d130: $('#f-d130'),
+    refl: $('#f-refl'), refn: $('#f-refn'), parc: $('#f-parc'), obs: $('#f-obs')
+  };
+}
+var selEss = '', selQual = '', selBp = true, essAffichees = [];
+
+function essencesAffichees() {
+  var codes = (A.cfg.favoris || []).slice();
+  (A.bord ? A.bord.lignes : []).forEach(function (l) { if (l.ess && codes.indexOf(l.ess) < 0) codes.push(l.ess); });
+  essAffichees.forEach(function (c) { if (codes.indexOf(c) < 0) codes.push(c); });
+  if (selEss && codes.indexOf(selEss) < 0) codes.push(selEss);
+  return codes.filter(function (c) { return A.cfg.essences.some(function (e) { return e.code === c; }); });
+}
+function renderChipsEss() {
+  var h = essencesAffichees().map(function (c) {
+    return '<button type="button" class="chip" data-ess="' + esc(c) + '" aria-pressed="' + (selEss === c) + '">' +
+      esc(c) + '</button>';
+  }).join('');
+  h += '<button type="button" class="chip plus" id="ess-autres">+ autre essence</button>';
+  $('#f-ess').innerHTML = h;
+}
+function renderChipsQual() {
+  var cl = (A.bord && A.bord.meta.classement) || 'Class. Comt';
+  var l = A.cfg.qualites[cl] || [];
+  $('#f-qual').innerHTML = l.map(function (q) {
+    return '<button type="button" class="chip' + (q.code === 'Z' || q.code === 'Z1' ? ' nul' : '') +
+      '" data-qual="' + esc(q.code) + '" aria-pressed="' + (selQual === q.code) + '" title="' + esc(q.nom) + '">' +
+      esc(q.code) + '<small>' + esc(q.nom) + '</small></button>';
+  }).join('');
+}
+function ligneFormulaire() {
+  return {
+    num: F.num.value.trim(),
+    bp: (selBp || F.d130.value.trim()) ? (F.d130.value.trim() ? E.toNum(F.d130.value) : true) : '',
+    ess: selEss, qual: selQual,
+    lon: F.lon.value.trim(), dia: F.dia.value.trim(),
+    parc: F.parc.value.trim(), obs: F.obs.value.trim(),
+    refl: F.refl.value.trim(), refn: F.refn.value.trim()
+  };
+}
+function apercu() {
+  if (!A.bord) return;
+  var l = ligneFormulaire();
+  var pret = l.ess && E.toNum(l.lon) > 0 && E.toNum(l.dia) > 0;
+  var c = pret ? E.cuber(l, A.bord.meta, A.cfg) : null;
+  $('#a-vsur').textContent = c ? E.fmt(c.vsur) : '—';
+  $('#a-vsous').textContent = c ? E.fmt(c.vsous) : '—';
+  $('#a-vmarch').textContent = c ? E.fmt(c.vmarch) : '—';
+  $('#a-cl').textContent = c ? c.clDiam : '—';
+
+  var av = '';
+  if (pret) {
+    var s = E.seuilsNuls(A.bord, A.cfg), seuil = s[l.ess];
+    var nul = E.toNum(l.lon) < s.lon || (seuil !== undefined && E.toNum(l.dia) <= seuil);
+    if (nul && l.qual !== 'Z') {
+      av = '<div class="avis rouge">Ce billon est hors dimension (longueur &lt; ' + E.fmt(s.lon, 1) +
+        ' m ou Ø ≤ ' + E.fmt(seuil, 0) + ' cm) : il devrait être en qualité <b>Z</b>.</div>';
+    } else if (!nul && l.qual === 'Z' && seuil !== undefined) {
+      av = '<div class="avis rouge">Qualité <b>Z</b> alors que les dimensions dépassent les seuils ' +
+        '(longueur ≥ ' + E.fmt(s.lon, 1) + ' m et Ø &gt; ' + E.fmt(seuil, 0) + ' cm).</div>';
+    }
+    if (E.toNum(l.refl) > E.toNum(l.lon)) {
+      av += '<div class="avis rouge">La réfaction dépasse la longueur du billon.</div>';
+    }
+  }
+  $('#a-avis').innerHTML = av;
+}
+function renderRuban() {
+  if (!A.bord) { $('#ruban').innerHTML = ''; return; }
+  var L = A.bord.lignes.slice(-5);
+  var h = L.map(function (l) {
+    return '<div class="plaq"><em>' + esc(l.ess) + ' ' + esc(l.qual) + '</em>' + esc(l.num) + '</div>';
+  }).join('');
+  h += '<div class="plaq suiv"><em>à poser</em>' + esc(F.num.value || '—') + '</div>';
+  $('#ruban').innerHTML = h;
+  var r = $('#ruban'); r.scrollLeft = r.scrollWidth;
+}
+function renderDernieres() {
+  if (!A.bord) return;
+  var L = E.cuberTout(A.bord, A.cfg).slice(-6).reverse();
+  $('#t-dernieres tbody').innerHTML = L.length ? L.map(function (l) {
+    return '<tr><td class="g num">' + esc(l.num) + '</td><td class="g">' + esc(l.ess) + '</td>' +
+      '<td class="g">' + esc(l.qual) + '</td><td class="num">' + E.fmt(E.toNum(l.lon), 1) + ' m</td>' +
+      '<td class="num">' + E.fmt(E.toNum(l.dia), 0) + '</td><td class="num"><b>' + E.fmt(l.c.vmarch) + '</b></td></tr>';
+  }).join('') : '<tr><td class="g muted" colspan="6">Aucun billon saisi.</td></tr>';
+}
+function prochainNumero(memeGrume) {
+  var qualitatif = A.bord.meta.classement === 'Class. Qualitatif';
+  var L = A.bord.lignes;
+  if (!L.length) return qualitatif ? '1.1' : '1';
+  return E.numSuivant(L[L.length - 1].num, qualitatif, !!memeGrume);
+}
+function viderFormulaire(memeGrume) {
+  A.edition = null; A.memeGrume = !!memeGrume;
+  F.num.value = prochainNumero(memeGrume);
+  F.lon.value = ''; F.dia.value = ''; F.d130.value = '';
+  F.refl.value = ''; F.refn.value = ''; F.obs.value = '';
+  if (!F.parc.value) F.parc.value = A.bord.meta.parcelles || '';
+  selQual = '';
+  selBp = !memeGrume;
+  $('#f-bp').setAttribute('aria-pressed', String(selBp));
+  $('#f-bp').disabled = !!memeGrume;
+  $('#f-annuler').hidden = true;
+  $('#f-valider').textContent = 'Enregistrer';
+  renderChipsEss(); renderChipsQual(); apercu(); renderRuban();
+  F.lon.focus();
+}
+function chargerLigne(i) {
+  var l = A.bord.lignes[i];
+  A.edition = i; A.memeGrume = false;
+  F.num.value = l.num || '';
+  selEss = l.ess || ''; selQual = l.qual || '';
+  F.lon.value = l.lon === '' || l.lon == null ? '' : String(l.lon).replace('.', ',');
+  F.dia.value = l.dia === '' || l.dia == null ? '' : String(l.dia).replace('.', ',');
+  selBp = l.bp !== '' && l.bp != null;
+  F.d130.value = (typeof l.bp === 'number') ? String(l.bp).replace('.', ',') : '';
+  F.refl.value = l.refl === '' || l.refl == null ? '' : String(l.refl).replace('.', ',');
+  F.refn.value = l.refn || ''; F.parc.value = l.parc || ''; F.obs.value = l.obs || '';
+  $('#f-bp').setAttribute('aria-pressed', String(selBp));
+  $('#f-bp').disabled = false;
+  if (F.refl.value || F.refn.value || F.obs.value) $('#f-plus').open = true;
+  $('#f-annuler').hidden = false;
+  $('#f-valider').textContent = 'Enregistrer les modifications';
+  renderChipsEss(); renderChipsQual(); apercu(); renderRuban();
+  aller('saisie'); F.lon.focus();
+}
+function valider(l) {
+  var pb = [];
+  if (!l.num) pb.push(['f-num', 'le n° de plaquette']);
+  if (!l.ess) pb.push([null, "l'essence"]);
+  if (!l.qual) pb.push([null, 'la qualité']);
+  if (!(E.toNum(l.lon) > 0)) pb.push(['f-lon', 'la longueur']);
+  if (!(E.toNum(l.dia) > 0)) pb.push(['f-dia', 'le diamètre']);
+  $$('.gros').forEach(function (i) { i.classList.remove('err'); });
+  pb.forEach(function (p) { if (p[0]) $('#' + p[0]).classList.add('err'); });
+  if (pb.length) { toast('Il manque ' + pb.map(function (p) { return p[1]; }).join(', ') + '.'); return false; }
+  return true;
+}
+function enregistrer(suite) {   // suite : 'billon' | 'grume' | null
+  if (!A.bord) { toast('Créez d’abord un bordereau.'); return; }
+  var l = ligneFormulaire();
+  if (!valider(l)) return;
+  if (A.edition !== null) {
+    A.bord.lignes[A.edition] = l;
+    toast('Billon ' + l.num + ' modifié.');
+  } else {
+    A.bord.lignes.push(l);
+  }
+  sauver(); majBandeau(); renderDernieres();
+  if (suite) viderFormulaire(suite === 'billon');
+  else viderFormulaire(false);
+  if (A.vue === 'bordereau') renderBordereau();
+}
+
+/* =========================================================== BORDEREAU */
+var COLS = [
+  ['num', 'N°', 'g'], ['bp', 'BP / Ø1,30', 'num'], ['ess', 'Ess.', 'g'], ['qual', 'Qual', 'g'],
+  ['lon', 'Long.', 'num'], ['dia', 'Ø méd.', 'num'], ['parc', 'Parcelle', 'g'], ['obs', 'Date / obs', 'g'],
+  ['refl', 'Réfact°', 'num'], ['refn', 'Défaut', 'g'],
+  ['vsur', 'VolBûch sur', 'num'], ['vsous', 'VolBûch sous', 'num'], ['vmarch', 'VolMarch sous', 'num'],
+  ['cld', 'Classe Ø sous', 'g'], ['clm', 'Classe mini', 'g']
+];
+function renderBordereau() {
+  if (!A.bord) { $('#t-bordereau').innerHTML = ''; $('#b-stats').innerHTML = ''; return; }
+  var L = E.cuberTout(A.bord, A.cfg);
+  var S = E.synthese(A.bord, A.cfg), B = E.syntheseBucheron(A.bord, A.cfg);
+  $('#b-stats').innerHTML =
+    stat('Billons', S.nbBillons, 0) + stat('Grumes', S.nbGrumes, 0) + stat('Plaquettes', S.nbPlaq, 0) +
+    stat('Vol. bûcheron sur', B.vsur) + stat('Vol. bûcheron sous', B.vsous) + stat('Vol. marchand', S.totalGen);
+
+  var f = A.filtre.toLowerCase();
+  var vis = L.map(function (l, i) { return { l: l, i: i }; }).filter(function (o) {
+    if (!f) return true;
+    return [o.l.num, o.l.ess, o.l.qual, o.l.parc, o.l.obs, o.l.refn].join(' ').toLowerCase().indexOf(f) >= 0;
+  });
+  var h = '<thead><tr>' + COLS.map(function (c) {
+    return '<th class="' + (c[2] === 'g' ? 'g' : 'num') + '">' + esc(c[1]) + '</th>';
+  }).join('') + '<th></th></tr></thead><tbody>';
+  if (!vis.length) h += '<tr><td class="g muted" colspan="16">Aucun billon' + (f ? ' ne correspond au filtre.' : ' saisi.') + '</td></tr>';
+  vis.forEach(function (o) {
+    var l = o.l;
+    h += '<tr' + (l.qual === 'Z' || l.qual === 'Z1' ? ' class="nulle"' : '') + '>' +
+      td(l.num, 'g') + td(l.bp === true ? '✓' : (l.bp === '' || l.bp == null ? '' : E.fmt(E.toNum(l.bp), 0)), 'num') +
+      td(l.ess, 'g') + td(l.qual, 'g') +
+      td(E.fmt(E.toNum(l.lon), 2), 'num') + td(E.fmt(E.toNum(l.dia), 0), 'num') +
+      td(l.parc, 'g') + td(l.obs, 'g') +
+      td(l.refl === '' || l.refl == null ? '' : E.fmt(E.toNum(l.refl), 2), 'num') + td(l.refn, 'g') +
+      td(E.fmt(l.c.vsur), 'num') + td(E.fmt(l.c.vsous), 'num') + '<td class="num"><b>' + E.fmt(l.c.vmarch) + '</b></td>' +
+      td(l.c.clDiam, 'g') + td(l.c.clMini, 'g') +
+      '<td class="act no-print"><button class="btn-min" data-mod="' + o.i + '">Modifier</button> ' +
+      '<button class="btn-min" data-sup="' + o.i + '">Suppr.</button></td></tr>';
+  });
+  h += '</tbody>';
+  $('#t-bordereau').innerHTML = h;
+}
+function td(v, cl) { return '<td class="' + (cl === 'g' ? 'g' : 'num') + '">' + esc(v == null ? '' : v) + '</td>'; }
+function stat(lab, val, dec) {
+  return '<div class="stat"><span class="eyebrow">' + esc(lab) + '</span><b class="num">' +
+    E.fmt(val, dec === undefined ? 2 : dec) + '</b></div>';
+}
+
+/* =========================================================== SYNTHESES */
+function renderSyntheses() {
+  var c = $('#s-contenu');
+  if (!A.bord || !A.bord.lignes.length) {
+    c.innerHTML = '<div class="carte"><div class="vide"><p>Aucun billon saisi : les synthèses sont vides.</p></div></div>';
+    return;
+  }
+  c.innerHTML = ({
+    synthese: tblSynthese, financiere: tblFinanciere, bucheron: tblBucheron, martelage: tblMartelage
+  }[A.sousVue])();
+  if (A.sousVue === 'financiere') brancherPrix();
+}
+function enteteHTML() {
+  var m = A.bord.meta;
+  return '<div class="imp-tete"><h1>Bordereau de cubage — article ' + esc(m.article || '') + '</h1>' +
+    '<dl><dt>Client</dt><dd>' + esc(m.client) + '</dd><dt>Mesures</dt><dd>' + esc(m.mesures === 'sous' ? 'sous écorce' : 'sur écorce') + '</dd>' +
+    '<dt>Forêt</dt><dd>' + esc(m.foret) + '</dd><dt>Plaquettes</dt><dd>' + esc(m.plaqCouleur) + '</dd>' +
+    '<dt>Parcelle(s)</dt><dd>' + esc(m.parcelles) + '</dd><dt>Type</dt><dd>' + esc(m.classement) + '</dd>' +
+    '<dt>ETF</dt><dd>' + esc(m.etf) + '</dd><dt>Date</dt><dd>' + esc(m.date || '') + '</dd></dl></div>';
+}
+function tblSynthese() {
+  var S = E.synthese(A.bord, A.cfg);
+  var h = '<div class="carte"><h2>Synthèse — volumes marchands sous écorce</h2><div class="tab-boite"><table><thead>' +
+    '<tr><th class="g">Essence</th><th>Grumes</th><th>Billons</th><th class="g">Qual.</th>';
+  E.CLASSES_DIAM.forEach(function (cl) { h += '<th colspan="2">' + cl + '</th>'; });
+  h += '<th>Vol. qualité</th><th>%</th><th>Vol. essence</th><th>VAM</th></tr>' +
+    '<tr><th class="g"></th><th></th><th></th><th class="g"></th>';
+  E.CLASSES_DIAM.forEach(function () { h += '<th>nb</th><th>m³</th>'; });
+  h += '<th>m³</th><th></th><th>m³</th><th>m³</th></tr></thead><tbody>';
+  S.lignes.forEach(function (l) {
+    if (l.type === 'detail') {
+      h += '<tr>' + td(l.ess, 'g') + td('', 'num') + td(E.fmt(l.nbBillons, 0), 'num') + td(l.qual, 'g');
+      l.cells.forEach(function (c) {
+        h += td(c.nb || '', 'num') + td(c.vol ? E.fmt(c.vol) : '', 'num');
+      });
+      h += td(E.fmt(l.volQual), 'num') + td(E.fmt(l.pct * 100, 1) + ' %', 'num') + td('', 'num') + td('', 'num') + '</tr>';
+    } else {
+      h += '<tr class="tot">' + td('Total ' + l.ess, 'g') + td(E.fmt(l.nbGrumes, 0), 'num') + td(E.fmt(l.nbBillons, 0), 'num') +
+        td('', 'g') + Array(E.CLASSES_DIAM.length * 2 + 1).join('<td></td>') + '<td></td><td></td>' +
+        td(E.fmt(l.volEss), 'num') + td(E.fmt(l.vam), 'num') + '</tr>';
+    }
+  });
+  h += '<tr class="tot-gen">' + td('Total général', 'g') + td(E.fmt(S.nbGrumes, 0), 'num') + td(E.fmt(S.nbBillons, 0), 'num') +
+    td('', 'g') + Array(E.CLASSES_DIAM.length * 2 + 1).join('<td></td>') + '<td></td><td></td>' +
+    td(E.fmt(S.totalGen), 'num') + td(S.nbGrumes ? E.fmt(S.totalGen / S.nbGrumes) : '', 'num') + '</tr>';
+  h += '</tbody></table></div><p class="muted" style="font-size:12.5px;margin:9px 0 0">' +
+    'Nombre de plaquettes dans le bordereau : <b>' + E.fmt(S.nbPlaq, 0) + '</b></p></div>';
+  return h;
+}
+function tblBucheron() {
+  var B = E.syntheseBucheron(A.bord, A.cfg);
+  var h = '<div class="carte"><h2>Bûcheron</h2><div class="tab-boite"><table><thead><tr>' +
+    '<th class="g">Essence</th><th>Nb tiges</th><th class="g">Qualité</th>' +
+    '<th>VolBûch sur</th><th>VolBûch sous</th><th>VolMarch sous</th></tr></thead><tbody>';
+  B.lignes.forEach(function (l) {
+    if (l.type === 'detail') {
+      h += '<tr>' + td(l.ess, 'g') + td('', 'num') + td(l.qual, 'g') +
+        td(E.fmt(l.vsur), 'num') + td(E.fmt(l.vsous), 'num') + td(E.fmt(l.vmarch), 'num') + '</tr>';
+    } else {
+      h += '<tr class="tot">' + td('Total ' + l.ess, 'g') + td(E.fmt(l.nbGrumes, 0), 'num') + td('', 'g') +
+        td(E.fmt(l.vsur), 'num') + td(E.fmt(l.vsous), 'num') + td(E.fmt(l.vmarch), 'num') + '</tr>';
+    }
+  });
+  h += '<tr class="tot-gen">' + td('Total général', 'g') + td(E.fmt(B.nbGrumes, 0), 'num') + td('', 'g') +
+    td(E.fmt(B.vsur), 'num') + td(E.fmt(B.vsous), 'num') + td(E.fmt(B.vmarch), 'num') + '</tr></tbody></table></div></div>';
+  return h;
+}
+function tblMartelage() {
+  var M = E.syntheseMartelage(A.bord, A.cfg);
+  if (!M.total) {
+    return '<div class="carte"><h2>Martelage</h2><div class="vide"><p>Aucun diamètre à 1,30 m saisi.<br>' +
+      'Renseignez le champ « Ø à 1,30 m » lors de la saisie pour obtenir la fiche de martelage.</p></div></div>';
+  }
+  var utiles = E.CLASSES_MART.filter(function (c, i) {
+    return M.cells[i] > 0 || M.lignes.some(function (l) { return l.cells[i] > 0; });
+  });
+  var idx = utiles.map(function (c) { return E.CLASSES_MART.indexOf(c); });
+  var h = '<div class="carte"><h2>Martelage — tiges par classe de Ø à 1,30 m</h2><div class="tab-boite"><table><thead><tr>' +
+    '<th class="g">Parcelle</th><th class="g">Ess.</th>' + utiles.map(function (c) { return '<th>' + c + '</th>'; }).join('') +
+    '<th>Total</th></tr></thead><tbody>';
+  M.lignes.forEach(function (l) {
+    var t = l.type === 'total';
+    h += '<tr' + (t ? ' class="tot"' : '') + '>' + td(t ? 'Total ' + l.parc : l.parc, 'g') + td(t ? '' : l.ess, 'g') +
+      idx.map(function (i) { return td(l.cells[i] || '', 'num'); }).join('') + td(E.fmt(l.total, 0), 'num') + '</tr>';
+  });
+  h += '<tr class="tot-gen">' + td('Total général', 'g') + td('', 'g') +
+    idx.map(function (i) { return td(M.cells[i] || '', 'num'); }).join('') + td(E.fmt(M.total, 0), 'num') +
+    '</tr></tbody></table></div></div>';
+  return h;
+}
+function tblFinanciere() {
+  var F2 = E.syntheseFinanciere(A.bord, A.cfg);
+  var h = '<div class="carte"><h2>Volumes par classe</h2><div class="tab-boite"><table><thead><tr>' +
+    '<th class="g">Essence</th><th class="g">Qual.</th>' +
+    E.CLASSES_DIAM.map(function (c) { return '<th>' + c + '</th>'; }).join('') +
+    '<th>Vol. qualité</th><th>Vol. essence</th><th>Montant</th><th>PU calculé</th></tr></thead><tbody>';
+  F2.lignes.forEach(function (l) {
+    if (l.type === 'detail') {
+      h += '<tr>' + td(l.ess, 'g') + td(l.qual, 'g') +
+        l.cells.map(function (v) { return td(v ? E.fmt(v) : '', 'num'); }).join('') +
+        td(E.fmt(l.volQual), 'num') + td('', 'num') + td('', 'num') + td('', 'num') + '</tr>';
+    } else {
+      h += '<tr class="tot">' + td('Total ' + l.ess, 'g') + td('', 'g') +
+        Array(E.CLASSES_DIAM.length + 1).join('<td></td>') + td('', 'num') +
+        td(E.fmt(l.volEss), 'num') + td(l.montant ? E.fmt(l.montant) + ' €' : '', 'num') +
+        td(l.pu ? E.fmt(l.pu) + ' €' : '', 'num') + '</tr>';
+    }
+  });
+  h += '<tr class="tot-gen">' + td('Total général', 'g') + td('', 'g') +
+    Array(E.CLASSES_DIAM.length + 1).join('<td></td>') + td('', 'num') + td(E.fmt(F2.volGen), 'num') +
+    td(F2.montantGen ? E.fmt(F2.montantGen) + ' €' : '', 'num') +
+    td(F2.puGen ? E.fmt(F2.puGen) + ' €' : '', 'num') + '</tr></tbody></table></div></div>';
+
+  // grille de prix
+  h += '<div class="carte no-print"><h2>Prix unitaires (€/m³ sous écorce)</h2>' +
+    '<p class="muted" style="font-size:12.5px;margin:-4px 0 10px">Renseignez le niveau qui vous arrange : ' +
+    'par classe de diamètre, par qualité, ou un prix unique par essence. Le montant retenu est le plus élevé des trois.</p>' +
+    '<div class="tab-boite"><table><thead><tr><th class="g">Essence</th><th class="g">Qual.</th>' +
+    E.CLASSES_DIAM.map(function (c) { return '<th>' + c + '</th>'; }).join('') +
+    '<th>PU qualité</th><th>PU essence</th><th>Niveau retenu</th></tr></thead><tbody>';
+  var prix = A.bord.prix || (A.bord.prix = {});
+  F2.lignes.forEach(function (l) {
+    if (l.type === 'detail') {
+      var p = prix[l.ess + '|' + l.qual] || {};
+      h += '<tr>' + td(l.ess, 'g') + td(l.qual, 'g') +
+        E.CLASSES_DIAM.map(function (c) {
+          return '<td><input type="text" inputmode="decimal" class="pu" style="width:64px;padding:4px 5px;text-align:right" ' +
+            'data-k="' + esc(l.ess + '|' + l.qual) + '" data-cl="' + esc(c) + '" value="' +
+            esc((p.cl || {})[c] == null ? '' : (p.cl || {})[c]) + '"></td>';
+        }).join('') +
+        '<td><input type="text" inputmode="decimal" class="pu" style="width:70px;padding:4px 5px;text-align:right" ' +
+        'data-k="' + esc(l.ess + '|' + l.qual) + '" data-q="1" value="' + esc(p.qual == null ? '' : p.qual) + '"></td>' +
+        '<td></td><td></td></tr>';
+    } else {
+      var pe = prix[l.ess + '|*'] || {};
+      h += '<tr class="tot">' + td('Total ' + l.ess, 'g') + td('', 'g') +
+        Array(E.CLASSES_DIAM.length + 2).join('<td></td>') +
+        '<td><input type="text" inputmode="decimal" class="pu" style="width:70px;padding:4px 5px;text-align:right" ' +
+        'data-k="' + esc(l.ess + '|*') + '" data-e="1" value="' + esc(pe.ess == null ? '' : pe.ess) + '"></td>' +
+        td(l.niveau, 'g') + '</tr>';
+    }
+  });
+  h += '</tbody></table></div></div>';
+  return h;
+}
+function brancherPrix() {
+  $$('.pu').forEach(function (i) {
+    i.addEventListener('change', function () {
+      var k = i.dataset.k, p = A.bord.prix[k] || (A.bord.prix[k] = {});
+      var v = i.value.trim();
+      if (i.dataset.cl) { p.cl = p.cl || {}; if (v) p.cl[i.dataset.cl] = E.toNum(v); else delete p.cl[i.dataset.cl]; }
+      else if (i.dataset.q) { if (v) p.qual = E.toNum(v); else delete p.qual; }
+      else { if (v) p.ess = E.toNum(v); else delete p.ess; }
+      sauver(); renderSyntheses();
+    });
+  });
+}
+
+/* ============================================================ FICHIERS */
+function renderFichiers() {
+  var h = A.index.length ? '' : '<div class="vide"><p>Aucun bordereau enregistré.</p></div>';
+  A.index.slice().sort(function (a, b) { return (b.maj || 0) - (a.maj || 0); }).forEach(function (b) {
+    var m = b.meta || {};
+    h += '<div class="liste-item' + (A.bord && A.bord.id === b.id ? ' actif' : '') + '">' +
+      '<span class="pastille" style="background:' + (COULEURS[String(m.plaqCouleur || '').toLowerCase()] || '#2E4A3C') + '"></span>' +
+      '<button class="li-c" data-ouvrir="' + b.id + '" style="background:none;border:none;text-align:left;padding:0">' +
+      '<b>' + esc((m.article ? 'Art. ' + m.article + ' — ' : '') + (m.foret || 'Sans forêt')) + '</b>' +
+      '<small>' + esc(m.client || '') + ' · ' + E.fmt(b.nb || 0, 0) + ' billons · ' + E.fmt(b.vol || 0) + ' m³' +
+      (b.maj ? ' · ' + new Date(b.maj).toLocaleDateString('fr-FR') : '') + '</small></button>' +
+      '<button class="btn-min" data-dupliquer="' + b.id + '">Dupliquer</button>' +
+      '<button class="btn-min" data-supprimer="' + b.id + '">Supprimer</button></div>';
+  });
+  $('#liste-bordereaux').innerHTML = h;
+}
+function nouveauBordereau(base) {
+  var b = {
+    id: uid(), maj: Date.now(),
+    meta: Object.assign({
+      article: '', client: '', foret: '', parcelles: '', etf: '',
+      mesures: 'sur', plaqCouleur: 'bleu', classement: 'Class. Comt',
+      date: new Date().toLocaleDateString('fr-FR')
+    }, base || {}),
+    lignes: [], prix: {}
+  };
+  A.index.push({ id: b.id, meta: b.meta, maj: b.maj, nb: 0, vol: 0 });
+  A.bord = b;
+  ecrire('bordcub.b.' + b.id, b); ecrire('bordcub.index', A.index); ecrire('bordcub.actif', b.id);
+  appliquerCouleur(); majBandeau(); selEss = ''; selQual = '';
+  viderFormulaire(false); renderFichiers(); renderBordereau(); renderDernieres();
+  return b;
+}
+function ouvrirBordereau(id) {
+  return lire('bordcub.b.' + id, null).then(function (b) {
+    if (!b) { toast('Bordereau introuvable.'); return; }
+    b.prix = b.prix || {}; b.lignes = b.lignes || [];
+    A.bord = b; A.edition = null; selEss = ''; selQual = ''; essAffichees = [];
+    ecrire('bordcub.actif', id);
+    appliquerCouleur(); majBandeau(); viderFormulaire(false);
+    renderFichiers(); renderBordereau(); renderDernieres(); renderSyntheses();
+  });
+}
+
+/* ------------------------------------------------------------ en-tête */
+function formEntete() {
+  var m = A.bord.meta;
+  var opt = function (l, v) {
+    return l.map(function (x) { return '<option value="' + esc(x) + '"' + (v === x ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('');
+  };
+  return '<div class="grille g2">' +
+    ch('e-article', 'N° d’article', m.article) + ch('e-client', 'Client', m.client) +
+    ch('e-foret', 'Forêt', m.foret) + ch('e-parc', 'Parcelle(s)', m.parcelles) +
+    ch('e-etf', 'ETF', m.etf) + ch('e-date', 'Date', m.date) +
+    '<div class="champ"><label class="eyebrow" for="e-mes">Mesures</label><select id="e-mes">' +
+    '<option value="sur"' + (m.mesures !== 'sous' ? ' selected' : '') + '>sur écorce</option>' +
+    '<option value="sous"' + (m.mesures === 'sous' ? ' selected' : '') + '>sous écorce</option></select></div>' +
+    '<div class="champ"><label class="eyebrow" for="e-cl">Type de bordereau</label><select id="e-cl">' +
+    opt(E.CLASSEMENTS, m.classement) + '</select></div>' +
+    '<div class="champ"><label class="eyebrow" for="e-plaq">Couleur des plaquettes</label><select id="e-plaq">' +
+    opt(Object.keys(COULEURS), String(m.plaqCouleur || '').toLowerCase()) + '</select></div>' +
+    '</div><div class="btn-rang" style="margin-top:6px"><button class="btn primaire" id="e-ok">Valider</button></div>';
+}
+function ch(id, lab, v) {
+  return '<div class="champ"><label class="eyebrow" for="' + id + '">' + esc(lab) + '</label>' +
+    '<input type="text" id="' + id + '" value="' + esc(v || '') + '"></div>';
+}
+function ouvrirEntete() {
+  if (!A.bord) { nouveauBordereau(); }
+  modale('En-tête du bordereau', formEntete());
+  $('#e-ok').addEventListener('click', function () {
+    var m = A.bord.meta, ancienCl = m.classement;
+    m.article = $('#e-article').value.trim(); m.client = $('#e-client').value.trim();
+    m.foret = $('#e-foret').value.trim(); m.parcelles = $('#e-parc').value.trim();
+    m.etf = $('#e-etf').value.trim(); m.date = $('#e-date').value.trim();
+    m.mesures = $('#e-mes').value; m.classement = $('#e-cl').value; m.plaqCouleur = $('#e-plaq').value;
+    if (m.classement !== ancienCl) selQual = '';
+    sauver(); appliquerCouleur(); majBandeau();
+    renderChipsQual(); renderBordereau(); renderSyntheses(); renderFichiers(); apercu();
+    fermerModale();
+  });
+}
+
+/* ============================================================ REGLAGES */
+function renderReglages() {
+  $$('#r-mode .chip').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.mode === A.cfg.mode)); });
+  $('#r-mode-txt').innerHTML = A.cfg.mode === 'historique'
+    ? 'Reproduit Bord-Cub à l’identique, y compris ses deux anomalies : la coupure des classes 2a/2b et 3a/3b se fait ' +
+    'sur le diamètre saisi et non sur le diamètre sous écorce, et les seuils de billons nuls sont toujours abaissés ' +
+    'de l’écorce même en mesure sur écorce. À conserver pour rester cohérent avec vos anciens bordereaux.'
+    : 'Les classes 2a/2b et 3a/3b sont coupées sur le diamètre sous écorce, comme l’indique l’intitulé des colonnes, ' +
+    'et les seuils de billons nuls ne sont abaissés que si les mesures sont prises sous écorce. ' +
+    'Attention : les classes de certains billons peuvent changer par rapport à Bord-Cub.';
+  $('#r-slon').value = String(A.cfg.seuilLongueur).replace('.', ',');
+  $('#r-ssap').value = String(A.cfg.seuilDiamSAP).replace('.', ',');
+  $('#r-sepc').value = String(A.cfg.seuilDiamEPC).replace('.', ',');
+  var s = A.bord ? E.seuilsNuls(A.bord, A.cfg) : null;
+  $('#r-seuils-txt').textContent = s
+    ? 'Seuils appliqués à ce bordereau : longueur < ' + E.fmt(s.lon, 1) + ' m, Ø sapin ≤ ' + E.fmt(s['S.P'], 0) +
+    ' cm, Ø épicéa ≤ ' + E.fmt(s['EPC'], 0) + ' cm.'
+    : '';
+
+  $('#t-essences').innerHTML = '<thead><tr><th class="g">Code</th><th class="g">Nom</th><th>Écorce</th>' +
+    '<th>Favori</th><th></th></tr></thead><tbody>' +
+    A.cfg.essences.map(function (e, i) {
+      return '<tr>' + td(e.code, 'g') + '<td class="g"><input type="text" data-ess-nom="' + i + '" value="' + esc(e.nom) + '" style="padding:3px 6px"></td>' +
+        '<td><input type="text" inputmode="decimal" data-ess-tx="' + i + '" value="' + esc(String(Math.round(e.tx * 100)).replace('.', ',')) +
+        '" style="width:58px;padding:3px 6px;text-align:right"> %</td>' +
+        '<td><button class="btn-min" data-ess-fav="' + i + '">' + ((A.cfg.favoris || []).indexOf(e.code) >= 0 ? '★' : '☆') + '</button></td>' +
+        '<td class="act"><button class="btn-min" data-ess-sup="' + i + '">Suppr.</button></td></tr>';
+    }).join('') + '</tbody>';
+
+  $('#r-cl-onglets').innerHTML = E.CLASSEMENTS.map(function (c) {
+    return '<button role="tab" data-rcl="' + esc(c) + '" aria-selected="' + (c === A.classementRegl) + '">' + esc(c) + '</button>';
+  }).join('');
+  var ql = A.cfg.qualites[A.classementRegl] || [];
+  $('#t-qualites').innerHTML = '<thead><tr><th class="g">Code</th><th class="g">Libellé</th><th></th></tr></thead><tbody>' +
+    ql.map(function (q, i) {
+      return '<tr>' + td(q.code, 'g') + '<td class="g"><input type="text" data-q-nom="' + i + '" value="' + esc(q.nom) + '" style="padding:3px 6px"></td>' +
+        '<td class="act"><button class="btn-min" data-q-sup="' + i + '">Suppr.</button></td></tr>';
+    }).join('') + '</tbody>';
+}
+
+/* ============================================================== EXPORT */
+function nomFichier(ext) {
+  var m = A.bord.meta;
+  var n = [m.article, m.client, m.foret, m.parcelles ? 'Parc ' + m.parcelles : ''].filter(Boolean).join(' ');
+  return (n || 'bordereau').replace(/[\\/:*?"<>|]/g, '-').slice(0, 90) + '.' + ext;
+}
+function telecharger(nom, data, type) {
+  try {
+    var blob = new Blob([data], { type: type || 'application/octet-stream' });
+    var url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url; a.download = nom; document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 1500);
+    toast(nom + ' téléchargé.');
+  } catch (e) { toast('Téléchargement impossible dans cet environnement.'); }
+}
+function exportXlsx() {
+  if (!A.bord) return;
+  try {
+    telecharger(nomFichier('xlsx'), window.BCX.xlsxBuild(window.BCW.construireClasseur(A.bord, A.cfg, E)),
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  } catch (e) { toast('Erreur d’export : ' + e.message); }
+}
+function exportCsv() {
+  if (!A.bord) return;
+  var m = A.bord.meta, L = E.cuberTout(A.bord, A.cfg);
+  var q = function (v) { var s = String(v == null ? '' : v); return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  var li = [
+    ['Article', m.article, '', '', '', '', '', '', 'Mesures', m.mesures],
+    ['Client', m.client, '', '', '', '', '', '', 'Plaquettes', m.plaqCouleur],
+    ['Foret', m.foret, '', '', '', '', '', '', 'Type', m.classement],
+    ['Parcelles', m.parcelles, '', '', '', '', '', '', 'ETF', m.etf],
+    ['N°', 'BP ou D1,30', 'Ess.', 'Qual', 'Long.', 'Diam', 'Parcelle', 'Date / Obs', 'Réfact°', 'Défaut',
+      'VolBûchSur', 'VolBûchSous', 'VolMarchSous', 'ClasseDiamSous', 'ClasseMINI']
+  ];
+  L.forEach(function (l) {
+    li.push([l.num, l.bp === true ? 'VRAI' : (l.bp === '' || l.bp == null ? '' : E.fmt(E.toNum(l.bp), 0)),
+    l.ess, l.qual, E.fmt(E.toNum(l.lon), 2), E.fmt(E.toNum(l.dia), 0), l.parc, l.obs,
+    l.refl === '' || l.refl == null ? '' : E.fmt(E.toNum(l.refl), 2), l.refn,
+    E.fmt(l.c.vsur), E.fmt(l.c.vsous), E.fmt(l.c.vmarch), l.c.clDiam, l.c.clMini]);
+  });
+  telecharger(nomFichier('csv'), '\uFEFF' + li.map(function (r) { return r.map(q).join(';'); }).join('\r\n'), 'text/csv');
+}
+function exportJson() {
+  if (!A.bord) return;
+  telecharger(nomFichier('json'), JSON.stringify({ format: 'bordcub-1', bordereau: A.bord, config: A.cfg }, null, 1), 'application/json');
+}
+function importJson() {
+  var i = document.createElement('input'); i.type = 'file'; i.accept = '.json,application/json';
+  i.addEventListener('change', function () {
+    var f = i.files[0]; if (!f) return;
+    var fr = new FileReader();
+    fr.onload = function () {
+      try {
+        var o = JSON.parse(fr.result);
+        var b = o.bordereau || o;
+        if (!b.lignes) throw new Error('fichier non reconnu');
+        b.id = uid(); b.maj = Date.now(); b.prix = b.prix || {};
+        A.index.push({ id: b.id, meta: b.meta, maj: b.maj, nb: b.lignes.length, vol: 0 });
+        A.bord = b;
+        ecrire('bordcub.b.' + b.id, b); ecrire('bordcub.index', A.index); ecrire('bordcub.actif', b.id);
+        appliquerCouleur(); majBandeau(); viderFormulaire(false);
+        renderFichiers(); renderBordereau(); renderSyntheses();
+        toast('Bordereau restauré : ' + b.lignes.length + ' billons.');
+      } catch (e) { toast('Fichier illisible.'); }
+    };
+    fr.readAsText(f);
+  });
+  i.click();
+}
+function ouvrirColler() {
+  modale('Coller depuis Excel',
+    '<p class="muted" style="font-size:13px;margin-top:0">Dans Excel, sélectionnez les lignes de la feuille ' +
+    '<b>Volumes</b> (colonnes N° … Défaut) puis copiez-les et collez-les ici. Les colonnes attendues, dans l’ordre : ' +
+    'N°, BP ou Ø1,30, essence, qualité, longueur, diamètre, parcelle, date/obs, réfaction, défaut.</p>' +
+    '<textarea id="c-txt" rows="9" placeholder="50331	VRAI	EPC	V	20,5	40 …"></textarea>' +
+    '<div class="btn-rang" style="margin-top:10px"><button class="btn primaire" id="c-ok">Ajouter au bordereau</button></div>');
+  $('#c-ok').addEventListener('click', function () {
+    var t = $('#c-txt').value.replace(/\r/g, '');
+    if (!t.trim()) { fermerModale(); return; }
+    var sep = t.indexOf('\t') >= 0 ? '\t' : (t.split('\n')[0].split(';').length > 3 ? ';' : ',');
+    var n = 0;
+    t.split('\n').forEach(function (raw) {
+      if (!raw.trim()) return;
+      var c = raw.split(sep).map(function (x) { return x.trim().replace(/^"|"$/g, ''); });
+      if (/^n°?$/i.test(c[0]) || /essence|ess\./i.test(c[2] || '')) return;   // ligne d'en-tête
+      if (!c[0] || !(E.toNum(c[5]) > 0)) return;
+      var bp = (c[1] || '').toUpperCase();
+      A.bord.lignes.push({
+        num: c[0], bp: (bp === 'VRAI' || bp === 'TRUE' || bp === '✓') ? true : (bp ? E.toNum(bp) : ''),
+        ess: (c[2] || '').toUpperCase(), qual: (c[3] || '').toUpperCase(),
+        lon: c[4] || '', dia: c[5] || '', parc: c[6] || '', obs: c[7] || '',
+        refl: c[8] || '', refn: c[9] || ''
+      });
+      n++;
+    });
+    sauver(); majBandeau(); renderBordereau(); renderDernieres(); renderSyntheses(); viderFormulaire(false);
+    fermerModale();
+    toast(n + ' billon' + (n > 1 ? 's' : '') + ' importé' + (n > 1 ? 's' : '') + '.');
+  });
+}
+
+/* =========================================================== IMPRESSION */
+function imprimer() {
+  if (!A.bord) return;
+  var L = E.cuberTout(A.bord, A.cfg);
+  var h = enteteHTML() + '<div class="carte"><div class="tab-boite"><table><thead><tr>' +
+    COLS.map(function (c) { return '<th class="' + (c[2] === 'g' ? 'g' : 'num') + '">' + esc(c[1]) + '</th>'; }).join('') +
+    '</tr></thead><tbody>' +
+    L.map(function (l) {
+      return '<tr>' + td(l.num, 'g') + td(l.bp === true ? '✓' : (l.bp === '' || l.bp == null ? '' : E.fmt(E.toNum(l.bp), 0)), 'num') +
+        td(l.ess, 'g') + td(l.qual, 'g') + td(E.fmt(E.toNum(l.lon), 2), 'num') + td(E.fmt(E.toNum(l.dia), 0), 'num') +
+        td(l.parc, 'g') + td(l.obs, 'g') + td(l.refl === '' || l.refl == null ? '' : E.fmt(E.toNum(l.refl), 2), 'num') +
+        td(l.refn, 'g') + td(E.fmt(l.c.vsur), 'num') + td(E.fmt(l.c.vsous), 'num') + td(E.fmt(l.c.vmarch), 'num') +
+        td(l.c.clDiam, 'g') + td(l.c.clMini, 'g') + '</tr>';
+    }).join('') + '</tbody></table></div></div>';
+  var sv = A.sousVue;
+  ['synthese', 'bucheron', 'martelage'].forEach(function (s) {
+    A.sousVue = s;
+    h += '<div class="saut">' + enteteHTML() +
+      ({ synthese: tblSynthese, bucheron: tblBucheron, martelage: tblMartelage }[s])() + '</div>';
+  });
+  A.sousVue = sv;
+  var v = $('#vue-impression');
+  v.innerHTML = h; v.classList.add('impression');
+  window.print();
+  setTimeout(function () { v.classList.remove('impression'); v.innerHTML = ''; }, 800);
+}
+
+/* ============================================================== MODALE */
+function modale(titre, html) {
+  $('#modale-titre').textContent = titre;
+  $('#modale-corps').innerHTML = html;
+  $('#modale').hidden = false;
+}
+function fermerModale() { $('#modale').hidden = true; $('#modale-corps').innerHTML = ''; }
+
+/* ============================================================ NAVIGATION */
+function aller(v) {
+  A.vue = v;
+  $$('.onglets button').forEach(function (b) { b.setAttribute('aria-selected', String(b.dataset.vue === v)); });
+  $$('main > .vue').forEach(function (s) { s.classList.toggle('actif', s.id === 'vue-' + v); });
+  if (v === 'bordereau') renderBordereau();
+  if (v === 'syntheses') renderSyntheses();
+  if (v === 'fichiers') renderFichiers();
+  if (v === 'reglages') renderReglages();
+  if (v === 'saisie') { renderRuban(); renderDernieres(); }
+  try { if (window.scrollY || window.pageYOffset) window.scrollTo(0, 0); } catch (e) { }
+}
+
+/* ============================================================ ECOUTEURS */
+function brancher() {
+  $$('.onglets button').forEach(function (b) {
+    b.addEventListener('click', function () { aller(b.dataset.vue); });
+  });
+  document.addEventListener('click', function (ev) {
+    var t = ev.target.closest ? ev.target.closest('[data-aller]') : null;
+    if (t) aller(t.dataset.aller);
+  });
+  $('#b-entete').addEventListener('click', ouvrirEntete);
+  $('#modale-x').addEventListener('click', fermerModale);
+  $('#modale').addEventListener('click', function (e) { if (e.target.id === 'modale') fermerModale(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !$('#modale').hidden) fermerModale(); });
+
+  /* --- saisie --- */
+  $('#f-ess').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-ess]');
+    if (b) { selEss = b.dataset.ess; renderChipsEss(); apercu(); return; }
+    if (e.target.closest('#ess-autres')) choisirEssence();
+  });
+  $('#f-qual').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-qual]');
+    if (b) { selQual = b.dataset.qual; renderChipsQual(); apercu(); }
+  });
+  $('#f-bp').addEventListener('click', function () {
+    selBp = !selBp; $('#f-bp').setAttribute('aria-pressed', String(selBp));
+    if (!selBp) F.d130.value = '';
+  });
+  $$('[data-pas]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var p = b.dataset.pas.split(':'), i = $('#' + p[0]);
+      var v = E.toNum(i.value) + parseFloat(p[1]);
+      if (v < 0) v = 0;
+      i.value = String(E.roundN(v, 2)).replace('.', ',');
+      i.classList.remove('err'); apercu();
+    });
+  });
+  ['f-num', 'f-lon', 'f-dia', 'f-d130', 'f-refl', 'f-refn', 'f-parc', 'f-obs'].forEach(function (id) {
+    var el = $('#' + id);
+    el.addEventListener('input', function () { el.classList.remove('err'); apercu(); if (id === 'f-num') renderRuban(); });
+    el.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); enregistrer(A.edition === null ? 'grume' : null); }
+    });
+  });
+  $('#f-billon').addEventListener('click', function () { enregistrer('billon'); });
+  $('#f-grume').addEventListener('click', function () { enregistrer('grume'); });
+  $('#f-valider').addEventListener('click', function () { enregistrer(null); });
+  $('#f-annuler').addEventListener('click', function () { viderFormulaire(false); });
+  $('#f-defaire').addEventListener('click', function () {
+    if (!A.bord || !A.bord.lignes.length) { toast('Rien à défaire.'); return; }
+    var l = A.bord.lignes.pop();
+    sauver(); majBandeau(); renderDernieres(); renderRuban(); renderBordereau();
+    viderFormulaire(false);
+    toast('Billon ' + l.num + ' supprimé.');
+  });
+
+  /* --- bordereau --- */
+  $('#b-filtre').addEventListener('input', function () { A.filtre = this.value; renderBordereau(); });
+  $('#t-bordereau').addEventListener('click', function (e) {
+    var m = e.target.closest('[data-mod]'), s = e.target.closest('[data-sup]');
+    if (m) chargerLigne(+m.dataset.mod);
+    if (s) {
+      var i = +s.dataset.sup, l = A.bord.lignes[i];
+      if (confirm('Supprimer le billon ' + l.num + ' ?')) {
+        A.bord.lignes.splice(i, 1);
+        sauver(); majBandeau(); renderBordereau(); renderDernieres();
+      }
+    }
+  });
+  $('#b-imprimer').addEventListener('click', imprimer);
+  $('#b-nuls').addEventListener('click', controlerNuls);
+
+  /* --- synthèses --- */
+  $('#s-onglets').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-s]'); if (!b) return;
+    A.sousVue = b.dataset.s;
+    $$('#s-onglets button').forEach(function (x) { x.setAttribute('aria-selected', String(x.dataset.s === A.sousVue)); });
+    renderSyntheses();
+  });
+
+  /* --- fichiers --- */
+  $('#n-nouveau').addEventListener('click', function () { nouveauBordereau(); ouvrirEntete(); });
+  $('#liste-bordereaux').addEventListener('click', function (e) {
+    var o = e.target.closest('[data-ouvrir]'), d = e.target.closest('[data-dupliquer]'), s = e.target.closest('[data-supprimer]');
+    if (o) { ouvrirBordereau(o.dataset.ouvrir).then(function () { aller('saisie'); }); }
+    if (d) {
+      lire('bordcub.b.' + d.dataset.dupliquer, null).then(function (b) {
+        if (!b) return;
+        var n = nouveauBordereau(b.meta);
+        n.meta = Object.assign({}, b.meta); sauver(); appliquerCouleur(); majBandeau(); renderFichiers();
+        toast('En-tête dupliqué, bordereau vide.');
+      });
+    }
+    if (s) {
+      var id = s.dataset.supprimer;
+      var e2 = A.index.filter(function (x) { return x.id === id; })[0];
+      if (!confirm('Supprimer définitivement « ' + ((e2 && e2.meta && e2.meta.foret) || 'ce bordereau') + ' » ?')) return;
+      A.index = A.index.filter(function (x) { return x.id !== id; });
+      Store.del('bordcub.b.' + id); ecrire('bordcub.index', A.index);
+      if (A.bord && A.bord.id === id) { A.bord = null; Store.del('bordcub.actif'); majBandeau(); }
+      renderFichiers(); renderBordereau();
+    }
+  });
+  $('#e-xlsx').addEventListener('click', exportXlsx);
+  $('#e-csv').addEventListener('click', exportCsv);
+  $('#e-json').addEventListener('click', exportJson);
+  $('#i-json').addEventListener('click', importJson);
+  $('#i-coller').addEventListener('click', function () { if (!A.bord) nouveauBordereau(); ouvrirColler(); });
+
+  /* --- réglages --- */
+  $('#r-mode').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-mode]'); if (!b) return;
+    A.cfg.mode = b.dataset.mode; sauverCfg();
+    renderReglages(); majBandeau(); renderBordereau(); renderSyntheses(); apercu();
+    toast('Mode ' + (A.cfg.mode === 'corrige' ? 'corrigé' : 'historique') + ' appliqué.');
+  });
+  [['r-slon', 'seuilLongueur'], ['r-ssap', 'seuilDiamSAP'], ['r-sepc', 'seuilDiamEPC']].forEach(function (p) {
+    $('#' + p[0]).addEventListener('change', function () {
+      A.cfg[p[1]] = E.toNum(this.value); sauverCfg(); renderReglages(); apercu();
+    });
+  });
+  $('#t-essences').addEventListener('click', function (e) {
+    var f = e.target.closest('[data-ess-fav]'), s = e.target.closest('[data-ess-sup]');
+    if (f) {
+      var c = A.cfg.essences[+f.dataset.essFav].code;
+      A.cfg.favoris = A.cfg.favoris || [];
+      var k = A.cfg.favoris.indexOf(c);
+      if (k >= 0) A.cfg.favoris.splice(k, 1); else A.cfg.favoris.push(c);
+      sauverCfg(); renderReglages(); renderChipsEss();
+    }
+    if (s) {
+      var i = +s.dataset.essSup, code = A.cfg.essences[i].code;
+      if (A.bord && A.bord.lignes.some(function (l) { return l.ess === code; })) { toast('Essence utilisée dans ce bordereau.'); return; }
+      A.cfg.essences.splice(i, 1); sauverCfg(); renderReglages(); renderChipsEss();
+    }
+  });
+  $('#t-essences').addEventListener('change', function (e) {
+    var n = e.target.dataset.essNom, t = e.target.dataset.essTx;
+    if (n !== undefined) { A.cfg.essences[+n].nom = e.target.value; sauverCfg(); }
+    if (t !== undefined) {
+      A.cfg.essences[+t].tx = E.toNum(e.target.value) / 100; sauverCfg();
+      majBandeau(); renderBordereau(); renderSyntheses(); apercu();
+    }
+  });
+  $('#r-ess-add').addEventListener('click', function () {
+    modale('Nouvelle essence', ch('ne-code', 'Code (3 caractères)', '') + ch('ne-nom', 'Nom', '') +
+      ch('ne-tx', 'Taux d’écorce (%)', '0') +
+      '<div class="btn-rang"><button class="btn primaire" id="ne-ok">Ajouter</button></div>');
+    $('#ne-ok').addEventListener('click', function () {
+      var c = $('#ne-code').value.trim().toUpperCase();
+      if (!c) { toast('Code obligatoire.'); return; }
+      if (A.cfg.essences.some(function (x) { return x.code === c; })) { toast('Ce code existe déjà.'); return; }
+      A.cfg.essences.push({ code: c, nom: $('#ne-nom').value.trim() || c, tx: E.toNum($('#ne-tx').value) / 100 });
+      sauverCfg(); renderReglages(); renderChipsEss(); fermerModale();
+    });
+  });
+  $('#r-cl-onglets').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-rcl]'); if (!b) return;
+    A.classementRegl = b.dataset.rcl; renderReglages();
+  });
+  $('#t-qualites').addEventListener('click', function (e) {
+    var s = e.target.closest('[data-q-sup]'); if (!s) return;
+    var l = A.cfg.qualites[A.classementRegl], code = l[+s.dataset.qSup].code;
+    if (A.bord && A.bord.meta.classement === A.classementRegl && A.bord.lignes.some(function (x) { return x.qual === code; })) {
+      toast('Qualité utilisée dans ce bordereau.'); return;
+    }
+    l.splice(+s.dataset.qSup, 1); sauverCfg(); renderReglages(); renderChipsQual();
+  });
+  $('#t-qualites').addEventListener('change', function (e) {
+    var n = e.target.dataset.qNom;
+    if (n !== undefined) { A.cfg.qualites[A.classementRegl][+n].nom = e.target.value; sauverCfg(); renderChipsQual(); }
+  });
+  $('#r-qual-add').addEventListener('click', function () {
+    modale('Nouvelle qualité — ' + A.classementRegl, ch('nq-code', 'Code', '') + ch('nq-nom', 'Libellé', '') +
+      '<div class="btn-rang"><button class="btn primaire" id="nq-ok">Ajouter</button></div>');
+    $('#nq-ok').addEventListener('click', function () {
+      var c = $('#nq-code').value.trim().toUpperCase();
+      if (!c) { toast('Code obligatoire.'); return; }
+      A.cfg.qualites[A.classementRegl].push({ code: c, nom: $('#nq-nom').value.trim() || c });
+      sauverCfg(); renderReglages(); renderChipsQual(); fermerModale();
+    });
+  });
+  $('#r-reset-cfg').addEventListener('click', function () {
+    if (!confirm('Rétablir les essences, qualités et seuils d’origine ? Vos bordereaux ne sont pas touchés.')) return;
+    var mode = A.cfg.mode;
+    A.cfg = E.configDefaut(); A.cfg.mode = mode;
+    sauverCfg(); renderReglages(); renderChipsEss(); renderChipsQual();
+    toast('Listes rétablies.');
+  });
+}
+function choisirEssence() {
+  modale('Choisir une essence',
+    '<input type="search" id="ce-f" placeholder="Rechercher…" autocomplete="off"><div id="ce-l" style="margin-top:11px"></div>');
+  var rend = function (f) {
+    f = (f || '').toLowerCase();
+    $('#ce-l').innerHTML = A.cfg.essences.filter(function (e) {
+      return !f || e.code.toLowerCase().indexOf(f) >= 0 || e.nom.toLowerCase().indexOf(f) >= 0;
+    }).map(function (e) {
+      return '<button class="liste-item" data-ce="' + esc(e.code) + '"><div class="li-c"><b>' + esc(e.code) +
+        ' — ' + esc(e.nom) + '</b><small>écorce ' + E.fmt(e.tx * 100, 0) + ' %</small></div></button>';
+    }).join('') || '<p class="muted">Aucune essence.</p>';
+  };
+  rend('');
+  $('#ce-f').addEventListener('input', function () { rend(this.value); });
+  $('#ce-l').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-ce]'); if (!b) return;
+    selEss = b.dataset.ce;
+    if (essAffichees.indexOf(selEss) < 0) essAffichees.push(selEss);
+    renderChipsEss(); apercu(); fermerModale();
+  });
+  setTimeout(function () { $('#ce-f').focus(); }, 60);
+}
+function controlerNuls() {
+  if (!A.bord || !A.bord.lignes.length) { toast('Aucun billon à contrôler.'); return; }
+  var r = E.analyserNuls(A.bord, A.cfg);
+  var h = '<p class="muted" style="margin-top:0;font-size:13px">Seuils : longueur &lt; <b>' + E.fmt(r.seuils.lon, 1) +
+    ' m</b>, Ø ≤ <b>' + E.fmt(r.seuils['S.P'], 0) + ' cm</b> pour le sapin et <b>' + E.fmt(r.seuils['EPC'], 0) +
+    ' cm</b> pour l’épicéa.</p>';
+  if (r.faussementZ.length) {
+    h += '<div class="avis rouge">' + r.faussementZ.length + ' billon(s) en qualité <b>Z</b> alors que leurs dimensions ' +
+      'dépassent les seuils : ' + esc(r.faussementZ.join(', ')) + '. Corrigez leur qualité ou leurs dimensions.</div>';
+  }
+  if (r.aPasserZ.length) {
+    h += '<div class="avis">' + r.aPasserZ.length + ' billon(s) hors dimension ne sont pas encore en qualité Z : ' +
+      esc(r.aPasserZ.map(function (x) { return x.num; }).join(', ')) + '.</div>' +
+      '<div class="btn-rang"><button class="btn primaire" id="nz-ok">Passer ces ' + r.aPasserZ.length + ' billons en Z</button></div>';
+  } else if (!r.faussementZ.length) {
+    h += '<div class="avis">Rien à signaler : ' + (r.dejaZ ? r.dejaZ + ' billon(s) déjà en Z, ' : '') +
+      'aucun autre billon hors dimension.</div>';
+  }
+  modale('Billons de valeur nulle', h);
+  if ($('#nz-ok')) {
+    $('#nz-ok').addEventListener('click', function () {
+      r.aPasserZ.forEach(function (x) { A.bord.lignes[x.i].qual = 'Z'; });
+      sauver(); majBandeau(); renderBordereau(); renderSyntheses(); renderDernieres();
+      fermerModale(); toast(r.aPasserZ.length + ' billon(s) passés en qualité Z.');
+    });
+  }
+}
+
+/* ================================================================ INIT */
+/* Raccourcis de l'écran d'accueil : ?vue=saisie|bordereau|syntheses|fichiers|reglages */
+function vueDemandee(def) {
+  try {
+    var m = /[?&]vue=([a-z]+)/.exec(location.search || '');
+    var v = m && m[1];
+    if (v && ['saisie', 'bordereau', 'syntheses', 'fichiers', 'reglages'].indexOf(v) >= 0) return v;
+  } catch (e) { }
+  return def;
+}
+
+function init() {
+  champs(); brancher();
+  Promise.all([lire('bordcub.cfg', null), lire('bordcub.index', []), Store.get('bordcub.actif')])
+    .then(function (res) {
+      A.cfg = res[0] || E.configDefaut();
+      var d = E.configDefaut();
+      ['essences', 'qualites', 'favoris'].forEach(function (k) { if (!A.cfg[k]) A.cfg[k] = d[k]; });
+      ['seuilDiamSAP', 'seuilDiamEPC', 'seuilLongueur'].forEach(function (k) { if (A.cfg[k] == null) A.cfg[k] = d[k]; });
+      if (!A.cfg.mode) A.cfg.mode = 'historique';
+      A.index = res[1] || [];
+      var actif = res[2];
+      if (actif != null) {
+        try { var p = JSON.parse(actif); if (typeof p === 'string') actif = p; } catch (e) { }
+      }
+      if (actif && A.index.some(function (x) { return x.id === actif; })) {
+        renderReglages();
+        return ouvrirBordereau(actif).then(function () { aller(vueDemandee('saisie')); });
+      }
+      majBandeau(); renderFichiers(); renderReglages();
+      aller('fichiers');
+      if (!A.index.length) {
+        $('#liste-bordereaux').innerHTML =
+          '<div class="vide"><p>Bienvenue. Créez votre premier bordereau, ou restaurez une sauvegarde.</p>' +
+          '<button class="btn primaire" id="v-nouveau">Créer un bordereau</button></div>';
+        $('#v-nouveau').addEventListener('click', function () { nouveauBordereau(); ouvrirEntete(); });
+      }
+    });
+}
+window.BCUI = { toast: toast };
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+else init();
+
+})();
+
+</script>
+<script>
+/* ==========================================================================
+   BordCub — installation, hors-ligne, stockage durable
+   Tout est facultatif : sur un fichier local ou un vieux navigateur,
+   chaque bloc se désactive proprement.
+   ========================================================================== */
+(function () {
+'use strict';
+
+var VERSION = '1.0.0-20260721';
+var $ = function (s) { return document.querySelector(s); };
+function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
+
+var etat = {
+  installee: false,      // lancée depuis l'écran d'accueil
+  installable: null,     // évènement beforeinstallprompt en attente
+  horsLigne: false,      // service worker actif
+  durable: null,         // navigator.storage.persisted()
+  reg: null
+};
+
+/* ------------------------------------------------- lancée en autonome ? */
+function estInstallee() {
+  try {
+    return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+      window.navigator.standalone === true;
+  } catch (e) { return false; }
+}
+
+/* --------------------------------------------------- stockage durable */
+/* Android peut effacer le stockage d'un site quand la mémoire manque.
+   persist() met le bordereau à l'abri ; accordé d'office si l'app est
+   installée, sinon Chrome décide selon l'usage. */
+function demanderDurable(explicite) {
+  if (!navigator.storage || !navigator.storage.persist) return Promise.resolve(null);
+  return navigator.storage.persisted().then(function (deja) {
+    if (deja) return true;
+    return navigator.storage.persist().then(function (ok) {
+      if (explicite) toast(ok ? 'Données protégées contre l’effacement automatique.'
+        : 'Refusé par le navigateur. Installez l’application pour l’obtenir.');
+      return ok;
+    });
+  }).catch(function () { return null; });
+}
+
+/* ---------------------------------------------------- service worker */
+function enregistrerSW() {
+  if (!('serviceWorker' in navigator)) return Promise.resolve(null);
+  if (location.protocol !== 'https:' && location.hostname !== 'localhost') return Promise.resolve(null);
+  return navigator.serviceWorker.register('sw.js').then(function (reg) {
+    etat.reg = reg;
+    reg.addEventListener('updatefound', function () {
+      var sw = reg.installing;
+      if (!sw) return;
+      sw.addEventListener('statechange', function () {
+        if (sw.state === 'installed' && navigator.serviceWorker.controller) proposerMaj(reg);
+      });
+    });
+    return reg;
+  }).catch(function () { return null; });
+}
+
+var rechargeEnCours = false;
+function proposerMaj(reg) {
+  var b = $('#r-maj');
+  if (b) { b.textContent = 'Installer la mise à jour'; b.classList.add('primaire'); }
+  toast('Nouvelle version prête — Réglages ▸ Application.');
+  proposerMaj.attente = reg.waiting;
+}
+function appliquerMaj() {
+  var reg = etat.reg;
+  var w = (reg && reg.waiting) || proposerMaj.attente;
+  if (!w) return false;
+  navigator.serviceWorker.addEventListener('controllerchange', function () {
+    if (rechargeEnCours) return;
+    rechargeEnCours = true; location.reload();
+  });
+  w.postMessage({ type: 'SKIP_WAITING' });
+  return true;
+}
+function verifierMaj() {
+  if (appliquerMaj()) { toast('Mise à jour en cours…'); return; }
+  if (!etat.reg) { toast('Mises à jour indisponibles (fichier local).'); return; }
+  toast('Recherche…');
+  etat.reg.update().then(function () {
+    setTimeout(function () {
+      if (!(etat.reg.waiting || proposerMaj.attente)) toast('Vous avez déjà la dernière version.');
+    }, 900);
+  }).catch(function () { toast('Vérification impossible hors réseau.'); });
+}
+
+/* ------------------------------------------------------- installation */
+window.addEventListener('beforeinstallprompt', function (ev) {
+  ev.preventDefault();
+  etat.installable = ev;
+  rafraichir();
+});
+window.addEventListener('appinstalled', function () {
+  etat.installable = null; etat.installee = true;
+  demanderDurable(false).then(function (d) { etat.durable = d; rafraichir(); });
+  toast('BordCub est installé.');
+});
+function installer() {
+  if (!etat.installable) return;
+  var ev = etat.installable; etat.installable = null;
+  ev.prompt();
+  ev.userChoice.then(function () { rafraichir(); }).catch(function () { });
+}
+
+/* -------------------------------------------------------- état visible */
+function rafraichir() {
+  var t = $('#r-appli-etat'), bi = $('#r-installer'), bp = $('#r-persist'), v = $('#r-version');
+  if (!t) return;
+  var l = [];
+  l.push(etat.installee ? 'Lancée depuis l’écran d’accueil.'
+    : etat.installable ? 'Installable sur l’écran d’accueil.'
+      : 'Ouverte dans le navigateur.');
+  l.push(etat.horsLigne ? 'Fonctionne sans réseau.'
+    : location.protocol === 'file:' ? 'Fichier local : déjà autonome, pas de mise à jour automatique.'
+      : 'Hors-ligne pas encore prêt.');
+  if (etat.durable === true) l.push('Données protégées contre l’effacement automatique.');
+  else if (etat.durable === false) l.push('Données non protégées : exportez régulièrement.');
+  t.textContent = l.join(' ');
+  if (bi) bi.hidden = !etat.installable;
+  if (bp) bp.hidden = !(etat.durable === false);
+  if (v) v.textContent = 'Version ' + VERSION;
+}
+
+/* ------------------------------------------------------------ démarrage */
+function demarrer() {
+  etat.installee = estInstallee();
+  var bi = $('#r-installer'), bp = $('#r-persist'), bm = $('#r-maj');
+  if (bi) bi.addEventListener('click', installer);
+  if (bp) bp.addEventListener('click', function () {
+    demanderDurable(true).then(function (d) { etat.durable = d; rafraichir(); });
+  });
+  if (bm) bm.addEventListener('click', verifierMaj);
+  rafraichir();
+  enregistrerSW().then(function (reg) {
+    etat.horsLigne = !!reg;
+    return demanderDurable(false);
+  }).then(function (d) { etat.durable = d; rafraichir(); });
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', demarrer);
+else demarrer();
+
+window.BCP = { etat: etat, rafraichir: rafraichir, version: VERSION };
+
+})();
+
+</script>
+</body>
+</html>

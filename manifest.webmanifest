@@ -1,0 +1,45 @@
+{
+  "id": "./",
+  "name": "BordCub — bordereau de cubage",
+  "short_name": "BordCub",
+  "description": "Bordereau de cubage forestier : saisie des billons, volumes, synthèses et export Excel. Fonctionne sans réseau.",
+  "lang": "fr",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#17251F",
+  "theme_color": "#17251F",
+  "categories": ["productivity", "utilities", "business"],
+  "icons": [
+    { "src": "icone-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icone-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icone.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Saisie",
+      "short_name": "Saisie",
+      "description": "Reprendre la saisie du bordereau en cours",
+      "url": "./?vue=saisie",
+      "icons": [{ "src": "icone-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Bordereaux",
+      "short_name": "Bordereaux",
+      "description": "Ouvrir la liste des bordereaux",
+      "url": "./?vue=fichiers",
+      "icons": [{ "src": "icone-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Synthèses",
+      "short_name": "Synthèses",
+      "description": "Voir les synthèses du bordereau en cours",
+      "url": "./?vue=syntheses",
+      "icons": [{ "src": "icone-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ]
+}
