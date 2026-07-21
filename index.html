@@ -462,12 +462,22 @@ td.act{width:1%;padding:3px 6px}
           <button class="btn primaire btn-min" id="n-nouveau">Nouveau bordereau</button></div>
         <div id="liste-bordereaux"></div>
       </div>
+      <div class="carte" id="c-sauvegarde">
+        <div class="carte-titre"><h2>Sauvegarde</h2>
+          <button class="btn primaire btn-min" id="s-tout">Tout sauvegarder</button></div>
+        <p class="muted" style="font-size:12.5px;margin:0 0 10px" id="s-etat"></p>
+        <div class="btn-rang">
+          <button class="btn" id="s-restaurer">Restaurer un fichier</button>
+          <button class="btn" id="s-recuperer">Récupérer…</button>
+        </div>
+        <div id="s-recup" hidden></div>
+      </div>
       <div class="carte">
         <h2>Échanger des fichiers</h2>
         <div class="btn-rang">
           <button class="btn" id="e-xlsx">Exporter en Excel</button>
           <button class="btn" id="e-csv">Exporter en CSV</button>
-          <button class="btn" id="e-json">Sauvegarde (.json)</button>
+          <button class="btn" id="e-json">Ce bordereau (.json)</button>
         </div>
         <div class="btn-rang" style="margin-top:9px">
           <button class="btn" id="i-json">Restaurer une sauvegarde</button>
@@ -1461,6 +1471,276 @@ if (typeof window !== 'undefined') window.BCW = BCW_API;
 </script>
 <script>
 /* ==========================================================================
+   BordCub — stockage
+   IndexedDB en principal (quota large, protégé par persist()), localStorage
+   en miroir. Deux copies indépendantes : si l'une est vidée ou abîmée,
+   l'autre remet l'application d'aplomb toute seule.
+   Dégradation : hôte > IndexedDB+miroir > localStorage seul > mémoire.
+   ========================================================================== */
+(function () {
+'use strict';
+
+var PREFIXE = 'bordcub.';
+var DB = 'bordcub', MAGASIN = 'kv', DELAI = 4000;
+
+var mode = 'memoire';
+var mem = {};
+var db = null;
+var miroir = false;
+
+/* ------------------------------------------------------------ miroir */
+function miroirDispo() {
+  try { localStorage.setItem('__bc', '1'); localStorage.removeItem('__bc'); return true; }
+  catch (e) { return false; }
+}
+function mSet(k, v) { if (miroir) { try { localStorage.setItem(k, v); } catch (e) { } } }
+function mGet(k) { if (!miroir) return null; try { return localStorage.getItem(k); } catch (e) { return null; } }
+function mDel(k) { if (miroir) { try { localStorage.removeItem(k); } catch (e) { } } }
+function mCles() {
+  if (!miroir) return [];
+  var r = [];
+  try {
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (k && k.indexOf(PREFIXE) === 0) r.push(k);
+    }
+  } catch (e) { }
+  return r;
+}
+
+/* -------------------------------------------------------- IndexedDB */
+function ouvrirDB() {
+  return new Promise(function (res, rej) {
+    var fini = false;
+    var minuteur = setTimeout(function () { if (!fini) { fini = true; rej(new Error('délai')); } }, DELAI);
+    var r;
+    try { r = indexedDB.open(DB, 1); } catch (e) { clearTimeout(minuteur); rej(e); return; }
+    r.onupgradeneeded = function () {
+      try { r.result.createObjectStore(MAGASIN); } catch (e) { }
+    };
+    r.onsuccess = function () { if (fini) return; fini = true; clearTimeout(minuteur); res(r.result); };
+    r.onerror = r.onblocked = function () { if (fini) return; fini = true; clearTimeout(minuteur); rej(r.error || new Error('bloqué')); };
+  });
+}
+function tx(ecriture) {
+  return db.transaction(MAGASIN, ecriture ? 'readwrite' : 'readonly').objectStore(MAGASIN);
+}
+function req(r) {
+  return new Promise(function (res, rej) {
+    r.onsuccess = function () { res(r.result); };
+    r.onerror = function () { rej(r.error); };
+  });
+}
+
+/* ------------------------------------------------------- API commune */
+var S = {
+  mode: function () { return mode; },
+
+  get: function (k) {
+    if (mode === 'hote') {
+      return window.storage.get(k).then(function (r) { return r ? r.value : null; }, function () { return null; });
+    }
+    if (mode === 'idb') {
+      return req(tx(false).get(k)).then(function (v) {
+        if (v !== undefined && v !== null) return v;
+        var s = mGet(k);                       // rattrapage depuis le miroir
+        if (s !== null) { S.set(k, s); return s; }
+        return null;
+      }, function () {
+        var s = mGet(k); return s === null ? null : s;
+      });
+    }
+    if (mode === 'local') return Promise.resolve(mGet(k));
+    return Promise.resolve(mem[k] === undefined ? null : mem[k]);
+  },
+
+  set: function (k, v) {
+    if (mode === 'hote') return window.storage.set(k, v).catch(function () { });
+    if (mode === 'idb') {
+      mSet(k, v);
+      return req(tx(true).put(v, k)).catch(function () { });
+    }
+    if (mode === 'local') {
+      try { localStorage.setItem(k, v); }
+      catch (e) { if (S.surSaturation) S.surSaturation(); }
+      return Promise.resolve();
+    }
+    mem[k] = v; return Promise.resolve();
+  },
+
+  del: function (k) {
+    if (mode === 'hote') return window.storage.delete(k).catch(function () { });
+    if (mode === 'idb') { mDel(k); return req(tx(true).delete(k)).catch(function () { }); }
+    if (mode === 'local') { mDel(k); return Promise.resolve(); }
+    delete mem[k]; return Promise.resolve();
+  },
+
+  /* toutes les clés bordcub.* connues, quel que soit le support */
+  keys: function () {
+    var fusion = function (a, b) {
+      var vu = {}, r = [];
+      a.concat(b).forEach(function (k) { if (k && k.indexOf(PREFIXE) === 0 && !vu[k]) { vu[k] = 1; r.push(k); } });
+      return r.sort();
+    };
+    if (mode === 'hote' && window.storage.list) {
+      return window.storage.list(PREFIXE).then(function (r) { return fusion((r && r.keys) || [], []); },
+        function () { return []; });
+    }
+    if (mode === 'idb') {
+      return req(tx(false).getAllKeys()).then(function (ks) { return fusion(ks || [], mCles()); },
+        function () { return fusion([], mCles()); });
+    }
+    if (mode === 'local') return Promise.resolve(fusion(mCles(), []));
+    return Promise.resolve(fusion(Object.keys(mem), []));
+  },
+
+  /* place occupée, si le navigateur veut bien la dire */
+  place: function () {
+    if (!navigator.storage || !navigator.storage.estimate) return Promise.resolve(null);
+    return navigator.storage.estimate().then(function (e) {
+      return { utilise: e.usage || 0, total: e.quota || 0 };
+    }).catch(function () { return null; });
+  }
+};
+
+/* ------------------------------------------------------------ départ */
+function reprise() {
+  /* ce que le miroir connaît et qu'IndexedDB ignore encore : on rapatrie.
+     C'est aussi le chemin de migration depuis la version localStorage. */
+  var cles = mCles();
+  if (!cles.length) return Promise.resolve(0);
+  return req(tx(false).getAllKeys()).then(function (deja) {
+    var vu = {}; (deja || []).forEach(function (k) { vu[k] = 1; });
+    var manquantes = cles.filter(function (k) { return !vu[k]; });
+    if (!manquantes.length) return 0;
+    var o = tx(true), n = 0;
+    manquantes.forEach(function (k) { var v = mGet(k); if (v !== null) { o.put(v, k); n++; } });
+    return n;
+  }).catch(function () { return 0; });
+}
+
+S.pret = (function () {
+  if (typeof window.storage === 'object' && window.storage && typeof window.storage.get === 'function') {
+    mode = 'hote';
+    return Promise.resolve(mode);
+  }
+  miroir = miroirDispo();
+  if (typeof indexedDB === 'undefined' || !indexedDB) {
+    mode = miroir ? 'local' : 'memoire';
+    return Promise.resolve(mode);
+  }
+  return ouvrirDB().then(function (d) {
+    db = d; mode = 'idb';
+    d.onversionchange = function () { try { d.close(); } catch (e) { } db = null; mode = miroir ? 'local' : 'memoire'; };
+    return reprise().then(function () { return mode; });
+  }, function () {
+    mode = miroir ? 'local' : 'memoire';
+    return mode;
+  });
+})();
+
+window.BCS = S;
+
+})();
+
+</script>
+<script>
+/* ==========================================================================
+   BordCub — sauvegarde et récupération (logique pure, sans DOM)
+   ========================================================================== */
+(function () {
+'use strict';
+
+var JOUR = 86400000;
+var MAX_INSTANTANES = 7;      // une semaine de photos quotidiennes
+var JOURS_POUBELLE = 30;      // délai avant effacement réel
+
+function jour(ts) {
+  var d = new Date(ts);
+  return d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0');
+}
+function cleInstantane(ts) { return 'bordcub.snap.' + jour(ts); }
+function clePoubelle(id) { return 'bordcub.poubelle.' + id; }
+
+/* Parmi les clés d'instantanés existantes, celles à effacer pour n'en
+   garder que les `max` plus récentes (les clés sont triables telles quelles). */
+function rotation(cles, max) {
+  var s = cles.filter(function (k) { return k.indexOf('bordcub.snap.') === 0; }).sort();
+  var trop = s.length - (max || MAX_INSTANTANES);
+  return trop > 0 ? s.slice(0, trop) : [];
+}
+
+/* Entrées de corbeille dont le délai est écoulé. entrees : [{cle, suppr}] */
+function aPurger(entrees, maintenant, jours) {
+  var limite = maintenant - (jours == null ? JOURS_POUBELLE : jours) * JOUR;
+  return entrees.filter(function (e) { return !e.suppr || e.suppr < limite; })
+    .map(function (e) { return e.cle; });
+}
+
+function construireSauvegarde(cfg, bordereaux) {
+  return {
+    format: 'bordcub-sauvegarde-1',
+    version: 1,
+    date: new Date().toISOString(),
+    config: cfg || null,
+    bordereaux: (bordereaux || []).filter(Boolean)
+  };
+}
+
+/* Accepte les deux formats : sauvegarde complète, ou bordereau seul
+   (format historique « bordcub-1 »). Renvoie null si illisible. */
+function lireSauvegarde(o) {
+  if (!o || typeof o !== 'object') return null;
+  if (Array.isArray(o.bordereaux)) {
+    var b = o.bordereaux.filter(function (x) { return x && Array.isArray(x.lignes); });
+    if (!b.length) return null;
+    return { config: o.config || null, bordereaux: b, complete: true };
+  }
+  var seul = o.bordereau || o;
+  if (seul && Array.isArray(seul.lignes)) {
+    return { config: o.config || null, bordereaux: [seul], complete: false };
+  }
+  return null;
+}
+
+/* « il y a 3 jours », pour l'indicateur de sauvegarde */
+function depuisQuand(ts, maintenant) {
+  if (!ts) return null;
+  var d = Math.floor((maintenant - ts) / JOUR);
+  if (d <= 0) return 'aujourd’hui';
+  if (d === 1) return 'hier';
+  if (d < 31) return 'il y a ' + d + ' jours';
+  var m = Math.floor(d / 30);
+  return 'il y a ' + m + ' mois';
+}
+/* Au-delà d'une semaine sans sauvegarde extérieure, on alerte. */
+function sauvegardeAncienne(ts, maintenant) {
+  return !ts || (maintenant - ts) > 7 * JOUR;
+}
+
+function octets(n) {
+  if (n == null) return '';
+  if (n < 1024) return n + ' o';
+  if (n < 1048576) return (n / 1024).toFixed(0) + ' Ko';
+  return (n / 1048576).toFixed(1) + ' Mo';
+}
+
+window.BCB = {
+  JOUR: JOUR, MAX_INSTANTANES: MAX_INSTANTANES, JOURS_POUBELLE: JOURS_POUBELLE,
+  jour: jour, cleInstantane: cleInstantane, clePoubelle: clePoubelle,
+  rotation: rotation, aPurger: aPurger,
+  construireSauvegarde: construireSauvegarde, lireSauvegarde: lireSauvegarde,
+  depuisQuand: depuisQuand, sauvegardeAncienne: sauvegardeAncienne, octets: octets
+};
+if (typeof module === 'object' && module.exports) module.exports = window.BCB;
+
+})();
+
+</script>
+<script>
+/* ==========================================================================
    BordCub — interface
    ========================================================================== */
 (function () {
@@ -1471,29 +1751,15 @@ var $$ = function (s, r) { return Array.prototype.slice.call((r || document).que
 var E = window.BC;   // moteur
 
 /* ------------------------------------------------------------ stockage */
-var Store = (function () {
-  var mem = {}, mode = 'memoire';
-  if (typeof window.storage === 'object' && window.storage && typeof window.storage.get === 'function') mode = 'hote';
-  else { try { localStorage.setItem('__bc', '1'); localStorage.removeItem('__bc'); mode = 'local'; } catch (e) { } }
-  return {
-    mode: mode,
-    get: function (k) {
-      if (mode === 'hote') return window.storage.get(k).then(function (r) { return r ? r.value : null; }, function () { return null; });
-      if (mode === 'local') { try { return Promise.resolve(localStorage.getItem(k)); } catch (e) { return Promise.resolve(null); } }
-      return Promise.resolve(mem[k] === undefined ? null : mem[k]);
-    },
-    set: function (k, v) {
-      if (mode === 'hote') return window.storage.set(k, v).catch(function () { });
-      if (mode === 'local') { try { localStorage.setItem(k, v); } catch (e) { toast('Mémoire pleine : exportez vos bordereaux.'); } return Promise.resolve(); }
-      mem[k] = v; return Promise.resolve();
-    },
-    del: function (k) {
-      if (mode === 'hote') return window.storage.delete(k).catch(function () { });
-      if (mode === 'local') { try { localStorage.removeItem(k); } catch (e) { } return Promise.resolve(); }
-      delete mem[k]; return Promise.resolve();
-    }
-  };
-})();
+var Store = {
+  get: function (k) { return window.BCS.get(k); },
+  set: function (k, v) { return window.BCS.set(k, v); },
+  del: function (k) { return window.BCS.del(k); },
+  keys: function () { return window.BCS.keys(); },
+  place: function () { return window.BCS.place(); },
+  mode: function () { return window.BCS.mode(); }
+};
+window.BCS.surSaturation = function () { toast('Mémoire pleine : exportez vos bordereaux.'); };
 function lire(k, def) { return Store.get(k).then(function (v) { try { return v ? JSON.parse(v) : def; } catch (e) { return def; } }); }
 function ecrire(k, o) { return Store.set(k, JSON.stringify(o)); }
 
@@ -2048,6 +2314,174 @@ function renderReglages() {
 }
 
 /* ============================================================== EXPORT */
+/* ==================================================== sauvegarde et corbeille */
+var B = window.BCB;
+
+function tousLesBordereaux() {
+  return Promise.all(A.index.map(function (e) { return lire('bordcub.b.' + e.id, null); }))
+    .then(function (l) { return l.filter(Boolean); });
+}
+
+/* Envoi direct (partage Android) sinon téléchargement classique. */
+function partager(nom, texte, type) {
+  try {
+    if (navigator.share && navigator.canShare && typeof File === 'function') {
+      var f = new File([texte], nom, { type: type });
+      if (navigator.canShare({ files: [f] })) {
+        return navigator.share({ files: [f], title: nom }).then(function () {
+          toast('Sauvegarde envoyée.');
+        }, function (e) {
+          if (!(e && e.name === 'AbortError')) telecharger(nom, texte, type);
+        });
+      }
+    }
+  } catch (e) { }
+  telecharger(nom, texte, type);
+  return Promise.resolve();
+}
+
+function marquerExport() {
+  A.export = Date.now();
+  return ecrire('bordcub.export', A.export).then(renderSauvegarde);
+}
+
+function sauvegarderTout() {
+  if (!A.index.length) { toast('Aucun bordereau à sauvegarder.'); return Promise.resolve(); }
+  return tousLesBordereaux().then(function (bs) {
+    var txt = JSON.stringify(B.construireSauvegarde(A.cfg, bs), null, 1);
+    return partager('BordCub-' + B.jour(Date.now()) + '.json', txt, 'application/json');
+  }).then(marquerExport);
+}
+
+/* Une photo complète par jour, sept jours glissants. */
+function instantaneDuJour() {
+  var cle = B.cleInstantane(Date.now());
+  return Store.get(cle).then(function (v) {
+    if (v || !A.index.length) return;
+    return tousLesBordereaux().then(function (bs) {
+      if (!bs.length) return;
+      return Store.set(cle, JSON.stringify(B.construireSauvegarde(A.cfg, bs)));
+    });
+  }).then(function () {
+    return Store.keys();
+  }).then(function (ks) {
+    return Promise.all(B.rotation(ks, B.MAX_INSTANTANES).map(function (k) { return Store.del(k); }));
+  }).catch(function () { });
+}
+
+function corbeille() {
+  return Store.keys().then(function (ks) {
+    return Promise.all(ks.filter(function (k) { return k.indexOf('bordcub.poubelle.') === 0; })
+      .map(function (k) {
+        return lire(k, null).then(function (o) {
+          return o && o.b ? { cle: k, suppr: o.suppr || 0, b: o.b } : null;
+        });
+      }));
+  }).then(function (l) {
+    return l.filter(Boolean).sort(function (a, b) { return b.suppr - a.suppr; });
+  }).catch(function () { return []; });
+}
+function jeter(id) {
+  return lire('bordcub.b.' + id, null).then(function (b) {
+    if (!b) return;
+    return Store.set(B.clePoubelle(id), JSON.stringify({ suppr: Date.now(), b: b }))
+      .then(function () { return Store.del('bordcub.b.' + id); });
+  });
+}
+function purger() {
+  return corbeille().then(function (l) {
+    return Promise.all(B.aPurger(l, Date.now()).map(function (k) { return Store.del(k); }));
+  }).catch(function () { });
+}
+function repecher(cle) {
+  return lire(cle, null).then(function (o) {
+    if (!o || !o.b) { toast('Introuvable.'); return; }
+    var b = o.b;
+    if (A.index.some(function (x) { return x.id === b.id; })) b.id = uid();
+    b.maj = Date.now();
+    A.index.push({ id: b.id, meta: b.meta, maj: b.maj, nb: (b.lignes || []).length, vol: 0 });
+    return ecrire('bordcub.b.' + b.id, b)
+      .then(function () { return ecrire('bordcub.index', A.index); })
+      .then(function () { return Store.del(cle); })
+      .then(function () {
+        renderFichiers(); renderSauvegarde();
+        toast('Bordereau récupéré.');
+      });
+  });
+}
+
+/* Réintègre une sauvegarde, fichier ou instantané. */
+function integrer(objet, source) {
+  var s = B.lireSauvegarde(objet);
+  if (!s) { toast('Fichier illisible.'); return Promise.resolve(); }
+  var n = 0, dernier = null;
+  return s.bordereaux.reduce(function (ch, b) {
+    return ch.then(function () {
+      b.id = uid(); b.maj = Date.now(); b.prix = b.prix || {}; b.lignes = b.lignes || [];
+      A.index.push({ id: b.id, meta: b.meta, maj: b.maj, nb: b.lignes.length, vol: 0 });
+      n++; dernier = b;
+      return ecrire('bordcub.b.' + b.id, b);
+    });
+  }, Promise.resolve()).then(function () {
+    return ecrire('bordcub.index', A.index);
+  }).then(function () {
+    if (dernier) { A.bord = dernier; return ecrire('bordcub.actif', dernier.id); }
+  }).then(function () {
+    appliquerCouleur(); majBandeau(); viderFormulaire(false);
+    renderFichiers(); renderBordereau(); renderSyntheses(); renderSauvegarde();
+    toast(n > 1 ? n + ' bordereaux restaurés' + (source ? ' (' + source + ')' : '') + '.'
+      : 'Bordereau restauré : ' + ((dernier && dernier.lignes.length) || 0) + ' billons.');
+  });
+}
+
+function renderSauvegarde() {
+  var e = $('#s-etat'); if (!e) return;
+  var q = B.depuisQuand(A.export, Date.now());
+  var vieux = B.sauvegardeAncienne(A.export, Date.now());
+  e.textContent = (q ? 'Dernière sauvegarde envoyée ' + q + '.' : 'Aucune sauvegarde envoyée hors du téléphone.') +
+    (vieux && A.index.length ? ' Pensez-y avant de repartir en forêt.' : '');
+  e.style.color = (vieux && A.index.length) ? 'var(--alerte, #B4231F)' : '';
+  if (!$('#s-recup').hidden) renderRecup();
+}
+
+function renderRecup() {
+  var z = $('#s-recup'); if (!z) return;
+  z.innerHTML = '<p class="muted" style="font-size:12px;margin:12px 0 6px">Chargement…</p>';
+  Promise.all([corbeille(), Store.keys()]).then(function (r) {
+    var pou = r[0];
+    var snaps = r[1].filter(function (k) { return k.indexOf('bordcub.snap.') === 0; }).sort().reverse();
+    var h = '';
+    h += '<p class="muted" style="font-size:12px;margin:12px 0 6px">Bordereaux supprimés — gardés ' +
+      B.JOURS_POUBELLE + ' jours</p>';
+    h += pou.length ? pou.map(function (p) {
+      var m = p.b.meta || {};
+      return '<div class="liste-item"><span class="pastille" style="background:#7A8471"></span>' +
+        '<div class="li-c"><b>' + esc(m.foret || 'Sans forêt') + '</b><small>' +
+        E.fmt((p.b.lignes || []).length, 0) + ' billons · supprimé le ' +
+        new Date(p.suppr).toLocaleDateString('fr-FR') + '</small></div>' +
+        '<button class="btn-min" data-repecher="' + esc(p.cle) + '">Récupérer</button></div>';
+    }).join('') : '<p class="muted" style="font-size:12.5px;margin:0 0 6px">Corbeille vide.</p>';
+
+    h += '<p class="muted" style="font-size:12px;margin:14px 0 6px">Copies automatiques quotidiennes</p>';
+    h += snaps.length ? snaps.map(function (k) {
+      var d = k.slice('bordcub.snap.'.length).split('-');
+      return '<div class="liste-item"><span class="pastille" style="background:#2E4A3C"></span>' +
+        '<div class="li-c"><b>' + d[2] + '/' + d[1] + '/' + d[0] + '</b>' +
+        '<small>copie complète de la journée</small></div>' +
+        '<button class="btn-min" data-instantane="' + esc(k) + '">Restaurer</button></div>';
+    }).join('') : '<p class="muted" style="font-size:12.5px;margin:0">Aucune copie pour l’instant.</p>';
+
+    h += '<p class="muted" style="font-size:12px;margin:12px 0 0" id="s-place"></p>';
+    z.innerHTML = h;
+    Store.place().then(function (p) {
+      var el = $('#s-place'); if (!el) return;
+      el.textContent = 'Stockage : ' + Store.mode() +
+        (p ? ' · ' + B.octets(p.utilise) + ' occupés' : '');
+    });
+  });
+}
+
+/* ------------------------------------------------------------- fichiers */
 function nomFichier(ext) {
   var m = A.bord.meta;
   var n = [m.article, m.client, m.foret, m.parcelles ? 'Parc ' + m.parcelles : ''].filter(Boolean).join(' ');
@@ -2092,6 +2526,7 @@ function exportCsv() {
 function exportJson() {
   if (!A.bord) return;
   telecharger(nomFichier('json'), JSON.stringify({ format: 'bordcub-1', bordereau: A.bord, config: A.cfg }, null, 1), 'application/json');
+  marquerExport();
 }
 function importJson() {
   var i = document.createElement('input'); i.type = 'file'; i.accept = '.json,application/json';
@@ -2099,18 +2534,9 @@ function importJson() {
     var f = i.files[0]; if (!f) return;
     var fr = new FileReader();
     fr.onload = function () {
-      try {
-        var o = JSON.parse(fr.result);
-        var b = o.bordereau || o;
-        if (!b.lignes) throw new Error('fichier non reconnu');
-        b.id = uid(); b.maj = Date.now(); b.prix = b.prix || {};
-        A.index.push({ id: b.id, meta: b.meta, maj: b.maj, nb: b.lignes.length, vol: 0 });
-        A.bord = b;
-        ecrire('bordcub.b.' + b.id, b); ecrire('bordcub.index', A.index); ecrire('bordcub.actif', b.id);
-        appliquerCouleur(); majBandeau(); viderFormulaire(false);
-        renderFichiers(); renderBordereau(); renderSyntheses();
-        toast('Bordereau restauré : ' + b.lignes.length + ' billons.');
-      } catch (e) { toast('Fichier illisible.'); }
+      var o = null;
+      try { o = JSON.parse(fr.result); } catch (e) { toast('Fichier illisible.'); return; }
+      integrer(o, f.name);
     };
     fr.readAsText(f);
   });
@@ -2292,17 +2718,37 @@ function brancher() {
     if (s) {
       var id = s.dataset.supprimer;
       var e2 = A.index.filter(function (x) { return x.id === id; })[0];
-      if (!confirm('Supprimer définitivement « ' + ((e2 && e2.meta && e2.meta.foret) || 'ce bordereau') + ' » ?')) return;
+      if (!confirm('Supprimer « ' + ((e2 && e2.meta && e2.meta.foret) || 'ce bordereau') +
+        ' » ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Sauvegarde ▸ Récupérer.')) return;
       A.index = A.index.filter(function (x) { return x.id !== id; });
-      Store.del('bordcub.b.' + id); ecrire('bordcub.index', A.index);
-      if (A.bord && A.bord.id === id) { A.bord = null; Store.del('bordcub.actif'); majBandeau(); }
-      renderFichiers(); renderBordereau();
+      jeter(id).then(function () { return ecrire('bordcub.index', A.index); }).then(function () {
+        if (A.bord && A.bord.id === id) { A.bord = null; Store.del('bordcub.actif'); majBandeau(); }
+        renderFichiers(); renderBordereau(); renderSauvegarde();
+        toast('Mis à la corbeille.');
+      });
+    }
+  });
+  $('#s-recup').addEventListener('click', function (e) {
+    var rp = e.target.closest('[data-repecher]'), ins = e.target.closest('[data-instantane]');
+    if (rp) repecher(rp.dataset.repecher).then(renderRecup);
+    if (ins) {
+      if (!confirm('Restaurer la copie du ' + ins.dataset.instantane.slice(-10) +
+        ' ?\n\nLes bordereaux qu’elle contient seront ajoutés à côté des vôtres, rien ne sera écrasé.')) return;
+      lire(ins.dataset.instantane, null).then(function (o) { return integrer(o, 'copie du jour'); });
     }
   });
   $('#e-xlsx').addEventListener('click', exportXlsx);
   $('#e-csv').addEventListener('click', exportCsv);
   $('#e-json').addEventListener('click', exportJson);
   $('#i-json').addEventListener('click', importJson);
+  $('#s-tout').addEventListener('click', sauvegarderTout);
+  $('#s-restaurer').addEventListener('click', importJson);
+  $('#s-recuperer').addEventListener('click', function () {
+    var z = $('#s-recup');
+    z.hidden = !z.hidden;
+    this.textContent = z.hidden ? 'Récupérer…' : 'Masquer';
+    if (!z.hidden) renderRecup();
+  });
   $('#i-coller').addEventListener('click', function () { if (!A.bord) nouveauBordereau(); ouvrirColler(); });
 
   /* --- réglages --- */
@@ -2449,8 +2895,12 @@ function vueDemandee(def) {
 
 function init() {
   champs(); brancher();
-  Promise.all([lire('bordcub.cfg', null), lire('bordcub.index', []), Store.get('bordcub.actif')])
+  window.BCS.pret.then(function () {
+    return Promise.all([lire('bordcub.cfg', null), lire('bordcub.index', []),
+      Store.get('bordcub.actif'), lire('bordcub.export', 0)]);
+  })
     .then(function (res) {
+      A.export = res[3] || 0;
       A.cfg = res[0] || E.configDefaut();
       var d = E.configDefaut();
       ['essences', 'qualites', 'favoris'].forEach(function (k) { if (!A.cfg[k]) A.cfg[k] = d[k]; });
@@ -2473,7 +2923,13 @@ function init() {
           '<button class="btn primaire" id="v-nouveau">Créer un bordereau</button></div>';
         $('#v-nouveau').addEventListener('click', function () { nouveauBordereau(); ouvrirEntete(); });
       }
-    });
+    })
+    .then(function () {
+      /* entretien de fond : copie du jour, purge de la corbeille, indicateur */
+      renderSauvegarde();
+      return purger().then(instantaneDuJour);
+    })
+    .catch(function () { });
 }
 window.BCUI = { toast: toast };
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
@@ -2491,7 +2947,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '1.0.0-20260721';
+var VERSION = '1.1.0-20260721-1518';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

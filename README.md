@@ -41,17 +41,22 @@ navigateur et rattachés à l'adresse du site. Si vous déménagez l'application
 ailleurs, exportez d'abord vos bordereaux en JSON (*Bordereaux ▸ Exporter*) et
 réimportez-les depuis la nouvelle adresse.
 
-**Sauvegardez de temps en temps.** Une fois installée, l'application demande à
-Android de protéger ses données contre l'effacement automatique — l'état est
-affiché dans *Réglages ▸ Application*. Ça ne remplace pas un export JSON de
-fin de journée sur le drive ou par mail.
+**Sauvegardez de temps en temps.** L'application se protège toute seule sur
+trois niveaux : deux copies internes indépendantes, une copie complète
+automatique par jour gardée une semaine, et une corbeille de trente jours pour
+les bordereaux supprimés (*Bordereaux ▸ Sauvegarde ▸ Récupérer*). Tout ça vit
+dans le téléphone : si le téléphone disparaît, tout disparaît. Le bouton
+**Tout sauvegarder** envoie un fichier unique par mail, WhatsApp ou vers le
+drive ; l'application vous rappelle quand ça date de plus d'une semaine.
 
 ## 4. Mettre à jour
 
-Réuploader les fichiers modifiés sur GitHub. À la prochaine ouverture avec du
-réseau, l'application détecte la nouvelle version et propose de l'installer
+Quand une nouvelle version arrive : dépôt GitHub ▸ **Add file ▸ Upload files**,
+déposer les fichiers reçus, **Commit changes**. Les fichiers de même nom sont
+remplacés, c'est voulu. À la prochaine ouverture **avec du réseau**,
+l'application repère la nouvelle version et propose de l'installer
 (*Réglages ▸ Application ▸ Installer la mise à jour*). Les bordereaux ne sont
-pas touchés.
+jamais touchés par une mise à jour.
 
 ## Sans rien publier
 
