@@ -1,4 +1,4 @@
-# BordCub — mettre l'application sur le téléphone
+# Sylve — mettre l'application sur le téléphone
 
 Pour qu'Android propose « Installer », l'application doit être servie par une
 adresse `https://`. C'est la seule contrainte : ensuite tout fonctionne hors
@@ -9,7 +9,7 @@ réseau, en forêt, sans compte et sans abonnement.
 Le plus simple est GitHub Pages, gratuit et sans maintenance.
 
 1. Créer un compte sur **github.com**.
-2. **New repository** → nom `bordcub` → **Public** (les dépôts privés demandent
+2. **New repository** → nom au choix → **Public** (les dépôts privés demandent
    un abonnement payant pour Pages) → **Create**.
 3. **Add file ▸ Upload files** → glisser **le contenu** de ce dossier
    (`index.html`, `sw.js`, `manifest.webmanifest`, les quatre icônes) — pas le
@@ -17,7 +17,7 @@ Le plus simple est GitHub Pages, gratuit et sans maintenance.
 4. **Settings ▸ Pages** → *Source* : **Deploy from a branch** → branche `main`,
    dossier `/ (root)` → **Save**.
 5. Au bout d'une ou deux minutes, l'adresse s'affiche sur cette même page :
-   `https://VOTRE-COMPTE.github.io/bordcub/`
+   `https://VOTRE-COMPTE.github.io/VOTRE-DEPOT/`
 
 Le dépôt est public : c'est le programme qui est visible, jamais vos
 bordereaux — ils ne quittent pas le téléphone.
@@ -31,8 +31,8 @@ bordereaux — ils ne quittent pas le téléphone.
 3. L'icône apparaît sur l'écran d'accueil. L'application se lance en plein
    écran, sans barre d'adresse, et fonctionne ensuite sans réseau.
 
-Un appui long sur l'icône ouvre directement la **saisie**, les **bordereaux**
-ou les **synthèses**.
+Un appui long sur l'icône ouvre directement la **saisie**, le **bois de
+chauffage** ou les **synthèses**.
 
 ## 3. Deux points à connaître
 
@@ -60,7 +60,7 @@ jamais touchés par une mise à jour.
 
 ## Sans rien publier
 
-`BordCub.html` est la même application en un seul fichier : ouvrable depuis la
+`Sylve.html` est la même application en un seul fichier : ouvrable depuis la
 mémoire du téléphone ou une clé USB, sans adresse et sans installation. On perd
 l'icône, le plein écran, les mises à jour automatiques et la protection du
 stockage — d'où l'intérêt de la version publiée.
