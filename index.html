@@ -705,6 +705,21 @@ td.act{width:1%;padding:3px 6px}
           1<sup>er</sup> janvier 2029. Sylve ne remplace pas votre comptable : les taux signalés
           « à confirmer » divergent selon les sources.
         </p>
+        <p class="eyebrow" style="margin:16px 0 6px">Hypothèses fiscales</p>
+        <div class="grille g2">
+          <div class="champ"><label class="eyebrow" for="r-cot">Cotisations (%)</label>
+            <input type="text" id="r-cot" inputmode="decimal" autocomplete="off"></div>
+          <div class="champ"><label class="eyebrow" for="r-imp">Impôt sur le revenu (%)</label>
+            <input type="text" id="r-imp" inputmode="decimal" autocomplete="off"></div>
+          <div class="champ"><label class="eyebrow" for="r-abv">Abattement vente (%)</label>
+            <input type="text" id="r-abv" inputmode="decimal" autocomplete="off"></div>
+          <div class="champ"><label class="eyebrow" for="r-cfe">CFE par unité (€)</label>
+            <input type="text" id="r-cfe" inputmode="decimal" autocomplete="off"></div>
+        </div>
+        <p class="muted" style="font-size:12px;margin:9px 0 0">
+          Servent au prix de revient et à l'estimation des prélèvements. Ce sont vos taux :
+          Sylve n'en connaît aucun.
+        </p>
         <p class="eyebrow" style="margin:16px 0 6px">Véhicule</p>
         <div class="grille g2">
           <div class="champ"><label class="eyebrow" for="r-l100">Consommation (L/100 km)</label>
@@ -864,10 +879,32 @@ td.act{width:1%;padding:3px 6px}
     <section class="vue" id="vue-stock2" role="tabpanel">
       <div class="carte">
         <div class="carte-titre"><h2>Fournitures</h2>
-          <button class="btn primaire btn-min" id="art-nouveau">+ Article</button></div>
+          <div class="btn-rang" style="margin:0">
+            <button class="btn btn-min" id="art-nouveau">+ Article</button>
+            <button class="btn primaire btn-min" id="art-reception">Réception</button>
+          </div></div>
         <div id="stock-resume"></div>
       </div>
       <div class="carte"><div id="liste-articles"></div></div>
+    </section>
+
+    <section class="vue" id="vue-revient" role="tabpanel">
+      <div class="carte">
+        <h2>Prix de revient</h2>
+        <p class="muted" style="font-size:12.5px;margin:0 0 12px">
+          Ce qu'un produit coûte vraiment, ce que l'État prendra, ce qu'il vous reste.
+        </p>
+        <div id="rev-form"></div>
+      </div>
+      <div id="rev-resultat"></div>
+    </section>
+
+    <section class="vue" id="vue-commandes" role="tabpanel">
+      <div class="carte">
+        <div class="carte-titre"><h2>Commandes</h2>
+          <button class="btn primaire btn-min" id="cmd-nouvelle">Réception</button></div>
+        <div id="liste-commandes"></div>
+      </div>
     </section>
 
     <section class="vue" id="vue-charges" role="tabpanel">
@@ -1044,6 +1081,7 @@ td.act{width:1%;padding:3px 6px}
 <div id="toast" hidden role="status"></div>
 <datalist id="liste-clients"></datalist>
 <datalist id="liste-proprios"></datalist>
+<datalist id="liste-fournisseurs"></datalist>
 
 <script>
 /* ==========================================================================
@@ -3577,7 +3615,13 @@ function arr(n, d) { var p = Math.pow(10, d == null ? 2 : d); return Math.round(
 
 /* Mouvements d'un article : entrées (achats) et sorties (chantiers).
    { date, sens: 'entree'|'sortie', qte, prix (HT unitaire, entrées),
-     chantier, depense, note } */
+     fraisUnit (quote-part de livraison, calculée à la réception),
+     commande, chantier, note }
+
+   La quote-part de livraison est figée au moment de la réception : les frais
+   de la commande sont répartis à parts égales sur les unités reçues. Un
+   tuteur à 0,60 € dans une commande dont la livraison revient à 0,1325 €
+   par unité coûte en réalité 0,7325 €. Sans cela, la marge est surestimée. */
 function mouvements(art) { return (art && art.mouvements) || []; }
 
 function entrees(art) {
@@ -3593,12 +3637,49 @@ function quantite(art) {
 }
 /* Prix moyen pondéré : total acheté / quantité achetée. Recalculé à chaque
    entrée, il lisse les variations de prix entre commandes. */
+/* Coût réel d'une entrée : prix d'achat plus sa part de livraison. */
+function coutReel(m) { return arr(nb(m && m.prix) + nb(m && m.fraisUnit), 4); }
+
+/* Prix moyen pondéré, sur les coûts réels. */
 function pmp(art) {
   var q = 0, v = 0;
-  entrees(art).forEach(function (m) { q += nb(m.qte); v += nb(m.qte) * nb(m.prix); });
+  entrees(art).forEach(function (m) { q += nb(m.qte); v += nb(m.qte) * coutReel(m); });
   return q > 0 ? arr(v / q, 4) : 0;
 }
+/* Coût de la dernière réception : c'est lui qui sert à chiffrer un devis,
+   parce qu'il reflète le prix auquel on rachètera. */
+function dernierCout(art) {
+  var e = entrees(art).slice().sort(function (a, b) { return (b.date || 0) - (a.date || 0); });
+  return e.length ? coutReel(e[0]) : 0;
+}
 function valeurStock(art) { return arr(quantite(art) * pmp(art), 2); }
+/* Part de livraison portée par le stock restant, à titre indicatif. */
+function fraisLivraisonTotal(art) {
+  return arr(entrees(art).reduce(function (s, m) { return s + nb(m.qte) * nb(m.fraisUnit); }, 0), 2);
+}
+
+/* --------------------------------------------------------- dosage
+   Certains produits s'achètent au litre ou au mètre et se facturent au
+   plant : un répulsif dosé à 6 ml par plant, acheté 0,02 €/ml, revient
+   à 0,12 € par plant. Le stock se lit alors aussi en nombre de plants. */
+function coutParPlant(art) {
+  var d = nb(art && art.dosage);
+  return d > 0 ? arr(pmp(art) * d, 4) : 0;
+}
+function stockEnPlants(art) {
+  var d = nb(art && art.dosage);
+  return d > 0 ? arr(quantite(art) / d, 0) : null;
+}
+/* Quantité et prix unitaire à porter sur un devis, pour N plants. */
+function pourPlants(art, nbPlants, prixParPlant) {
+  var d = nb(art && art.dosage);
+  if (!(d > 0) || !(nb(nbPlants) > 0)) return null;
+  return {
+    quantite: arr(nb(nbPlants) * d, 2),
+    prixUnitaire: nb(prixParPlant) > 0 ? arr(nb(prixParPlant) / d, 5) : null,
+    cout: arr(nb(nbPlants) * d * pmp(art), 2)
+  };
+}
 function quantiteSortie(art) {
   return arr(sorties(art).reduce(function (s, m) { return s + nb(m.qte); }, 0), 3);
 }
@@ -3665,15 +3746,73 @@ function margeGlobale(articles, chantiers, montantLigne, dans) {
     taux: vendu > 0 ? Math.round((vendu - cout) / vendu * 100) : null };
 }
 
+
+/* ============================================ PRIX DE REVIENT
+   Décomposition d'un prix de vente : ce que le produit a coûté, ce que
+   l'État prendra, ce qui reste. Les taux sont ceux que l'utilisateur
+   saisit — aucun n'est deviné.
+
+   Au micro-BIC, cotisations et impôt portent sur le chiffre d'affaires
+   après abattement : sur 1 € vendu, la base est de 29 % si l'abattement
+   est de 71 %. Le taux de charges rapporté au prix de vente vaut donc
+   (1 − abattement) × (cotisations + impôt). */
+function tauxCharges(cfg) {
+  var c = cfg || {};
+  var ab = c.abattement != null ? nb(c.abattement) : 0.71;
+  return arr((1 - ab) * (nb(c.cotisations) + nb(c.impot)), 6);
+}
+/* Prix plancher : celui qui couvre exactement le coût et les charges. */
+function prixPlancher(cout, cfg) {
+  var t = tauxCharges(cfg);
+  if (t >= 1) return null;
+  return arr(nb(cout) / (1 - t), 4);
+}
+/* Prix visant un bénéfice net donné, en pourcentage du plancher. */
+function prixAvecBenefice(cout, cfg, tauxBenefice) {
+  var p = prixPlancher(cout, cfg);
+  return p == null ? null : arr(p * (1 + nb(tauxBenefice)), 4);
+}
+/* Prix visant un taux de marge brute donné. */
+function prixAvecMarge(cout, tauxMarge) {
+  var t = nb(tauxMarge);
+  if (t >= 1) return null;
+  return arr(nb(cout) / (1 - t), 4);
+}
+/* Décomposition d'un prix de vente donné. */
+function decomposer(prixVente, cout, cfg) {
+  var c = cfg || {}, pv = nb(prixVente), cu = nb(cout);
+  var ab = c.abattement != null ? nb(c.abattement) : 0.71;
+  var base = pv * (1 - ab);
+  var msa = arr(base * nb(c.cotisations), 5);
+  var ir = arr(base * nb(c.impot), 5);
+  var cfe = nb(c.cfeUnitaire);
+  var charges = arr(msa + ir + cfe, 5);
+  var benefice = arr(pv - cu - charges, 5);
+  var marge = arr(pv - cu, 5);
+  var pc = function (v) { return pv > 0 ? arr(v / pv * 100, 2) : 0; };
+  return {
+    prixVente: arr(pv, 4), cout: arr(cu, 4),
+    cotisations: msa, impot: ir, cfe: arr(cfe, 5), charges: charges,
+    benefice: benefice, marge: marge,
+    partCout: pc(cu), partCotisations: pc(msa), partImpot: pc(ir), partCfe: pc(cfe),
+    partBenefice: pc(benefice), tauxMarge: pc(marge),
+    viable: benefice >= 0
+  };
+}
+
 var M = {
   UNITES_ART: UNITES_ART, nomUniteArt: nomUniteArt, courtUniteArt: courtUniteArt,
   nb: nb, arr: arr,
   mouvements: mouvements, entrees: entrees, sorties: sorties,
-  quantite: quantite, pmp: pmp, valeurStock: valeurStock, quantiteSortie: quantiteSortie,
+  quantite: quantite, pmp: pmp, coutReel: coutReel, dernierCout: dernierCout,
+  valeurStock: valeurStock, fraisLivraisonTotal: fraisLivraisonTotal, quantiteSortie: quantiteSortie,
+  coutParPlant: coutParPlant, stockEnPlants: stockEnPlants, pourPlants: pourPlants,
   coutSortie: coutSortie, coutSorties: coutSorties, sousSeuil: sousSeuil,
   valeurTotale: valeurTotale, articlesSousSeuil: articlesSousSeuil,
   consommationChantier: consommationChantier, coutFournitures: coutFournitures,
-  margeChantier: margeChantier, margeGlobale: margeGlobale
+  margeChantier: margeChantier, margeGlobale: margeGlobale,
+  tauxCharges: tauxCharges, prixPlancher: prixPlancher, prixAvecBenefice: prixAvecBenefice,
+  prixAvecMarge: prixAvecMarge, decomposer: decomposer
 };
 if (typeof window !== 'undefined') window.BCS2 = M;
 if (typeof module === 'object' && module.exports) module.exports = M;
@@ -3891,10 +4030,10 @@ function aPurger(entrees, maintenant, jours) {
     .map(function (e) { return e.cle; });
 }
 
-function construireSauvegarde(cfg, bordereaux, piles, chantiers, depenses, clients, articles, charges, proprios) {
+function construireSauvegarde(cfg, bordereaux, piles, chantiers, depenses, clients, articles, charges, proprios, fournisseurs) {
   return {
     format: 'bordcub-sauvegarde-1',
-    version: 5,
+    version: 6,
     date: new Date().toISOString(),
     config: cfg || null,
     bordereaux: (bordereaux || []).filter(Boolean),
@@ -3904,7 +4043,8 @@ function construireSauvegarde(cfg, bordereaux, piles, chantiers, depenses, clien
     clients: (clients || []).filter(Boolean),
     articles: (articles || []).filter(Boolean),
     charges: (charges || []).filter(Boolean),
-    proprios: (proprios || []).filter(Boolean)
+    proprios: (proprios || []).filter(Boolean),
+    fournisseurs: (fournisseurs || []).filter(Boolean)
   };
 }
 
@@ -3920,7 +4060,8 @@ function lireSauvegarde(o) {
     return { config: o.config || null, bordereaux: b, piles: pi, chantiers: chs,
       depenses: (o.depenses || []).filter(Boolean), clients: (o.clients || []).filter(Boolean),
       articles: (o.articles || []).filter(Boolean), charges: (o.charges || []).filter(Boolean),
-      proprios: (o.proprios || []).filter(Boolean), complete: true };
+      proprios: (o.proprios || []).filter(Boolean),
+      fournisseurs: (o.fournisseurs || []).filter(Boolean), complete: true };
   }
   var seul = o.bordereau || o;
   if (seul && Array.isArray(seul.lignes)) {
@@ -3990,7 +4131,7 @@ function ecrire(k, o) { return Store.set(k, JSON.stringify(o)); }
 /* ---------------------------------------------------------------- état */
 var A = {
   cfg: null, index: [], bord: null, piles: [], chantiers: [], module: 'cubage', ici: null,
-  vuePiles: 'stock', filtreCh: 'ouverts', chOuvert: null, clients: [], proprios: [], estim: null, imp: null, articles: [], charges: [], calMois: null, calJour: null, nbAlertes: 0, planifie: null,
+  vuePiles: 'stock', filtreCh: 'ouverts', chOuvert: null, clients: [], proprios: [], estim: null, imp: null, articles: [], charges: [], fournisseurs: [], revient: null, calMois: null, calJour: null, nbAlertes: 0, planifie: null,
   depenses: [], periode: null, filtreDep: 'tous', vueAna: 'ensemble', secReglages: 'general',
   vue: 'saisie', sousVue: 'synthese', edition: null,
   memeGrume: false, classementRegl: 'Class. Comt', filtre: ''
@@ -4587,7 +4728,7 @@ function sauvegarderTout() {
   if (!A.index.length && !A.piles.length && !A.chantiers.length && !A.depenses.length &&
     !A.articles.length && !A.charges.length) { toast('Rien à sauvegarder.'); return Promise.resolve(); }
   return tousLesBordereaux().then(function (bs) {
-    var txt = JSON.stringify(B.construireSauvegarde(A.cfg, bs, A.piles, A.chantiers, A.depenses, A.clients, A.articles, A.charges, A.proprios), null, 1);
+    var txt = JSON.stringify(B.construireSauvegarde(A.cfg, bs, A.piles, A.chantiers, A.depenses, A.clients, A.articles, A.charges, A.proprios, A.fournisseurs), null, 1);
     return partager('BordCub-' + B.jour(Date.now()) + '.json', txt, 'application/json');
   }).then(marquerExport);
 }
@@ -4610,7 +4751,7 @@ function instantaneDuJour() {
     return tousLesBordereaux().then(function (bs) {
       if (!bs.length && !A.piles.length && !A.chantiers.length) return;
       return Store.set(cle, JSON.stringify(B.construireSauvegarde(A.cfg, bs, sansPhotos(A.piles),
-        A.chantiers, A.depenses, A.clients, A.articles, A.charges, A.proprios)));
+        A.chantiers, A.depenses, A.clients, A.articles, A.charges, A.proprios, A.fournisseurs)));
     });
   }).then(function () {
     return Store.keys();
@@ -4708,6 +4849,7 @@ function integrer(objet, source) {
       A.charges.push(cg); ng++;
     });
     (s.proprios || []).forEach(function (p) { noterProprio(p); });
+    (s.fournisseurs || []).forEach(function (f2) { noterFournisseur(f2); });
     return Promise.all([np ? sauverPiles() : null, nc ? sauverChantiers() : null,
       nd ? sauverDepenses() : null, na ? sauverArticles() : null, ng ? sauverCharges() : null]);
   }).then(function () {
@@ -5031,6 +5173,8 @@ function aller(v) {
   if (v === 'charges') renderCharges();
   if (v === 'stock2') renderStockFournitures();
   if (v === 'analyses') renderAnalyses();
+  if (v === 'commandes') renderCommandes();
+  if (v === 'revient') renderRevient();
   if (v === 'rendements') renderRendements();
   if (v === 'estimer') renderEstimer();
   try { if (window.scrollY || window.pageYOffset) window.scrollTo(0, 0); } catch (e) { }
@@ -5322,6 +5466,18 @@ function brancher() {
     else if (so) ouvrirSortieStock(so.dataset.artsortie);
     else if (mo) ouvrirArticle(mo.dataset.artmod);
     else if (hi) ouvrirHistoriqueArticle(hi.dataset.arthist);
+  });
+
+  /* --- réceptions et prix de revient --- */
+  $('#art-reception').addEventListener('click', ouvrirReception);
+  $('#cmd-nouvelle').addEventListener('click', ouvrirReception);
+  $('#rev-form').addEventListener('change', function (e) {
+    if (e.target.closest('#rev-art')) { A.revient.article = $('#rev-art').value; A.revient.prix = ''; A.revient.parPlant = ''; renderRevient(); }
+    else if (e.target.closest('#rev-base')) { A.revient.base = $('#rev-base').value; renderRevient(); }
+  });
+  $('#rev-form').addEventListener('input', function (e) {
+    if (e.target.closest('#rev-prix')) { A.revient.prix = $('#rev-prix').value; A.revient.parPlant = ''; renderRevientResultat(); }
+    else if (e.target.closest('#rev-plant')) { A.revient.parPlant = $('#rev-plant').value; A.revient.prix = ''; renderRevientResultat(); }
   });
 
   /* --- charges fixes --- */
@@ -5637,7 +5793,7 @@ function vueDemandee(def) {
     var m = /[?&]vue=([a-z]+)/.exec(location.search || '');
     var v = m && m[1];
     if (v && ['saisie', 'bordereau', 'syntheses', 'fichiers', 'reglages',
-      'stock', 'bois', 'lieux', 'accueil', 'carnet', 'chantier', 'estimer', 'rendements', 'calendrier', 'finances', 'depenses', 'stock2', 'charges', 'carte', 'analyses'].indexOf(v) >= 0) return v;
+      'stock', 'bois', 'lieux', 'accueil', 'carnet', 'chantier', 'estimer', 'rendements', 'calendrier', 'finances', 'depenses', 'stock2', 'charges', 'carte', 'analyses', 'commandes', 'revient'].indexOf(v) >= 0) return v;
   } catch (e) { }
   return def;
 }
@@ -5649,7 +5805,7 @@ function init() {
       Store.get('bordcub.actif'), lire('bordcub.export', 0),
       lire('bordcub.piles', []), lire('bordcub.module', 'cubage'), lire('bordcub.chantiers', []),
       lire('bordcub.clients', []), lire('bordcub.depenses', []), lire('bordcub.proprios', []),
-      lire('bordcub.articles', []), lire('bordcub.charges', [])]);
+      lire('bordcub.articles', []), lire('bordcub.charges', []), lire('bordcub.fournisseurs', [])]);
   })
     .then(function (res) {
       A.export = res[3] || 0;
@@ -5661,6 +5817,7 @@ function init() {
       A.proprios = res[9] || [];
       A.articles = res[10] || [];
       A.charges = res[11] || [];
+      A.fournisseurs = res[12] || [];
       A.cfg = res[0] || E.configDefaut();
       var d = E.configDefaut();
       ['essences', 'qualites', 'favoris'].forEach(function (k) { if (!A.cfg[k]) A.cfg[k] = d[k]; });
@@ -5680,14 +5837,14 @@ function init() {
       renderCarnet(); renderReglagesCh(); renderReglagesAlertes(); renderEstimer();
       renderRendements(); renderCalendrier(); renderAlertes();
       renderFinances(); renderDepenses(); renderCharges(); renderStockFournitures();
-      renderCarteChantiers(); renderAnalyses(); renderAccueil();
+      renderCarteChantiers(); renderAnalyses(); renderCommandes(); renderRevient(); renderAccueil();
       var vd = vueDemandee(null);
       if (vd === 'accueil') { majBandeau(); renderFichiers(); renderReglages(); allerAccueil(); return; }
       if (vd) {
         var MOD_DE_VUE = { stock: 'bois', bois: 'bois', lieux: 'bois',
           carnet: 'chantiers', chantier: 'chantiers', calendrier: 'calendrier',
           rendements: 'rendements', estimer: 'devis', finances: 'finances', depenses: 'finances',
-          charges: 'finances', stock2: 'stock', carte: 'calendrier', analyses: 'analyses' };
+          charges: 'finances', stock2: 'stock', commandes: 'stock', revient: 'stock', carte: 'calendrier', analyses: 'analyses' };
         var mod = MOD_DE_VUE[vd] || 'cubage';
         renderReglages();
         if (actif && A.index.some(function (x) { return x.id === actif; })) {
@@ -5752,7 +5909,8 @@ var MODULES = {
   },
   stock: {
     nom: 'Stock et fournitures', defaut: 'stock2', groupe: 'entreprise',
-    vues: [['stock2', '▥', 'Fournitures'], ['reglages', '⚙', 'Réglages']]
+    vues: [['stock2', '▥', 'Fournitures'], ['commandes', '▤', 'Réceptions'],
+    ['revient', '€', 'Prix de revient'], ['reglages', '⚙', 'Réglages']]
   },
   bois: {
     nom: 'Bois de chauffage', defaut: 'stock',
@@ -7512,6 +7670,10 @@ function majPastilleEntreprise() {
 }
 
 function renderReglagesAlertes() {
+  if ($('#r-cot')) $('#r-cot').value = (A.cfg && A.cfg.tauxCotisations != null) ? A.cfg.tauxCotisations : '';
+  if ($('#r-imp')) $('#r-imp').value = (A.cfg && A.cfg.tauxImpot != null) ? A.cfg.tauxImpot : '';
+  if ($('#r-abv')) $('#r-abv').value = Math.round(((A.cfg && A.cfg.abattementVente != null) ? A.cfg.abattementVente : 0.71) * 100);
+  if ($('#r-cfe')) $('#r-cfe').value = (A.cfg && A.cfg.cfeUnitaire) || '';
   if ($('#r-l100')) $('#r-l100').value = (A.cfg && A.cfg.litres100) || 9;
   if ($('#r-pl')) $('#r-pl').value = (A.cfg && A.cfg.prixLitre) || 1.75;
   if ($('#r-rd')) $('#r-rd').value = (A.cfg && A.cfg.joursRelanceDevis) || 21;
@@ -7519,6 +7681,17 @@ function renderReglagesAlertes() {
   if ($('#r-we')) $('#r-we').checked = !!(A.cfg && A.cfg.weekends);
 }
 function brancherReglagesAlertes() {
+  var majFisc = function () {
+    A.cfg.tauxCotisations = FIN.nb($('#r-cot').value) || null;
+    A.cfg.tauxImpot = FIN.nb($('#r-imp').value) || null;
+    var ab = FIN.nb($('#r-abv').value);
+    A.cfg.abattementVente = (ab > 0 && ab < 100) ? ab / 100 : 0.71;
+    A.cfg.cfeUnitaire = FIN.nb($('#r-cfe').value) || null;
+    sauverCfg(); renderRevient(); renderAnalyses();
+  };
+  ['#r-cot', '#r-imp', '#r-abv', '#r-cfe'].forEach(function (id) {
+    var el = $(id); if (el) el.addEventListener('change', majFisc);
+  });
   ['#r-l100', '#r-pl'].forEach(function (id) {
     var el = $(id);
     if (el) el.addEventListener('change', function () {
@@ -8009,7 +8182,8 @@ function renderStockFournitures() {
     return '<div class="liste-item pile-c"><div class="li-h">' +
       '<span class="pastille" style="background:' + (ST.sousSeuil(a) ? '#B98A00' : '#2E4A3C') + ';margin-top:4px"></span>' +
       '<div class="li-c"><b>' + esc(a.nom || 'Article') + ' — ' + E.fmt(q, q % 1 ? 2 : 0) + ' ' + u + '</b>' +
-      '<small>' + eur(p) + ' / ' + u + ' en moyenne · ' + eur(ST.valeurStock(a)) + ' en stock' +
+      '<small>' + E.fmt(p, 4) + ' € / ' + u + ' livraison comprise · ' + eur(ST.valeurStock(a)) + ' en stock' +
+      (ST.stockEnPlants(a) != null ? ' · ' + E.fmt(ST.stockEnPlants(a), 0) + ' plants' : '') +
       (ST.quantiteSortie(a) ? ' · ' + E.fmt(ST.quantiteSortie(a), 0) + ' ' + u + ' sortis' : '') +
       (ST.sousSeuil(a) ? '<br><span class="retard">sous le seuil de ' + E.fmt(C.nb(a.seuil), 0) + '</span>' : '') +
       '</small></div></div>' +
@@ -8038,7 +8212,11 @@ function ouvrirArticle(id) {
     '<input type="text" id="ar-four" autocomplete="off" value="' + esc(a.fournisseur || '') + '"></div>' +
     '<div class="champ"><label class="eyebrow" for="ar-ref">Référence</label>' +
     '<input type="text" id="ar-ref" autocomplete="off" value="' + esc(a.reference || '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="ar-dosage">Dosage par plant</label>' +
+    '<input type="text" id="ar-dosage" inputmode="decimal" placeholder="ex. 6 ml" value="' + (a.dosage || '') + '"></div>' +
     '</div>' +
+    '<p class="muted" style="font-size:11.5px;margin:6px 0 0">Le dosage sert aux produits achetés ' +
+    'au litre ou au mètre et facturés au plant : le stock se lit alors aussi en nombre de plants.</p>' +
     '<div class="btn-rang" style="margin-top:11px">' +
     '<button class="btn primaire" id="ar-ok">Valider</button>' +
     (id ? '<button class="btn danger btn-min" id="ar-sup">Supprimer</button>' : '') + '</div>');
@@ -8046,7 +8224,8 @@ function ouvrirArticle(id) {
     var nom = $('#ar-nom').value.trim();
     if (!nom) { toast('Donnez une désignation.'); return; }
     var maj = { nom: nom, unite: $('#ar-unite').value, seuil: ST.nb($('#ar-seuil').value) || null,
-      fournisseur: $('#ar-four').value.trim(), reference: $('#ar-ref').value.trim(), maj: Date.now() };
+      fournisseur: $('#ar-four').value.trim(), reference: $('#ar-ref').value.trim(),
+      dosage: ST.nb($('#ar-dosage').value) || null, maj: Date.now() };
     if (id) { Object.keys(maj).forEach(function (k) { a[k] = maj[k]; }); }
     else { maj.id = uid(); maj.mouvements = []; A.articles.push(maj); }
     sauverArticles().then(function () {
@@ -8642,6 +8821,286 @@ function htmlDepenses(an, b) {
     '</small></div></div></div>';
 }
 
+/* ============================= RÉCEPTION DE COMMANDE ET PRIX DE REVIENT */
+
+/* Une réception : plusieurs articles reçus le même jour, chez le même
+   fournisseur, avec des frais de livraison à répartir sur l'ensemble. */
+var recLignes = [];
+function ouvrirReception() {
+  if (!A.articles.length) { toast('Créez d’abord un article.'); return; }
+  recLignes = [{ article: A.articles[0].id, qte: '', prix: '' }];
+  modale('Réception de commande',
+    '<div class="grille g2">' +
+    '<div class="champ"><label class="eyebrow" for="rc-date">Date de réception</label>' +
+    '<input type="date" id="rc-date" value="' + new Date().toISOString().slice(0, 10) + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="rc-num">N° de commande</label>' +
+    '<input type="text" id="rc-num" autocomplete="off"></div>' +
+    '<div class="champ"><label class="eyebrow" for="rc-four">Fournisseur</label>' +
+    '<input type="text" id="rc-four" autocomplete="off" list="liste-fournisseurs"></div>' +
+    '<div class="champ"><label class="eyebrow" for="rc-livr">Frais de livraison (€ HT)</label>' +
+    '<input type="text" id="rc-livr" inputmode="decimal" placeholder="0"></div>' +
+    '</div>' +
+    '<label class="eyebrow" style="margin-top:12px;display:block">Articles reçus</label>' +
+    '<div id="rc-lignes"></div>' +
+    '<div class="carte2" id="rc-apercu" style="margin:11px 0"></div>' +
+    '<label class="ligne-check" style="display:flex;align-items:center;gap:8px;font-size:13.5px">' +
+    '<input type="checkbox" id="rc-dep" checked> Créer la dépense correspondante</label>' +
+    '<div class="grille g2" style="margin-top:8px"><div class="champ">' +
+    '<label class="eyebrow" for="rc-tva">TVA</label>' +
+    '<select id="rc-tva">' + FIN.TAUX_TVA.map(function (t) {
+      return '<option value="' + t + '"' + (t === 20 ? ' selected' : '') + '>' + (t ? t + ' %' : 'sans TVA') + '</option>';
+    }).join('') + '</select></div></div>' +
+    '<div class="btn-rang" style="margin-top:11px"><button class="btn primaire" id="rc-ok">Enregistrer</button></div>');
+  majDatalistFournisseurs();
+  renderRecLignes();
+
+  $('#rc-lignes').addEventListener('input', function () { lireRecLignes(); apercuReception(); });
+  $('#rc-lignes').addEventListener('change', function () { lireRecLignes(); apercuReception(); });
+  $('#rc-livr').addEventListener('input', apercuReception);
+  $('#rc-lignes').addEventListener('click', function (e) {
+    var plus = e.target.closest('#rc-plus'), sup = e.target.closest('[data-rcsup]');
+    if (plus) { lireRecLignes(); recLignes.push({ article: A.articles[0].id, qte: '', prix: '' }); renderRecLignes(); }
+    else if (sup) { lireRecLignes(); recLignes.splice(Number(sup.dataset.rcsup), 1); renderRecLignes(); }
+  });
+  $('#rc-ok').addEventListener('click', validerReception);
+}
+function renderRecLignes() {
+  $('#rc-lignes').innerHTML = recLignes.map(function (l, i) {
+    var art = article(l.article);
+    return '<div class="carte2" style="margin-bottom:7px;padding:9px 10px">' +
+      '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">' +
+      '<select data-rcart="' + i + '" style="flex:1">' + A.articles.map(function (a) {
+        return '<option value="' + a.id + '"' + (a.id === l.article ? ' selected' : '') + '>' + esc(a.nom || '') + '</option>';
+      }).join('') + '</select>' +
+      (recLignes.length > 1 ? '<button type="button" class="btn-min" data-rcsup="' + i + '">✕</button>' : '') + '</div>' +
+      '<div class="grille g2">' +
+      '<div class="champ"><label class="eyebrow">Quantité' +
+      (art ? ' (' + ST.courtUniteArt(art.unite) + ')' : '') + '</label>' +
+      '<input type="text" data-rcqte="' + i + '" class="gros" inputmode="decimal" value="' + esc(l.qte) + '"></div>' +
+      '<div class="champ"><label class="eyebrow">Prix unitaire HT</label>' +
+      '<input type="text" data-rcprix="' + i + '" class="gros" inputmode="decimal" value="' + esc(l.prix) + '"></div>' +
+      '</div></div>';
+  }).join('') + '<button type="button" class="btn-min" id="rc-plus">+ un article</button>';
+  apercuReception();
+}
+function lireRecLignes() {
+  $$('#rc-lignes [data-rcart]').forEach(function (i) { recLignes[Number(i.dataset.rcart)].article = i.value; });
+  $$('#rc-lignes [data-rcqte]').forEach(function (i) { recLignes[Number(i.dataset.rcqte)].qte = i.value; });
+  $$('#rc-lignes [data-rcprix]').forEach(function (i) { recLignes[Number(i.dataset.rcprix)].prix = i.value; });
+}
+function apercuReception() {
+  var z = $('#rc-apercu'); if (!z) return;
+  var valides = recLignes.filter(function (l) { return ST.nb(l.qte) > 0 && ST.nb(l.prix) > 0; });
+  var qteTot = valides.reduce(function (s, l) { return s + ST.nb(l.qte); }, 0);
+  var marchandise = valides.reduce(function (s, l) { return s + ST.nb(l.qte) * ST.nb(l.prix); }, 0);
+  var livr = ST.nb($('#rc-livr') ? $('#rc-livr').value : 0);
+  if (!qteTot) { z.innerHTML = '<span class="muted">Renseignez quantité et prix.</span>'; return; }
+  var part = livr / qteTot;
+  z.innerHTML = '<b class="num" style="font-size:19px">' + eur(marchandise + livr) + '</b> HT' +
+    '<div class="muted" style="font-size:12.5px;margin-top:3px">' +
+    E.fmt(qteTot, 0) + ' unités · ' + eur(marchandise) + ' de marchandise' +
+    (livr ? ' + ' + eur(livr) + ' de livraison, soit ' + E.fmt(ST.arr(part, 4), 4) + ' € par unité' : '') + '</div>' +
+    (livr ? '<div style="margin-top:7px;font-size:12.5px">' + valides.map(function (l) {
+      var a = article(l.article);
+      return '<div style="display:flex;justify-content:space-between;padding:2px 0">' +
+        '<span>' + esc(a ? a.nom : '') + '</span><span class="num muted">' +
+        E.fmt(ST.nb(l.prix), 2) + ' → <b>' + E.fmt(ST.arr(ST.nb(l.prix) + part, 4), 4) + ' €</b></span></div>';
+    }).join('') + '</div>' : '');
+}
+function validerReception() {
+  lireRecLignes();
+  var valides = recLignes.filter(function (l) { return ST.nb(l.qte) > 0 && ST.nb(l.prix) > 0; });
+  if (!valides.length) { toast('Aucune ligne complète.'); return; }
+  var date = versDate($('#rc-date').value) || Date.now();
+  var num = $('#rc-num').value.trim(), four = $('#rc-four').value.trim();
+  var livr = ST.nb($('#rc-livr').value);
+  var qteTot = valides.reduce(function (s, l) { return s + ST.nb(l.qte); }, 0);
+  var part = qteTot > 0 ? livr / qteTot : 0;
+  var marchandise = 0;
+  valides.forEach(function (l) {
+    var a = article(l.article); if (!a) return;
+    a.mouvements = a.mouvements || [];
+    a.mouvements.push({ date: date, sens: 'entree', qte: ST.nb(l.qte), prix: ST.nb(l.prix),
+      fraisUnit: ST.arr(part, 6), commande: num || null, fournisseur: four || null });
+    a.maj = Date.now();
+    marchandise += ST.nb(l.qte) * ST.nb(l.prix);
+  });
+  noterFournisseur(four);
+  var suite = sauverArticles();
+  if ($('#rc-dep').checked) {
+    var taux = ST.nb($('#rc-tva').value);
+    var lignes = [{ libelle: 'Fournitures' + (num ? ' ' + num : ''), categorie: 'FOURN',
+      ttc: FIN.arr(marchandise * (1 + taux / 100), 2), taux: taux }];
+    if (livr) lignes.push({ libelle: 'Livraison', categorie: 'FOURN',
+      ttc: FIN.arr(livr * (1 + taux / 100), 2), taux: taux });
+    A.depenses.push({ id: uid(), date: date, fournisseur: four, numero: num,
+      commande: num || null, maj: Date.now(), lignes: lignes });
+    suite = suite.then(sauverDepenses);
+  }
+  suite.then(function () {
+    fermerModale(); renderStockFournitures(); renderCommandes(); renderDepenses();
+    renderFinances(); renderAnalyses(); renderAccueil();
+    toast('Réception enregistrée.');
+  });
+}
+function noterFournisseur(nom) {
+  if (!nom) return;
+  A.fournisseurs = A.fournisseurs || [];
+  if (A.fournisseurs.some(function (x) { return x.toLowerCase() === nom.toLowerCase(); })) return;
+  A.fournisseurs.push(nom);
+  A.fournisseurs.sort(function (a, b) { return a.localeCompare(b, 'fr'); });
+  ecrire('bordcub.fournisseurs', A.fournisseurs);
+  majDatalistFournisseurs();
+}
+function majDatalistFournisseurs() {
+  var d = $('#liste-fournisseurs'); if (!d) return;
+  d.innerHTML = (A.fournisseurs || []).map(function (x) { return '<option value="' + esc(x) + '">'; }).join('');
+}
+
+/* ------------------------------------------------------- les commandes */
+function renderCommandes() {
+  var z = $('#liste-commandes'); if (!z) return;
+  var cmds = {};
+  A.articles.forEach(function (a) {
+    ST.entrees(a).forEach(function (m) {
+      var k = (m.commande || '') + '|' + ST.arr(m.date / 86400000, 0);
+      if (!cmds[k]) cmds[k] = { num: m.commande, date: m.date, fournisseur: m.fournisseur, lignes: [], total: 0, frais: 0 };
+      cmds[k].lignes.push({ article: a, m: m });
+      cmds[k].total += ST.nb(m.qte) * ST.nb(m.prix);
+      cmds[k].frais += ST.nb(m.qte) * ST.nb(m.fraisUnit);
+    });
+  });
+  var l = Object.keys(cmds).map(function (k) { return cmds[k]; })
+    .sort(function (a, b) { return (b.date || 0) - (a.date || 0); });
+  if (!l.length) {
+    z.innerHTML = '<div class="vide"><p>Aucune réception. Enregistrez une commande reçue : ' +
+      'les frais de livraison seront répartis sur les articles.</p></div>';
+    return;
+  }
+  z.innerHTML = l.map(function (c) {
+    return '<div class="liste-item pile-c"><div class="li-h">' +
+      '<span class="pastille" style="background:#2E4A3C;margin-top:4px"></span>' +
+      '<div class="li-c"><b>' + esc(c.num || 'Sans numéro') + ' — ' + eur(c.total + c.frais) + '</b>' +
+      '<small>' + dateCourte(c.date) + (c.fournisseur ? ' · ' + esc(c.fournisseur) : '') +
+      ' · ' + c.lignes.length + ' article' + (c.lignes.length > 1 ? 's' : '') +
+      (c.frais ? ' · dont ' + eur(c.frais) + ' de livraison' : '') + '<br>' +
+      c.lignes.map(function (x) {
+        return esc(x.article.nom || '') + ' ' + E.fmt(ST.nb(x.m.qte), 0) + ' × ' +
+          E.fmt(ST.coutReel(x.m), 4) + ' €';
+      }).join(' · ') + '</small></div></div></div>';
+  }).join('');
+}
+
+/* --------------------------------------------------- prix de revient */
+function fiscStock() {
+  var c = A.cfg || {};
+  return {
+    abattement: c.abattementVente != null ? c.abattementVente : 0.71,
+    cotisations: FIN.nb(c.tauxCotisations) / 100,
+    impot: FIN.nb(c.tauxImpot) / 100,
+    cfeUnitaire: FIN.nb(c.cfeUnitaire)
+  };
+}
+function renderRevient() {
+  var z = $('#rev-form'); if (!z) return;
+  if (!A.articles.length) {
+    z.innerHTML = '<div class="vide"><p>Créez un article et enregistrez une réception ' +
+      'pour connaître son coût réel.</p></div>';
+    $('#rev-resultat').innerHTML = '';
+    return;
+  }
+  var r = A.revient || (A.revient = { article: A.articles[0].id, prix: '', base: 'pmp' });
+  var art = article(r.article) || A.articles[0];
+  var cout = r.base === 'dernier' ? ST.dernierCout(art) : ST.pmp(art);
+  var parPlant = ST.coutParPlant(art);
+  z.innerHTML =
+    '<div class="grille g2">' +
+    '<div class="champ"><label class="eyebrow" for="rev-art">Produit</label>' +
+    '<select id="rev-art">' + A.articles.map(function (a) {
+      return '<option value="' + a.id + '"' + (a.id === r.article ? ' selected' : '') + '>' + esc(a.nom || '') + '</option>';
+    }).join('') + '</select></div>' +
+    '<div class="champ"><label class="eyebrow" for="rev-base">Coût retenu</label>' +
+    '<select id="rev-base">' +
+    '<option value="pmp"' + (r.base === 'pmp' ? ' selected' : '') + '>moyenne du stock</option>' +
+    '<option value="dernier"' + (r.base === 'dernier' ? ' selected' : '') + '>dernière réception</option>' +
+    '</select></div>' +
+    '<div class="champ"><label class="eyebrow" for="rev-prix">Prix de vente (€ / ' +
+    esc(ST.courtUniteArt(art.unite)) + ')</label>' +
+    '<input type="text" id="rev-prix" class="gros" inputmode="decimal" value="' + esc(r.prix) + '"></div>' +
+    (parPlant ? '<div class="champ"><label class="eyebrow" for="rev-plant">ou prix par plant (€)</label>' +
+      '<input type="text" id="rev-plant" class="gros" inputmode="decimal" value="' + esc(r.parPlant || '') + '"></div>' : '') +
+    '</div>' +
+    '<div class="carte2" style="margin-top:11px">' +
+    '<div style="display:flex;justify-content:space-between;font-size:13.5px">' +
+    '<span>Coût unitaire réel</span><b class="num">' + E.fmt(cout, 4) + ' €</b></div>' +
+    (parPlant ? '<div style="display:flex;justify-content:space-between;font-size:13.5px;margin-top:3px">' +
+      '<span class="muted">soit par plant (' + E.fmt(ST.nb(art.dosage), 1) + ' ' +
+      ST.courtUniteArt(art.unite) + ')</span><b class="num muted">' + E.fmt(parPlant, 4) + ' €</b></div>' : '') +
+    '<div class="muted" style="font-size:11.5px;margin-top:5px">Livraison comprise. ' +
+    (r.base === 'dernier' ? 'Dernière réception — le prix auquel vous rachèterez.'
+      : 'Moyenne du stock — ce que vaut ce qui est en réserve.') + '</div></div>';
+  renderRevientResultat();
+}
+function renderRevientResultat() {
+  var z = $('#rev-resultat'); if (!z) return;
+  var r = A.revient, art = article(r.article);
+  if (!art) { z.innerHTML = ''; return; }
+  var f = fiscStock();
+  var dosage = ST.nb(art.dosage);
+  var cout = r.base === 'dernier' ? ST.dernierCout(art) : ST.pmp(art);
+  var pv = ST.nb(r.prix);
+  if (!pv && dosage > 0 && ST.nb(r.parPlant) > 0) pv = ST.nb(r.parPlant) / dosage;
+  var tc = ST.tauxCharges(f);
+
+  var conseils = '<div class="carte"><h2>Prix conseillés</h2>' +
+    (tc > 0 ? '' : '<p class="muted" style="font-size:12px;margin:0 0 9px">Saisissez vos taux de ' +
+      'cotisations et d’impôt dans Réglages ▸ Entreprise pour tenir compte des charges.</p>') +
+    '<div class="kpi">' +
+    ['<div class="carte2"><b class="num">' + E.fmt(ST.prixPlancher(cout, f) || 0, 4) + ' €</b><small>plancher — couvre tout</small></div>',
+     '<div class="carte2"><b class="num">' + E.fmt(ST.prixAvecBenefice(cout, f, 0.1) || 0, 4) + ' €</b><small>+ 10 % de bénéfice</small></div>',
+     '<div class="carte2"><b class="num">' + E.fmt(ST.prixAvecMarge(cout, 0.3) || 0, 4) + ' €</b><small>30 % de marge brute</small></div>',
+     '<div class="carte2"><b class="num">' + E.fmt(ST.prixAvecMarge(cout, 0.5) || 0, 4) + ' €</b><small>50 % de marge brute</small></div>'
+    ].join('') + '</div>' +
+    (dosage > 0 ? '<p class="muted" style="font-size:12px;margin:10px 0 0">Par plant : ' +
+      E.fmt((ST.prixPlancher(cout, f) || 0) * dosage, 3) + ' € au plancher, ' +
+      E.fmt((ST.prixAvecMarge(cout, 0.5) || 0) * dosage, 3) + ' € à 50 % de marge.</p>' : '') +
+    '</div>';
+
+  if (!pv) { z.innerHTML = conseils; return; }
+  var d = ST.decomposer(pv, cout, f);
+  var COUL = { cout: '#5B3A1E', cotisations: '#C4611B', impot: '#B98A00', cfe: '#7A8471', benefice: '#2E7D46' };
+  var parts = [
+    { cle: 'cout', nom: 'Coût unitaire réel', v: d.cout, p: d.partCout },
+    { cle: 'cotisations', nom: 'Cotisations', v: d.cotisations, p: d.partCotisations },
+    { cle: 'impot', nom: 'Impôt sur le revenu', v: d.impot, p: d.partImpot },
+    { cle: 'cfe', nom: 'CFE', v: d.cfe, p: d.partCfe },
+    { cle: 'benefice', nom: 'Bénéfice net', v: d.benefice, p: d.partBenefice }
+  ].filter(function (x) { return x.v !== 0; });
+
+  z.innerHTML =
+    '<div class="carte"><h2>À ' + E.fmt(pv, 4) + ' € l’unité' +
+    (dosage > 0 ? ' (' + E.fmt(pv * dosage, 3) + ' € le plant)' : '') + '</h2>' +
+    '<div class="jauge" style="height:17px">' + parts.filter(function (x) { return x.v > 0; }).map(function (x) {
+      return '<i style="width:' + Math.max(0, x.p) + '%;background:' + COUL[x.cle] + '"></i>';
+    }).join('') + '</div>' +
+    '<div style="margin-top:11px">' + parts.map(function (x) {
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:13.5px">' +
+        '<span><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:' +
+        COUL[x.cle] + ';margin-right:7px"></i>' + esc(x.nom) + '</span>' +
+        '<span><b class="num">' + E.fmt(x.v, 4) + ' €</b>' +
+        '<span class="muted" style="font-size:11.5px"> · ' + E.fmt(x.p, 1) + ' %</span></span></div>';
+    }).join('') + '</div>' +
+    '<div class="kpi" style="margin-top:11px">' +
+    '<div class="carte2" style="border-color:' + (d.viable ? '#2E7D46' : '#B4231F') + '">' +
+    '<b class="num">' + E.fmt(d.partBenefice, 1) + ' %</b><small>de bénéfice net</small></div>' +
+    '<div class="carte2"><b class="num">' + E.fmt(d.tauxMarge, 1) + ' %</b><small>de marge brute</small></div>' +
+    '</div>' +
+    (d.viable ? '' : '<p class="muted" style="font-size:12.5px;margin:10px 0 0;color:#B4231F">' +
+      'À ce prix vous perdez ' + eur(-d.benefice) + ' par unité. Le plancher est à ' +
+      E.fmt(ST.prixPlancher(cout, f) || 0, 4) + ' €.</p>') +
+    '</div>' + conseils;
+}
+
 function renderReglagesCh() {
   if ($('#r-hj')) $('#r-hj').value = (A.cfg && A.cfg.heuresJour) || 7;
   if ($('#r-pj')) $('#r-pj').value = (A.cfg && A.cfg.prixJourVise) || '';
@@ -8681,7 +9140,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.2.0-20260725-0851';
+var VERSION = '4.3.0-20260725-0950';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
