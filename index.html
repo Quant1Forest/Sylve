@@ -68,6 +68,10 @@ body:not(.m-chantiers) .mod-import{display:none}
 .kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px;margin-top:11px}
 .kpi .carte2{padding:9px 11px}
 .kpi b{font-size:19px;display:block}
+#regl-corps.f-general > :not(.sec-general),
+#regl-corps.f-ent > :not(.sec-ent),
+#regl-corps.f-cubage > :not(.sec-cubage),
+#regl-corps.f-bois > :not(.sec-bois){display:none}
 .bandeau-nav{flex:1;min-width:0}
 .bandeau-nav select{
   width:100%;max-width:280px;border:none;background:none;color:inherit;
@@ -629,7 +633,17 @@ td.act{width:1%;padding:3px 6px}
 
     <!-- ====================================================== réglages -->
     <section class="vue" id="vue-reglages" role="tabpanel">
-      <div class="mod-cubage">
+      <div class="carte">
+        <div class="carte-titre"><h2>Réglages</h2></div>
+        <div class="chips" id="regl-nav">
+          <button class="chip" data-regl="general" aria-pressed="true">Général</button>
+          <button class="chip" data-regl="ent" aria-pressed="false">Entreprise</button>
+          <button class="chip" data-regl="cubage" aria-pressed="false">Cubage</button>
+          <button class="chip" data-regl="bois" aria-pressed="false">Bois de chauffage</button>
+        </div>
+      </div>
+      <div id="regl-corps" class="f-general">
+      <div class="sec-cubage">
       <div class="carte">
         <h2>Mode de calcul</h2>
         <div class="chips" id="r-mode">
@@ -662,7 +676,7 @@ td.act{width:1%;padding:3px 6px}
         <button class="btn-min" id="r-qual-add" style="margin-top:9px">Ajouter une qualité</button>
       </div>
       </div><!-- /mod-cubage -->
-      <div class="carte" id="c-appli">
+      <div class="carte sec-general" id="c-appli">
         <h2>Application</h2>
         <p class="muted" style="font-size:12.5px;margin:0 0 10px" id="r-appli-etat"></p>
         <div class="btn-rang">
@@ -672,7 +686,7 @@ td.act{width:1%;padding:3px 6px}
         </div>
         <p class="muted" style="font-size:12px;margin:10px 0 0" id="r-version"></p>
       </div>
-      <div class="carte mod-ent" id="c-ch-regl">
+      <div class="carte sec-ent" id="c-ch-regl">
         <h2>Chantiers</h2>
         <div class="grille g2">
           <div class="champ"><label class="eyebrow" for="r-hj">Heures dans une journée</label>
@@ -709,7 +723,7 @@ td.act{width:1%;padding:3px 6px}
           <input type="checkbox" id="r-we"> Compter les week-ends comme jours travaillables
         </label>
       </div>
-      <div class="carte mod-bois" id="c-bois-regl">
+      <div class="carte sec-bois" id="c-bois-regl">
         <h2>Seuils d'humidité</h2>
         <p class="muted" style="font-size:12px;margin:0 0 10px">Tels que lus à l'humidimètre. Quatre états : vert, en séchage, sec, très sec.</p>
         <div class="grille g3">
@@ -726,12 +740,13 @@ td.act{width:1%;padding:3px 6px}
           pas le stock.
         </p>
       </div>
-      <div class="carte">
+      <div class="carte sec-general">
         <h2>Remise à zéro</h2>
         <div class="btn-rang">
           <button class="btn danger" id="r-reset-cfg">Rétablir les listes d'origine</button>
         </div>
       </div>
+      </div><!-- /regl-corps -->
     </section>
 
     <!-- ======================================================= accueil -->
@@ -745,7 +760,9 @@ td.act{width:1%;padding:3px 6px}
             </g>
             <path d="M11 32h42" stroke="#C4611B" stroke-width="3.5" stroke-linecap="round"/>
           </svg>
-          <div><h1>Sylve</h1><p id="a-sous">Outil de terrain</p></div>
+          <div style="flex:1"><h1>Sylve</h1><p id="a-sous">Outil de terrain</p></div>
+          <button class="tuile" id="a-reglages" title="Réglages"
+            style="width:auto;flex:none;padding:11px 13px">⚙</button>
         </div>
         <p class="eyebrow" style="margin:22px 0 8px">Entreprise</p>
         <div class="tuiles">
@@ -3974,7 +3991,7 @@ function ecrire(k, o) { return Store.set(k, JSON.stringify(o)); }
 var A = {
   cfg: null, index: [], bord: null, piles: [], chantiers: [], module: 'cubage', ici: null,
   vuePiles: 'stock', filtreCh: 'ouverts', chOuvert: null, clients: [], proprios: [], estim: null, imp: null, articles: [], charges: [], calMois: null, calJour: null, nbAlertes: 0, planifie: null,
-  depenses: [], periode: null, filtreDep: 'tous', vueAna: 'ensemble',
+  depenses: [], periode: null, filtreDep: 'tous', vueAna: 'ensemble', secReglages: 'general',
   vue: 'saisie', sousVue: 'synthese', edition: null,
   memeGrume: false, classementRegl: 'Class. Comt', filtre: ''
 };
@@ -4817,6 +4834,26 @@ function exportStockXlsx() {
   } catch (e) { toast('Export impossible.'); }
 }
 
+/* Les réglages vivent tous au même endroit, rangés par domaine. On y accède
+   depuis l'accueil, ou depuis un module — qui ouvre alors sa propre section. */
+var SEC_DE_MODULE = { cubage: 'cubage', bois: 'bois' };
+function renderReglagesNav() {
+  var z = $('#regl-corps'); if (!z) return;
+  var sec = A.secReglages || 'general';
+  z.className = 'f-' + sec;
+  $$('#regl-nav .chip').forEach(function (b) {
+    b.setAttribute('aria-pressed', String(b.dataset.regl === sec));
+  });
+}
+function allerReglages(sec) {
+  A.secReglages = sec || 'general';
+  document.body.classList.remove('accueil-ouvert');
+  if (!MODULES[A.module]) A.module = 'cubage';
+  majOnglets();
+  renderReglagesNav();
+  aller('reglages');
+}
+
 function renderReglagesBois() {
   var s = H.seuils(A.cfg);
   if ($('#r-sv')) $('#r-sv').value = s.vert;
@@ -4980,7 +5017,7 @@ function aller(v) {
   if (v === 'bordereau') renderBordereau();
   if (v === 'syntheses') renderSyntheses();
   if (v === 'fichiers') renderFichiers();
-  if (v === 'reglages') renderReglages();
+  if (v === 'reglages') { renderReglages(); renderReglagesNav(); }
   if (v === 'saisie') { renderRuban(); renderDernieres(); }
   /* les vues de l'entreprise se recalculent à l'ouverture : leurs données
      changent d'un module à l'autre (un chantier localisé ailleurs, un achat
@@ -5003,7 +5040,17 @@ function aller(v) {
 function brancher() {
   $('#onglets').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-vue]');
-    if (b) aller(b.dataset.vue);
+    if (!b) return;
+    if (b.dataset.vue === 'reglages') {
+      var m = MODULES[A.module];
+      A.secReglages = SEC_DE_MODULE[A.module] || (m && m.groupe === 'entreprise' ? 'ent' : 'general');
+    }
+    aller(b.dataset.vue);
+  });
+  $('#a-reglages').addEventListener('click', function () { allerReglages('general'); });
+  $('#regl-nav').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-regl]');
+    if (b) { A.secReglages = b.dataset.regl; renderReglagesNav(); }
   });
   $('#b-accueil').addEventListener('click', allerAccueil);
   $('#b-module').addEventListener('change', function () { allerModule(this.value); });
@@ -8634,7 +8681,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.1.0-20260724-1657';
+var VERSION = '4.2.0-20260725-0851';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
