@@ -56,6 +56,9 @@ main{flex:1;padding:14px 14px 96px;max-width:1240px;width:100%;margin:0 auto}
 /* On masque ce qui n'appartient pas au module ouvert. La forme body:not()
    l'emporte sur un display posé directement sur l'élément (.bandeau-sous,
    .carte…), ce qui évite qu'un bloc réapparaisse dans une autre partie. */
+/* Les réglages sont communs à tous les modules : le bandeau du bordereau
+   n'y a rien à faire. */
+body.v-reglages #b-bordereau{display:none}
 body:not(.m-cubage) .mod-cubage,
 body:not(.m-bois) .mod-bois,
 body:not(.m-ent) .mod-ent,
@@ -68,11 +71,7 @@ body:not(.m-chantiers) .mod-import{display:none}
 .kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px;margin-top:11px}
 .kpi .carte2{padding:9px 11px}
 .kpi b{font-size:19px;display:block}
-#regl-corps.f-general > :not(.sec-general),
-#regl-corps.f-ent > :not(.sec-ent),
-#regl-corps.f-cubage > :not(.sec-cubage),
-#regl-corps.f-stock > :not(.sec-stock),
-#regl-corps.f-bois > :not(.sec-bois){display:none}
+
 .lien-regl{
   font:inherit;font-size:12px;color:var(--gris);border:none;background:none;padding:0;
   cursor:pointer;text-decoration:underline;text-underline-offset:2px;
@@ -646,13 +645,13 @@ td.act{width:1%;padding:3px 6px}
         <div class="chips" id="regl-nav">
           <button class="chip" data-regl="general" aria-pressed="true">Général</button>
           <button class="chip" data-regl="ent" aria-pressed="false">Entreprise</button>
-          <button class="chip" data-regl="stock" aria-pressed="false">Stock et fournitures</button>
           <button class="chip" data-regl="cubage" aria-pressed="false">Cubage</button>
           <button class="chip" data-regl="bois" aria-pressed="false">Bois de chauffage</button>
         </div>
+        <div class="sous-onglets" id="regl-sous" role="tablist"></div>
       </div>
-      <div id="regl-corps" class="f-general">
-      <div class="sec-cubage">
+      <div id="regl-corps">
+      <div data-sec="cubage">
       <div class="carte">
         <h2>Mode de calcul</h2>
         <div class="chips" id="r-mode">
@@ -685,7 +684,7 @@ td.act{width:1%;padding:3px 6px}
         <button class="btn-min" id="r-qual-add" style="margin-top:9px">Ajouter une qualité</button>
       </div>
       </div><!-- /mod-cubage -->
-      <div class="carte sec-general" id="c-appli">
+      <div class="carte" data-sec="general" id="c-appli">
         <h2>Application</h2>
         <p class="muted" style="font-size:12.5px;margin:0 0 10px" id="r-appli-etat"></p>
         <div class="btn-rang">
@@ -695,7 +694,7 @@ td.act{width:1%;padding:3px 6px}
         </div>
         <p class="muted" style="font-size:12px;margin:10px 0 0" id="r-version"></p>
       </div>
-      <div class="carte sec-ent" id="c-ch-regl">
+      <div class="carte" data-sec="ent" data-sous="gen" id="c-ch-regl">
         <h2>Chantiers</h2>
         <div class="grille g2">
           <div class="champ"><label class="eyebrow" for="r-hj">Heures dans une journée</label>
@@ -706,28 +705,6 @@ td.act{width:1%;padding:3px 6px}
         <p class="muted" style="font-size:12px;margin:10px 0 0">
           Sert à convertir les heures en jours-homme et à comparer le prix de journée
           réellement obtenu sur chaque chantier.
-        </p>
-        <p class="muted" style="font-size:12px;margin:10px 0 0;padding:9px 11px;background:var(--carte2);border-radius:9px">
-          Taux issus de l'annexe BOFiP du secteur de la sylviculture (BOI-ANNX-000509, 28/05/2025)
-          et de l'article 279 b septies du CGI. Le taux de 10 % ne s'applique qu'aux prestations
-          rendues à un exploitant agricole ou forestier identifié, et prend fin au
-          1<sup>er</sup> janvier 2029. Sylve ne remplace pas votre comptable : les taux signalés
-          « à confirmer » divergent selon les sources.
-        </p>
-        <p class="eyebrow" style="margin:16px 0 6px">Hypothèses fiscales</p>
-        <div class="grille g2">
-          <div class="champ"><label class="eyebrow" for="r-cot">Cotisations (%)</label>
-            <input type="text" id="r-cot" inputmode="decimal" autocomplete="off"></div>
-          <div class="champ"><label class="eyebrow" for="r-imp">Impôt sur le revenu (%)</label>
-            <input type="text" id="r-imp" inputmode="decimal" autocomplete="off"></div>
-          <div class="champ"><label class="eyebrow" for="r-abv">Abattement vente (%)</label>
-            <input type="text" id="r-abv" inputmode="decimal" autocomplete="off"></div>
-          <div class="champ"><label class="eyebrow" for="r-cfe">CFE par unité (€)</label>
-            <input type="text" id="r-cfe" inputmode="decimal" autocomplete="off"></div>
-        </div>
-        <p class="muted" style="font-size:12px;margin:9px 0 0">
-          Servent au prix de revient et à l'estimation des prélèvements. Ce sont vos taux :
-          Sylve n'en connaît aucun.
         </p>
         <p class="eyebrow" style="margin:16px 0 6px">Véhicule</p>
         <div class="grille g2">
@@ -747,7 +724,43 @@ td.act{width:1%;padding:3px 6px}
           <input type="checkbox" id="r-we"> Compter les week-ends comme jours travaillables
         </label>
       </div>
-      <div class="carte sec-stock" id="c-four-regl">
+
+      <div class="carte" data-sec="ent" data-sous="fin">
+        <h2>Hypothèses fiscales</h2>
+        <div class="grille g2">
+          <div class="champ"><label class="eyebrow" for="r-cot">Cotisations (%)</label>
+            <input type="text" id="r-cot" inputmode="decimal" autocomplete="off"></div>
+          <div class="champ"><label class="eyebrow" for="r-imp">Impôt sur le revenu (%)</label>
+            <input type="text" id="r-imp" inputmode="decimal" autocomplete="off"></div>
+          <div class="champ"><label class="eyebrow" for="r-abv">Abattement vente (%)</label>
+            <input type="text" id="r-abv" inputmode="decimal" autocomplete="off"></div>
+          <div class="champ"><label class="eyebrow" for="r-cfe">CFE par unité (€)</label>
+            <input type="text" id="r-cfe" inputmode="decimal" autocomplete="off"></div>
+        </div>
+        <p class="muted" style="font-size:12px;margin:9px 0 0">
+          Servent au prix de revient et à l'estimation des prélèvements. Ce sont vos taux :
+          Sylve n'en connaît aucun.
+        </p>
+        <p class="muted" style="font-size:12px;margin:12px 0 0;padding:9px 11px;background:var(--carte2);border-radius:9px">
+          Taux de TVA issus de l'annexe BOFiP du secteur de la sylviculture (BOI-ANNX-000509,
+          28/05/2025) et de l'article 279 b septies du CGI. Le taux de 10 % ne s'applique qu'aux
+          prestations rendues à un exploitant agricole ou forestier identifié, et prend fin au
+          1<sup>er</sup> janvier 2029. Sylve ne remplace pas votre comptable : les taux signalés
+          « à confirmer » divergent selon les sources.
+        </p>
+      </div>
+
+      <div class="carte" data-sec="ent" data-sous="listes">
+        <h2>Listes déroulantes</h2>
+        <p class="muted" style="font-size:12.5px;margin:0 0 11px">
+          Tout ce qui vous est proposé ailleurs dans l'application se règle ici. Un nom saisi
+          à la volée n'est jamais ajouté sans vous le demander.
+        </p>
+        <div class="sous-onglets" id="rl-nav" role="tablist"></div>
+        <div id="rl-liste" style="margin-top:11px"></div>
+        <button class="btn-min" id="rl-add" style="margin-top:9px">Ajouter</button>
+      </div>
+      <div class="carte" data-sec="ent" data-sous="stock" id="c-four-regl">
         <div class="carte-titre"><h2>Fournisseurs</h2>
           <button class="btn-min" id="rf-add">Ajouter</button></div>
         <p class="muted" style="font-size:12.5px;margin:0 0 10px">
@@ -755,7 +768,7 @@ td.act{width:1%;padding:3px 6px}
         </p>
         <div id="rf-liste"></div>
       </div>
-      <div class="carte sec-stock" id="c-prod-regl">
+      <div class="carte" data-sec="ent" data-sous="stock" id="c-prod-regl">
         <div class="carte-titre"><h2>Produits</h2>
           <button class="btn-min" id="rp-add">Ajouter</button></div>
         <p class="muted" style="font-size:12.5px;margin:0 0 10px">
@@ -764,7 +777,7 @@ td.act{width:1%;padding:3px 6px}
         </p>
         <div id="rp-liste"></div>
       </div>
-      <div class="carte sec-bois" id="c-bois-regl">
+      <div class="carte" data-sec="bois" id="c-bois-regl">
         <h2>Seuils d'humidité</h2>
         <p class="muted" style="font-size:12px;margin:0 0 10px">Tels que lus à l'humidimètre. Quatre états : vert, en séchage, sec, très sec.</p>
         <div class="grille g3">
@@ -781,7 +794,7 @@ td.act{width:1%;padding:3px 6px}
           pas le stock.
         </p>
       </div>
-      <div class="carte sec-general">
+      <div class="carte" data-sec="general">
         <h2>Remise à zéro</h2>
         <div class="btn-rang">
           <button class="btn danger" id="r-reset-cfg">Rétablir les listes d'origine</button>
@@ -815,6 +828,7 @@ td.act{width:1%;padding:3px 6px}
               <span id="a-ent-alerte" class="pastille-alerte"></span></span>
           </button>
         </div>
+        <div id="a-journee"></div>
 
         <p class="eyebrow" style="margin:24px 0 8px">Outils de terrain</p>
         <div class="tuiles">
@@ -1125,6 +1139,7 @@ td.act{width:1%;padding:3px 6px}
 <datalist id="liste-clients"></datalist>
 <datalist id="liste-proprios"></datalist>
 <datalist id="liste-fournisseurs"></datalist>
+<datalist id="liste-lieux"></datalist>
 
 <script>
 /* ==========================================================================
@@ -2611,6 +2626,32 @@ function mesJours(t, cfg) {
   if (t.unite === 'h') d = d / HEURES_JOUR(cfg);
   return arr(d, 3);
 }
+/* ----------------------------------------------------------- la journée
+   Une journée de travail se découpe en postes : trois heures de plantation
+   pour deux cents plants, le reste à poser des protections. Le temps porté
+   par un chantier en découle — on ne le saisit jamais deux fois. */
+function heuresPostes(j) {
+  return arr(((j && j.postes) || []).reduce(function (s, p) { return s + nb(p.heures); }, 0), 2);
+}
+function heuresJournee(j) { return arr(heuresPostes(j) + nb(j && j.nonProd), 2); }
+function joursJournee(j, cfg) { return arr(heuresJournee(j) / HEURES_JOUR(cfg), 3); }
+
+/* Le prix de journée visé : réglage général, redéfini au devis si le
+   chantier le mérite. */
+function prixJourVise(ch, cfg) {
+  return nb(ch && ch.prixJour) || nb(cfg && cfg.prixJourVise) || 0;
+}
+/* Ce que le devis paie en journées, face à ce qu'on y a réellement passé. */
+function bilanJournees(ch, cfg) {
+  var pj = prixJourVise(ch, cfg), m = montant(ch), faites = tempsMoi(ch, cfg);
+  var prevues = pj > 0 ? arr(m / pj, 2) : null;
+  return {
+    prixJourVise: pj || null, prevues: prevues, faites: faites,
+    ecart: prevues != null ? arr(faites - prevues, 2) : null,
+    obtenu: faites > 0 ? arr(m / faites, 2) : null
+  };
+}
+
 function tempsTotal(ch, cfg) {
   return arr(((ch && ch.temps) || []).reduce(function (s, t) { return s + joursSaisie(t, cfg); }, 0), 2);
 }
@@ -3187,6 +3228,8 @@ var M = {
   tauxLigne: tauxLigne, tauxPresents: tauxPresents, tauxAttendu: tauxAttendu,
   estFourniture: estFourniture, tauxFixe: tauxFixe, tauxDiscute: tauxDiscute, parDonneur: parDonneur,
   joursSaisie: joursSaisie, mesJours: mesJours, tempsTotal: tempsTotal, tempsMoi: tempsMoi,
+  heuresPostes: heuresPostes, heuresJournee: heuresJournee, joursJournee: joursJournee,
+  prixJourVise: prixJourVise, bilanJournees: bilanJournees, HEURES_JOUR: HEURES_JOUR,
   prixJour: prixJour, rendement: rendement,
   dureePrevue: dureePrevue, enRetard: enRetard, tri: tri, filtre: filtre, totaux: totaux,
   jourCle: jourCle, minuit: minuit, ajouteJours: ajouteJours, estWeekend: estWeekend,
@@ -4178,7 +4221,7 @@ function aPurger(entrees, maintenant, jours) {
 
 var FORMAT_SAUVEGARDE = 'bordcub-sauvegarde-1';
 
-function construireSauvegarde(cfg, bordereaux, piles, chantiers, depenses, clients, articles, charges, proprios, fournisseurs, commandes, sorties) {
+function construireSauvegarde(cfg, bordereaux, piles, chantiers, depenses, clients, articles, charges, proprios, fournisseurs, commandes, sorties, journees) {
   return {
     format: FORMAT_SAUVEGARDE,
     version: 7,
@@ -4194,7 +4237,8 @@ function construireSauvegarde(cfg, bordereaux, piles, chantiers, depenses, clien
     proprios: (proprios || []).filter(Boolean),
     fournisseurs: (fournisseurs || []).filter(Boolean),
     commandes: (commandes || []).filter(Boolean),
-    sorties: (sorties || []).filter(Boolean)
+    sorties: (sorties || []).filter(Boolean),
+    journees: (journees || []).filter(Boolean)
   };
 }
 
@@ -4213,13 +4257,14 @@ function lireSauvegarde(o) {
       proprios: (o.proprios || []).filter(Boolean),
       fournisseurs: (o.fournisseurs || []).filter(Boolean),
       commandes: (o.commandes || []).filter(Boolean),
-      sorties: (o.sorties || []).filter(Boolean), complete: true };
+      sorties: (o.sorties || []).filter(Boolean),
+      journees: (o.journees || []).filter(Boolean), complete: true };
     /* Une sauvegarde peut ne contenir que du stock ou que des dépenses : la
        refuser faute de bordereau revenait à interdire l'import à qui ne fait
        pas de cubage. */
     var vide = true;
     ['bordereaux', 'piles', 'chantiers', 'depenses', 'clients', 'articles',
-      'charges', 'proprios', 'fournisseurs', 'commandes', 'sorties'].forEach(function (k) {
+      'charges', 'proprios', 'fournisseurs', 'commandes', 'sorties', 'journees'].forEach(function (k) {
         if (r[k].length) vide = false;
       });
     return vide ? null : r;
@@ -4292,7 +4337,7 @@ function ecrire(k, o) { return Store.set(k, JSON.stringify(o)); }
 /* ---------------------------------------------------------------- état */
 var A = {
   cfg: null, index: [], bord: null, piles: [], chantiers: [], module: 'cubage', ici: null,
-  vuePiles: 'stock', filtreCh: 'ouverts', chOuvert: null, clients: [], proprios: [], estim: null, imp: null, articles: [], charges: [], fournisseurs: [], commandes: [], sorties: [], mvt: 'achats', revient: null, calMois: null, calJour: null, nbAlertes: 0, planifie: null,
+  vuePiles: 'stock', filtreCh: 'ouverts', chOuvert: null, clients: [], proprios: [], estim: null, imp: null, articles: [], charges: [], fournisseurs: [], commandes: [], sorties: [], mvt: 'achats', journees: [], lieuxRegles: [], sousReglages: null, listeReglee: 'clients', revient: null, calMois: null, calJour: null, nbAlertes: 0, planifie: null,
   depenses: [], periode: null, filtreDep: 'tous', vueAna: 'ensemble', secReglages: 'general',
   vue: 'saisie', sousVue: 'synthese', edition: null,
   memeGrume: false, classementRegl: 'Class. Comt', filtre: ''
@@ -4891,6 +4936,7 @@ function contenuSauvegarde() {
     { n: A.depenses.length, u: 'dépense', p: 'dépenses' },
     { n: (A.commandes || []).length, u: 'commande', p: 'commandes' },
     { n: (A.sorties || []).length, u: 'mouvement', p: 'mouvements' },
+    { n: (A.journees || []).length, u: 'journée', p: 'journées' },
     { n: A.articles.length, u: 'produit', p: 'produits' },
     { n: A.charges.length, u: 'charge fixe', p: 'charges fixes' }
   ].filter(function (x) { return x.n > 0; });
@@ -4910,7 +4956,7 @@ function sauvegarderTout() {
   if (!c.length) { toast('Rien à sauvegarder.'); return Promise.resolve(); }
   var poids = '';
   return tousLesBordereaux().then(function (bs) {
-    var txt = JSON.stringify(B.construireSauvegarde(A.cfg, bs, A.piles, A.chantiers, A.depenses, A.clients, A.articles, A.charges, A.proprios, A.fournisseurs, A.commandes, A.sorties), null, 1);
+    var txt = JSON.stringify(B.construireSauvegarde(A.cfg, bs, A.piles, A.chantiers, A.depenses, A.clients, A.articles, A.charges, A.proprios, A.fournisseurs, A.commandes, A.sorties, A.journees), null, 1);
     try { poids = B.octets(new Blob([txt]).size); } catch (e) { poids = B.octets(txt.length); }
     return partager('Sylve-' + B.jour(Date.now()) + '.json', txt, 'application/json');
   }).then(marquerExport).then(function () {
@@ -4939,7 +4985,7 @@ function instantaneDuJour() {
       if (!aDesDonnees()) return;
       return Store.set(cle, JSON.stringify(B.construireSauvegarde(A.cfg, bs, sansPhotos(A.piles),
         A.chantiers, A.depenses, A.clients, A.articles, A.charges, A.proprios, A.fournisseurs,
-        A.commandes, A.sorties)));
+        A.commandes, A.sorties, A.journees)));
     });
   }).then(function () {
     return Store.keys();
@@ -4960,7 +5006,8 @@ var CORBEILLE = {
   produit:     { nom: 'Produit',     liste: 'articles',     sauver: function () { return sauverArticles(); } },
   fournisseur: { nom: 'Fournisseur', liste: 'fournisseurs', sauver: function () { return sauverFournisseurs(); } },
   commande:    { nom: 'Commande',    liste: 'commandes',    sauver: function () { return sauverCommandes(); } },
-  sortie:      { nom: 'Mouvement',   liste: 'sorties',      sauver: function () { return sauverSorties(); } }
+  sortie:      { nom: 'Mouvement',   liste: 'sorties',      sauver: function () { return sauverSorties(); } },
+  journee:     { nom: 'Journée',     liste: 'journees',     sauver: function () { return sauverJournees(); } }
 };
 
 function corbeille() {
@@ -5107,9 +5154,16 @@ function integrer(objet, source, remplace) {
       if (A.sorties.some(function (x) { return x.id === so.id; })) so.id = uid();
       A.sorties.push(so); nm++;
     });
+    A.journees = A.journees || [];
+    (s.journees || []).forEach(function (jj) {
+      if (!jj || !jj.postes) return;
+      if (A.journees.some(function (x) { return x.id === jj.id; })) jj.id = uid();
+      A.journees.push(jj); nm++;
+    });
     return Promise.all([np ? sauverPiles() : null, nc ? sauverChantiers() : null,
       nd ? sauverDepenses() : null, na ? sauverArticles() : null, ng ? sauverCharges() : null,
-      nf ? sauverFournisseurs() : null, nm ? sauverCommandes() : null, nm ? sauverSorties() : null]);
+      nf ? sauverFournisseurs() : null, nm ? sauverCommandes() : null, nm ? sauverSorties() : null,
+      nm ? sauverJournees() : null]);
   }).then(function () {
     if (dernier) { A.bord = dernier; return ecrire('bordcub.actif', dernier.id); }
   }).then(function () {
@@ -5119,7 +5173,7 @@ function integrer(objet, source, remplace) {
     if (A.bord) viderFormulaire(false);
     renderFichiers(); renderBordereau(); renderSyntheses(); renderSauvegarde();
     renderPiles(); renderStock(); renderLieux(); renderCarnet(); renderDepenses(); renderFinances();
-    renderCharges(); indexerStock(); renderStockFournitures(); renderCommandes();
+    renderCharges(); indexerStock(); indexerJournees(); renderStockFournitures(); renderCommandes();
     renderRevient(); renderReglagesStock(); renderCarteChantiers();
     var revenu = contenuSauvegarde();
     toast(revenu.length
@@ -5266,14 +5320,39 @@ function exportStockXlsx() {
 
 /* Les réglages vivent tous au même endroit, rangés par domaine. On y accède
    depuis l'accueil, ou depuis un module — qui ouvre alors sa propre section. */
-var SEC_DE_MODULE = { cubage: 'cubage', bois: 'bois', stock: 'stock' };
+var SEC_DE_MODULE = { cubage: 'cubage', bois: 'bois', stock: 'ent' };
+/* Chaque onglet de réglages peut avoir ses sous-parties : les réglages de
+   l'entreprise ne se ressemblent pas d'un module à l'autre, et tout empiler
+   dans une seule page rend l'ensemble illisible. */
+var SOUS_REGLAGES = {
+  ent: [['gen', 'Général'], ['listes', 'Listes'], ['stock', 'Stock'], ['fin', 'Financier']]
+};
 function renderReglagesNav() {
   var z = $('#regl-corps'); if (!z) return;
   var sec = A.secReglages || 'general';
-  z.className = 'f-' + sec;
+  var sous = SOUS_REGLAGES[sec] || null;
+  z.className = '';
   $$('#regl-nav .chip').forEach(function (b) {
     b.setAttribute('aria-pressed', String(b.dataset.regl === sec));
   });
+  var nav = $('#regl-sous');
+  if (!sous) { nav.innerHTML = ''; nav.hidden = true; }
+  else {
+    var actif = A.sousReglages && sous.some(function (x) { return x[0] === A.sousReglages; })
+      ? A.sousReglages : sous[0][0];
+    A.sousReglages = actif;
+    nav.hidden = false;
+    nav.innerHTML = sous.map(function (x) {
+      return '<button class="sous-onglet" data-sous="' + x[0] + '" role="tab" aria-selected="' +
+        (x[0] === actif) + '">' + esc(x[1]) + '</button>';
+    }).join('');
+  }
+  Array.prototype.slice.call(z.children).forEach(function (el) {
+    var ok = el.dataset.sec === sec &&
+      (!sous || !el.dataset.sous || el.dataset.sous === A.sousReglages);
+    el.hidden = !ok;
+  });
+  if (sec === 'ent' && A.sousReglages === 'listes') renderListesReglages();
 }
 function allerReglages(sec) {
   A.secReglages = sec || 'general';
@@ -5378,6 +5457,7 @@ function demanderRestauration(objet, nom) {
     { n: (s.depenses || []).length, u: 'dépense', p: 'dépenses' },
     { n: (s.commandes || []).length, u: 'commande', p: 'commandes' },
     { n: (s.sorties || []).length, u: 'mouvement', p: 'mouvements' },
+    { n: (s.journees || []).length, u: 'journée', p: 'journées' },
     { n: (s.articles || []).length, u: 'produit', p: 'produits' }
   ].filter(function (x) { return x.n > 0; });
   var ici = contenuSauvegarde();
@@ -5409,7 +5489,7 @@ function instantaneForce() {
   return tousLesBordereaux().then(function (bs) {
     return Store.set(B.cleInstantane(Date.now()), JSON.stringify(
       B.construireSauvegarde(A.cfg, bs, sansPhotos(A.piles), A.chantiers, A.depenses, A.clients,
-        A.articles, A.charges, A.proprios, A.fournisseurs, A.commandes, A.sorties)));
+        A.articles, A.charges, A.proprios, A.fournisseurs, A.commandes, A.sorties, A.journees)));
   });
 }
 function viderTout() {
@@ -5419,11 +5499,11 @@ function viderTout() {
   }, Promise.resolve()).then(function () {
     A.index = []; A.bord = null; A.piles = []; A.chantiers = []; A.depenses = [];
     A.clients = []; A.proprios = []; A.articles = []; A.charges = [];
-    A.fournisseurs = []; A.commandes = []; A.sorties = [];
+    A.fournisseurs = []; A.commandes = []; A.sorties = []; A.journees = [];
     return Promise.all([ecrire('bordcub.index', A.index), Store.del('bordcub.actif'),
       sauverPiles(), sauverChantiers(), sauverDepenses(), ecrire('bordcub.clients', A.clients),
       ecrire('bordcub.proprios', A.proprios), sauverArticles(), sauverCharges(),
-      sauverFournisseurs(), sauverCommandes(), sauverSorties()]);
+      sauverFournisseurs(), sauverCommandes(), sauverSorties(), sauverJournees()]);
   });
 }
 
@@ -5509,6 +5589,7 @@ function aller(v) {
   if (v === 'bordereau') renderBordereau();
   if (v === 'syntheses') renderSyntheses();
   if (v === 'fichiers') renderFichiers();
+  document.body.classList.toggle('v-reglages', v === 'reglages');
   if (v === 'reglages') { renderReglages(); renderReglagesNav(); }
   if (v === 'saisie') { renderRuban(); renderDernieres(); }
   /* les vues de l'entreprise se recalculent à l'ouverture : leurs données
@@ -5544,7 +5625,7 @@ function brancher() {
   $('#a-reglages').addEventListener('click', function () { allerReglages('general'); });
   $('#regl-nav').addEventListener('click', function (e) {
     var b = e.target.closest('[data-regl]');
-    if (b) { A.secReglages = b.dataset.regl; renderReglagesNav(); }
+    if (b) { A.secReglages = b.dataset.regl; A.sousReglages = null; renderReglagesNav(); }
   });
   $('#b-accueil').addEventListener('click', allerAccueil);
   $('#b-module').addEventListener('change', function () { allerModule(this.value); });
@@ -5859,6 +5940,19 @@ function brancher() {
   /* --- stock : catalogue et fournisseurs --- */
   $('#rf-add').addEventListener('click', function () { ouvrirFournisseur(null); });
   $('#rp-add').addEventListener('click', function () { ouvrirArticle(null); });
+  $('#regl-sous').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-sous]');
+    if (b) { A.sousReglages = b.dataset.sous; renderReglagesNav(); }
+  });
+  $('#rl-nav').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-liste]');
+    if (b) { A.listeReglee = b.dataset.liste; renderListesReglages(); }
+  });
+  $('#rl-add').addEventListener('click', function () { ouvrirEntreeListe(null); });
+  $('#rl-liste').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-lmodif]');
+    if (b) ouvrirEntreeListe(b.dataset.lmodif);
+  });
   $('#regl-corps').addEventListener('click', function (e) {
     var f = e.target.closest('[data-fourmod]'), a = e.target.closest('[data-artmod]');
     if (f) ouvrirFournisseur(f.dataset.fourmod);
@@ -6058,6 +6152,9 @@ function brancher() {
   $('#b-xlsx').addEventListener('click', exportStockXlsx);
   $('#s-tout').addEventListener('click', sauvegarderTout);
   $('#s-restaurer').addEventListener('click', importJson);
+  $('#a-journee').addEventListener('click', function (e) {
+    if (e.target.closest('#a-jour')) ouvrirJournee(null);
+  });
   $('#a-sauvegarde').addEventListener('click', function (e) {
     if (!e.target.closest('#a-sauver')) return;
     document.body.classList.remove('accueil-ouvert');
@@ -6225,7 +6322,8 @@ function init() {
       lire('bordcub.piles', []), lire('bordcub.module', 'cubage'), lire('bordcub.chantiers', []),
       lire('bordcub.clients', []), lire('bordcub.depenses', []), lire('bordcub.proprios', []),
       lire('bordcub.articles', []), lire('bordcub.charges', []), lire('bordcub.fournisseurs', []),
-      lire('bordcub.commandes', []), lire('bordcub.sorties', [])]);
+      lire('bordcub.commandes', []), lire('bordcub.sorties', []),
+      lire('bordcub.journees', []), lire('bordcub.lieux', [])]);
   })
     .then(function (res) {
       A.export = res[3] || 0;
@@ -6240,6 +6338,8 @@ function init() {
       A.fournisseurs = res[12] || [];
       A.commandes = res[13] || [];
       A.sorties = res[14] || [];
+      A.journees = res[15] || [];
+      A.lieuxRegles = res[16] || [];
       A.cfg = res[0] || E.configDefaut();
       var d = E.configDefaut();
       ['essences', 'qualites', 'favoris'].forEach(function (k) { if (!A.cfg[k]) A.cfg[k] = d[k]; });
@@ -6255,7 +6355,7 @@ function init() {
       if (actif != null) {
         try { var p = JSON.parse(actif); if (typeof p === 'string') actif = p; } catch (e) { }
       }
-      migrerStock(); indexerStock();
+      migrerStock(); indexerStock(); migrerJournees(); indexerJournees(); majDatalistLieux();
       majOnglets(); renderPiles(); renderStock(); renderLieux(); renderReglagesBois();
       renderCarnet(); renderReglagesCh(); renderReglagesAlertes(); renderEstimer();
       renderRendements(); renderCalendrier(); renderAlertes();
@@ -6408,7 +6508,7 @@ function renderAccueil() {
     ? A.piles.length + (A.piles.length > 1 ? ' piles' : ' pile')
     : 'Aucune pile enregistrée';
   if ($('#a-lieux-n')) { var n = tousLesPoints().length; $('#a-lieux-n').textContent = n || '—'; }
-  renderNudgeSauvegarde();
+  renderNudgeSauvegarde(); renderMaJournee();
   renderEntreprise();
 }
 
@@ -7164,7 +7264,8 @@ function renderFiche() {
   var c = chantier(A.chOuvert);
   if (!c) { z.innerHTML = '<div class="carte"><div class="vide"><p>Chantier introuvable.</p></div></div>'; return; }
   var m = C.montant(c), j = C.tempsTotal(c, A.cfg), pj = C.prixJour(c, A.cfg);
-  var vise = C.nb(A.cfg && A.cfg.prixJourVise);
+  var vise = C.prixJourVise(c, A.cfg);
+  var bil = C.bilanJournees(c, A.cfg);
   var lignes = (c.lignes || []).map(function (l, i) {
     var q = l.unite === 'forfait' ? 'forfait'
       : E.fmt(C.nb(l.quantite), C.nb(l.quantite) % 1 ? 2 : 0) + ' ' + C.courtUnite(l.unite) +
@@ -7267,8 +7368,25 @@ function renderFiche() {
       (pj ? '<div class="carte2"><b class="num">' + eur(pj) + '</b><small>par jour-homme' +
         (vise ? (pj >= vise ? ' ✓' : ' ✕') : '') + '</small></div>' : '') +
       rends + '</div>' +
-      (vise && pj ? '<p class="muted" style="font-size:12px;margin:9px 0 0">Objectif ' + eur(vise) +
-        ' — ' + (pj >= vise ? 'atteint' : 'manque ' + eur(vise - pj)) + ' par jour.</p>' : '') +
+      (bil.prevues != null && bil.faites > 0
+        ? '<div class="carte2" style="margin-top:11px;border-color:' +
+          (bil.ecart > 0.25 ? '#B4231F' : bil.ecart < -0.25 ? '#2E7D46' : 'var(--trait)') + '">' +
+          '<div style="display:flex;justify-content:space-between;font-size:13.5px">' +
+          '<span>Le devis paie</span><b class="num">' + E.fmt(bil.prevues, 2) + ' j à ' + eur(vise) + '</b></div>' +
+          '<div style="display:flex;justify-content:space-between;font-size:13.5px;margin-top:3px">' +
+          '<span>J’y ai passé</span><b class="num">' + E.fmt(bil.faites, 2) + ' j</b></div>' +
+          '<div style="display:flex;justify-content:space-between;font-size:13.5px;margin-top:3px">' +
+          '<span class="muted">soit</span><b class="num">' + eur(bil.obtenu) + ' la journée</b></div>' +
+          '<p class="muted" style="font-size:12px;margin:7px 0 0">' +
+          (Math.abs(bil.ecart) <= 0.25
+            ? 'Estimation juste.'
+            : bil.ecart > 0
+              ? E.fmt(bil.ecart, 2) + ' journée' + (bil.ecart > 1 ? 's' : '') + ' de plus que prévu : ' +
+                eur(vise - bil.obtenu) + ' perdus par jour.'
+              : E.fmt(-bil.ecart, 2) + ' journée' + (-bil.ecart > 1 ? 's' : '') + ' de moins que prévu : ' +
+                eur(bil.obtenu - vise) + ' gagnés par jour.') + '</p></div>'
+        : vise && pj ? '<p class="muted" style="font-size:12px;margin:9px 0 0">Objectif ' + eur(vise) +
+          ' — ' + (pj >= vise ? 'atteint' : 'manque ' + eur(vise - pj)) + ' par jour.</p>' : '') +
       (mixteNonMarque ? '<p class="muted" style="font-size:12px;margin:9px 0 0">Plusieurs travaux sur ce chantier : ' +
         'précisez l’activité dans chaque saisie de temps pour obtenir les rendements.</p>' : '') : '') +
     '</div>' +
@@ -7333,6 +7451,10 @@ function formEnteteCh(c) {
     '<div class="champ"><label class="eyebrow" for="ce-jest">Journées estimées</label>' +
     '<input type="text" id="ce-jest" inputmode="decimal" autocomplete="off" value="' +
     (c.joursEstimes != null ? esc(String(c.joursEstimes).replace('.', ',')) : '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="ce-pj">Prix de journée (€)</label>' +
+    '<input type="text" id="ce-pj" inputmode="decimal" placeholder="' +
+    (C.nb(A.cfg && A.cfg.prixJourVise) || 'défaut') + '" value="' +
+    (c.prixJour != null ? esc(String(c.prixJour).replace('.', ',')) : '') + '"></div>' +
     '<div class="champ"><label class="eyebrow">Journées placées</label>' +
     '<div id="ce-total-jours" class="gros" style="padding:9px 0;font-family:var(--mono)"></div></div>' +
     '</div>' +
@@ -7464,6 +7586,7 @@ function ouvrirEnteteCh(id) {
       proprietaire: $('#ce-proprio').value.trim(), foret: $('#ce-foret').value.trim(),
       parcelles: $('#ce-parc').value.trim(), commune: $('#ce-com').value.trim(),
       echeance: ech, joursEstimes: jest > 0 ? jest : null,
+      prixJour: C.nb($('#ce-pj').value) || null,
       jours: (function () {
         lireCeJours();
         var vus = {};
@@ -7495,31 +7618,14 @@ function ouvrirEnteteCh(id) {
 }
 
 /* Donneurs d'ordre : liste alimentée par la saisie, proposée partout. */
-function noterClient(nom) {
-  if (!nom) return;
-  var bas = nom.toLowerCase();
-  if (A.clients.some(function (x) { return x.toLowerCase() === bas; })) return;
-  A.clients.push(nom);
-  A.clients.sort(function (a, b) { return a.localeCompare(b, 'fr'); });
-  ecrire('bordcub.clients', A.clients);
-  majDatalistClients();
-}
+function noterClient(nom) { return proposerAjoutListe('clients', nom); }
 function majDatalistClients() {
   var d = $('#liste-clients');
   if (d) d.innerHTML = A.clients.map(function (x) { return '<option value="' + esc(x) + '">'; }).join('');
   var p = $('#liste-proprios');
   if (p) p.innerHTML = (A.proprios || []).map(function (x) { return '<option value="' + esc(x) + '">'; }).join('');
 }
-function noterProprio(nom) {
-  if (!nom) return;
-  A.proprios = A.proprios || [];
-  var bas = nom.toLowerCase();
-  if (A.proprios.some(function (x) { return x.toLowerCase() === bas; })) return;
-  A.proprios.push(nom);
-  A.proprios.sort(function (a, b) { return a.localeCompare(b, 'fr'); });
-  ecrire('bordcub.proprios', A.proprios);
-  majDatalistClients();
-}
+function noterProprio(nom) { return proposerAjoutListe('proprios', nom); }
 
 function ouvrirLigne(id, idx) {
   var c = chantier(id); if (!c) return;
@@ -8566,6 +8672,388 @@ function validerImport() {
     renderImportResultat(); renderCarnet(); renderRendements(); renderFinances(); renderAccueil();
     toast(n + ' chantier' + (n > 1 ? 's importés' : ' importé') + '.');
   });
+}
+
+
+/* ================================================= LISTES DÉROULANTES
+   Donneurs d'ordre, propriétaires, communes : ce qui est proposé ailleurs
+   se règle ici. Et un nom tapé au vol n'entre jamais dans la liste sans
+   qu'on le demande — sinon la moindre faute de frappe s'y installe. */
+var LISTES = {
+  clients: { nom: 'Donneurs d’ordre', champ: 'clients', cle: 'bordcub.clients',
+    aide: 'Experts et gestionnaires forestiers qui vous confient les chantiers.' },
+  proprios: { nom: 'Propriétaires', champ: 'proprios', cle: 'bordcub.proprios',
+    aide: 'Ceux que vous facturez.' },
+  lieux: { nom: 'Forêts et communes', champ: 'lieuxRegles', cle: 'bordcub.lieux',
+    aide: 'Proposés à la saisie d’une journée et d’un chantier.' }
+};
+function listeDe(k) {
+  var d = LISTES[k]; if (!d) return [];
+  A[d.champ] = A[d.champ] || [];
+  return A[d.champ];
+}
+function sauverListe(k) {
+  var d = LISTES[k];
+  return ecrire(d.cle, listeDe(k)).then(function () {
+    majDatalistClients(); majDatalistLieux();
+  });
+}
+function renderListesReglages() {
+  var nav = $('#rl-nav'); if (!nav) return;
+  var actif = A.listeReglee && LISTES[A.listeReglee] ? A.listeReglee : 'clients';
+  A.listeReglee = actif;
+  nav.innerHTML = Object.keys(LISTES).map(function (k) {
+    return '<button class="sous-onglet" data-liste="' + k + '" role="tab" aria-selected="' +
+      (k === actif) + '">' + esc(LISTES[k].nom) + '</button>';
+  }).join('');
+  var l = listeDe(actif).slice().sort(function (a, b) { return a.localeCompare(b, 'fr'); });
+  $('#rl-liste').innerHTML =
+    '<p class="muted" style="font-size:12px;margin:0 0 9px">' + esc(LISTES[actif].aide) + '</p>' +
+    (l.length ? l.map(function (x) {
+      return '<div class="liste-item"><div class="li-c"><b>' + esc(x) + '</b></div>' +
+        '<button class="btn-min" data-lmodif="' + esc(x) + '">Modifier</button></div>';
+    }).join('') : '<p class="muted" style="font-size:12.5px;margin:0">Liste vide.</p>');
+}
+function ouvrirEntreeListe(nom) {
+  var k = A.listeReglee, d = LISTES[k];
+  modale(nom ? 'Modifier' : 'Ajouter — ' + d.nom,
+    '<div class="champ"><label class="eyebrow" for="le-nom">Nom</label>' +
+    '<input type="text" id="le-nom" class="gros" autocomplete="off" value="' + esc(nom || '') + '"></div>' +
+    '<div class="btn-rang" style="margin-top:11px">' +
+    '<button class="btn primaire" id="le-ok">Valider</button>' +
+    (nom ? '<button class="btn danger btn-min" id="le-sup">Supprimer</button>' : '') + '</div>');
+  $('#le-ok').addEventListener('click', function () {
+    var v = $('#le-nom').value.trim();
+    if (!v) { toast('Donnez un nom.'); return; }
+    var l = listeDe(k);
+    var i = nom ? l.indexOf(nom) : -1;
+    if (i >= 0) l[i] = v; else if (l.indexOf(v) < 0) l.push(v);
+    sauverListe(k).then(function () {
+      fermerModale(); renderListesReglages(); toast(nom ? 'Modifié.' : 'Ajouté.');
+    });
+  });
+  if (nom) $('#le-sup').addEventListener('click', function () {
+    if (!confirm('Retirer « ' + nom + ' » de la liste ?\n\nLes fiches qui le mentionnent ne changent pas.')) return;
+    A[d.champ] = listeDe(k).filter(function (x) { return x !== nom; });
+    sauverListe(k).then(function () {
+      fermerModale(); renderListesReglages(); toast('Retiré.');
+    });
+  });
+}
+/* Un nom saisi ailleurs qu'ici : on propose de l'ajouter, on ne le fait pas
+   à sa place. Retourne une promesse pour ne pas bloquer l'enregistrement. */
+function proposerAjoutListe(k, nom) {
+  if (!nom) return Promise.resolve(false);
+  var l = listeDe(k), bas = nom.toLowerCase();
+  if (l.some(function (x) { return x.toLowerCase() === bas; })) return Promise.resolve(false);
+  if (!confirm('« ' + nom + ' » n’est pas dans vos ' + LISTES[k].nom.toLowerCase() +
+    '.\n\nL’ajouter à la liste ?')) return Promise.resolve(false);
+  l.push(nom);
+  return sauverListe(k).then(function () { return true; });
+}
+function majDatalistLieux() {
+  var d = $('#liste-lieux');
+  if (d) d.innerHTML = lieuxConnus().map(function (x) { return '<option value="' + esc(x) + '">'; }).join('');
+}
+
+/* ================================================== MA JOURNÉE
+   Le soir, en rentrant. Ce qu'on a fait, où, combien de temps, et pour
+   quelle quantité. C'est la seule saisie qui doit tenir en trente secondes,
+   sinon elle ne se fait pas — et sans elle rien ne se calcule.
+   ====================================================================== */
+
+function sauverJournees() { return ecrire('bordcub.journees', A.journees); }
+function journee(id) {
+  return (A.journees || []).filter(function (j) { return j.id === id; })[0] || null;
+}
+
+/* Les temps déjà saisis dans les fiches chantier deviennent des journées :
+   une par chantier et par date, chaque activité formant un poste. */
+function migrerJournees() {
+  if (A.cfg && A.cfg.journeesMigrees) return false;
+  var vues = {};
+  (A.chantiers || []).forEach(function (c) {
+    (c.temps || []).forEach(function (t) {
+      if (t.jrn) return;
+      var k = c.id + '|' + B.jour(t.date);
+      if (!vues[k]) {
+        vues[k] = { id: uid(), date: t.date, chantier: c.id, lieu: c.lieu || '',
+          km: 0, nonProd: 0, personnes: C.nb(t.personnes) || 1,
+          sansMoi: !!t.sansMoi, fin: false, postes: [] };
+        A.journees.push(vues[k]);
+      }
+      var j = vues[k];
+      j.km += C.nb(t.km);
+      var h = t.unite === 'h' ? C.nb(t.duree) : C.nb(t.duree) * C.HEURES_JOUR(A.cfg);
+      if (t.activite) j.postes.push({ travaux: t.activite, heures: C.arr(h, 2), quantite: 0 });
+      else j.nonProd = C.arr(j.nonProd + h, 2);
+    });
+  });
+  A.cfg = A.cfg || {};
+  A.cfg.journeesMigrees = true;
+  sauverCfg();
+  if (A.journees.length) sauverJournees();
+  return true;
+}
+
+/* Le temps porté par chaque chantier n'est qu'une lecture des journées :
+   tout le calcul de rendement et de prix de journée continue de marcher
+   sans savoir d'où le temps vient. */
+function indexerJournees() {
+  (A.chantiers || []).forEach(function (c) { c.temps = []; });
+  (A.journees || []).forEach(function (j) {
+    if (!j.chantier) return;
+    var c = chantier(j.chantier); if (!c) return;
+    var pers = C.nb(j.personnes) || 1;
+    /* Une journée non facturée nourrit le rendement mais jamais le prix de
+       journée : elle entre comme si quelqu'un d'autre l'avait faite. */
+    var hors = !!j.nonFacture;
+    var premier = true;
+    (j.postes || []).forEach(function (p) {
+      if (C.nb(p.heures) <= 0) return;
+      c.temps.push({ date: j.date, duree: C.nb(p.heures), unite: 'h', personnes: pers,
+        sansMoi: (j.sansMoi || hors) || undefined, nonFacture: hors || undefined,
+        km: premier ? (C.nb(j.km) || undefined) : undefined,
+        activite: p.travaux || null, quantite: C.nb(p.quantite) || undefined, jrn: j.id });
+      premier = false;
+    });
+    /* Le trajet et les temps morts comptent dans la journée facturée mais
+       jamais dans le rendement : ils entrent sans activité. */
+    if (C.nb(j.nonProd) > 0) {
+      c.temps.push({ date: j.date, duree: C.nb(j.nonProd), unite: 'h', personnes: pers,
+        sansMoi: (j.sansMoi || hors) || undefined, nonFacture: hors || undefined,
+        km: premier ? (C.nb(j.km) || undefined) : undefined,
+        activite: null, jrn: j.id });
+    }
+  });
+}
+function majJournees() {
+  indexerJournees();
+  renderFiche(); renderCarnet(); renderCalendrier(); renderRendements();
+  renderAccueil(); renderFinances();
+}
+
+/* Les lieux déjà fréquentés, pour ne pas les retaper. */
+function lieuxConnus() {
+  var v = {}, l = [];
+  (A.journees || []).forEach(function (j) {
+    if (j.lieu) v[j.lieu] = 1;
+    if (j.commune) v[j.commune] = 1;
+  });
+  (A.chantiers || []).forEach(function (c) { if (c.lieu) v[c.lieu] = 1; });
+  (A.lieuxRegles || []).forEach(function (x) { if (x) v[x] = 1; });
+  for (var k in v) l.push(k);
+  return l.sort(function (a, b) { return a.localeCompare(b, 'fr'); });
+}
+function derniereJournee() {
+  return (A.journees || []).slice().sort(function (a, b) {
+    return (b.date || 0) - (a.date || 0);
+  })[0] || null;
+}
+
+/* ------------------------------------------------------------- l'écran */
+var pst = [];
+
+function optionsTravaux(sel) {
+  return '<option value="">— prestation —</option>' + C.TRAVAUX.filter(function (t) {
+    return !t.fourniture;
+  }).map(function (t) {
+    return '<option value="' + t.c + '"' + (t.c === sel ? ' selected' : '') + '>' + esc(t.n) + '</option>';
+  }).join('');
+}
+function renderPostes() {
+  var z = $('#mj-postes'); if (!z) return;
+  z.innerHTML = pst.map(function (p, i) {
+    var u = p.travaux ? C.courtUnite(C.uniteDe(p.travaux)) : '';
+    return '<div class="carte2" style="margin-bottom:7px;padding:9px 10px">' +
+      '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">' +
+      '<select data-pstt="' + i + '" style="flex:1">' + optionsTravaux(p.travaux) + '</select>' +
+      (pst.length > 1 ? '<button type="button" class="btn-min" data-pstsup="' + i + '">✕</button>' : '') +
+      '</div><div class="grille g2">' +
+      '<div class="champ" style="margin:0"><label class="eyebrow">Heures</label>' +
+      '<input type="text" data-psth="' + i + '" class="gros" inputmode="decimal" value="' + esc(p.heures) + '"></div>' +
+      '<div class="champ" style="margin:0"><label class="eyebrow">Fait' + (u ? ' (' + esc(u) + ')' : '') + '</label>' +
+      '<input type="text" data-pstq="' + i + '" class="gros" inputmode="decimal" value="' + esc(p.quantite) + '"></div>' +
+      '</div></div>';
+  }).join('') + '<button type="button" class="btn-min" id="pst-plus">+ une prestation</button>';
+}
+function lirePostes() {
+  $$('#mj-postes [data-pstt]').forEach(function (i) { pst[+i.dataset.pstt].travaux = i.value; });
+  $$('#mj-postes [data-psth]').forEach(function (i) { pst[+i.dataset.psth].heures = i.value; });
+  $$('#mj-postes [data-pstq]').forEach(function (i) { pst[+i.dataset.pstq].quantite = i.value; });
+}
+
+function ouvrirJournee(id, modele) {
+  var j = id ? journee(id) : null;
+  if (id && !j) return;
+  var src = j || modele || null;
+  pst = (src && src.postes && src.postes.length)
+    ? src.postes.map(function (p) {
+        return { travaux: p.travaux, heures: j ? String(p.heures) : '', quantite: j ? String(p.quantite || '') : '' };
+      })
+    : [{ travaux: '', heures: '', quantite: '' }];
+
+  var chs = A.chantiers.slice().sort(function (a, b) { return (b.maj || 0) - (a.maj || 0); });
+  var dj = derniereJournee();
+  modale(id ? 'Modifier la journée' : 'Ma journée',
+    (!id && dj ? '<button class="btn btn-min" id="mj-hier" style="margin-bottom:11px">' +
+      'Reprendre ' + esc(dateCourte(dj.date)) + (dj.lieu ? ' — ' + esc(dj.lieu) : '') + '</button>' : '') +
+    '<label class="ligne-check" style="display:flex;align-items:flex-start;gap:8px;font-size:13.5px;' +
+    'padding:9px 11px;background:var(--carte2);border-radius:9px;margin-bottom:11px">' +
+    '<input type="checkbox" id="mj-nonfact"' + (src && src.nonFacture ? ' checked' : '') +
+    ' style="margin-top:2px"><span>Journée non facturée' +
+    '<span class="muted" style="display:block;font-size:11.5px">Chantier observé ou travail pour ' +
+    'soi : le temps et les quantités nourrissent les rendements, sans entrer dans le chiffre ' +
+    'd’affaires. Les kilomètres deviennent facultatifs.</span></span></label>' +
+    '<div class="champ"><label class="eyebrow" for="mj-date">Date</label>' +
+    '<input type="date" id="mj-date" value="' + jourIso(j && j.date) + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="mj-ch">Chantier</label>' +
+    '<select id="mj-ch"><option value="">— aucun, journée libre —</option>' +
+    chs.map(function (c) {
+      return '<option value="' + c.id + '"' +
+        (src && src.chantier === c.id ? ' selected' : '') + '>' + esc(c.nom || 'Chantier') + '</option>';
+    }).join('') + '</select></div>' +
+    '<div class="grille g2">' +
+    '<div class="champ"><label class="eyebrow" for="mj-lieu">Forêt</label>' +
+    '<input type="text" id="mj-lieu" list="liste-lieux" autocomplete="off" value="' +
+    esc((src && src.lieu) || '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="mj-commune">Commune</label>' +
+    '<input type="text" id="mj-commune" list="liste-lieux" autocomplete="off" value="' +
+    esc((src && src.commune) || '') + '"></div>' +
+    '</div>' +
+    '<label class="eyebrow" style="margin-top:6px;display:block">Ce que j’ai fait</label>' +
+    '<div id="mj-postes"></div>' +
+    '<label class="eyebrow" style="margin-top:11px;display:block">Trajet et temps morts</label>' +
+    '<div class="grille g3">' +
+    '<div class="champ" style="margin:0"><label class="eyebrow" for="mj-nonprod">Heures</label>' +
+    '<input type="text" id="mj-nonprod" inputmode="decimal" value="' +
+    (j && C.nb(j.nonProd) ? j.nonProd : '') + '"></div>' +
+    '<div class="champ" style="margin:0"><label class="eyebrow" for="mj-km">Kilomètres</label>' +
+    '<input type="text" id="mj-km" inputmode="decimal" value="' +
+    (src && C.nb(src.km) ? src.km : '') + '"></div>' +
+    '<div class="champ" style="margin:0"><label class="eyebrow" for="mj-pers">Personnes</label>' +
+    '<input type="text" id="mj-pers" inputmode="numeric" value="' +
+    ((src && C.nb(src.personnes)) || 1) + '"></div>' +
+    '</div>' +
+    '<div class="carte2" id="mj-apercu" style="margin:11px 0"></div>' +
+    '<label class="ligne-check" style="display:flex;align-items:center;gap:8px;font-size:13.5px">' +
+    '<input type="checkbox" id="mj-fin"' + (j && j.fin ? ' checked' : '') + '> ' +
+    'Ce chantier est terminé</label>' +
+    '<div class="champ" style="margin-top:9px"><label class="eyebrow" for="mj-note">Note</label>' +
+    '<textarea id="mj-note" rows="2">' + esc((j && j.note) || '') + '</textarea></div>' +
+    '<div class="btn-rang" style="margin-top:11px">' +
+    '<button class="btn primaire" id="mj-ok">Enregistrer</button>' +
+    (id ? '<button class="btn danger btn-min" id="mj-sup">Supprimer</button>' : '') + '</div>');
+
+  var apercu = function () {
+    var z = $('#mj-apercu'); if (!z) return;
+    var prod = pst.reduce(function (s, p) { return s + C.nb(p.heures); }, 0);
+    var np = C.nb($('#mj-nonprod').value);
+    var tot = prod + np;
+    if (tot <= 0) { z.innerHTML = '<span class="muted">Indiquez vos heures.</span>'; return; }
+    var pers = C.nb($('#mj-pers').value) || 1;
+    var jrs = tot / C.HEURES_JOUR(A.cfg);
+    var ch = $('#mj-ch').value ? chantier($('#mj-ch').value) : null;
+    var nf = $('#mj-nonfact').checked;
+    var pj = ch ? C.prixJourVise(ch, A.cfg) : C.nb(A.cfg && A.cfg.prixJourVise);
+    z.innerHTML = '<b class="num" style="font-size:19px">' + E.fmt(tot, 2) + ' h</b>' +
+      ' — ' + E.fmt(jrs, 2) + ' journée' + (jrs > 1 ? 's' : '') +
+      (nf ? ' <span class="retard">non facturée</span>' : '') +
+      '<div class="muted" style="font-size:12.5px;margin-top:3px">' +
+      E.fmt(prod, 2) + ' h productives' + (np ? ' · ' + E.fmt(np, 2) + ' h de trajet' : '') +
+      (pers > 1 ? ' · ' + pers + ' personnes' : '') +
+      (nf ? ' · compte pour le rendement seulement'
+          : pj ? ' · ' + eur(C.arr(jrs * pj, 2)) + ' à ' + eur(pj) + '/j' : '') + '</div>' +
+      pst.filter(function (p) { return p.travaux && C.nb(p.quantite) > 0 && C.nb(p.heures) > 0; })
+        .map(function (p) {
+          var u = C.courtUnite(C.uniteDe(p.travaux));
+          var parJ = C.nb(p.quantite) / (C.nb(p.heures) / C.HEURES_JOUR(A.cfg)) * pers;
+          return '<div style="display:flex;justify-content:space-between;font-size:12.5px;margin-top:4px">' +
+            '<span>' + esc(C.nomTravail(p.travaux)) + '</span><b class="num">' +
+            E.fmt(parJ, parJ >= 100 ? 0 : 1) + ' ' + esc(u) + '/jour</b></div>';
+        }).join('');
+  };
+  renderPostes(); apercu();
+  $('#mj-postes').addEventListener('input', function () { lirePostes(); apercu(); });
+  $('#mj-postes').addEventListener('change', function () { lirePostes(); renderPostes(); apercu(); });
+  $('#mj-postes').addEventListener('click', function (e) {
+    var plus = e.target.closest('#pst-plus'), sup = e.target.closest('[data-pstsup]');
+    if (plus) { lirePostes(); pst.push({ travaux: '', heures: '', quantite: '' }); }
+    else if (sup) { lirePostes(); pst.splice(+sup.dataset.pstsup, 1); }
+    else return;
+    renderPostes(); apercu();
+  });
+  ['#mj-nonprod', '#mj-pers'].forEach(function (x) { $(x).addEventListener('input', apercu); });
+  $('#mj-nonfact').addEventListener('change', apercu);
+  $('#mj-ch').addEventListener('change', function () {
+    var c = $('#mj-ch').value ? chantier($('#mj-ch').value) : null;
+    if (c && c.lieu && !$('#mj-lieu').value) $('#mj-lieu').value = c.lieu;
+    apercu();
+  });
+  if ($('#mj-hier')) $('#mj-hier').addEventListener('click', function () {
+    fermerModale(); ouvrirJournee(null, dj);
+  });
+
+  $('#mj-ok').addEventListener('click', function () {
+    lirePostes();
+    var postes = pst.filter(function (p) { return p.travaux && C.nb(p.heures) > 0; })
+      .map(function (p) {
+        return { travaux: p.travaux, heures: C.nb(p.heures), quantite: C.nb(p.quantite) || 0 };
+      });
+    var np = C.nb($('#mj-nonprod').value);
+    if (!postes.length && np <= 0) { toast('Indiquez au moins une prestation.'); return; }
+    var maj = {
+      date: versDate($('#mj-date').value) || Date.now(),
+      chantier: $('#mj-ch').value || null, lieu: $('#mj-lieu').value.trim(),
+      commune: $('#mj-commune').value.trim(),
+      nonFacture: !!$('#mj-nonfact').checked,
+      km: C.nb($('#mj-km').value) || 0, nonProd: np,
+      personnes: C.nb($('#mj-pers').value) || 1,
+      fin: !!$('#mj-fin').checked, note: $('#mj-note').value.trim(),
+      postes: postes, maj: Date.now()
+    };
+    A.journees = A.journees || [];
+    if (j) Object.keys(maj).forEach(function (k) { j[k] = maj[k]; });
+    else { maj.id = uid(); A.journees.push(maj); }
+    var ch = maj.chantier ? chantier(maj.chantier) : null;
+    /* La case « terminé » fait avancer le chantier : c'est le seul endroit
+       où on le sait vraiment, le soir même. */
+    if (ch && maj.fin && ch.statut !== 'facture' && ch.statut !== 'paye') {
+      ch.statut = 'termine'; ch.maj = Date.now();
+    }
+    indexerJournees();
+    sauverJournees().then(function () { return ch ? sauverChantiers() : null; }).then(function () {
+      fermerModale(); majJournees();
+      toast(maj.fin ? 'Journée enregistrée, chantier terminé.' : 'Journée enregistrée.');
+    });
+  });
+  if (id) $('#mj-sup').addEventListener('click', function () {
+    if (!confirm('Supprimer cette journée ?\n\nIl restera récupérable ' +
+      B.JOURS_POUBELLE + ' jours dans Réglages ▸ Fichiers ▸ Corbeille.')) return;
+    A.journees = A.journees.filter(function (x) { return x.id !== id; });
+    jeterObjet('journee', j, dateCourte(j.date) + (j.lieu ? ' — ' + j.lieu : ''),
+      E.fmt(C.heuresJournee(j), 1) + ' h')
+      .then(sauverJournees).then(function () {
+        fermerModale(); majJournees(); toast('Journée mise à la corbeille.');
+      });
+  });
+}
+
+/* Le raccourci de l'accueil : la saisie du soir doit être à un pouce. */
+function renderMaJournee() {
+  var z = $('#a-journee'); if (!z) return;
+  var auj = B.jour(Date.now());
+  var faite = (A.journees || []).some(function (j) { return B.jour(j.date) === auj; });
+  var sem = (A.journees || []).filter(function (j) {
+    return (j.date || 0) > Date.now() - 7 * 86400000;
+  });
+  var h = sem.reduce(function (s, j) { return s + C.heuresJournee(j); }, 0);
+  z.innerHTML = '<button class="btn primaire" id="a-jour" style="width:100%;margin-top:10px;' +
+    'display:flex;align-items:center;justify-content:center;gap:9px;padding:13px">' +
+    '<span style="font-size:16px">☀</span><span>Enregistrer ma journée</span>' +
+    '</button><p class="muted" style="font-size:12px;margin:6px 0 0;text-align:center">' +
+    (faite ? 'Déjà saisie aujourd’hui' : 'Rien de saisi aujourd’hui') +
+    (sem.length ? ' · ' + E.fmt(h, 1) + ' h sur 7 jours' : '') + '</p>';
 }
 
 /* ================================================ STOCK DE FOURNITURES
@@ -10379,7 +10867,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.7.0-20260726-1420';
+var VERSION = '4.9.0-20260727-1210';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
