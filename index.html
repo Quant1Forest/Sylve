@@ -71,7 +71,15 @@ body:not(.m-chantiers) .mod-import{display:none}
 #regl-corps.f-general > :not(.sec-general),
 #regl-corps.f-ent > :not(.sec-ent),
 #regl-corps.f-cubage > :not(.sec-cubage),
+#regl-corps.f-stock > :not(.sec-stock),
 #regl-corps.f-bois > :not(.sec-bois){display:none}
+.lien-regl{
+  font:inherit;font-size:12px;color:var(--gris);border:none;background:none;padding:0;
+  cursor:pointer;text-decoration:underline;text-underline-offset:2px;
+}
+.lien-regl:hover{color:var(--accent)}
+.tot td{font-weight:700;border-top:2px solid var(--trait-fort);border-bottom:none}
+.pt{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:1px}
 .bandeau-nav{flex:1;min-width:0}
 .bandeau-nav select{
   width:100%;max-width:280px;border:none;background:none;color:inherit;
@@ -620,7 +628,7 @@ td.act{width:1%;padding:3px 6px}
         <p class="muted" style="font-size:12.5px;margin:0 0 10px" id="s-etat"></p>
         <div class="btn-rang">
           <button class="btn" id="s-restaurer">Restaurer un fichier</button>
-          <button class="btn" id="s-recuperer">Récupérer…</button>
+          <button class="btn" id="s-recuperer">Corbeille…</button>
         </div>
         <div id="s-recup" hidden></div>
         <p class="muted" style="font-size:12px;margin:11px 0 0">
@@ -638,6 +646,7 @@ td.act{width:1%;padding:3px 6px}
         <div class="chips" id="regl-nav">
           <button class="chip" data-regl="general" aria-pressed="true">Général</button>
           <button class="chip" data-regl="ent" aria-pressed="false">Entreprise</button>
+          <button class="chip" data-regl="stock" aria-pressed="false">Stock et fournitures</button>
           <button class="chip" data-regl="cubage" aria-pressed="false">Cubage</button>
           <button class="chip" data-regl="bois" aria-pressed="false">Bois de chauffage</button>
         </div>
@@ -738,6 +747,23 @@ td.act{width:1%;padding:3px 6px}
           <input type="checkbox" id="r-we"> Compter les week-ends comme jours travaillables
         </label>
       </div>
+      <div class="carte sec-stock" id="c-four-regl">
+        <div class="carte-titre"><h2>Fournisseurs</h2>
+          <button class="btn-min" id="rf-add">Ajouter</button></div>
+        <p class="muted" style="font-size:12.5px;margin:0 0 10px">
+          Ce carnet alimente la liste déroulante des commandes.
+        </p>
+        <div id="rf-liste"></div>
+      </div>
+      <div class="carte sec-stock" id="c-prod-regl">
+        <div class="carte-titre"><h2>Produits</h2>
+          <button class="btn-min" id="rp-add">Ajouter</button></div>
+        <p class="muted" style="font-size:12.5px;margin:0 0 10px">
+          Le catalogue de ce que vous achetez et revendez. Décrit une fois ici, un produit
+          se retrouve ensuite dans les commandes, les sorties et le prix de revient.
+        </p>
+        <div id="rp-liste"></div>
+      </div>
       <div class="carte sec-bois" id="c-bois-regl">
         <h2>Seuils d'humidité</h2>
         <p class="muted" style="font-size:12px;margin:0 0 10px">Tels que lus à l'humidimètre. Quatre états : vert, en séchage, sec, très sec.</p>
@@ -779,6 +805,7 @@ td.act{width:1%;padding:3px 6px}
           <button class="tuile" id="a-reglages" title="Réglages"
             style="width:auto;flex:none;padding:11px 13px">⚙</button>
         </div>
+        <div id="a-sauvegarde"></div>
         <p class="eyebrow" style="margin:22px 0 8px">Entreprise</p>
         <div class="tuiles">
           <button class="tuile" data-module="entreprise">
@@ -878,33 +905,49 @@ td.act{width:1%;padding:3px 6px}
 
     <section class="vue" id="vue-stock2" role="tabpanel">
       <div class="carte">
-        <div class="carte-titre"><h2>Fournitures</h2>
+        <div class="carte-titre"><h2>Inventaire</h2>
           <div class="btn-rang" style="margin:0">
-            <button class="btn btn-min" id="art-nouveau">+ Article</button>
-            <button class="btn primaire btn-min" id="art-reception">Réception</button>
+            <button class="btn primaire btn-min" id="art-reception">+ Commande</button>
           </div></div>
         <div id="stock-resume"></div>
       </div>
-      <div class="carte"><div id="liste-articles"></div></div>
+      <div class="carte">
+        <div class="carte-titre"><h2>État du stock</h2>
+          <button class="lien-regl" data-versregl="stock">Réglages ▸ Produits</button></div>
+        <div id="stock-table"></div>
+      </div>
+      <div id="stock-alertes"></div>
     </section>
 
     <section class="vue" id="vue-revient" role="tabpanel">
       <div class="carte">
-        <h2>Prix de revient</h2>
-        <p class="muted" style="font-size:12.5px;margin:0 0 12px">
+        <div class="carte-titre"><h2>Prix de revient</h2>
+          <button class="lien-regl" id="rev-hyp">Hypothèses</button></div>
+        <p class="muted" style="font-size:12.5px;margin:0 0 11px">
           Ce qu'un produit coûte vraiment, ce que l'État prendra, ce qu'il vous reste.
         </p>
-        <div id="rev-form"></div>
+        <div class="chips" id="rev-nav">
+          <button class="chip" data-rev="simul" aria-pressed="true">Simulateur</button>
+          <button class="chip" data-rev="couts" aria-pressed="false">Coûts</button>
+          <button class="chip" data-rev="perf" aria-pressed="false">Performance</button>
+        </div>
+        <div id="rev-form" style="margin-top:12px"></div>
       </div>
       <div id="rev-resultat"></div>
     </section>
 
     <section class="vue" id="vue-commandes" role="tabpanel">
       <div class="carte">
-        <div class="carte-titre"><h2>Commandes</h2>
-          <button class="btn primaire btn-min" id="cmd-nouvelle">Réception</button></div>
-        <div id="liste-commandes"></div>
+        <div class="carte-titre"><h2>Entrées et sorties</h2>
+          <button class="btn primaire btn-min" id="cmd-nouvelle">Enregistrer</button></div>
+        <div class="chips" id="mvt-nav">
+          <button class="chip" data-mvt="achats" aria-pressed="true">Entrées</button>
+          <button class="chip" data-mvt="sorties" aria-pressed="false">Sorties</button>
+          <button class="chip" data-mvt="pertes" aria-pressed="false">Pertes</button>
+        </div>
+        <p class="muted" style="font-size:12.5px;margin:11px 0 0" id="mvt-aide"></p>
       </div>
+      <div class="carte"><div id="liste-commandes"></div></div>
     </section>
 
     <section class="vue" id="vue-charges" role="tabpanel">
@@ -3597,6 +3640,52 @@ var UNITES_ART = [
   { c: 'sac', n: 'sac', court: 'sac' },
   { c: 'litre', n: 'litre', court: 'L' }
 ];
+/* Un produit a un type : cela sert à trier l'inventaire et à ne pas mélanger
+   une gaine de protection avec un répulsif dosé au millilitre. */
+var TYPES_ART = [
+  { c: 'protection', n: 'Protection' },
+  { c: 'tuteur', n: 'Tuteur, piquet' },
+  { c: 'traitement', n: 'Traitement, répulsif' },
+  { c: 'plant', n: 'Plant' },
+  { c: 'consommable', n: 'Consommable' },
+  { c: 'autre', n: 'Autre' }
+];
+function nomTypeArt(c) {
+  for (var i = 0; i < TYPES_ART.length; i++) if (TYPES_ART[i].c === c) return TYPES_ART[i].n;
+  return 'Autre';
+}
+
+/* Une commande ne pèse sur le stock qu'une fois reçue. */
+var STATUTS_ACHAT = [
+  { c: 'devis', n: 'Devis demandé', recu: false },
+  { c: 'commande', n: 'Commandé', recu: false },
+  { c: 'expedie', n: 'Expédié', recu: false },
+  { c: 'recu', n: 'Reçu', recu: true },
+  { c: 'annule', n: 'Annulé', recu: false, mort: true }
+];
+/* Une sortie ne quitte le stock qu'une fois le chantier fait ; avant cela
+   elle est engagée ou seulement prévue. */
+var STATUTS_VENTE = [
+  { c: 'potentiel', n: 'Chantier potentiel', etat: 'prevu' },
+  { c: 'aprevoir', n: 'À prévoir', etat: 'prevu' },
+  { c: 'accepte', n: 'Devis ou chantier accepté', etat: 'engage' },
+  { c: 'encours', n: 'En cours de réalisation', etat: 'engage' },
+  { c: 'fini', n: 'Chantier terminé', etat: 'sorti' },
+  { c: 'annule', n: 'Annulé', etat: 'mort' }
+];
+function trouveSt(l, c) { for (var i = 0; i < l.length; i++) if (l[i].c === c) return l[i]; return null; }
+function nomStatutAchat(c) { var x = trouveSt(STATUTS_ACHAT, c); return x ? x.n : 'Reçu'; }
+function achatRecu(c) { var x = trouveSt(STATUTS_ACHAT, c); return x ? !!x.recu : true; }
+function achatMort(c) { var x = trouveSt(STATUTS_ACHAT, c); return !!(x && x.mort); }
+function nomStatutVente(c) { var x = trouveSt(STATUTS_VENTE, c); return x ? x.n : 'Chantier terminé'; }
+function etatVente(c) { var x = trouveSt(STATUTS_VENTE, c); return x ? x.etat : 'sorti'; }
+/* Le statut d'un chantier donne d'office celui de la sortie qui s'y rattache :
+   inutile de tenir deux fois la même information. */
+var VENTE_DE_CHANTIER = {
+  devis: 'potentiel', envoye: 'aprevoir', accepte: 'accepte', encours: 'encours',
+  termine: 'fini', facture: 'fini', paye: 'fini', sansuite: 'annule'
+};
+
 function nomUniteArt(c) {
   for (var i = 0; i < UNITES_ART.length; i++) if (UNITES_ART[i].c === c) return UNITES_ART[i].n;
   return c || '';
@@ -3624,16 +3713,52 @@ function arr(n, d) { var p = Math.pow(10, d == null ? 2 : d); return Math.round(
    par unité coûte en réalité 0,7325 €. Sans cela, la marge est surestimée. */
 function mouvements(art) { return (art && art.mouvements) || []; }
 
+/* Un mouvement n'agit sur le stock réel que s'il a eu lieu. Une commande
+   passée mais pas encore livrée est « attendue » ; une sortie prévue sur un
+   chantier accepté est « engagée ». Trois niveaux de lecture, comme dans le
+   tableur : ce que j'ai, ce qu'il me restera, ce qu'il faudra racheter. */
 function entrees(art) {
-  return mouvements(art).filter(function (m) { return m.sens === 'entree'; });
+  return mouvements(art).filter(function (m) { return m.sens === 'entree' && !m.attendu; });
+}
+function attendues(art) {
+  return mouvements(art).filter(function (m) { return m.sens === 'entree' && m.attendu; });
 }
 function sorties(art) {
-  return mouvements(art).filter(function (m) { return m.sens === 'sortie'; });
+  return mouvements(art).filter(function (m) { return m.sens === 'sortie' && (!m.etat || m.etat === 'sorti'); });
 }
-function quantite(art) {
-  return arr(mouvements(art).reduce(function (s, m) {
-    return s + (m.sens === 'entree' ? nb(m.qte) : -nb(m.qte));
-  }, 0), 3);
+function engagees(art) {
+  return mouvements(art).filter(function (m) { return m.sens === 'sortie' && m.etat === 'engage'; });
+}
+function prevues(art) {
+  return mouvements(art).filter(function (m) { return m.sens === 'sortie' && m.etat === 'prevu'; });
+}
+/* Trois sortes de sorties, qui pèsent toutes sur le stock mais pas sur le
+   chiffre d'affaires : une vente rapporte, un débours est refacturé à
+   l'euro près, une perte ne rapporte rien. */
+function ventes(art) { return sorties(art).filter(function (m) { return !m.perte && !m.debours; }); }
+function debours(art) { return sorties(art).filter(function (m) { return !m.perte && !!m.debours; }); }
+function pertes(art) { return sorties(art).filter(function (m) { return !!m.perte; }); }
+
+function sommeQte(l) { return l.reduce(function (s, m) { return s + nb(m.qte); }, 0); }
+function quantite(art) { return arr(sommeQte(entrees(art)) - sommeQte(sorties(art)), 3); }
+function quantiteAttendue(art) { return arr(sommeQte(attendues(art)), 3); }
+/* Ce qu'il restera une fois honorés les chantiers acceptés ou en cours. */
+function stockFutur(art) { return arr(quantite(art) - sommeQte(engagees(art)), 3); }
+/* Et une fois honorés aussi les chantiers seulement prévus ou potentiels. */
+function stockPrevu(art) { return arr(stockFutur(art) - sommeQte(prevues(art)), 3); }
+function quantiteVendue(art) { return arr(sommeQte(ventes(art)), 3); }
+function quantitePerdue(art) { return arr(sommeQte(pertes(art)), 3); }
+function quantiteDebours(art) { return arr(sommeQte(debours(art)), 3); }
+function quantiteAchetee(art) { return arr(sommeQte(entrees(art)), 3); }
+function caVendu(art) {
+  return arr(ventes(art).reduce(function (s, m) { return s + nb(m.qte) * nb(m.prix); }, 0), 2);
+}
+function caDebours(art) {
+  return arr(debours(art).reduce(function (s, m) { return s + nb(m.qte) * nb(m.prix); }, 0), 2);
+}
+function prixVenteMoyen(art) {
+  var q = quantiteVendue(art);
+  return q > 0 ? arr(caVendu(art) / q, 4) : 0;
 }
 /* Prix moyen pondéré : total acheté / quantité achetée. Recalculé à chaque
    entrée, il lisse les variations de prix entre commandes. */
@@ -3697,6 +3822,15 @@ function coutSorties(art) {
 function sousSeuil(art) {
   var s = nb(art && art.seuil);
   return s > 0 && quantite(art) <= s;
+}
+/* Trois états lisibles d'un coup d'œil dans le tableau d'inventaire. */
+function etatStock(art) {
+  if (quantite(art) <= 0) return 'rupture';
+  if (sousSeuil(art)) return 'faible';
+  return 'ok';
+}
+function nomEtatStock(e) {
+  return e === 'rupture' ? 'Rupture' : e === 'faible' ? 'Stock faible' : 'En stock';
 }
 
 /* ------------------------------------------------------------- ensemble */
@@ -3802,6 +3936,18 @@ function decomposer(prixVente, cout, cfg) {
 
 var M = {
   UNITES_ART: UNITES_ART, nomUniteArt: nomUniteArt, courtUniteArt: courtUniteArt,
+  TYPES_ART: TYPES_ART, nomTypeArt: nomTypeArt,
+  STATUTS_ACHAT: STATUTS_ACHAT, nomStatutAchat: nomStatutAchat,
+  achatRecu: achatRecu, achatMort: achatMort,
+  STATUTS_VENTE: STATUTS_VENTE, nomStatutVente: nomStatutVente, etatVente: etatVente,
+  VENTE_DE_CHANTIER: VENTE_DE_CHANTIER,
+  attendues: attendues, engagees: engagees, prevues: prevues,
+  ventes: ventes, debours: debours, pertes: pertes,
+  quantiteAttendue: quantiteAttendue, stockFutur: stockFutur, stockPrevu: stockPrevu,
+  quantiteVendue: quantiteVendue, quantitePerdue: quantitePerdue,
+  quantiteDebours: quantiteDebours, quantiteAchetee: quantiteAchetee,
+  caVendu: caVendu, caDebours: caDebours, prixVenteMoyen: prixVenteMoyen,
+  etatStock: etatStock, nomEtatStock: nomEtatStock,
   nb: nb, arr: arr,
   mouvements: mouvements, entrees: entrees, sorties: sorties,
   quantite: quantite, pmp: pmp, coutReel: coutReel, dernierCout: dernierCout,
@@ -4030,10 +4176,12 @@ function aPurger(entrees, maintenant, jours) {
     .map(function (e) { return e.cle; });
 }
 
-function construireSauvegarde(cfg, bordereaux, piles, chantiers, depenses, clients, articles, charges, proprios, fournisseurs) {
+var FORMAT_SAUVEGARDE = 'bordcub-sauvegarde-1';
+
+function construireSauvegarde(cfg, bordereaux, piles, chantiers, depenses, clients, articles, charges, proprios, fournisseurs, commandes, sorties) {
   return {
-    format: 'bordcub-sauvegarde-1',
-    version: 6,
+    format: FORMAT_SAUVEGARDE,
+    version: 7,
     date: new Date().toISOString(),
     config: cfg || null,
     bordereaux: (bordereaux || []).filter(Boolean),
@@ -4044,7 +4192,9 @@ function construireSauvegarde(cfg, bordereaux, piles, chantiers, depenses, clien
     articles: (articles || []).filter(Boolean),
     charges: (charges || []).filter(Boolean),
     proprios: (proprios || []).filter(Boolean),
-    fournisseurs: (fournisseurs || []).filter(Boolean)
+    fournisseurs: (fournisseurs || []).filter(Boolean),
+    commandes: (commandes || []).filter(Boolean),
+    sorties: (sorties || []).filter(Boolean)
   };
 }
 
@@ -4052,16 +4202,27 @@ function construireSauvegarde(cfg, bordereaux, piles, chantiers, depenses, clien
    (format historique « bordcub-1 »). Renvoie null si illisible. */
 function lireSauvegarde(o) {
   if (!o || typeof o !== 'object') return null;
-  if (Array.isArray(o.bordereaux) || Array.isArray(o.piles) || Array.isArray(o.chantiers)) {
-    var b = (o.bordereaux || []).filter(function (x) { return x && Array.isArray(x.lignes); });
-    var pi = (o.piles || []).filter(function (x) { return x && x.nom != null; });
-    var chs = (o.chantiers || []).filter(function (x) { return x && x.nom != null; });
-    if (!b.length && !pi.length && !chs.length) return null;
-    return { config: o.config || null, bordereaux: b, piles: pi, chantiers: chs,
+  if (o.format === FORMAT_SAUVEGARDE || Array.isArray(o.bordereaux) ||
+    Array.isArray(o.piles) || Array.isArray(o.chantiers)) {
+    var r = { config: o.config || null,
+      bordereaux: (o.bordereaux || []).filter(function (x) { return x && Array.isArray(x.lignes); }),
+      piles: (o.piles || []).filter(function (x) { return x && x.nom != null; }),
+      chantiers: (o.chantiers || []).filter(function (x) { return x && x.nom != null; }),
       depenses: (o.depenses || []).filter(Boolean), clients: (o.clients || []).filter(Boolean),
       articles: (o.articles || []).filter(Boolean), charges: (o.charges || []).filter(Boolean),
       proprios: (o.proprios || []).filter(Boolean),
-      fournisseurs: (o.fournisseurs || []).filter(Boolean), complete: true };
+      fournisseurs: (o.fournisseurs || []).filter(Boolean),
+      commandes: (o.commandes || []).filter(Boolean),
+      sorties: (o.sorties || []).filter(Boolean), complete: true };
+    /* Une sauvegarde peut ne contenir que du stock ou que des dépenses : la
+       refuser faute de bordereau revenait à interdire l'import à qui ne fait
+       pas de cubage. */
+    var vide = true;
+    ['bordereaux', 'piles', 'chantiers', 'depenses', 'clients', 'articles',
+      'charges', 'proprios', 'fournisseurs', 'commandes', 'sorties'].forEach(function (k) {
+        if (r[k].length) vide = false;
+      });
+    return vide ? null : r;
   }
   var seul = o.bordereau || o;
   if (seul && Array.isArray(seul.lignes)) {
@@ -4082,7 +4243,7 @@ function depuisQuand(ts, maintenant) {
 }
 /* Au-delà d'une semaine sans sauvegarde extérieure, on alerte. */
 function sauvegardeAncienne(ts, maintenant) {
-  return !ts || (maintenant - ts) > 7 * JOUR;
+  return !ts || (maintenant - ts) > 30 * JOUR;
 }
 
 function octets(n) {
@@ -4131,7 +4292,7 @@ function ecrire(k, o) { return Store.set(k, JSON.stringify(o)); }
 /* ---------------------------------------------------------------- état */
 var A = {
   cfg: null, index: [], bord: null, piles: [], chantiers: [], module: 'cubage', ici: null,
-  vuePiles: 'stock', filtreCh: 'ouverts', chOuvert: null, clients: [], proprios: [], estim: null, imp: null, articles: [], charges: [], fournisseurs: [], revient: null, calMois: null, calJour: null, nbAlertes: 0, planifie: null,
+  vuePiles: 'stock', filtreCh: 'ouverts', chOuvert: null, clients: [], proprios: [], estim: null, imp: null, articles: [], charges: [], fournisseurs: [], commandes: [], sorties: [], mvt: 'achats', revient: null, calMois: null, calJour: null, nbAlertes: 0, planifie: null,
   depenses: [], periode: null, filtreDep: 'tous', vueAna: 'ensemble', secReglages: 'general',
   vue: 'saisie', sousVue: 'synthese', edition: null,
   memeGrume: false, classementRegl: 'Class. Comt', filtre: ''
@@ -4719,18 +4880,42 @@ function partager(nom, texte, type) {
   return Promise.resolve();
 }
 
+/* Ce que la sauvegarde emporte réellement. Sert au rappel comme au libellé :
+   l'ancien test ne regardait que les bordereaux de cubage, si bien qu'une
+   année entière de chantiers et de finances ne déclenchait aucune alerte. */
+function contenuSauvegarde() {
+  return [
+    { n: A.index.length, u: 'bordereau', p: 'bordereaux' },
+    { n: A.piles.length, u: 'pile', p: 'piles' },
+    { n: A.chantiers.length, u: 'chantier', p: 'chantiers' },
+    { n: A.depenses.length, u: 'dépense', p: 'dépenses' },
+    { n: (A.commandes || []).length, u: 'commande', p: 'commandes' },
+    { n: (A.sorties || []).length, u: 'mouvement', p: 'mouvements' },
+    { n: A.articles.length, u: 'produit', p: 'produits' },
+    { n: A.charges.length, u: 'charge fixe', p: 'charges fixes' }
+  ].filter(function (x) { return x.n > 0; });
+}
+function listerContenu(c) {
+  return c.map(function (x) { return E.fmt(x.n, 0) + ' ' + (x.n > 1 ? x.p : x.u); }).join(', ');
+}
+function aDesDonnees() { return contenuSauvegarde().length > 0; }
+
 function marquerExport() {
   A.export = Date.now();
   return ecrire('bordcub.export', A.export).then(renderSauvegarde);
 }
 
 function sauvegarderTout() {
-  if (!A.index.length && !A.piles.length && !A.chantiers.length && !A.depenses.length &&
-    !A.articles.length && !A.charges.length) { toast('Rien à sauvegarder.'); return Promise.resolve(); }
+  var c = contenuSauvegarde();
+  if (!c.length) { toast('Rien à sauvegarder.'); return Promise.resolve(); }
+  var poids = '';
   return tousLesBordereaux().then(function (bs) {
-    var txt = JSON.stringify(B.construireSauvegarde(A.cfg, bs, A.piles, A.chantiers, A.depenses, A.clients, A.articles, A.charges, A.proprios, A.fournisseurs), null, 1);
-    return partager('BordCub-' + B.jour(Date.now()) + '.json', txt, 'application/json');
-  }).then(marquerExport);
+    var txt = JSON.stringify(B.construireSauvegarde(A.cfg, bs, A.piles, A.chantiers, A.depenses, A.clients, A.articles, A.charges, A.proprios, A.fournisseurs, A.commandes, A.sorties), null, 1);
+    try { poids = B.octets(new Blob([txt]).size); } catch (e) { poids = B.octets(txt.length); }
+    return partager('Sylve-' + B.jour(Date.now()) + '.json', txt, 'application/json');
+  }).then(marquerExport).then(function () {
+    toast('Sauvegarde' + (poids ? ' de ' + poids : '') + ' : ' + listerContenu(c) + '.');
+  });
 }
 
 /* Une copie complète par jour, sept jours glissants. Les photos de piles
@@ -4747,11 +4932,14 @@ function sansPhotos(piles) {
 function instantaneDuJour() {
   var cle = B.cleInstantane(Date.now());
   return Store.get(cle).then(function (v) {
-    if (v || (!A.index.length && !A.piles.length && !A.chantiers.length)) return;
+    /* Une entreprise sans cubage a autant besoin de sa copie du jour qu'une
+       autre : le critère est d'avoir des données, pas d'avoir des bordereaux. */
+    if (v || !aDesDonnees()) return;
     return tousLesBordereaux().then(function (bs) {
-      if (!bs.length && !A.piles.length && !A.chantiers.length) return;
+      if (!aDesDonnees()) return;
       return Store.set(cle, JSON.stringify(B.construireSauvegarde(A.cfg, bs, sansPhotos(A.piles),
-        A.chantiers, A.depenses, A.clients, A.articles, A.charges, A.proprios, A.fournisseurs)));
+        A.chantiers, A.depenses, A.clients, A.articles, A.charges, A.proprios, A.fournisseurs,
+        A.commandes, A.sorties)));
     });
   }).then(function () {
     return Store.keys();
@@ -4760,17 +4948,68 @@ function instantaneDuJour() {
   }).catch(function () { });
 }
 
+/* Corbeille commune à tout ce qui se supprime. Chaque type déclare où ses
+   objets vivent et comment les enregistrer : reposer un chantier ou une
+   commande dans sa liste devient la même opération. */
+var CORBEILLE = {
+  bordereau:   { nom: 'Bordereau' },
+  chantier:    { nom: 'Chantier',    liste: 'chantiers',    sauver: function () { return sauverChantiers(); } },
+  depense:     { nom: 'Dépense',     liste: 'depenses',     sauver: function () { return sauverDepenses(); } },
+  pile:        { nom: 'Pile',        liste: 'piles',        sauver: function () { return sauverPiles(); } },
+  charge:      { nom: 'Charge fixe', liste: 'charges',      sauver: function () { return sauverCharges(); } },
+  produit:     { nom: 'Produit',     liste: 'articles',     sauver: function () { return sauverArticles(); } },
+  fournisseur: { nom: 'Fournisseur', liste: 'fournisseurs', sauver: function () { return sauverFournisseurs(); } },
+  commande:    { nom: 'Commande',    liste: 'commandes',    sauver: function () { return sauverCommandes(); } },
+  sortie:      { nom: 'Mouvement',   liste: 'sorties',      sauver: function () { return sauverSorties(); } }
+};
+
 function corbeille() {
   return Store.keys().then(function (ks) {
     return Promise.all(ks.filter(function (k) { return k.indexOf('bordcub.poubelle.') === 0; })
       .map(function (k) {
         return lire(k, null).then(function (o) {
-          return o && o.b ? { cle: k, suppr: o.suppr || 0, b: o.b } : null;
+          if (!o) return null;
+          /* Ancien format : un bordereau nu sous la clé « b ». */
+          if (o.b) {
+            return { cle: k, suppr: o.suppr || 0, type: 'bordereau', b: o.b,
+              nom: (o.b.meta && o.b.meta.foret) || 'Sans forêt',
+              detail: E.fmt((o.b.lignes || []).length, 0) + ' billons' };
+          }
+          if (o.o && CORBEILLE[o.type]) {
+            return { cle: k, suppr: o.suppr || 0, type: o.type, o: o.o,
+              nom: o.nom || '', detail: o.detail || '' };
+          }
+          return null;
         });
       }));
   }).then(function (l) {
     return l.filter(Boolean).sort(function (a, b) { return b.suppr - a.suppr; });
   }).catch(function () { return []; });
+}
+
+/* Mettre à la corbeille plutôt qu'effacer. L'objet entier est conservé :
+   au repêchage il revient tel qu'il était, liens compris. */
+function jeterObjet(type, objet, nom, detail) {
+  return Store.set(B.clePoubelle(uid()), JSON.stringify({
+    suppr: Date.now(), type: type, nom: nom || '', detail: detail || '', o: objet
+  }));
+}
+function repecherObjet(e) {
+  var d = CORBEILLE[e.type];
+  if (!d || !d.liste) { toast('Type inconnu.'); return Promise.resolve(); }
+  var l = A[d.liste] = A[d.liste] || [];
+  var o = e.o;
+  /* Si un objet porte déjà cet identifiant, on en donne un neuf plutôt que
+     d'écraser ce qui est en place. */
+  if (o && o.id && l.some(function (x) { return x.id === o.id; })) o.id = uid();
+  l.push(o);
+  return d.sauver().then(function () { return Store.del(e.cle); }).then(function () {
+    indexerStock();
+    renderCarnet(); renderAccueil(); renderDepenses(); renderFinances(); renderCharges();
+    renderPiles(); renderStock(); renderLieux(); renderStockFournitures(); renderCommandes();
+    renderRevient(); renderReglagesStock(); renderCarteChantiers(); renderSauvegarde();
+    toast((d.nom || 'Élément') + ' récupéré.');
+  });
 }
 function jeter(id) {
   return lire('bordcub.b.' + id, null).then(function (b) {
@@ -4802,7 +5041,7 @@ function repecher(cle) {
 }
 
 /* Réintègre une sauvegarde, fichier ou instantané. */
-function integrer(objet, source) {
+function integrer(objet, source, remplace) {
   var s = B.lireSauvegarde(objet);
   if (!s) { toast('Fichier illisible.'); return Promise.resolve(); }
   var n = 0, nPiles = 0, nCh = 0, dernier = null;
@@ -4849,22 +5088,43 @@ function integrer(objet, source) {
       A.charges.push(cg); ng++;
     });
     (s.proprios || []).forEach(function (p) { noterProprio(p); });
-    (s.fournisseurs || []).forEach(function (f2) { noterFournisseur(f2); });
+    var nf = 0, nm = 0;
+    A.fournisseurs = A.fournisseurs || [];
+    (s.fournisseurs || []).forEach(function (f2) {
+      if (typeof f2 === 'string') { idFournisseurParNom(f2); nf++; return; }
+      if (!f2 || !f2.nom) return;
+      if (A.fournisseurs.some(function (x) { return x.id === f2.id; })) return;
+      A.fournisseurs.push(f2); nf++;
+    });
+    A.commandes = A.commandes || []; A.sorties = A.sorties || [];
+    (s.commandes || []).forEach(function (cm) {
+      if (!cm || !cm.lignes) return;
+      if (A.commandes.some(function (x) { return x.id === cm.id; })) cm.id = uid();
+      A.commandes.push(cm); nm++;
+    });
+    (s.sorties || []).forEach(function (so) {
+      if (!so || !so.lignes) return;
+      if (A.sorties.some(function (x) { return x.id === so.id; })) so.id = uid();
+      A.sorties.push(so); nm++;
+    });
     return Promise.all([np ? sauverPiles() : null, nc ? sauverChantiers() : null,
-      nd ? sauverDepenses() : null, na ? sauverArticles() : null, ng ? sauverCharges() : null]);
+      nd ? sauverDepenses() : null, na ? sauverArticles() : null, ng ? sauverCharges() : null,
+      nf ? sauverFournisseurs() : null, nm ? sauverCommandes() : null, nm ? sauverSorties() : null]);
   }).then(function () {
     if (dernier) { A.bord = dernier; return ecrire('bordcub.actif', dernier.id); }
   }).then(function () {
-    appliquerCouleur(); majBandeau(); viderFormulaire(false);
+    /* Sans bordereau actif il n'y a pas de formulaire à remplir : le vider
+       plantait toute restauration ne contenant que des données d'entreprise. */
+    appliquerCouleur(); majBandeau();
+    if (A.bord) viderFormulaire(false);
     renderFichiers(); renderBordereau(); renderSyntheses(); renderSauvegarde();
     renderPiles(); renderStock(); renderLieux(); renderCarnet(); renderDepenses(); renderFinances();
-    renderCharges(); renderStockFournitures(); renderCarteChantiers();
-    if (!n && (nPiles || nCh)) {
-      toast([nPiles ? nPiles + ' piles' : '', nCh ? nCh + ' chantiers' : ''].filter(Boolean).join(' et ') + ' restaurés.');
-      return;
-    }
-    toast(n > 1 ? n + ' bordereaux restaurés' + (source ? ' (' + source + ')' : '') + '.'
-      : 'Bordereau restauré : ' + ((dernier && dernier.lignes.length) || 0) + ' billons.');
+    renderCharges(); indexerStock(); renderStockFournitures(); renderCommandes();
+    renderRevient(); renderReglagesStock(); renderCarteChantiers();
+    var revenu = contenuSauvegarde();
+    toast(revenu.length
+      ? (remplace ? 'Remplacé par ' : 'Restauré : ') + listerContenu(revenu) + '.'
+      : 'Rien n’a été restauré.');
   });
 }
 
@@ -4891,12 +5151,33 @@ function renderFichiersModule() {
 
 function renderSauvegarde() {
   var e = $('#s-etat'); if (!e) return;
+  var c = contenuSauvegarde();
   var q = B.depuisQuand(A.export, Date.now());
-  var vieux = B.sauvegardeAncienne(A.export, Date.now());
-  e.textContent = (q ? 'Dernière sauvegarde envoyée ' + q + '.' : 'Aucune sauvegarde envoyée hors du téléphone.') +
-    (vieux && A.index.length ? ' Pensez-y avant de repartir en forêt.' : '');
-  e.style.color = (vieux && A.index.length) ? 'var(--alerte, #B4231F)' : '';
+  var vieux = c.length && B.sauvegardeAncienne(A.export, Date.now());
+  e.style.color = '';
+  e.innerHTML = !c.length
+    ? 'Rien à sauvegarder pour l’instant.'
+    : '<b' + (vieux ? ' style="color:#B4231F"' : '') + '>' +
+      (q ? 'Dernière sauvegarde ' + esc(q) + '.' : 'Aucune sauvegarde n’est jamais sortie de ce téléphone.') +
+      '</b>' +
+      (vieux ? ' Vos données ne vivent qu’ici : une copie ailleurs, et vous ne risquez plus rien.' : '') +
+      '<br><span style="font-size:12px">Le fichier emportera ' + esc(listerContenu(c)) + '.</span>';
   if (!$('#s-recup').hidden) renderRecup();
+  renderNudgeSauvegarde();
+}
+
+/* Le rappel doit être là où il ouvre l'application, pas dans un écran
+   qu'il ne visite jamais. */
+function renderNudgeSauvegarde() {
+  var z = $('#a-sauvegarde'); if (!z) return;
+  var c = contenuSauvegarde();
+  if (!c.length || !B.sauvegardeAncienne(A.export, Date.now())) { z.innerHTML = ''; return; }
+  var q = B.depuisQuand(A.export, Date.now());
+  z.innerHTML = '<button class="alerte" id="a-sauver" style="margin-top:16px;width:100%">' +
+    '<i class="ic" style="background:#B4231F"></i>' +
+    '<span><b>Sauvegardez vos données</b><small>' +
+    (q ? 'Dernière copie ' + esc(q) : 'Aucune copie n’est sortie de ce téléphone') +
+    ' · ' + esc(listerContenu(c)) + '</small></span></button>';
 }
 
 function renderRecup() {
@@ -4905,16 +5186,23 @@ function renderRecup() {
   Promise.all([corbeille(), Store.keys()]).then(function (r) {
     var pou = r[0];
     var snaps = r[1].filter(function (k) { return k.indexOf('bordcub.snap.') === 0; }).sort().reverse();
-    var h = '';
-    h += '<p class="muted" style="font-size:12px;margin:12px 0 6px">Bordereaux supprimés — gardés ' +
-      B.JOURS_POUBELLE + ' jours</p>';
+    var COUL = { bordereau: '#7A8471', chantier: '#2E4A3C', depense: '#8A5A2B', pile: '#5B3A1E',
+      charge: '#B98A00', produit: '#C4611B', fournisseur: '#7A8471', commande: '#2E7D46', sortie: '#8A5A2B' };
+    var h = '<p class="muted" style="font-size:12px;margin:12px 0 6px">Corbeille — tout est ' +
+      'récupérable pendant ' + B.JOURS_POUBELLE + ' jours, puis effacé</p>';
     h += pou.length ? pou.map(function (p) {
-      var m = p.b.meta || {};
-      return '<div class="liste-item"><span class="pastille" style="background:#7A8471"></span>' +
-        '<div class="li-c"><b>' + esc(m.foret || 'Sans forêt') + '</b><small>' +
-        E.fmt((p.b.lignes || []).length, 0) + ' billons · supprimé le ' +
-        new Date(p.suppr).toLocaleDateString('fr-FR') + '</small></div>' +
-        '<button class="btn-min" data-repecher="' + esc(p.cle) + '">Récupérer</button></div>';
+      var d = CORBEILLE[p.type] || {};
+      var reste = B.JOURS_POUBELLE - Math.floor((Date.now() - p.suppr) / 86400000);
+      return '<div class="liste-item pile-c"><div class="li-h">' +
+        '<span class="pastille" style="background:' + (COUL[p.type] || '#7A8471') + ';margin-top:4px"></span>' +
+        '<div class="li-c"><b>' + esc(p.nom || d.nom || 'Élément') + '</b><small>' +
+        esc(d.nom || p.type) + (p.detail ? ' · ' + esc(p.detail) : '') +
+        ' · supprimé le ' + new Date(p.suppr).toLocaleDateString('fr-FR') +
+        (reste > 0 ? ' · effacé dans ' + reste + ' jour' + (reste > 1 ? 's' : '') : ' · bientôt effacé') +
+        '</small></div></div>' +
+        '<div class="li-actions">' +
+        '<button class="btn-min" data-repecher="' + esc(p.cle) + '">Récupérer</button>' +
+        '<button class="btn-min" data-jeterdef="' + esc(p.cle) + '">Supprimer</button></div></div>';
     }).join('') : '<p class="muted" style="font-size:12.5px;margin:0 0 6px">Corbeille vide.</p>';
 
     h += '<p class="muted" style="font-size:12px;margin:14px 0 6px">Copies automatiques quotidiennes</p>';
@@ -4978,7 +5266,7 @@ function exportStockXlsx() {
 
 /* Les réglages vivent tous au même endroit, rangés par domaine. On y accède
    depuis l'accueil, ou depuis un module — qui ouvre alors sa propre section. */
-var SEC_DE_MODULE = { cubage: 'cubage', bois: 'bois' };
+var SEC_DE_MODULE = { cubage: 'cubage', bois: 'bois', stock: 'stock' };
 function renderReglagesNav() {
   var z = $('#regl-corps'); if (!z) return;
   var sec = A.secReglages || 'general';
@@ -5071,12 +5359,74 @@ function importJson() {
     fr.onload = function () {
       var o = null;
       try { o = JSON.parse(fr.result); } catch (e) { toast('Fichier illisible.'); return; }
-      integrer(o, f.name);
+      demanderRestauration(o, f.name);
     };
     fr.readAsText(f);
   });
   i.click();
 }
+/* Restaurer sur une application vide ne pose aucune question : il n'y a
+   rien à perdre. Sur une application qui contient déjà quelque chose, le
+   choix compte trop pour être fait à la place de l'utilisateur. */
+function demanderRestauration(objet, nom) {
+  var s = B.lireSauvegarde(objet);
+  if (!s) { toast('Fichier illisible.'); return; }
+  var venant = [
+    { n: (s.bordereaux || []).length, u: 'bordereau', p: 'bordereaux' },
+    { n: (s.piles || []).length, u: 'pile', p: 'piles' },
+    { n: (s.chantiers || []).length, u: 'chantier', p: 'chantiers' },
+    { n: (s.depenses || []).length, u: 'dépense', p: 'dépenses' },
+    { n: (s.commandes || []).length, u: 'commande', p: 'commandes' },
+    { n: (s.sorties || []).length, u: 'mouvement', p: 'mouvements' },
+    { n: (s.articles || []).length, u: 'produit', p: 'produits' }
+  ].filter(function (x) { return x.n > 0; });
+  var ici = contenuSauvegarde();
+  if (!ici.length) { integrer(objet, nom); return; }
+
+  modale('Restaurer ' + nom,
+    '<div class="carte2" style="margin-top:0"><b>Le fichier contient</b><br>' +
+    '<span style="font-size:13px">' + esc(venant.length ? listerContenu(venant) : 'rien de reconnaissable') + '</span></div>' +
+    '<div class="carte2" style="margin-top:8px"><b>L’application contient déjà</b><br>' +
+    '<span style="font-size:13px">' + esc(listerContenu(ici)) + '</span></div>' +
+    '<p class="muted" style="font-size:12.5px;margin:12px 0 0"><b>Fusionner</b> ajoute ce qui vient ' +
+    'du fichier sans toucher au reste — c’est le choix sûr, quitte à créer des doublons.<br>' +
+    '<b>Remplacer</b> efface tout ce qui est ici et ne garde que le fichier. Une copie de l’état ' +
+    'actuel est mise de côté avant, récupérable dans « Récupérer… ».</p>' +
+    '<div class="btn-rang" style="margin-top:12px">' +
+    '<button class="btn primaire" id="re-fus">Fusionner</button>' +
+    '<button class="btn danger" id="re-rem">Remplacer tout</button></div>');
+
+  $('#re-fus').addEventListener('click', function () { fermerModale(); integrer(objet, nom); });
+  $('#re-rem').addEventListener('click', function () {
+    if (!confirm('Effacer définitivement ' + listerContenu(ici) + ' pour ne garder que le fichier ?')) return;
+    fermerModale();
+    instantaneForce().then(viderTout).then(function () { integrer(objet, nom, true); });
+  });
+}
+
+/* Copie de sécurité prise juste avant un remplacement. */
+function instantaneForce() {
+  return tousLesBordereaux().then(function (bs) {
+    return Store.set(B.cleInstantane(Date.now()), JSON.stringify(
+      B.construireSauvegarde(A.cfg, bs, sansPhotos(A.piles), A.chantiers, A.depenses, A.clients,
+        A.articles, A.charges, A.proprios, A.fournisseurs, A.commandes, A.sorties)));
+  });
+}
+function viderTout() {
+  var cles = A.index.map(function (b) { return 'bordcub.b.' + b.id; });
+  return cles.reduce(function (ch, k) {
+    return ch.then(function () { return Store.del(k); });
+  }, Promise.resolve()).then(function () {
+    A.index = []; A.bord = null; A.piles = []; A.chantiers = []; A.depenses = [];
+    A.clients = []; A.proprios = []; A.articles = []; A.charges = [];
+    A.fournisseurs = []; A.commandes = []; A.sorties = [];
+    return Promise.all([ecrire('bordcub.index', A.index), Store.del('bordcub.actif'),
+      sauverPiles(), sauverChantiers(), sauverDepenses(), ecrire('bordcub.clients', A.clients),
+      ecrire('bordcub.proprios', A.proprios), sauverArticles(), sauverCharges(),
+      sauverFournisseurs(), sauverCommandes(), sauverSorties()]);
+  });
+}
+
 function ouvrirColler() {
   modale('Coller depuis Excel',
     '<p class="muted" style="font-size:13px;margin-top:0">Dans Excel, sélectionnez les lignes de la feuille ' +
@@ -5204,7 +5554,7 @@ function brancher() {
     else if (b.id === 'b-pile') ouvrirPile(null);
     else if (b.id === 'b-chantier') ouvrirEnteteCh(null);
     else if (b.id === 'b-depense') ouvrirDepense(null);
-    else if (b.id === 'b-article') ouvrirArticle(null);
+    else if (b.id === 'b-article') ouvrirCommande(null);
     else if (b.id === 'b-estimer') { renderEstimer(); aller('estimer'); }
     else if (b.id === 'b-aujourdhui') { A.calMois = null; A.calJour = Date.now(); renderCalendrier(); aller('calendrier'); }
   });
@@ -5309,7 +5659,7 @@ function brancher() {
       var id = s.dataset.supprimer;
       var e2 = A.index.filter(function (x) { return x.id === id; })[0];
       if (!confirm('Supprimer « ' + ((e2 && e2.meta && e2.meta.foret) || 'ce bordereau') +
-        ' » ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Sauvegarde ▸ Récupérer.')) return;
+        ' » ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Fichiers ▸ Corbeille.')) return;
       A.index = A.index.filter(function (x) { return x.id !== id; });
       jeter(id).then(function () { return ecrire('bordcub.index', A.index); }).then(function () {
         if (A.bord && A.bord.id === id) { A.bord = null; Store.del('bordcub.actif'); majBandeau(); }
@@ -5319,8 +5669,28 @@ function brancher() {
     }
   });
   $('#s-recup').addEventListener('click', function (e) {
-    var rp = e.target.closest('[data-repecher]'), ins = e.target.closest('[data-instantane]');
-    if (rp) repecher(rp.dataset.repecher).then(renderRecup);
+    var rp = e.target.closest('[data-repecher]'), ins = e.target.closest('[data-instantane]'),
+      jd = e.target.closest('[data-jeterdef]');
+    if (jd) {
+      corbeille().then(function (l) {
+        var it = l.filter(function (x) { return x.cle === jd.dataset.jeterdef; })[0];
+        if (!it) { renderRecup(); return; }
+        var d = CORBEILLE[it.type] || {};
+        if (!confirm('Supprimer définitivement « ' + (it.nom || d.nom || 'cet élément') +
+          ' » ?\n\nCette fois c’est sans retour : rien ne permettra de le récupérer.')) return;
+        Store.del(it.cle).then(function () { renderRecup(); toast('Supprimé définitivement.'); });
+      });
+      return;
+    }
+    if (rp) {
+      corbeille().then(function (l) {
+        var it = l.filter(function (x) { return x.cle === rp.dataset.repecher; })[0];
+        if (!it) { renderRecup(); return; }
+        var suite = it.type === 'bordereau' ? repecher(it.cle) : repecherObjet(it);
+        return suite.then(renderRecup);
+      });
+      return;
+    }
     if (ins) {
       if (!confirm('Restaurer la copie du ' + ins.dataset.instantane.slice(-10) +
         ' ?\n\nLes bordereaux qu’elle contient seront ajoutés à côté des vôtres, rien ne sera écrasé.')) return;
@@ -5372,12 +5742,14 @@ function brancher() {
       return;
     }
     if (e.target.closest('#f-sup')) {
-      if (!confirm('Supprimer « ' + (c.nom || 'ce chantier') + ' » ?\n\nCette suppression est définitive.')) return;
+      if (!confirm('Supprimer « ' + (c.nom || 'ce chantier') + ' » ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Fichiers ▸ Corbeille.')) return;
       A.chantiers = A.chantiers.filter(function (x) { return x.id !== id; });
       A.chOuvert = null;
-      sauverChantiers().then(function () {
-        renderCarnet(); renderAccueil(); aller('carnet'); toast('Chantier supprimé.');
-      });
+      jeterObjet('chantier', c, c.nom || 'Chantier',
+        C.nomStatut(c.statut) + (c.client ? ' · ' + c.client : ''))
+        .then(sauverChantiers).then(function () {
+          renderCarnet(); renderAccueil(); aller('carnet'); toast('Chantier mis à la corbeille.');
+        });
     }
   });
   /* --- estimatif --- */
@@ -5457,27 +5829,61 @@ function brancher() {
     sauverCfg(); renderAnalyses();
   });
 
-  /* --- stock de fournitures --- */
-  $('#art-nouveau').addEventListener('click', function () { ouvrirArticle(null); });
-  $('#liste-articles').addEventListener('click', function (e) {
-    var en = e.target.closest('[data-artentree]'), so = e.target.closest('[data-artsortie]'),
-      mo = e.target.closest('[data-artmod]'), hi = e.target.closest('[data-arthist]');
-    if (en) ouvrirEntree(en.dataset.artentree);
-    else if (so) ouvrirSortieStock(so.dataset.artsortie);
-    else if (mo) ouvrirArticle(mo.dataset.artmod);
-    else if (hi) ouvrirHistoriqueArticle(hi.dataset.arthist);
+  /* --- stock : inventaire --- */
+  $('#vue-stock2').addEventListener('click', function (e) {
+    var f = e.target.closest('[data-artfiche]');
+    if (f) { ouvrirFicheArticle(f.dataset.artfiche); return; }
+    if (e.target.closest('#art-reception')) ouvrirCommande(null);
   });
 
-  /* --- réceptions et prix de revient --- */
-  $('#art-reception').addEventListener('click', ouvrirReception);
-  $('#cmd-nouvelle').addEventListener('click', ouvrirReception);
+  /* --- stock : entrées, sorties, pertes --- */
+  $('#mvt-nav').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-mvt]');
+    if (b) { A.mvt = b.dataset.mvt; renderCommandes(); }
+  });
+  $('#cmd-nouvelle').addEventListener('click', function () { nouveauMouvement(); });
+  $('#liste-commandes').addEventListener('click', function (e) {
+    var m = e.target.closest('[data-cmdmod]'), r = e.target.closest('[data-cmdrecu]'),
+      sm = e.target.closest('[data-srtmod]');
+    if (m) ouvrirCommande(m.dataset.cmdmod);
+    else if (sm) ouvrirSortie(sm.dataset.srtmod);
+    else if (e.target.closest('#cmd-vide')) nouveauMouvement();
+    else if (r) {
+      var c = commande(r.dataset.cmdrecu); if (!c) return;
+      c.statut = 'recu'; c.maj = Date.now();
+      if (!c.dateLiv) c.dateLiv = Date.now();
+      sauverCommandes().then(function () { majStock(); toast('Commande reçue.'); });
+    }
+  });
+
+  /* --- stock : catalogue et fournisseurs --- */
+  $('#rf-add').addEventListener('click', function () { ouvrirFournisseur(null); });
+  $('#rp-add').addEventListener('click', function () { ouvrirArticle(null); });
+  $('#regl-corps').addEventListener('click', function (e) {
+    var f = e.target.closest('[data-fourmod]'), a = e.target.closest('[data-artmod]');
+    if (f) ouvrirFournisseur(f.dataset.fourmod);
+    else if (a) ouvrirArticle(a.dataset.artmod);
+  });
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('[data-versregl]') : null;
+    if (b) allerReglages(b.dataset.versregl);
+  });
+
+  /* --- prix de revient --- */
+  $('#rev-nav').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-rev]');
+    if (b) { A.revient.onglet = b.dataset.rev; renderRevient(); }
+  });
+  $('#rev-hyp').addEventListener('click', ouvrirHypotheses);
   $('#rev-form').addEventListener('change', function (e) {
-    if (e.target.closest('#rev-art')) { A.revient.article = $('#rev-art').value; A.revient.prix = ''; A.revient.parPlant = ''; renderRevient(); }
+    if (e.target.closest('#rev-art')) { A.revient.article = $('#rev-art').value; A.revient.prix = ''; renderRevient(); }
     else if (e.target.closest('#rev-base')) { A.revient.base = $('#rev-base').value; renderRevient(); }
+    else if (e.target.closest('#rev-mode')) { A.revient.mode = $('#rev-mode').value; renderRevient(); }
+    else if (e.target.closest('#rev-par')) { A.revient.par = $('#rev-par').value; A.revient.prix = ''; renderRevient(); }
   });
   $('#rev-form').addEventListener('input', function (e) {
-    if (e.target.closest('#rev-prix')) { A.revient.prix = $('#rev-prix').value; A.revient.parPlant = ''; renderRevientResultat(); }
-    else if (e.target.closest('#rev-plant')) { A.revient.parPlant = $('#rev-plant').value; A.revient.prix = ''; renderRevientResultat(); }
+    if (e.target.closest('#rev-prix')) { A.revient.prix = $('#rev-prix').value; renderRevientResultat(); }
+
   });
 
   /* --- charges fixes --- */
@@ -5487,9 +5893,12 @@ function brancher() {
     if (m) ouvrirCharge(m.dataset.chgmod);
     else if (s) {
       var c = charge(s.dataset.chgsup);
-      if (!c || !confirm('Supprimer « ' + (c.libelle || '') + ' » ?')) return;
+      if (!c || !confirm('Supprimer « ' + (c.libelle || '') + ' » ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Fichiers ▸ Corbeille.')) return;
       A.charges = A.charges.filter(function (x) { return x.id !== c.id; });
-      sauverCharges().then(function () { renderCharges(); renderFinances(); toast('Charge supprimée.'); });
+      jeterObjet('charge', c, c.libelle || 'Charge', eur(FIN.nb(c.montant)))
+        .then(sauverCharges).then(function () {
+          renderCharges(); renderFinances(); toast('Charge mise à la corbeille.');
+        });
     }
   });
   $('#charges-echeances').addEventListener('click', function (e) {
@@ -5597,11 +6006,12 @@ function brancher() {
     if (m) { ouvrirDepense(m.dataset.depmod); return; }
     if (s) {
       var d = depense(s.dataset.depsup);
-      if (!d || !confirm('Supprimer cette dépense de ' + eur(FIN.nb(d.ttc)) + ' ?')) return;
+      if (!d || !confirm('Supprimer cette dépense de ' + eur(FIN.nb(d.ttc)) + ' ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Fichiers ▸ Corbeille.')) return;
       A.depenses = A.depenses.filter(function (x) { return x.id !== d.id; });
-      sauverDepenses().then(function () {
-        renderDepenses(); renderFinances(); renderAccueil(); toast('Dépense supprimée.');
-      });
+      jeterObjet('depense', d, (d.fournisseur || 'Dépense'), eur(FIN.nb(d.ttc)))
+        .then(sauverDepenses).then(function () {
+          renderDepenses(); renderFinances(); renderAccueil(); toast('Dépense mise à la corbeille.');
+        });
     }
   });
 
@@ -5626,11 +6036,12 @@ function brancher() {
     else if (o) ouvrirPile(o.dataset.pile);
     else if (s2) {
       var p = pile(s2.dataset.pilesup);
-      if (!p || !confirm('Supprimer la pile « ' + (p.nom || '') + '  » ?')) return;
+      if (!p || !confirm('Supprimer la pile « ' + (p.nom || '') + ' » ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Fichiers ▸ Corbeille.')) return;
       A.piles = A.piles.filter(function (x) { return x.id !== p.id; });
-      sauverPiles().then(function () {
-        renderPiles(); renderStock(); renderLieux(); toast('Pile supprimée.');
-      });
+      jeterObjet('pile', p, p.nom || 'Pile', E.fmt(H.restant(p), 2) + ' st')
+        .then(sauverPiles).then(function () {
+          renderPiles(); renderStock(); renderLieux(); toast('Pile mise à la corbeille.');
+        });
     }
   });
   $('#l-relever').addEventListener('click', function () {
@@ -5647,10 +6058,18 @@ function brancher() {
   $('#b-xlsx').addEventListener('click', exportStockXlsx);
   $('#s-tout').addEventListener('click', sauvegarderTout);
   $('#s-restaurer').addEventListener('click', importJson);
+  $('#a-sauvegarde').addEventListener('click', function (e) {
+    if (!e.target.closest('#a-sauver')) return;
+    document.body.classList.remove('accueil-ouvert');
+    if (!MODULES[A.module]) A.module = 'cubage';
+    majOnglets(); aller('fichiers');
+    var c = $('#c-sauvegarde');
+    if (c) c.scrollIntoView({ block: 'center' });
+  });
   $('#s-recuperer').addEventListener('click', function () {
     var z = $('#s-recup');
     z.hidden = !z.hidden;
-    this.textContent = z.hidden ? 'Récupérer…' : 'Masquer';
+    this.textContent = z.hidden ? 'Corbeille…' : 'Masquer';
     if (!z.hidden) renderRecup();
   });
   $('#i-coller').addEventListener('click', function () { if (!A.bord) nouveauBordereau(); ouvrirColler(); });
@@ -5805,7 +6224,8 @@ function init() {
       Store.get('bordcub.actif'), lire('bordcub.export', 0),
       lire('bordcub.piles', []), lire('bordcub.module', 'cubage'), lire('bordcub.chantiers', []),
       lire('bordcub.clients', []), lire('bordcub.depenses', []), lire('bordcub.proprios', []),
-      lire('bordcub.articles', []), lire('bordcub.charges', []), lire('bordcub.fournisseurs', [])]);
+      lire('bordcub.articles', []), lire('bordcub.charges', []), lire('bordcub.fournisseurs', []),
+      lire('bordcub.commandes', []), lire('bordcub.sorties', [])]);
   })
     .then(function (res) {
       A.export = res[3] || 0;
@@ -5818,6 +6238,8 @@ function init() {
       A.articles = res[10] || [];
       A.charges = res[11] || [];
       A.fournisseurs = res[12] || [];
+      A.commandes = res[13] || [];
+      A.sorties = res[14] || [];
       A.cfg = res[0] || E.configDefaut();
       var d = E.configDefaut();
       ['essences', 'qualites', 'favoris'].forEach(function (k) { if (!A.cfg[k]) A.cfg[k] = d[k]; });
@@ -5833,11 +6255,13 @@ function init() {
       if (actif != null) {
         try { var p = JSON.parse(actif); if (typeof p === 'string') actif = p; } catch (e) { }
       }
+      migrerStock(); indexerStock();
       majOnglets(); renderPiles(); renderStock(); renderLieux(); renderReglagesBois();
       renderCarnet(); renderReglagesCh(); renderReglagesAlertes(); renderEstimer();
       renderRendements(); renderCalendrier(); renderAlertes();
       renderFinances(); renderDepenses(); renderCharges(); renderStockFournitures();
-      renderCarteChantiers(); renderAnalyses(); renderCommandes(); renderRevient(); renderAccueil();
+      renderCarteChantiers(); renderAnalyses(); renderCommandes(); renderRevient();
+      renderReglagesStock(); renderAccueil();
       var vd = vueDemandee(null);
       if (vd === 'accueil') { majBandeau(); renderFichiers(); renderReglages(); allerAccueil(); return; }
       if (vd) {
@@ -5909,7 +6333,7 @@ var MODULES = {
   },
   stock: {
     nom: 'Stock et fournitures', defaut: 'stock2', groupe: 'entreprise',
-    vues: [['stock2', '▥', 'Fournitures'], ['commandes', '▤', 'Réceptions'],
+    vues: [['stock2', '▥', 'Inventaire'], ['commandes', '⇄', 'Entrées / sorties'],
     ['revient', '€', 'Prix de revient'], ['reglages', '⚙', 'Réglages']]
   },
   bois: {
@@ -5926,7 +6350,7 @@ var ACTIONS_MODULE = {
   bois: [['b-pile', '+ Pile']],
   chantiers: [['b-chantier', '+ Chantier']],
   finances: [['b-depense', '+ Dépense']],
-  stock: [['b-article', '+ Article']],
+  stock: [['b-article', '+ Commande']],
   devis: [['b-estimer', 'Estimer']],
   calendrier: [['b-aujourdhui', 'Aujourd’hui']]
 };
@@ -5984,6 +6408,7 @@ function renderAccueil() {
     ? A.piles.length + (A.piles.length > 1 ? ' piles' : ' pile')
     : 'Aucune pile enregistrée';
   if ($('#a-lieux-n')) { var n = tousLesPoints().length; $('#a-lieux-n').textContent = n || '—'; }
+  renderNudgeSauvegarde();
   renderEntreprise();
 }
 
@@ -8143,75 +8568,523 @@ function validerImport() {
   });
 }
 
-/* ================================================ STOCK DE FOURNITURES */
+/* ================================================ STOCK DE FOURNITURES
+   Trois tables tenues à la main — les commandes, les sorties, les pertes —
+   et un inventaire qui n'est que leur résultat. C'est l'organisation du
+   tableur : on ne saisit jamais un stock, on saisit ce qui entre et ce qui
+   sort, et le stock se déduit.
+   ====================================================================== */
 var ST = window.BCS2;
 
 function article(id) { return A.articles.filter(function (a) { return a.id === id; })[0] || null; }
 function sauverArticles() { return ecrire('bordcub.articles', A.articles); }
+function sauverCommandes() { return ecrire('bordcub.commandes', A.commandes); }
+function sauverSorties() { return ecrire('bordcub.sorties', A.sorties); }
+function sauverFournisseurs() { return ecrire('bordcub.fournisseurs', A.fournisseurs); }
+function commande(id) { return (A.commandes || []).filter(function (c) { return c.id === id; })[0] || null; }
+function sortie(id) { return (A.sorties || []).filter(function (s) { return s.id === id; })[0] || null; }
+function fournisseur(id) {
+  return (A.fournisseurs || []).filter(function (f) { return f.id === id; })[0] || null;
+}
+function nomFournisseur(id) {
+  var f = fournisseur(id);
+  return f ? (f.nom || '') : (id || '');
+}
 
+/* --------------------------------------------------------------- reprise
+   Les fournisseurs étaient de simples noms ; les mouvements vivaient dans
+   la fiche article. On reconstruit une fois des commandes et des sorties à
+   partir de l'ancien format, sans rien effacer : les anciennes données
+   restent dans le fichier de sauvegarde. */
+function migrerStock() {
+  var faites = false;
+  A.fournisseurs = (A.fournisseurs || []).map(function (f) {
+    if (typeof f !== 'string') return f;
+    faites = true;
+    return { id: uid(), nom: f };
+  });
+  if (A.cfg && A.cfg.stockMigre) { if (faites) sauverFournisseurs(); return faites; }
+
+  var cmds = {}, srts = {};
+  (A.articles || []).forEach(function (a) {
+    (a.mouvements || []).forEach(function (m) {
+      var jour = ST.arr((m.date || 0) / 86400000, 0);
+      if (m.sens === 'entree') {
+        var k = (m.commande || '') + '|' + jour;
+        if (!cmds[k]) cmds[k] = { id: uid(), num: m.commande || '', dateCmd: m.date, dateLiv: m.date,
+          fournisseur: idFournisseurParNom(m.fournisseur), statut: 'recu', livraison: 0, lignes: [] };
+        cmds[k].livraison += ST.nb(m.qte) * ST.nb(m.fraisUnit);
+        cmds[k].lignes.push({ article: a.id, qte: ST.nb(m.qte), prix: ST.nb(m.prix) });
+      } else {
+        var k2 = (m.chantier || '') + '|' + jour;
+        if (!srts[k2]) srts[k2] = { id: uid(), num: '', date: m.date, client: '',
+          chantier: m.chantier || null, statut: 'fini', perte: false, lignes: [] };
+        srts[k2].lignes.push({ article: a.id, qte: ST.nb(m.qte), prix: 0 });
+      }
+    });
+  });
+  var lc = Object.keys(cmds).map(function (k) { return cmds[k]; });
+  var ls = Object.keys(srts).map(function (k) { return srts[k]; });
+  A.commandes = (A.commandes || []).concat(lc);
+  A.sorties = (A.sorties || []).concat(ls);
+  A.cfg = A.cfg || {};
+  A.cfg.stockMigre = true;
+  if (lc.length) sauverCommandes();
+  if (ls.length) sauverSorties();
+  sauverFournisseurs();
+  sauverCfg();
+  return true;
+}
+function idFournisseurParNom(nom) {
+  if (!nom) return null;
+  var n = String(nom).trim().toLowerCase();
+  var f = (A.fournisseurs || []).filter(function (x) {
+    return (x.nom || '').trim().toLowerCase() === n;
+  })[0];
+  if (f) return f.id;
+  f = { id: uid(), nom: String(nom).trim() };
+  A.fournisseurs.push(f);
+  return f.id;
+}
+
+/* ------------------------------------------------------- frais de port
+   Un bon de livraison ne mélange jamais deux fournisseurs, donc jamais deux
+   unités : le prorata des quantités suffit et colle au tableur. Si une
+   commande mélange malgré tout des unités — des millilitres et des pièces —
+   on bascule sur le prorata des montants, sinon cinquante litres de répulsif
+   avaleraient le port d'une palette de tuteurs. */
+function reglePort(c) {
+  if (c && c.regle) return c.regle;
+  var vues = {}, n = 0;
+  ((c && c.lignes) || []).forEach(function (l) {
+    var a = article(l.article); if (!a) return;
+    var u = a.unite || 'unite';
+    if (!vues[u]) { vues[u] = 1; n++; }
+  });
+  return n > 1 ? 'montant' : 'quantite';
+}
+/* Part de livraison portée par une unité de chaque ligne, dans l'ordre. */
+function partsPort(c) {
+  var lignes = (c && c.lignes) || [], livr = ST.nb(c && c.livraison);
+  var regle = reglePort(c), out = [];
+  if (regle === 'montant') {
+    var val = lignes.reduce(function (s, l) { return s + ST.nb(l.qte) * ST.nb(l.prix); }, 0);
+    lignes.forEach(function (l) { out.push(val > 0 ? livr * ST.nb(l.prix) / val : 0); });
+  } else {
+    var qt = lignes.reduce(function (s, l) { return s + ST.nb(l.qte); }, 0);
+    lignes.forEach(function () { out.push(qt > 0 ? livr / qt : 0); });
+  }
+  out.regle = regle;
+  return out;
+}
+
+/* ------------------------------------------------------------- indexation
+   Les commandes et les sorties sont la source ; les mouvements portés par
+   chaque article n'en sont qu'une vue, refaite à chaque modification. Tout
+   le reste de l'application — marge d'un chantier, valeur du stock — lit
+   cette vue sans savoir d'où elle vient. */
+function indexerStock() {
+  (A.articles || []).forEach(function (a) { a.mouvements = []; });
+  (A.commandes || []).forEach(function (c) {
+    if (ST.achatMort(c.statut)) return;
+    var attendu = !ST.achatRecu(c.statut);
+    var parts = partsPort(c);
+    (c.lignes || []).forEach(function (l, i) {
+      var a = article(l.article); if (!a || ST.nb(l.qte) <= 0) return;
+      a.mouvements.push({ date: c.dateLiv || c.dateCmd, sens: 'entree', qte: ST.nb(l.qte),
+        prix: ST.nb(l.prix), fraisUnit: ST.arr(parts[i] || 0, 6), commande: c.num || null,
+        cmd: c.id, fournisseur: nomFournisseur(c.fournisseur), attendu: attendu });
+    });
+  });
+  (A.sorties || []).forEach(function (s) {
+    var st = s.statut;
+    /* Une sortie rattachée à un chantier suit le statut du chantier. */
+    if (s.chantier) {
+      var ch = chantier(s.chantier);
+      if (ch) st = ST.VENTE_DE_CHANTIER[ch.statut] || st;
+    }
+    var etat = s.perte ? 'sorti' : ST.etatVente(st);
+    if (etat === 'mort') return;
+    (s.lignes || []).forEach(function (l) {
+      var a = article(l.article); if (!a || ST.nb(l.qte) <= 0) return;
+      a.mouvements.push({ date: s.date, sens: 'sortie', qte: ST.nb(l.qte), prix: ST.nb(l.prix),
+        srt: s.id, vente: s.num || null, client: s.client || null, chantier: s.chantier || null,
+        perte: !!s.perte, debours: !!s.debours, motif: s.motif || null, etat: etat });
+    });
+  });
+}
+/* Un seul point d'entrée après toute modification du stock. */
+function majStock() {
+  indexerStock();
+  renderStockFournitures();
+  renderCommandes();
+  renderRevient();
+  renderReglagesStock();
+  renderAccueil();
+}
+
+/* ------------------------------------------------------------ inventaire */
 function renderStockFournitures() {
   var z = $('#stock-resume'); if (!z) return;
-  var val = ST.valeurTotale(A.articles);
-  var bas = ST.articlesSousSeuil(A.articles);
+  var t = $('#stock-table');
   if (!A.articles.length) {
-    z.innerHTML = '<div class="vide"><p>Aucun article. Enregistrez ce que vous achetez en gros ' +
-      '(gaines, tuteurs, grillage) : les sorties par chantier donneront votre marge réelle.</p></div>';
-    $('#liste-articles').innerHTML = '';
+    z.innerHTML = '<div class="vide"><p>Aucun produit au catalogue. Décrivez d’abord ce que ' +
+      'vous achetez — gaines, tuteurs, répulsif — puis enregistrez vos commandes : ' +
+      'l’inventaire se remplira tout seul.</p>' +
+      '<button class="btn primaire" data-versregl="stock">Ouvrir le catalogue</button></div>';
+    if (t) t.innerHTML = '';
+    if ($('#stock-alertes')) $('#stock-alertes').innerHTML = '';
     return;
   }
-  var b = periodeCourante();
-  var mg = ST.margeGlobale(A.articles, A.chantiers, C.montantLigne, function (ch) {
-    var d = FIN.dateRecette(ch);
-    return ['facture', 'paye'].indexOf(ch.statut) >= 0 && FIN.dansPeriode(d, b);
-  });
+  var val = ST.valeurTotale(A.articles);
+  var bas = ST.articlesSousSeuil(A.articles);
+  var ruptures = A.articles.filter(function (a) { return ST.etatStock(a) === 'rupture'; });
+  var attendu = A.articles.reduce(function (s, a) { return s + ST.quantiteAttendue(a); }, 0);
+
   z.innerHTML = '<div class="kpi">' +
     '<div class="carte2"><b class="num">' + eur(val) + '</b><small>valeur du stock</small></div>' +
-    '<div class="carte2"><b class="num">' + A.articles.length + '</b><small>article' + (A.articles.length > 1 ? 's' : '') + '</small></div>' +
-    (mg.vendu ? '<div class="carte2"><b class="num">' + eur(mg.marge) + '</b><small>marge sur ' +
-      esc(libellePeriode()) + (mg.taux != null ? ' · ' + mg.taux + ' %' : '') + '</small></div>' : '') +
+    '<div class="carte2"><b class="num">' + A.articles.length + '</b><small>produit' +
+      (A.articles.length > 1 ? 's' : '') + '</small></div>' +
+    (attendu ? '<div class="carte2"><b class="num">' + E.fmt(attendu, 0) +
+      '</b><small>en commande</small></div>' : '') +
+    (ruptures.length ? '<div class="carte2" style="border-color:#B4231F"><b class="num">' +
+      ruptures.length + '</b><small>en rupture</small></div>' : '') +
     (bas.length ? '<div class="carte2" style="border-color:#B98A00"><b class="num">' + bas.length +
       '</b><small>à recommander</small></div>' : '') +
-    '</div>' +
-    (mg.vendu ? '<p class="muted" style="font-size:12px;margin:10px 0 0">' +
-      eur(mg.vendu) + ' refacturés pour ' + eur(mg.cout) + ' de stock sorti.</p>' : '');
+    '</div>';
 
-  $('#liste-articles').innerHTML = A.articles.slice().sort(function (a, b2) {
-    return ST.sousSeuil(b2) - ST.sousSeuil(a) || (a.nom || '').localeCompare(b2.nom || '', 'fr');
-  }).map(function (a) {
-    var q = ST.quantite(a), p = ST.pmp(a), u = ST.courtUniteArt(a.unite);
-    return '<div class="liste-item pile-c"><div class="li-h">' +
-      '<span class="pastille" style="background:' + (ST.sousSeuil(a) ? '#B98A00' : '#2E4A3C') + ';margin-top:4px"></span>' +
-      '<div class="li-c"><b>' + esc(a.nom || 'Article') + ' — ' + E.fmt(q, q % 1 ? 2 : 0) + ' ' + u + '</b>' +
-      '<small>' + E.fmt(p, 4) + ' € / ' + u + ' livraison comprise · ' + eur(ST.valeurStock(a)) + ' en stock' +
-      (ST.stockEnPlants(a) != null ? ' · ' + E.fmt(ST.stockEnPlants(a), 0) + ' plants' : '') +
-      (ST.quantiteSortie(a) ? ' · ' + E.fmt(ST.quantiteSortie(a), 0) + ' ' + u + ' sortis' : '') +
-      (ST.sousSeuil(a) ? '<br><span class="retard">sous le seuil de ' + E.fmt(C.nb(a.seuil), 0) + '</span>' : '') +
-      '</small></div></div>' +
+  var l = A.articles.slice().sort(function (a, b) {
+    return (a.nom || '').localeCompare(b.nom || '', 'fr');
+  });
+  var engage = l.some(function (a) { return ST.stockFutur(a) !== ST.quantite(a); });
+  var prevu = l.some(function (a) { return ST.stockPrevu(a) !== ST.stockFutur(a); });
+  var tot = { achat: 0, vendu: 0, stock: 0, valeur: 0 };
+
+  t.innerHTML = '<div class="tab-boite"><table><thead><tr>' +
+    '<th style="text-align:left">Produit</th>' +
+    '<th class="num">Acheté</th><th class="num">Sorti</th><th class="num">En stock</th>' +
+    (engage ? '<th class="num">Futur</th>' : '') +
+    (prevu ? '<th class="num">À prévoir</th>' : '') +
+    '<th class="num">Coût unit. réel</th><th class="num">Valeur</th>' +
+    '</tr></thead><tbody>' +
+    l.map(function (a) {
+      var q = ST.quantite(a), e = ST.etatStock(a), u = ST.courtUniteArt(a.unite);
+      var coul = e === 'rupture' ? '#B4231F' : e === 'faible' ? '#B98A00' : '#2E7D46';
+      var att = ST.quantiteAttendue(a);
+      tot.achat += ST.quantiteAchetee(a); tot.vendu += ST.quantiteSortie(a);
+      tot.stock += q; tot.valeur += ST.valeurStock(a);
+      return '<tr data-artfiche="' + a.id + '" style="cursor:pointer">' +
+        '<td style="text-align:left"><i class="pt" style="background:' + coul + '"></i>' +
+        esc(a.nom || 'Produit') +
+        '<small class="muted"> ' + esc(u) + (att ? ' · +' + E.fmt(att, 0) + ' attendus' : '') + '</small></td>' +
+        '<td class="num">' + E.fmt(ST.quantiteAchetee(a), 0) + '</td>' +
+        '<td class="num">' + E.fmt(ST.quantiteSortie(a), 0) + '</td>' +
+        '<td class="num"><b>' + E.fmt(q, q % 1 ? 2 : 0) + '</b></td>' +
+        (engage ? '<td class="num muted">' + E.fmt(ST.stockFutur(a), 0) + '</td>' : '') +
+        (prevu ? '<td class="num muted">' + E.fmt(ST.stockPrevu(a), 0) + '</td>' : '') +
+        '<td class="num">' + E.fmt(ST.pmp(a), 4) + '</td>' +
+        '<td class="num">' + E.fmt(ST.valeurStock(a), 2) + '</td></tr>';
+    }).join('') +
+    '<tr class="tot"><td style="text-align:left">Total</td>' +
+    '<td class="num">' + E.fmt(tot.achat, 0) + '</td>' +
+    '<td class="num">' + E.fmt(tot.vendu, 0) + '</td>' +
+    '<td class="num">' + E.fmt(tot.stock, 0) + '</td>' +
+    (engage ? '<td></td>' : '') + (prevu ? '<td></td>' : '') +
+    '<td></td><td class="num">' + E.fmt(tot.valeur, 2) + '</td></tr>' +
+    '</tbody></table></div>' +
+    '<p class="muted" style="font-size:11.5px;margin:9px 0 0">' +
+    'Coût unitaire réel : moyenne pondérée de toutes les commandes reçues, livraison répartie.' +
+    (engage ? ' « Futur » retire ce qui est déjà engagé sur un chantier accepté ou en cours.' : '') +
+    (prevu ? ' « À prévoir » retire en plus les chantiers seulement envisagés.' : '') +
+    '</p>';
+
+  var al = ruptures.concat(bas.filter(function (a) { return ST.etatStock(a) === 'faible'; }));
+  $('#stock-alertes').innerHTML = al.length
+    ? '<div class="carte"><h2>À recommander</h2>' + al.map(function (a) {
+        var q = ST.quantite(a);
+        return '<button class="alerte" data-artfiche="' + a.id + '">' +
+          '<i class="ic" style="background:' + (q <= 0 ? '#B4231F' : '#B98A00') + '"></i>' +
+          '<span><b>' + esc(a.nom || '') + '</b><small>' +
+          (q <= 0 ? 'rupture' : E.fmt(q, 0) + ' ' + ST.courtUniteArt(a.unite) +
+            ' — seuil à ' + E.fmt(ST.nb(a.seuil), 0)) +
+          (a.fournisseur ? ' · ' + esc(nomFournisseur(a.fournisseur)) : '') +
+          '</small></span></button>';
+      }).join('') + '</div>'
+    : '';
+}
+
+/* ------------------------------------------------------- fiche d'un produit */
+function ouvrirFicheArticle(id) {
+  var a = article(id); if (!a) return;
+  var u = ST.courtUniteArt(a.unite), q = ST.quantite(a);
+  var mv = ST.mouvements(a).slice().sort(function (x, y) { return (y.date || 0) - (x.date || 0); });
+  var ca = ST.caVendu(a), coutV = ST.arr(ST.quantiteVendue(a) * ST.pmp(a), 2);
+
+  modale(a.nom || 'Produit',
+    '<div class="kpi" style="margin-top:0">' +
+    '<div class="carte2"><b class="num">' + E.fmt(q, q % 1 ? 2 : 0) + '</b><small>' + esc(u) + ' en stock</small></div>' +
+    '<div class="carte2"><b class="num">' + E.fmt(ST.pmp(a), 4) + '</b><small>coût unitaire réel</small></div>' +
+    '<div class="carte2"><b class="num">' + eur(ST.valeurStock(a)) + '</b><small>valeur</small></div>' +
+    (ST.stockEnPlants(a) != null ? '<div class="carte2"><b class="num">' +
+      E.fmt(ST.stockEnPlants(a), 0) + '</b><small>plants couverts</small></div>' : '') +
+    '</div>' +
+    (ca ? '<div class="carte2" style="margin:11px 0"><div style="display:flex;justify-content:space-between;font-size:13.5px">' +
+      '<span>' + E.fmt(ST.quantiteVendue(a), 0) + ' ' + esc(u) + ' vendus</span><b class="num">' + eur(ca) + '</b></div>' +
+      '<div style="display:flex;justify-content:space-between;font-size:13.5px;margin-top:3px">' +
+      '<span class="muted">marge brute</span><b class="num">' + eur(ST.arr(ca - coutV, 2)) +
+      (ca > 0 ? ' · ' + E.fmt((ca - coutV) / ca * 100, 1) + ' %' : '') + '</b></div></div>' : '') +
+    (ST.quantiteDebours(a) ? '<p class="muted" style="font-size:12.5px;margin:0 0 9px">' +
+      E.fmt(ST.quantiteDebours(a), 0) + ' ' + esc(u) + ' refacturés en débours pour ' +
+      eur(ST.caDebours(a)) + ', hors chiffre d’affaires.</p>' : '') +
+    (ST.quantiteAttendue(a) ? '<p class="muted" style="font-size:12.5px;margin:0 0 9px">' +
+      E.fmt(ST.quantiteAttendue(a), 0) + ' ' + esc(u) + ' commandés, pas encore reçus.</p>' : '') +
+    '<p class="eyebrow" style="margin:14px 0 6px">Mouvements</p>' +
+    (mv.length ? '<div style="max-height:44vh;overflow:auto">' + mv.map(function (m) {
+      var ch = m.chantier ? chantier(m.chantier) : null;
+      var coul = m.sens === 'entree' ? (m.attendu ? '#8A9382' : '#2E7D46')
+        : m.perte ? '#B4231F' : m.etat === 'sorti' ? '#8A5A2B' : '#B98A00';
+      return '<div class="liste-item"><span class="pastille" style="background:' + coul + '"></span>' +
+        '<div class="li-c"><b>' + (m.sens === 'entree' ? '+' : '−') + E.fmt(ST.nb(m.qte), 0) + ' ' + esc(u) +
+        (m.sens === 'entree' ? ' à ' + E.fmt(ST.coutReel(m), 4) + ' €'
+          : ST.nb(m.prix) ? ' à ' + E.fmt(ST.nb(m.prix), 4) + ' €' : '') + '</b>' +
+        '<small>' + dateCourte(m.date) +
+        (m.commande ? ' · ' + esc(m.commande) : '') +
+        (m.fournisseur ? ' · ' + esc(m.fournisseur) : '') +
+        (m.client ? ' · ' + esc(m.client) : '') +
+        (ch ? ' · ' + esc(ch.nom || 'chantier') : '') +
+        (m.attendu ? ' · attendu' : '') +
+        (m.etat === 'engage' ? ' · engagé' : m.etat === 'prevu' ? ' · prévu' : '') +
+        (m.perte ? ' · perte' + (m.motif ? ' (' + esc(m.motif) + ')' : '') : '') +
+        '</small></div></div>';
+    }).join('') + '</div>' : '<div class="vide"><p>Aucun mouvement.</p></div>') +
+    '<div class="btn-rang" style="margin-top:12px">' +
+    '<button class="btn primaire" id="fa-cmd">Commande</button>' +
+    '<button class="btn" id="fa-sortie">Sortie</button>' +
+    '<button class="btn btn-min" id="fa-mod">Modifier le produit</button></div>');
+
+  $('#fa-cmd').addEventListener('click', function () { fermerModale(); ouvrirCommande(null, id); });
+  $('#fa-sortie').addEventListener('click', function () { fermerModale(); ouvrirSortie(null, false, id); });
+  $('#fa-mod').addEventListener('click', function () { fermerModale(); ouvrirArticle(id); });
+}
+
+/* Le bouton d'action ouvre la bonne fenêtre selon l'onglet ouvert. */
+function nouveauMouvement() {
+  var o = A.mvt || 'achats';
+  if (o === 'achats') ouvrirCommande(null);
+  else ouvrirSortie(null, o === 'pertes');
+}
+
+/* -------------------------------------------------- entrées et sorties */
+var AIDE_MVT = {
+  achats: 'Une commande par ligne, avec ses articles et ses frais de livraison. ' +
+    'Tant qu’elle n’est pas marquée reçue, elle n’entre pas dans le stock.',
+  sorties: 'Ce qui quitte le stock : refacturé à un client, ou consommé sur un chantier. ' +
+    'Rattachée à un chantier, la sortie suit son statut.',
+  pertes: 'Casse, vol, produit périmé : la quantité quitte le stock sans chiffre d’affaires.'
+};
+function renderCommandes() {
+  var z = $('#liste-commandes'); if (!z) return;
+  var onglet = A.mvt || 'achats';
+  $$('#mvt-nav .chip').forEach(function (b) {
+    b.setAttribute('aria-pressed', String(b.dataset.mvt === onglet));
+  });
+  if ($('#mvt-aide')) $('#mvt-aide').textContent = AIDE_MVT[onglet];
+  if ($('#cmd-nouvelle')) {
+    $('#cmd-nouvelle').textContent = onglet === 'achats' ? '+ Commande'
+      : onglet === 'sorties' ? '+ Sortie' : '+ Perte';
+  }
+  z.innerHTML = onglet === 'achats' ? listeAchats() : listeSorties(onglet === 'pertes');
+}
+
+function listeAchats() {
+  var l = (A.commandes || []).slice().sort(function (a, b) {
+    return (b.dateCmd || b.dateLiv || 0) - (a.dateCmd || a.dateLiv || 0);
+  });
+  if (!l.length) {
+    return '<div class="vide"><p>Aucune commande. Enregistrez-en une : les frais de livraison ' +
+      'seront répartis sur les articles, et le stock se mettra à jour.</p>' +
+      '<button class="btn primaire" id="cmd-vide">Nouvelle commande</button></div>';
+  }
+  return l.map(function (c) {
+    var qte = (c.lignes || []).reduce(function (s, x) { return s + ST.nb(x.qte); }, 0);
+    var uu = null, mixte = false;
+    (c.lignes || []).forEach(function (x) {
+      var a = article(x.article); if (!a) return;
+      if (uu == null) uu = a.unite; else if (uu !== a.unite) mixte = true;
+    });
+    var unite = mixte || !uu ? 'unités' : ST.courtUniteArt(uu);
+    var march = (c.lignes || []).reduce(function (s, x) { return s + ST.nb(x.qte) * ST.nb(x.prix); }, 0);
+    var recu = ST.achatRecu(c.statut), mort = ST.achatMort(c.statut);
+    return '<div class="liste-item pile-c' + (mort ? ' epuise' : '') + '"><div class="li-h">' +
+      '<span class="pastille" style="background:' +
+      (mort ? '#8A9382' : recu ? '#2E7D46' : '#B98A00') + ';margin-top:4px"></span>' +
+      '<div class="li-c"><b>' + esc(c.num || 'Sans numéro') + ' — ' +
+      eur(ST.arr(march + ST.nb(c.livraison), 2)) + '</b>' +
+      '<small>' + dateCourte(c.dateLiv || c.dateCmd) +
+      ' · ' + esc(ST.nomStatutAchat(c.statut)) +
+      (c.fournisseur ? ' · ' + esc(nomFournisseur(c.fournisseur)) : '') +
+      ' · ' + E.fmt(qte, 0) + ' ' + esc(unite) +
+      (ST.nb(c.livraison) ? ' · dont ' + eur(ST.nb(c.livraison)) + ' de livraison' : '') + '<br>' +
+      (c.lignes || []).map(function (x) {
+        var a = article(x.article);
+        return esc(a ? a.nom : '?') + ' ' + E.fmt(ST.nb(x.qte), 0) + ' × ' + E.fmt(ST.nb(x.prix), 4) + ' €';
+      }).join(' · ') + '</small></div></div>' +
       '<div class="li-actions">' +
-      '<button class="btn-min" data-artentree="' + a.id + '">Achat</button>' +
-      '<button class="btn-min" data-artsortie="' + a.id + '">Sortie</button>' +
-      '<button class="btn-min" data-artmod="' + a.id + '">Modifier</button>' +
-      '<button class="btn-min" data-arthist="' + a.id + '">Historique</button></div></div>';
+      (recu || mort ? '' : '<button class="btn-min" data-cmdrecu="' + c.id + '">Marquer reçue</button>') +
+      '<button class="btn-min" data-cmdmod="' + c.id + '">Modifier</button></div></div>';
   }).join('');
 }
 
-function ouvrirArticle(id) {
-  var a = id ? article(id) : { unite: 'unite' };
-  if (!a) return;
-  modale(id ? 'Modifier l’article' : 'Nouvel article',
-    '<div class="champ"><label class="eyebrow" for="ar-nom">Désignation</label>' +
-    '<input type="text" id="ar-nom" class="gros" autocomplete="off" placeholder="gaine 60 cm, tuteur acacia…" value="' + esc(a.nom || '') + '"></div>' +
+function listeSorties(pertes) {
+  var l = (A.sorties || []).filter(function (s) { return !!s.perte === !!pertes; })
+    .sort(function (a, b) { return (b.date || 0) - (a.date || 0); });
+  if (!l.length) {
+    return '<div class="vide"><p>' + (pertes
+      ? 'Aucune perte enregistrée.'
+      : 'Aucune sortie. Enregistrez ce qui part sur un chantier ou ce que vous refacturez.') +
+      '</p><button class="btn primaire" id="cmd-vide">' +
+      (pertes ? 'Enregistrer une perte' : 'Nouvelle sortie') + '</button></div>';
+  }
+  return l.map(function (s) {
+    var ch = s.chantier ? chantier(s.chantier) : null;
+    var st = s.statut;
+    if (ch) st = ST.VENTE_DE_CHANTIER[ch.statut] || st;
+    var etat = s.perte ? 'sorti' : ST.etatVente(st);
+    var ca = (s.lignes || []).reduce(function (t, x) { return t + ST.nb(x.qte) * ST.nb(x.prix); }, 0);
+    var cout = (s.lignes || []).reduce(function (t, x) {
+      var a = article(x.article); return t + ST.nb(x.qte) * (a ? ST.pmp(a) : 0);
+    }, 0);
+    var coul = s.perte ? '#B4231F' : s.debours ? '#7A8471' : etat === 'sorti' ? '#8A5A2B'
+      : etat === 'engage' ? '#B98A00' : etat === 'mort' ? '#8A9382' : '#7A8471';
+    return '<div class="liste-item pile-c' + (etat === 'mort' ? ' epuise' : '') + '"><div class="li-h">' +
+      '<span class="pastille" style="background:' + coul + ';margin-top:4px"></span>' +
+      '<div class="li-c"><b>' +
+      esc(s.num || (s.perte ? 'Perte' : ch ? (ch.nom || 'Chantier') : s.client || 'Sortie')) +
+      (s.perte ? '' : ' — ' + eur(ST.arr(ca, 2))) + '</b>' +
+      '<small>' + dateCourte(s.date) +
+      (s.perte ? (s.motif ? ' · ' + esc(s.motif) : '') : ' · ' + esc(ST.nomStatutVente(st))) +
+      (ch ? ' · ' + esc(ch.nom || 'chantier') + (s.chantier ? ' (statut du chantier)' : '') : '') +
+      (!ch && s.client && s.num ? ' · ' + esc(s.client) : '') +
+      (s.debours ? ' · débours' : '') +
+      (!s.perte && !s.debours && ca ? ' · marge ' + eur(ST.arr(ca - cout, 2)) : '') + '<br>' +
+      (s.lignes || []).map(function (x) {
+        var a = article(x.article);
+        return esc(a ? a.nom : '?') + ' ' + E.fmt(ST.nb(x.qte), 0) +
+          (s.perte ? '' : ' × ' + E.fmt(ST.nb(x.prix), 4) + ' €');
+      }).join(' · ') + '</small></div></div>' +
+      '<div class="li-actions">' +
+      '<button class="btn-min" data-srtmod="' + s.id + '">Modifier</button></div></div>';
+  }).join('');
+}
+
+/* ------------------------------------------------ catalogue et carnet
+   Les listes déroulantes des commandes viennent d'ici, et de nulle part
+   ailleurs : un produit saisi une fois est proposé partout. */
+function renderReglagesStock() {
+  var zf = $('#rf-liste'); if (!zf) return;
+  var lf = (A.fournisseurs || []).slice().sort(function (a, b) {
+    return (a.nom || '').localeCompare(b.nom || '', 'fr');
+  });
+  zf.innerHTML = lf.length ? lf.map(function (f) {
+    var n = (A.commandes || []).filter(function (c) { return c.fournisseur === f.id; }).length;
+    return '<div class="liste-item"><div class="li-c"><b>' + esc(f.nom || '') + '</b><small>' +
+      [f.categorie, f.contact, f.tel, f.ville].filter(Boolean).map(esc).join(' · ') +
+      (n ? (f.categorie || f.contact || f.tel || f.ville ? ' · ' : '') + n + ' commande' + (n > 1 ? 's' : '') : '') +
+      '</small></div>' +
+      '<button class="btn-min" data-fourmod="' + f.id + '">Modifier</button></div>';
+  }).join('') : '<p class="muted" style="font-size:12.5px;margin:0">Aucun fournisseur.</p>';
+
+  var zp = $('#rp-liste'); if (!zp) return;
+  var lp = A.articles.slice().sort(function (a, b) {
+    return (a.type || '').localeCompare(b.type || '') || (a.nom || '').localeCompare(b.nom || '', 'fr');
+  });
+  zp.innerHTML = lp.length ? lp.map(function (a) {
+    return '<div class="liste-item"><div class="li-c"><b>' + esc(a.nom || '') + '</b><small>' +
+      esc(ST.nomTypeArt(a.type)) + ' · ' + esc(ST.nomUniteArt(a.unite)) +
+      (a.fournisseur ? ' · ' + esc(nomFournisseur(a.fournisseur)) : '') +
+      (ST.nb(a.dosage) ? ' · ' + E.fmt(ST.nb(a.dosage), 2) + ' ' + esc(ST.courtUniteArt(a.unite)) + '/plant' : '') +
+      (ST.nb(a.seuil) ? ' · seuil ' + E.fmt(ST.nb(a.seuil), 0) : '') +
+      (a.designation ? '<br>' + esc(a.designation) : '') +
+      '</small></div>' +
+      '<button class="btn-min" data-artmod="' + a.id + '">Modifier</button></div>';
+  }).join('') : '<p class="muted" style="font-size:12.5px;margin:0">Aucun produit.</p>';
+}
+
+function ouvrirFournisseur(id) {
+  var f = id ? fournisseur(id) : {};
+  if (!f) return;
+  modale(id ? 'Modifier le fournisseur' : 'Nouveau fournisseur',
+    '<div class="champ"><label class="eyebrow" for="fo-nom">Nom</label>' +
+    '<input type="text" id="fo-nom" class="gros" autocomplete="off" value="' + esc(f.nom || '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="fo-cat">Catégorie de produit</label>' +
+    '<input type="text" id="fo-cat" autocomplete="off" placeholder="protection des plants, plants…" value="' + esc(f.categorie || '') + '"></div>' +
     '<div class="grille g2">' +
+    '<div class="champ"><label class="eyebrow" for="fo-contact">Contact</label>' +
+    '<input type="text" id="fo-contact" autocomplete="off" value="' + esc(f.contact || '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="fo-tel">Téléphone</label>' +
+    '<input type="tel" id="fo-tel" autocomplete="off" value="' + esc(f.tel || '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="fo-mail">Courriel</label>' +
+    '<input type="email" id="fo-mail" autocomplete="off" value="' + esc(f.mail || '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="fo-ville">Ville</label>' +
+    '<input type="text" id="fo-ville" autocomplete="off" value="' + esc(f.ville || '') + '"></div>' +
+    '</div>' +
+    '<div class="champ"><label class="eyebrow" for="fo-note">Notes</label>' +
+    '<textarea id="fo-note" rows="2">' + esc(f.notes || '') + '</textarea></div>' +
+    '<div class="btn-rang" style="margin-top:11px">' +
+    '<button class="btn primaire" id="fo-ok">Valider</button>' +
+    (id ? '<button class="btn danger btn-min" id="fo-sup">Supprimer</button>' : '') + '</div>');
+  $('#fo-ok').addEventListener('click', function () {
+    var nom = $('#fo-nom').value.trim();
+    if (!nom) { toast('Donnez un nom.'); return; }
+    var maj = { nom: nom, categorie: $('#fo-cat').value.trim(), contact: $('#fo-contact').value.trim(),
+      tel: $('#fo-tel').value.trim(), mail: $('#fo-mail').value.trim(),
+      ville: $('#fo-ville').value.trim(), notes: $('#fo-note').value.trim(), maj: Date.now() };
+    if (id) Object.keys(maj).forEach(function (k) { f[k] = maj[k]; });
+    else { maj.id = uid(); A.fournisseurs.push(maj); }
+    sauverFournisseurs().then(function () {
+      fermerModale(); majStock(); toast(id ? 'Fournisseur modifié.' : 'Fournisseur ajouté.');
+    });
+  });
+  if (id) $('#fo-sup').addEventListener('click', function () {
+    var n = (A.commandes || []).filter(function (c) { return c.fournisseur === id; }).length;
+    if (n && !confirm(n + ' commande' + (n > 1 ? 's sont rattachées' : ' est rattachée') +
+      ' à ce fournisseur. Le supprimer quand même ?')) return;
+    A.fournisseurs = A.fournisseurs.filter(function (x) { return x.id !== id; });
+    jeterObjet('fournisseur', f, f.nom || 'Fournisseur', f.categorie || '')
+      .then(sauverFournisseurs).then(function () {
+        fermerModale(); majStock(); toast('Fournisseur mis à la corbeille.');
+      });
+  });
+}
+
+function ouvrirArticle(id) {
+  var a = id ? article(id) : { unite: 'unite', type: 'protection' };
+  if (!a) return;
+  modale(id ? 'Modifier le produit' : 'Nouveau produit',
+    '<div class="champ"><label class="eyebrow" for="ar-nom">Nom court</label>' +
+    '<input type="text" id="ar-nom" class="gros" autocomplete="off" placeholder="gaine 14*120, tuteur acacia…" value="' + esc(a.nom || '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="ar-des">Désignation complète</label>' +
+    '<input type="text" id="ar-des" autocomplete="off" placeholder="telle qu’elle figure sur la facture" value="' + esc(a.designation || '') + '"></div>' +
+    '<div class="grille g2">' +
+    '<div class="champ"><label class="eyebrow" for="ar-type">Type</label>' +
+    '<select id="ar-type">' + ST.TYPES_ART.map(function (t) {
+      return '<option value="' + t.c + '"' + (a.type === t.c ? ' selected' : '') + '>' + t.n + '</option>';
+    }).join('') + '</select></div>' +
     '<div class="champ"><label class="eyebrow" for="ar-unite">Unité</label>' +
     '<select id="ar-unite">' + ST.UNITES_ART.map(function (u) {
       return '<option value="' + u.c + '"' + (a.unite === u.c ? ' selected' : '') + '>' + u.n + '</option>';
     }).join('') + '</select></div>' +
-    '<div class="champ"><label class="eyebrow" for="ar-seuil">Seuil d’alerte</label>' +
-    '<input type="text" id="ar-seuil" inputmode="decimal" placeholder="facultatif" value="' + (a.seuil || '') + '"></div>' +
     '<div class="champ"><label class="eyebrow" for="ar-four">Fournisseur habituel</label>' +
-    '<input type="text" id="ar-four" autocomplete="off" value="' + esc(a.fournisseur || '') + '"></div>' +
+    '<select id="ar-four"><option value="">— aucun —</option>' +
+    (A.fournisseurs || []).slice().sort(function (x, y) {
+      return (x.nom || '').localeCompare(y.nom || '', 'fr');
+    }).map(function (f) {
+      return '<option value="' + f.id + '"' + (a.fournisseur === f.id ? ' selected' : '') + '>' + esc(f.nom) + '</option>';
+    }).join('') + '</select></div>' +
     '<div class="champ"><label class="eyebrow" for="ar-ref">Référence</label>' +
     '<input type="text" id="ar-ref" autocomplete="off" value="' + esc(a.reference || '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="ar-seuil">Seuil d’alerte</label>' +
+    '<input type="text" id="ar-seuil" inputmode="decimal" placeholder="facultatif" value="' + (a.seuil || '') + '"></div>' +
     '<div class="champ"><label class="eyebrow" for="ar-dosage">Dosage par plant</label>' +
     '<input type="text" id="ar-dosage" inputmode="decimal" placeholder="ex. 6 ml" value="' + (a.dosage || '') + '"></div>' +
     '</div>' +
@@ -8222,149 +9095,32 @@ function ouvrirArticle(id) {
     (id ? '<button class="btn danger btn-min" id="ar-sup">Supprimer</button>' : '') + '</div>');
   $('#ar-ok').addEventListener('click', function () {
     var nom = $('#ar-nom').value.trim();
-    if (!nom) { toast('Donnez une désignation.'); return; }
-    var maj = { nom: nom, unite: $('#ar-unite').value, seuil: ST.nb($('#ar-seuil').value) || null,
-      fournisseur: $('#ar-four').value.trim(), reference: $('#ar-ref').value.trim(),
+    if (!nom) { toast('Donnez un nom.'); return; }
+    var maj = { nom: nom, designation: $('#ar-des').value.trim(), type: $('#ar-type').value,
+      unite: $('#ar-unite').value, seuil: ST.nb($('#ar-seuil').value) || null,
+      fournisseur: $('#ar-four').value || null, reference: $('#ar-ref').value.trim(),
       dosage: ST.nb($('#ar-dosage').value) || null, maj: Date.now() };
-    if (id) { Object.keys(maj).forEach(function (k) { a[k] = maj[k]; }); }
+    if (id) Object.keys(maj).forEach(function (k) { a[k] = maj[k]; });
     else { maj.id = uid(); maj.mouvements = []; A.articles.push(maj); }
     sauverArticles().then(function () {
-      fermerModale(); renderStockFournitures(); renderAccueil();
-      toast(id ? 'Article modifié.' : 'Article créé.');
+      fermerModale(); majStock(); toast(id ? 'Produit modifié.' : 'Produit créé.');
     });
   });
-  if (id) {
-    $('#ar-sup').addEventListener('click', function () {
-      if (!confirm('Supprimer « ' + (a.nom || '') + ' » et tout son historique ?')) return;
-      A.articles = A.articles.filter(function (x) { return x.id !== id; });
-      sauverArticles().then(function () {
-        fermerModale(); renderStockFournitures(); renderAccueil(); toast('Article supprimé.');
+  if (id) $('#ar-sup').addEventListener('click', function () {
+    var n = (A.commandes || []).concat(A.sorties || []).filter(function (c) {
+      return (c.lignes || []).some(function (l) { return l.article === id; });
+    }).length;
+    if (!confirm(n ? 'Ce produit apparaît dans ' + n + ' mouvement' + (n > 1 ? 's' : '') +
+      '. Les lignes correspondantes seront ignorées. Supprimer ?'
+      : 'Supprimer « ' + (a.nom || '') + ' » ?')) return;
+    A.articles = A.articles.filter(function (x) { return x.id !== id; });
+    jeterObjet('produit', a, a.nom || 'Produit', ST.nomTypeArt(a.type))
+      .then(sauverArticles).then(function () {
+        fermerModale(); majStock(); toast('Produit mis à la corbeille.');
       });
-    });
-  }
-}
-
-function ouvrirEntree(id) {
-  var a = article(id); if (!a) return;
-  var u = ST.courtUniteArt(a.unite);
-  modale('Achat — ' + (a.nom || 'article'),
-    '<p class="muted" style="font-size:12.5px;margin:0 0 10px">En stock : ' +
-    E.fmt(ST.quantite(a), 0) + ' ' + u + ' à ' + eur(ST.pmp(a)) + ' en moyenne.</p>' +
-    '<div class="grille g2">' +
-    '<div class="champ"><label class="eyebrow" for="en-date">Date</label>' +
-    '<input type="date" id="en-date" value="' + new Date().toISOString().slice(0, 10) + '"></div>' +
-    '<div class="champ"><label class="eyebrow" for="en-qte">Quantité (' + u + ')</label>' +
-    '<input type="text" id="en-qte" class="gros" inputmode="decimal"></div>' +
-    '<div class="champ"><label class="eyebrow" for="en-prix">Prix unitaire HT (€)</label>' +
-    '<input type="text" id="en-prix" class="gros" inputmode="decimal"></div>' +
-    '<div class="champ"><label class="eyebrow" for="en-four">Fournisseur</label>' +
-    '<input type="text" id="en-four" autocomplete="off" value="' + esc(a.fournisseur || '') + '"></div>' +
-    '</div>' +
-    '<div class="carte2" id="en-apercu" style="margin:11px 0"></div>' +
-    '<label class="ligne-check" style="display:flex;align-items:center;gap:8px;font-size:13.5px">' +
-    '<input type="checkbox" id="en-dep" checked> Créer aussi la dépense correspondante</label>' +
-    '<div class="grille g2" id="en-tva-bloc" style="margin-top:8px">' +
-    '<div class="champ"><label class="eyebrow" for="en-tva">TVA</label>' +
-    '<select id="en-tva">' + FIN.TAUX_TVA.map(function (t) {
-      return '<option value="' + t + '"' + (t === 20 ? ' selected' : '') + '>' + (t ? t + ' %' : 'sans TVA') + '</option>';
-    }).join('') + '</select></div></div>' +
-    '<div class="btn-rang" style="margin-top:11px"><button class="btn primaire" id="en-ok">Enregistrer</button></div>');
-  var apercu = function () {
-    var q = ST.nb($('#en-qte').value), p = ST.nb($('#en-prix').value);
-    var nouveauPmp = (ST.quantite(a) + q) > 0
-      ? (ST.quantite(a) * ST.pmp(a) + q * p) / (ST.quantite(a) + q) : p;
-    $('#en-apercu').innerHTML = (q && p)
-      ? '<b class="num" style="font-size:19px">' + eur(q * p) + '</b> HT' +
-        '<div class="muted" style="font-size:12px">stock : ' + E.fmt(ST.quantite(a) + q, 0) + ' ' + u +
-        ' · nouveau prix moyen ' + eur(nouveauPmp) + '</div>'
-      : '<span class="muted">Quantité et prix attendus.</span>';
-  };
-  ['#en-qte', '#en-prix'].forEach(function (s) { $(s).addEventListener('input', apercu); });
-  apercu();
-  $('#en-ok').addEventListener('click', function () {
-    var q = ST.nb($('#en-qte').value), p = ST.nb($('#en-prix').value);
-    if (q <= 0 || p <= 0) { toast('Quantité et prix attendus.'); return; }
-    var date = versDate($('#en-date').value) || Date.now();
-    var four = $('#en-four').value.trim();
-    a.mouvements = a.mouvements || [];
-    a.mouvements.push({ date: date, sens: 'entree', qte: q, prix: p, fournisseur: four });
-    a.maj = Date.now();
-    var suite = sauverArticles();
-    if ($('#en-dep').checked) {
-      var taux = ST.nb($('#en-tva').value);
-      var ht = q * p;
-      A.depenses.push({ id: uid(), date: date, fournisseur: four, article: a.id, maj: Date.now(),
-        lignes: [{ libelle: a.nom, categorie: 'FOURN', ttc: FIN.arr(ht * (1 + taux / 100), 2), taux: taux }] });
-      suite = suite.then(sauverDepenses);
-    }
-    suite.then(function () {
-      fermerModale(); renderStockFournitures(); renderDepenses(); renderFinances(); renderAccueil();
-      toast('Achat enregistré.');
-    });
   });
 }
 
-function ouvrirSortieStock(id) {
-  var a = article(id); if (!a) return;
-  var u = ST.courtUniteArt(a.unite), dispo = ST.quantite(a);
-  var ouverts = C.filtre(A.chantiers, 'ouverts');
-  modale('Sortie — ' + (a.nom || 'article'),
-    '<p class="muted" style="font-size:12.5px;margin:0 0 10px">Disponible : ' +
-    E.fmt(dispo, 0) + ' ' + u + ' à ' + eur(ST.pmp(a)) + '.</p>' +
-    '<div class="grille g2">' +
-    '<div class="champ"><label class="eyebrow" for="so-date">Date</label>' +
-    '<input type="date" id="so-date" value="' + new Date().toISOString().slice(0, 10) + '"></div>' +
-    '<div class="champ"><label class="eyebrow" for="so-qte">Quantité (' + u + ')</label>' +
-    '<input type="text" id="so-qte" class="gros" inputmode="decimal"></div></div>' +
-    '<div class="champ"><label class="eyebrow" for="so-ch">Chantier</label>' +
-    '<select id="so-ch"><option value="">— sans chantier —</option>' +
-    A.chantiers.slice().sort(function (x, y) { return (y.maj || 0) - (x.maj || 0); }).map(function (c) {
-      return '<option value="' + c.id + '">' + esc(c.nom || 'Chantier') + '</option>';
-    }).join('') + '</select></div>' +
-    '<div class="carte2" id="so-apercu" style="margin:11px 0"></div>' +
-    '<div class="btn-rang"><button class="btn primaire" id="so-ok">Enregistrer</button></div>');
-  var apercu = function () {
-    var q = ST.nb($('#so-qte').value);
-    $('#so-apercu').innerHTML = q
-      ? '<b class="num" style="font-size:19px">' + eur(q * ST.pmp(a)) + '</b> de stock sorti' +
-        '<div class="muted" style="font-size:12px">reste ' + E.fmt(dispo - q, 0) + ' ' + u +
-        (q > dispo ? ' — stock négatif' : '') + '</div>'
-      : '<span class="muted">Quantité attendue.</span>';
-  };
-  $('#so-qte').addEventListener('input', apercu);
-  apercu();
-  $('#so-ok').addEventListener('click', function () {
-    var q = ST.nb($('#so-qte').value);
-    if (q <= 0) { toast('Quantité attendue.'); return; }
-    if (q > dispo && !confirm('Sortir ' + E.fmt(q, 0) + ' ' + u + ' alors qu’il n’en reste que ' +
-      E.fmt(dispo, 0) + ' ?\\n\\nLe stock passera en négatif.')) return;
-    a.mouvements = a.mouvements || [];
-    a.mouvements.push({ date: versDate($('#so-date').value) || Date.now(), sens: 'sortie', qte: q,
-      prixSortie: ST.pmp(a), chantier: $('#so-ch').value || null });
-    a.maj = Date.now();
-    sauverArticles().then(function () {
-      fermerModale(); renderStockFournitures(); renderFiche(); renderAccueil();
-      toast('Sortie enregistrée.');
-    });
-  });
-}
-
-function ouvrirHistoriqueArticle(id) {
-  var a = article(id); if (!a) return;
-  var u = ST.courtUniteArt(a.unite);
-  var mv = ST.mouvements(a).slice().sort(function (x, y) { return (y.date || 0) - (x.date || 0); });
-  modale('Historique — ' + (a.nom || 'article'),
-    mv.length ? mv.map(function (m) {
-      var ch = m.chantier ? chantier(m.chantier) : null;
-      return '<div class="liste-item"><span class="pastille" style="background:' +
-        (m.sens === 'entree' ? '#2E7D46' : '#8A5A2B') + '"></span>' +
-        '<div class="li-c"><b>' + (m.sens === 'entree' ? '+' : '−') + E.fmt(C.nb(m.qte), 0) + ' ' + u +
-        (m.sens === 'entree' ? ' à ' + eur(C.nb(m.prix)) : '') + '</b>' +
-        '<small>' + dateCourte(m.date) +
-        (m.fournisseur ? ' · ' + esc(m.fournisseur) : '') +
-        (ch ? ' · ' + esc(ch.nom || 'chantier') : '') + '</small></div></div>';
-    }).join('') : '<div class="vide"><p>Aucun mouvement.</p></div>');
-}
 
 /* ==================================================== CHARGES FIXES */
 function charge(id) { return A.charges.filter(function (c) { return c.id === id; })[0] || null; }
@@ -8821,177 +9577,405 @@ function htmlDepenses(an, b) {
     '</small></div></div></div>';
 }
 
-/* ============================= RÉCEPTION DE COMMANDE ET PRIX DE REVIENT */
+/* ================== SAISIE DES COMMANDES, DES SORTIES, DES PERTES =======
+   Une commande porte plusieurs articles et des frais de livraison qui se
+   répartissent sur les quantités reçues : un tuteur à 0,60 € dans une
+   commande dont la livraison revient à 0,1325 € par unité coûte en réalité
+   0,7325 €. Sans cela, la marge est surestimée.
+   ====================================================================== */
 
-/* Une réception : plusieurs articles reçus le même jour, chez le même
-   fournisseur, avec des frais de livraison à répartir sur l'ensemble. */
-var recLignes = [];
-function ouvrirReception() {
-  if (!A.articles.length) { toast('Créez d’abord un article.'); return; }
-  recLignes = [{ article: A.articles[0].id, qte: '', prix: '' }];
-  modale('Réception de commande',
-    '<div class="grille g2">' +
-    '<div class="champ"><label class="eyebrow" for="rc-date">Date de réception</label>' +
-    '<input type="date" id="rc-date" value="' + new Date().toISOString().slice(0, 10) + '"></div>' +
-    '<div class="champ"><label class="eyebrow" for="rc-num">N° de commande</label>' +
-    '<input type="text" id="rc-num" autocomplete="off"></div>' +
-    '<div class="champ"><label class="eyebrow" for="rc-four">Fournisseur</label>' +
-    '<input type="text" id="rc-four" autocomplete="off" list="liste-fournisseurs"></div>' +
-    '<div class="champ"><label class="eyebrow" for="rc-livr">Frais de livraison (€ HT)</label>' +
-    '<input type="text" id="rc-livr" inputmode="decimal" placeholder="0"></div>' +
-    '</div>' +
-    '<label class="eyebrow" style="margin-top:12px;display:block">Articles reçus</label>' +
-    '<div id="rc-lignes"></div>' +
-    '<div class="carte2" id="rc-apercu" style="margin:11px 0"></div>' +
-    '<label class="ligne-check" style="display:flex;align-items:center;gap:8px;font-size:13.5px">' +
-    '<input type="checkbox" id="rc-dep" checked> Créer la dépense correspondante</label>' +
-    '<div class="grille g2" style="margin-top:8px"><div class="champ">' +
-    '<label class="eyebrow" for="rc-tva">TVA</label>' +
-    '<select id="rc-tva">' + FIN.TAUX_TVA.map(function (t) {
-      return '<option value="' + t + '"' + (t === 20 ? ' selected' : '') + '>' + (t ? t + ' %' : 'sans TVA') + '</option>';
-    }).join('') + '</select></div></div>' +
-    '<div class="btn-rang" style="margin-top:11px"><button class="btn primaire" id="rc-ok">Enregistrer</button></div>');
-  majDatalistFournisseurs();
-  renderRecLignes();
+var lg = [];   /* lignes en cours de saisie */
 
-  $('#rc-lignes').addEventListener('input', function () { lireRecLignes(); apercuReception(); });
-  $('#rc-lignes').addEventListener('change', function () { lireRecLignes(); apercuReception(); });
-  $('#rc-livr').addEventListener('input', apercuReception);
-  $('#rc-lignes').addEventListener('click', function (e) {
-    var plus = e.target.closest('#rc-plus'), sup = e.target.closest('[data-rcsup]');
-    if (plus) { lireRecLignes(); recLignes.push({ article: A.articles[0].id, qte: '', prix: '' }); renderRecLignes(); }
-    else if (sup) { lireRecLignes(); recLignes.splice(Number(sup.dataset.rcsup), 1); renderRecLignes(); }
-  });
-  $('#rc-ok').addEventListener('click', validerReception);
+function optionsArticles(sel) {
+  return A.articles.slice().sort(function (a, b) {
+    return (a.nom || '').localeCompare(b.nom || '', 'fr');
+  }).map(function (a) {
+    return '<option value="' + a.id + '"' + (a.id === sel ? ' selected' : '') + '>' + esc(a.nom || '') + '</option>';
+  }).join('');
 }
-function renderRecLignes() {
-  $('#rc-lignes').innerHTML = recLignes.map(function (l, i) {
+function optionsFournisseurs(sel) {
+  return '<option value="">— aucun —</option>' + (A.fournisseurs || []).slice()
+    .sort(function (a, b) { return (a.nom || '').localeCompare(b.nom || '', 'fr'); })
+    .map(function (f) {
+      return '<option value="' + f.id + '"' + (f.id === sel ? ' selected' : '') + '>' + esc(f.nom) + '</option>';
+    }).join('');
+}
+function jourIso(ts) { return new Date(ts || Date.now()).toISOString().slice(0, 10); }
+
+/* Le bloc de lignes est commun aux commandes, aux sorties et aux pertes ;
+   seule l'étiquette du prix change. */
+function renderLignes(prixLabel) {
+  $('#lg-lignes').innerHTML = lg.map(function (l, i) {
     var art = article(l.article);
     return '<div class="carte2" style="margin-bottom:7px;padding:9px 10px">' +
       '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">' +
-      '<select data-rcart="' + i + '" style="flex:1">' + A.articles.map(function (a) {
-        return '<option value="' + a.id + '"' + (a.id === l.article ? ' selected' : '') + '>' + esc(a.nom || '') + '</option>';
-      }).join('') + '</select>' +
-      (recLignes.length > 1 ? '<button type="button" class="btn-min" data-rcsup="' + i + '">✕</button>' : '') + '</div>' +
+      '<select data-lgart="' + i + '" style="flex:1">' + optionsArticles(l.article) + '</select>' +
+      (lg.length > 1 ? '<button type="button" class="btn-min" data-lgsup="' + i + '">✕</button>' : '') + '</div>' +
       '<div class="grille g2">' +
-      '<div class="champ"><label class="eyebrow">Quantité' +
+      '<div class="champ" style="margin:0"><label class="eyebrow">Quantité' +
       (art ? ' (' + ST.courtUniteArt(art.unite) + ')' : '') + '</label>' +
-      '<input type="text" data-rcqte="' + i + '" class="gros" inputmode="decimal" value="' + esc(l.qte) + '"></div>' +
-      '<div class="champ"><label class="eyebrow">Prix unitaire HT</label>' +
-      '<input type="text" data-rcprix="' + i + '" class="gros" inputmode="decimal" value="' + esc(l.prix) + '"></div>' +
+      '<input type="text" data-lgqte="' + i + '" class="gros" inputmode="decimal" value="' + esc(l.qte) + '"></div>' +
+      (prixLabel ? '<div class="champ" style="margin:0"><label class="eyebrow">' + prixLabel + '</label>' +
+        '<input type="text" data-lgprix="' + i + '" class="gros" inputmode="decimal" value="' + esc(l.prix) + '"></div>' : '') +
       '</div></div>';
-  }).join('') + '<button type="button" class="btn-min" id="rc-plus">+ un article</button>';
-  apercuReception();
+  }).join('') + '<button type="button" class="btn-min" id="lg-plus">+ un produit</button>';
 }
-function lireRecLignes() {
-  $$('#rc-lignes [data-rcart]').forEach(function (i) { recLignes[Number(i.dataset.rcart)].article = i.value; });
-  $$('#rc-lignes [data-rcqte]').forEach(function (i) { recLignes[Number(i.dataset.rcqte)].qte = i.value; });
-  $$('#rc-lignes [data-rcprix]').forEach(function (i) { recLignes[Number(i.dataset.rcprix)].prix = i.value; });
+function lireLignes() {
+  $$('#lg-lignes [data-lgart]').forEach(function (i) { lg[Number(i.dataset.lgart)].article = i.value; });
+  $$('#lg-lignes [data-lgqte]').forEach(function (i) { lg[Number(i.dataset.lgqte)].qte = i.value; });
+  $$('#lg-lignes [data-lgprix]').forEach(function (i) { lg[Number(i.dataset.lgprix)].prix = i.value; });
 }
-function apercuReception() {
-  var z = $('#rc-apercu'); if (!z) return;
-  var valides = recLignes.filter(function (l) { return ST.nb(l.qte) > 0 && ST.nb(l.prix) > 0; });
-  var qteTot = valides.reduce(function (s, l) { return s + ST.nb(l.qte); }, 0);
-  var marchandise = valides.reduce(function (s, l) { return s + ST.nb(l.qte) * ST.nb(l.prix); }, 0);
-  var livr = ST.nb($('#rc-livr') ? $('#rc-livr').value : 0);
-  if (!qteTot) { z.innerHTML = '<span class="muted">Renseignez quantité et prix.</span>'; return; }
-  var part = livr / qteTot;
-  z.innerHTML = '<b class="num" style="font-size:19px">' + eur(marchandise + livr) + '</b> HT' +
-    '<div class="muted" style="font-size:12.5px;margin-top:3px">' +
-    E.fmt(qteTot, 0) + ' unités · ' + eur(marchandise) + ' de marchandise' +
-    (livr ? ' + ' + eur(livr) + ' de livraison, soit ' + E.fmt(ST.arr(part, 4), 4) + ' € par unité' : '') + '</div>' +
-    (livr ? '<div style="margin-top:7px;font-size:12.5px">' + valides.map(function (l) {
-      var a = article(l.article);
-      return '<div style="display:flex;justify-content:space-between;padding:2px 0">' +
-        '<span>' + esc(a ? a.nom : '') + '</span><span class="num muted">' +
-        E.fmt(ST.nb(l.prix), 2) + ' → <b>' + E.fmt(ST.arr(ST.nb(l.prix) + part, 4), 4) + ' €</b></span></div>';
-    }).join('') + '</div>' : '');
-}
-function validerReception() {
-  lireRecLignes();
-  var valides = recLignes.filter(function (l) { return ST.nb(l.qte) > 0 && ST.nb(l.prix) > 0; });
-  if (!valides.length) { toast('Aucune ligne complète.'); return; }
-  var date = versDate($('#rc-date').value) || Date.now();
-  var num = $('#rc-num').value.trim(), four = $('#rc-four').value.trim();
-  var livr = ST.nb($('#rc-livr').value);
-  var qteTot = valides.reduce(function (s, l) { return s + ST.nb(l.qte); }, 0);
-  var part = qteTot > 0 ? livr / qteTot : 0;
-  var marchandise = 0;
-  valides.forEach(function (l) {
-    var a = article(l.article); if (!a) return;
-    a.mouvements = a.mouvements || [];
-    a.mouvements.push({ date: date, sens: 'entree', qte: ST.nb(l.qte), prix: ST.nb(l.prix),
-      fraisUnit: ST.arr(part, 6), commande: num || null, fournisseur: four || null });
-    a.maj = Date.now();
-    marchandise += ST.nb(l.qte) * ST.nb(l.prix);
+function brancherLignes(prixLabel, apercu) {
+  renderLignes(prixLabel);
+  $('#lg-lignes').addEventListener('input', function () { lireLignes(); apercu(); });
+  $('#lg-lignes').addEventListener('change', function () { lireLignes(); apercu(); });
+  $('#lg-lignes').addEventListener('click', function (e) {
+    var plus = e.target.closest('#lg-plus'), sup = e.target.closest('[data-lgsup]');
+    if (plus) { lireLignes(); lg.push({ article: A.articles[0].id, qte: '', prix: '' }); }
+    else if (sup) { lireLignes(); lg.splice(Number(sup.dataset.lgsup), 1); }
+    else return;
+    renderLignes(prixLabel); apercu();
   });
-  noterFournisseur(four);
-  var suite = sauverArticles();
-  if ($('#rc-dep').checked) {
-    var taux = ST.nb($('#rc-tva').value);
-    var lignes = [{ libelle: 'Fournitures' + (num ? ' ' + num : ''), categorie: 'FOURN',
-      ttc: FIN.arr(marchandise * (1 + taux / 100), 2), taux: taux }];
-    if (livr) lignes.push({ libelle: 'Livraison', categorie: 'FOURN',
-      ttc: FIN.arr(livr * (1 + taux / 100), 2), taux: taux });
-    A.depenses.push({ id: uid(), date: date, fournisseur: four, numero: num,
-      commande: num || null, maj: Date.now(), lignes: lignes });
-    suite = suite.then(sauverDepenses);
-  }
-  suite.then(function () {
-    fermerModale(); renderStockFournitures(); renderCommandes(); renderDepenses();
-    renderFinances(); renderAnalyses(); renderAccueil();
-    toast('Réception enregistrée.');
-  });
+  apercu();
 }
-function noterFournisseur(nom) {
-  if (!nom) return;
-  A.fournisseurs = A.fournisseurs || [];
-  if (A.fournisseurs.some(function (x) { return x.toLowerCase() === nom.toLowerCase(); })) return;
-  A.fournisseurs.push(nom);
-  A.fournisseurs.sort(function (a, b) { return a.localeCompare(b, 'fr'); });
-  ecrire('bordcub.fournisseurs', A.fournisseurs);
-  majDatalistFournisseurs();
-}
-function majDatalistFournisseurs() {
-  var d = $('#liste-fournisseurs'); if (!d) return;
-  d.innerHTML = (A.fournisseurs || []).map(function (x) { return '<option value="' + esc(x) + '">'; }).join('');
+function lignesValides() {
+  return lg.filter(function (l) { return l.article && ST.nb(l.qte) > 0; })
+    .map(function (l) { return { article: l.article, qte: ST.nb(l.qte), prix: ST.nb(l.prix) }; });
 }
 
-/* ------------------------------------------------------- les commandes */
-function renderCommandes() {
-  var z = $('#liste-commandes'); if (!z) return;
-  var cmds = {};
-  A.articles.forEach(function (a) {
-    ST.entrees(a).forEach(function (m) {
-      var k = (m.commande || '') + '|' + ST.arr(m.date / 86400000, 0);
-      if (!cmds[k]) cmds[k] = { num: m.commande, date: m.date, fournisseur: m.fournisseur, lignes: [], total: 0, frais: 0 };
-      cmds[k].lignes.push({ article: a, m: m });
-      cmds[k].total += ST.nb(m.qte) * ST.nb(m.prix);
-      cmds[k].frais += ST.nb(m.qte) * ST.nb(m.fraisUnit);
+/* ---------------------------------------------------------- une commande */
+function ouvrirCommande(id, artPref) {
+  if (!A.articles.length) {
+    toast('Créez d’abord un produit dans les réglages.');
+    allerReglages('stock'); return;
+  }
+  var c = id ? commande(id) : null;
+  if (id && !c) return;
+  lg = c ? (c.lignes || []).map(function (l) {
+    return { article: l.article, qte: String(l.qte), prix: String(l.prix) };
+  }) : [{ article: artPref || A.articles[0].id, qte: '', prix: '' }];
+  if (!lg.length) lg = [{ article: A.articles[0].id, qte: '', prix: '' }];
+
+  modale(id ? 'Modifier la commande' : 'Nouvelle commande',
+    '<div class="grille g2">' +
+    '<div class="champ"><label class="eyebrow" for="cm-num">N° de commande</label>' +
+    '<input type="text" id="cm-num" autocomplete="off" value="' + esc(c ? c.num || '' : '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="cm-statut">Statut</label>' +
+    '<select id="cm-statut">' + ST.STATUTS_ACHAT.map(function (s) {
+      return '<option value="' + s.c + '"' + ((c ? c.statut : 'recu') === s.c ? ' selected' : '') + '>' + s.n + '</option>';
+    }).join('') + '</select></div>' +
+    '<div class="champ"><label class="eyebrow" for="cm-dcmd">Date de commande</label>' +
+    '<input type="date" id="cm-dcmd" value="' + jourIso(c && c.dateCmd) + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="cm-dliv">Date de livraison</label>' +
+    '<input type="date" id="cm-dliv" value="' + jourIso(c && (c.dateLiv || c.dateCmd)) + '"></div>' +
+    '</div>' +
+    '<div class="champ"><label class="eyebrow" for="cm-four">Fournisseur</label>' +
+    '<div style="display:flex;gap:6px">' +
+    '<select id="cm-four" style="flex:1">' + optionsFournisseurs(c && c.fournisseur) + '</select>' +
+    '<button type="button" class="btn-min" id="cm-four-plus">+</button></div></div>' +
+    '<label class="eyebrow" style="margin-top:6px;display:block">Produits commandés</label>' +
+    '<div id="lg-lignes"></div>' +
+    '<div class="champ" style="margin-top:11px"><label class="eyebrow" for="cm-livr">Frais de livraison (€ HT)</label>' +
+    '<input type="text" id="cm-livr" inputmode="decimal" placeholder="0" value="' + (c && ST.nb(c.livraison) ? c.livraison : '') + '"></div>' +
+    '<div class="carte2" id="cm-apercu" style="margin:11px 0"></div>' +
+    (id ? '' :
+      '<label class="ligne-check" style="display:flex;align-items:center;gap:8px;font-size:13.5px">' +
+      '<input type="checkbox" id="cm-dep" checked> Créer aussi la dépense correspondante</label>' +
+      '<div class="grille g2" style="margin-top:8px"><div class="champ">' +
+      '<label class="eyebrow" for="cm-tva">TVA</label>' +
+      '<select id="cm-tva">' + FIN.TAUX_TVA.map(function (t) {
+        return '<option value="' + t + '"' + (t === 20 ? ' selected' : '') + '>' + (t ? t + ' %' : 'sans TVA') + '</option>';
+      }).join('') + '</select></div></div>') +
+    '<div class="btn-rang" style="margin-top:11px">' +
+    '<button class="btn primaire" id="cm-ok">Enregistrer</button>' +
+    (id ? '<button class="btn danger btn-min" id="cm-sup">Supprimer</button>' : '') + '</div>');
+
+  var apercu = function () {
+    var z = $('#cm-apercu'); if (!z) return;
+    var v = lignesValides().filter(function (l) { return l.prix > 0; });
+    var qteTot = v.reduce(function (s, l) { return s + l.qte; }, 0);
+    var march = v.reduce(function (s, l) { return s + l.qte * l.prix; }, 0);
+    var livr = ST.nb($('#cm-livr').value);
+    if (!qteTot) { z.innerHTML = '<span class="muted">Renseignez quantité et prix.</span>'; return; }
+    var parts = partsPort({ lignes: v, livraison: livr });
+    z.innerHTML = '<b class="num" style="font-size:19px">' + eur(march + livr) + '</b> HT' +
+      '<div class="muted" style="font-size:12.5px;margin-top:3px">' +
+      E.fmt(qteTot, 0) + ' unités · ' + eur(march) + ' de marchandise' +
+      (livr ? ' + ' + eur(livr) + ' de livraison' : '') + '</div>' +
+      (livr ? '<div style="margin-top:7px;font-size:12.5px">' + v.map(function (l, i) {
+        var a = article(l.article);
+        return '<div style="display:flex;justify-content:space-between;padding:2px 0">' +
+          '<span>' + esc(a ? a.nom : '') + '</span><span class="num muted">' +
+          E.fmt(l.prix, 2) + ' → <b>' + E.fmt(ST.arr(l.prix + parts[i], 4), 4) + ' €</b></span></div>';
+      }).join('') +
+      (parts.regle === 'montant' ? '<div class="muted" style="font-size:11.5px;margin-top:5px">' +
+        'Unités différentes dans la commande : la livraison est répartie au prorata des montants.</div>' : '') +
+      '</div>' : '');
+  };
+  brancherLignes('Prix unitaire HT', apercu);
+  $('#cm-livr').addEventListener('input', apercu);
+  $('#cm-four-plus').addEventListener('click', function () { fermerModale(); ouvrirFournisseur(null); });
+
+  $('#cm-ok').addEventListener('click', function () {
+    lireLignes();
+    var lignes = lignesValides();
+    if (!lignes.length) { toast('Aucune ligne complète.'); return; }
+    var maj = {
+      num: $('#cm-num').value.trim(), statut: $('#cm-statut').value,
+      dateCmd: versDate($('#cm-dcmd').value) || Date.now(),
+      dateLiv: versDate($('#cm-dliv').value) || null,
+      fournisseur: $('#cm-four').value || null,
+      livraison: ST.nb($('#cm-livr').value), lignes: lignes, maj: Date.now()
+    };
+    A.commandes = A.commandes || [];
+    if (c) Object.keys(maj).forEach(function (k) { c[k] = maj[k]; });
+    else { maj.id = uid(); A.commandes.push(maj); }
+    var suite = sauverCommandes();
+    if (!id && $('#cm-dep') && $('#cm-dep').checked) {
+      var taux = ST.nb($('#cm-tva').value);
+      var march = lignes.reduce(function (s, l) { return s + l.qte * l.prix; }, 0);
+      var dl = [{ libelle: 'Fournitures' + (maj.num ? ' ' + maj.num : ''), categorie: 'FOURN',
+        ttc: FIN.arr(march * (1 + taux / 100), 2), taux: taux }];
+      if (maj.livraison) dl.push({ libelle: 'Livraison', categorie: 'FOURN',
+        ttc: FIN.arr(maj.livraison * (1 + taux / 100), 2), taux: taux });
+      A.depenses.push({ id: uid(), date: maj.dateLiv || maj.dateCmd,
+        fournisseur: nomFournisseur(maj.fournisseur), numero: maj.num,
+        commande: maj.id, maj: Date.now(), lignes: dl });
+      suite = suite.then(sauverDepenses);
+    }
+    suite.then(function () {
+      fermerModale(); majStock(); renderDepenses(); renderFinances(); renderAnalyses();
+      toast(id ? 'Commande modifiée.' : 'Commande enregistrée.');
     });
   });
-  var l = Object.keys(cmds).map(function (k) { return cmds[k]; })
-    .sort(function (a, b) { return (b.date || 0) - (a.date || 0); });
-  if (!l.length) {
-    z.innerHTML = '<div class="vide"><p>Aucune réception. Enregistrez une commande reçue : ' +
-      'les frais de livraison seront répartis sur les articles.</p></div>';
-    return;
+  if (id) $('#cm-sup').addEventListener('click', function () {
+    if (!confirm('Supprimer cette commande ? Le stock sera recalculé sans elle.\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Fichiers ▸ Corbeille.')) return;
+    A.commandes = A.commandes.filter(function (x) { return x.id !== id; });
+    jeterObjet('commande', c, c.num || 'Commande',
+      (c.lignes || []).length + ' ligne' + ((c.lignes || []).length > 1 ? 's' : ''))
+      .then(sauverCommandes).then(function () {
+        fermerModale(); majStock(); toast('Commande mise à la corbeille.');
+      });
+  });
+  apercu();
+}
+
+/* ------------------------------------------------- une sortie, une perte */
+function ouvrirSortie(id, perte, artPref) {
+  if (!A.articles.length) {
+    toast('Créez d’abord un produit dans les réglages.');
+    allerReglages('stock'); return;
   }
-  z.innerHTML = l.map(function (c) {
-    return '<div class="liste-item pile-c"><div class="li-h">' +
-      '<span class="pastille" style="background:#2E4A3C;margin-top:4px"></span>' +
-      '<div class="li-c"><b>' + esc(c.num || 'Sans numéro') + ' — ' + eur(c.total + c.frais) + '</b>' +
-      '<small>' + dateCourte(c.date) + (c.fournisseur ? ' · ' + esc(c.fournisseur) : '') +
-      ' · ' + c.lignes.length + ' article' + (c.lignes.length > 1 ? 's' : '') +
-      (c.frais ? ' · dont ' + eur(c.frais) + ' de livraison' : '') + '<br>' +
-      c.lignes.map(function (x) {
-        return esc(x.article.nom || '') + ' ' + E.fmt(ST.nb(x.m.qte), 0) + ' × ' +
-          E.fmt(ST.coutReel(x.m), 4) + ' €';
-      }).join(' · ') + '</small></div></div></div>';
-  }).join('');
+  var s = id ? sortie(id) : null;
+  if (id && !s) return;
+  if (s) perte = !!s.perte;
+  lg = s ? (s.lignes || []).map(function (l) {
+    return { article: l.article, qte: String(l.qte), prix: String(l.prix) };
+  }) : [{ article: artPref || A.articles[0].id, qte: '', prix: '' }];
+  if (!lg.length) lg = [{ article: A.articles[0].id, qte: '', prix: '' }];
+
+  var chs = A.chantiers.slice().sort(function (x, y) { return (y.maj || 0) - (x.maj || 0); });
+  modale(id ? (perte ? 'Modifier la perte' : 'Modifier la sortie')
+    : (perte ? 'Perte ou casse' : 'Sortie de stock'),
+    '<div class="grille g2">' +
+    '<div class="champ"><label class="eyebrow" for="so-date">Date</label>' +
+    '<input type="date" id="so-date" value="' + jourIso(s && s.date) + '"></div>' +
+    (perte
+      ? '<div class="champ"><label class="eyebrow" for="so-motif">Motif</label>' +
+        '<input type="text" id="so-motif" autocomplete="off" placeholder="casse, vol, périmé…" value="' + esc(s ? s.motif || '' : '') + '"></div>'
+      : '<div class="champ"><label class="eyebrow" for="so-num">N° de facture</label>' +
+        '<input type="text" id="so-num" autocomplete="off" value="' + esc(s ? s.num || '' : '') + '"></div>') +
+    '</div>' +
+    (perte ? '' :
+      '<div class="champ"><label class="eyebrow" for="so-ch">Chantier</label>' +
+      '<select id="so-ch"><option value="">— sans chantier —</option>' +
+      chs.map(function (x) {
+        return '<option value="' + x.id + '"' + (s && s.chantier === x.id ? ' selected' : '') + '>' +
+          esc(x.nom || 'Chantier') + '</option>';
+      }).join('') + '</select></div>' +
+      '<div class="grille g2">' +
+      '<div class="champ"><label class="eyebrow" for="so-client">Client</label>' +
+      '<input type="text" id="so-client" autocomplete="off" placeholder="si hors chantier" value="' + esc(s ? s.client || '' : '') + '"></div>' +
+      '<div class="champ"><label class="eyebrow" for="so-statut">Statut</label>' +
+      '<select id="so-statut">' + ST.STATUTS_VENTE.map(function (x) {
+        return '<option value="' + x.c + '"' + ((s ? s.statut : 'fini') === x.c ? ' selected' : '') + '>' + x.n + '</option>';
+      }).join('') + '</select></div></div>' +
+      '<p class="muted" style="font-size:11.5px;margin:-4px 0 8px" id="so-note-ch"></p>') +
+    '<label class="eyebrow" style="margin-top:6px;display:block">Produits sortis</label>' +
+    '<div id="lg-lignes"></div>' +
+    (perte ? '' :
+      '<label class="ligne-check" style="display:flex;align-items:center;gap:8px;font-size:13.5px;margin-top:9px">' +
+      '<input type="checkbox" id="so-deb"' + (s && s.debours ? ' checked' : '') + '> ' +
+      'Refacturé en débours (hors chiffre d’affaires)</label>') +
+    '<div class="carte2" id="so-apercu" style="margin:11px 0"></div>' +
+    '<div class="btn-rang" style="margin-top:11px">' +
+    '<button class="btn primaire" id="so-ok">Enregistrer</button>' +
+    (id ? '<button class="btn danger btn-min" id="so-sup">Supprimer</button>' : '') + '</div>');
+
+  var apercu = function () {
+    var z = $('#so-apercu'); if (!z) return;
+    var v = lignesValides();
+    if (!v.length) { z.innerHTML = '<span class="muted">Quantité attendue.</span>'; return; }
+    var cout = 0, ca = 0, manque = [];
+    v.forEach(function (l) {
+      var a = article(l.article); if (!a) return;
+      cout += l.qte * ST.pmp(a); ca += l.qte * l.prix;
+      if (l.qte > ST.quantite(a)) manque.push(a.nom);
+    });
+    var deb = $('#so-deb') && $('#so-deb').checked;
+    z.innerHTML = perte
+      ? '<b class="num" style="font-size:19px">' + eur(ST.arr(cout, 2)) + '</b> de stock perdu'
+      : deb
+        ? '<b class="num" style="font-size:19px">' + eur(ST.arr(ca, 2)) + '</b> refacturés en débours' +
+          '<div class="muted" style="font-size:12.5px;margin-top:3px">' +
+          eur(ST.arr(cout, 2)) + ' de stock sorti · écart ' + eur(ST.arr(ca - cout, 2)) +
+          ' · hors chiffre d’affaires</div>'
+        : '<b class="num" style="font-size:19px">' + eur(ST.arr(ca, 2)) + '</b> de vente' +
+          '<div class="muted" style="font-size:12.5px;margin-top:3px">' +
+          eur(ST.arr(cout, 2)) + ' de stock sorti · marge ' + eur(ST.arr(ca - cout, 2)) +
+          (ca > 0 ? ' (' + E.fmt((ca - cout) / ca * 100, 1) + ' %)' : '') + '</div>';
+    if (manque.length) z.innerHTML += '<div class="retard" style="margin-top:5px">Stock insuffisant : ' +
+      esc(manque.join(', ')) + '</div>';
+    /* Le chiffre d'affaires vient des lignes du chantier : on rappelle ce qui
+       y figure déjà, pour que la même vente ne soit pas comptée deux fois. */
+    var vch = $('#so-ch') ? $('#so-ch').value : '';
+    var chx = vch ? chantier(vch) : null;
+    if (chx && !deb) {
+      var dejaVendu = ((chx.lignes || []).filter(function (x) { return x.nature === 'vente'; })
+        .reduce(function (t, x) { return t + C.montantLigne(x); }, 0));
+      if (dejaVendu) z.innerHTML += '<div class="muted" style="font-size:11.5px;margin-top:5px">' +
+        'Ce chantier porte déjà ' + eur(ST.arr(dejaVendu, 2)) + ' de vente de fournitures : ' +
+        'le chiffre d’affaires vient de là, pas d’ici.</div>';
+    }
+  };
+  brancherLignes(perte ? '' : 'Prix de vente unitaire', apercu);
+
+  var noteCh = function () {
+    var e = $('#so-note-ch'); if (!e) return;
+    var v = $('#so-ch') ? $('#so-ch').value : '';
+    var ch = v ? chantier(v) : null;
+    if ($('#so-statut')) $('#so-statut').disabled = !!ch;
+    e.textContent = ch
+      ? 'Le statut suit celui du chantier : ' + C.nomStatut(ch.statut) + '.'
+      : '';
+  };
+  if ($('#so-ch')) {
+    $('#so-ch').addEventListener('change', function () { noteCh(); apercu(); });
+    noteCh();
+  }
+  if ($('#so-deb')) $('#so-deb').addEventListener('change', apercu);
+
+  $('#so-ok').addEventListener('click', function () {
+    lireLignes();
+    var lignes = lignesValides();
+    if (!lignes.length) { toast('Aucune ligne complète.'); return; }
+    var maj = {
+      date: versDate($('#so-date').value) || Date.now(), perte: !!perte,
+      motif: perte ? $('#so-motif').value.trim() : null,
+      num: perte ? '' : $('#so-num').value.trim(),
+      client: perte ? '' : $('#so-client').value.trim(),
+      chantier: perte ? null : ($('#so-ch').value || null),
+      debours: perte ? false : !!($('#so-deb') && $('#so-deb').checked),
+      statut: perte ? 'fini' : $('#so-statut').value,
+      lignes: lignes, maj: Date.now()
+    };
+    A.sorties = A.sorties || [];
+    if (s) Object.keys(maj).forEach(function (k) { s[k] = maj[k]; });
+    else { maj.id = uid(); A.sorties.push(maj); }
+    sauverSorties().then(function () {
+      fermerModale(); majStock(); renderFiche(); renderFinances(); renderAnalyses();
+      toast(perte ? 'Perte enregistrée.' : id ? 'Sortie modifiée.' : 'Sortie enregistrée.');
+    });
+  });
+  if (id) $('#so-sup').addEventListener('click', function () {
+    if (!confirm('Supprimer ce mouvement ? Le stock sera recalculé sans lui.\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Fichiers ▸ Corbeille.')) return;
+    A.sorties = A.sorties.filter(function (x) { return x.id !== id; });
+    jeterObjet('sortie', s, s.num || s.client || (s.perte ? 'Perte' : 'Sortie'),
+      (s.lignes || []).length + ' ligne' + ((s.lignes || []).length > 1 ? 's' : ''))
+      .then(sauverSorties).then(function () {
+        fermerModale(); majStock(); toast('Mouvement mis à la corbeille.');
+      });
+  });
+  apercu();
 }
 
 /* --------------------------------------------------- prix de revient */
+/* ------------------------------------------------------- graphiques
+   Tout est dessiné en SVG à la main : aucune bibliothèque à charger, donc
+   rien à télécharger en forêt. */
+
+/* Anneau de répartition. Un camembert percé se lit mieux qu'un plein :
+   le centre porte le chiffre qui compte. */
+function anneau(parts, options) {
+  var o = options || {};
+  var vus = parts.filter(function (p) { return p.valeur > 0; });
+  var tot = vus.reduce(function (s, p) { return s + p.valeur; }, 0);
+  if (tot <= 0) return '';
+  var R = 54, r = 33, cx = 62, cy = 62, ang = -Math.PI / 2, svg = '';
+  if (vus.length === 1) {
+    svg += '<circle cx="' + cx + '" cy="' + cy + '" r="' + ((R + r) / 2) +
+      '" fill="none" stroke="' + vus[0].couleur + '" stroke-width="' + (R - r) + '"/>';
+  } else {
+    vus.forEach(function (p) {
+      var a = p.valeur / tot * Math.PI * 2, b = ang + a;
+      var g = a > Math.PI ? 1 : 0;
+      var pt = function (ray, t) {
+        return (cx + ray * Math.cos(t)).toFixed(2) + ' ' + (cy + ray * Math.sin(t)).toFixed(2);
+      };
+      svg += '<path d="M' + pt(R, ang) + ' A' + R + ' ' + R + ' 0 ' + g + ' 1 ' + pt(R, b) +
+        ' L' + pt(r, b) + ' A' + r + ' ' + r + ' 0 ' + g + ' 0 ' + pt(r, ang) + ' Z" fill="' +
+        p.couleur + '" stroke="var(--carte)" stroke-width="1"><title>' +
+        xmlEsc(p.nom + ' : ' + E.fmt(p.valeur / tot * 100, 1) + ' %') + '</title></path>';
+      ang = b;
+    });
+  }
+  if (o.centre) {
+    svg += '<text x="' + cx + '" y="' + (cy + (o.sous ? 0 : 4)) +
+      '" font-size="15" font-weight="700" text-anchor="middle" fill="var(--encre)">' +
+      xmlEsc(o.centre) + '</text>';
+    if (o.sous) svg += '<text x="' + cx + '" y="' + (cy + 14) +
+      '" font-size="8.5" text-anchor="middle" fill="var(--doux)">' + xmlEsc(o.sous) + '</text>';
+  }
+  return '<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">' +
+    '<svg viewBox="0 0 124 124" width="124" height="124" style="flex:none">' + svg + '</svg>' +
+    '<div style="flex:1;min-width:150px">' + vus.map(function (p) {
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:13px">' +
+        '<span><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:' +
+        p.couleur + ';margin-right:7px"></i>' + esc(p.nom) + '</span>' +
+        '<span><b class="num">' + esc(p.texte || E.fmt(p.valeur, 4)) + '</b>' +
+        '<span class="muted" style="font-size:11.5px"> · ' + E.fmt(p.valeur / tot * 100, 1) + ' %</span></span></div>';
+    }).join('') + '</div></div>';
+}
+
+/* Barres horizontales avec un repère d'objectif : on voit d'un coup qui
+   passe la barre et qui reste dessous. */
+function barresObjectif(lignes, objectif, o) {
+  o = o || {};
+  if (!lignes.length) return '<p class="muted" style="font-size:12.5px">Rien à afficher.</p>';
+  var max = Math.max.apply(null, lignes.map(function (l) { return l.valeur; }).concat([objectif, 0]));
+  if (max <= 0) return '<p class="muted" style="font-size:12.5px">Rien à afficher.</p>';
+  var pcObj = objectif > 0 ? objectif / max * 100 : null;
+  return '<div style="position:relative">' +
+    lignes.map(function (l) {
+      var pc = Math.max(0, Math.min(100, l.valeur / max * 100));
+      var atteint = l.valeur >= objectif;
+      return '<div style="margin-bottom:9px">' +
+        '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px">' +
+        '<span>' + esc(l.nom) + '</span>' +
+        '<span class="num"' + (atteint ? '' : ' style="color:#B4231F"') + '>' +
+        esc(l.texte || E.fmt(l.valeur, 1)) + '</span></div>' +
+        '<div style="height:9px;background:var(--trait);border-radius:5px;overflow:hidden">' +
+        '<i style="display:block;height:100%;width:' + pc.toFixed(1) + '%;background:' +
+        (atteint ? '#2E7D46' : '#C4611B') + '"></i></div></div>';
+    }).join('') +
+    (pcObj != null ? '<div style="position:absolute;top:0;bottom:14px;left:' + pcObj.toFixed(1) +
+      '%;border-left:2px dashed var(--doux);pointer-events:none"></div>' : '') +
+    '</div>' +
+    (pcObj != null ? '<p class="muted" style="font-size:11.5px;margin:2px 0 0">' +
+      'Trait pointillé : votre objectif de ' + esc(o.libObjectif || (E.fmt(objectif, 0) + ' %')) + '.</p>' : '');
+}
+
+/* ---------------------------------------------------- prix de revient */
 function fiscStock() {
   var c = A.cfg || {};
   return {
@@ -9001,104 +9985,359 @@ function fiscStock() {
     cfeUnitaire: FIN.nb(c.cfeUnitaire)
   };
 }
+function cibleBenefice() {
+  var v = A.cfg && A.cfg.cibleBenefice;
+  return v != null ? FIN.nb(v) : 10;
+}
+function cibleMarge() {
+  var v = A.cfg && A.cfg.cibleMarge;
+  return v != null ? FIN.nb(v) : 30;
+}
+/* Coût retenu pour un produit : moyenne du stock ou dernière commande. */
+function coutRetenu(art) {
+  return (A.revient && A.revient.base === 'dernier') ? ST.dernierCout(art) : ST.pmp(art);
+}
+
 function renderRevient() {
   var z = $('#rev-form'); if (!z) return;
+  var r = A.revient || (A.revient = { article: null, prix: '', base: 'pmp', onglet: 'simul', mode: 'saisi' });
+  if (!r.onglet) r.onglet = 'simul';
+  $$('#rev-nav .chip').forEach(function (b) {
+    b.setAttribute('aria-pressed', String(b.dataset.rev === r.onglet));
+  });
   if (!A.articles.length) {
-    z.innerHTML = '<div class="vide"><p>Créez un article et enregistrez une réception ' +
+    z.innerHTML = '<div class="vide"><p>Créez un produit et enregistrez une commande ' +
       'pour connaître son coût réel.</p></div>';
     $('#rev-resultat').innerHTML = '';
     return;
   }
-  var r = A.revient || (A.revient = { article: A.articles[0].id, prix: '', base: 'pmp' });
-  var art = article(r.article) || A.articles[0];
-  var cout = r.base === 'dernier' ? ST.dernierCout(art) : ST.pmp(art);
-  var parPlant = ST.coutParPlant(art);
+  if (!article(r.article)) r.article = A.articles[0].id;
+
+  if (r.onglet !== 'simul') {
+    z.innerHTML = '<p class="muted" style="font-size:12.5px;margin:0">' +
+      (r.onglet === 'couts'
+        ? 'Chaque ligne de commande, livraison répartie, et le prix qu’il faudrait pratiquer.'
+        : 'Ce que chaque produit a réellement rapporté, prix pratiqués à l’appui.') + '</p>';
+    renderRevientResultat();
+    return;
+  }
+
+  var art = article(r.article);
+  var e = echelle(art);
+  var cout = coutRetenu(art) * e.k;
+  var moyen = ST.prixVenteMoyen(art) * e.k;
   z.innerHTML =
     '<div class="grille g2">' +
     '<div class="champ"><label class="eyebrow" for="rev-art">Produit</label>' +
-    '<select id="rev-art">' + A.articles.map(function (a) {
-      return '<option value="' + a.id + '"' + (a.id === r.article ? ' selected' : '') + '>' + esc(a.nom || '') + '</option>';
-    }).join('') + '</select></div>' +
+    '<select id="rev-art">' + optionsArticles(r.article) + '</select></div>' +
     '<div class="champ"><label class="eyebrow" for="rev-base">Coût retenu</label>' +
     '<select id="rev-base">' +
     '<option value="pmp"' + (r.base === 'pmp' ? ' selected' : '') + '>moyenne du stock</option>' +
-    '<option value="dernier"' + (r.base === 'dernier' ? ' selected' : '') + '>dernière réception</option>' +
+    '<option value="dernier"' + (r.base === 'dernier' ? ' selected' : '') + '>dernière commande</option>' +
     '</select></div>' +
-    '<div class="champ"><label class="eyebrow" for="rev-prix">Prix de vente (€ / ' +
-    esc(ST.courtUniteArt(art.unite)) + ')</label>' +
-    '<input type="text" id="rev-prix" class="gros" inputmode="decimal" value="' + esc(r.prix) + '"></div>' +
-    (parPlant ? '<div class="champ"><label class="eyebrow" for="rev-plant">ou prix par plant (€)</label>' +
-      '<input type="text" id="rev-plant" class="gros" inputmode="decimal" value="' + esc(r.parPlant || '') + '"></div>' : '') +
+    (e.dose
+      ? '<div class="champ"><label class="eyebrow" for="rev-par">Raisonner</label>' +
+        '<select id="rev-par">' +
+        '<option value="plant"' + (r.par !== 'unite' ? ' selected' : '') + '>par plant</option>' +
+        '<option value="unite"' + (r.par === 'unite' ? ' selected' : '') + '>par ' +
+        esc(ST.courtUniteArt(art.unite)) + '</option></select></div>' : '') +
+    '<div class="champ"><label class="eyebrow" for="rev-mode">Prix de vente</label>' +
+    '<select id="rev-mode">' +
+    '<option value="saisi"' + (r.mode !== 'moyen' ? ' selected' : '') + '>prix saisi</option>' +
+    '<option value="moyen"' + (r.mode === 'moyen' ? ' selected' : '') + '>prix moyen pratiqué</option>' +
+    '</select></div>' +
+    (r.mode === 'moyen'
+      ? '<div class="champ"><label class="eyebrow">Prix moyen hors débours</label>' +
+        '<input type="text" class="gros" value="' + (moyen ? E.fmt(moyen, 4) : '—') + '" disabled></div>'
+      : '<div class="champ"><label class="eyebrow" for="rev-prix">Prix (€ / ' + esc(e.nom) + ')</label>' +
+        '<input type="text" id="rev-prix" class="gros" inputmode="decimal" value="' + esc(r.prix) + '"></div>') +
     '</div>' +
     '<div class="carte2" style="margin-top:11px">' +
     '<div style="display:flex;justify-content:space-between;font-size:13.5px">' +
-    '<span>Coût unitaire réel</span><b class="num">' + E.fmt(cout, 4) + ' €</b></div>' +
-    (parPlant ? '<div style="display:flex;justify-content:space-between;font-size:13.5px;margin-top:3px">' +
-      '<span class="muted">soit par plant (' + E.fmt(ST.nb(art.dosage), 1) + ' ' +
-      ST.courtUniteArt(art.unite) + ')</span><b class="num muted">' + E.fmt(parPlant, 4) + ' €</b></div>' : '') +
+    '<span>Coût réel par ' + esc(e.nom) + '</span><b class="num">' + E.fmt(cout, 4) + ' €</b></div>' +
+    (e.dose ? '<div style="display:flex;justify-content:space-between;font-size:13.5px;margin-top:3px">' +
+      '<span class="muted">dosage retenu</span><b class="num muted">' + E.fmt(e.dose, 1) + ' ' +
+      esc(ST.courtUniteArt(art.unite)) + ' par plant</b></div>' : '') +
     '<div class="muted" style="font-size:11.5px;margin-top:5px">Livraison comprise. ' +
-    (r.base === 'dernier' ? 'Dernière réception — le prix auquel vous rachèterez.'
-      : 'Moyenne du stock — ce que vaut ce qui est en réserve.') + '</div></div>';
+    (r.base === 'dernier' ? 'Dernière commande — le prix auquel vous rachèterez.'
+      : 'Moyenne pondérée de toutes les commandes reçues.') + '</div></div>';
   renderRevientResultat();
 }
+
+/* Un produit dosé se vend au plant, pas au millilitre : tout le simulateur
+   bascule dans l'unité choisie, coût compris. Les rapports ne changent pas,
+   seuls les euros suivent l'échelle. */
+function echelle(art) {
+  var d = ST.nb(art && art.dosage);
+  var parPlant = d > 0 && (!A.revient || A.revient.par !== 'unite');
+  return { dose: d > 0 ? d : 0, k: parPlant ? d : 1,
+    nom: parPlant ? 'plant' : ST.courtUniteArt(art && art.unite) };
+}
+
 function renderRevientResultat() {
   var z = $('#rev-resultat'); if (!z) return;
-  var r = A.revient, art = article(r.article);
+  var r = A.revient, art = article(r && r.article);
   if (!art) { z.innerHTML = ''; return; }
-  var f = fiscStock();
-  var dosage = ST.nb(art.dosage);
-  var cout = r.base === 'dernier' ? ST.dernierCout(art) : ST.pmp(art);
-  var pv = ST.nb(r.prix);
-  if (!pv && dosage > 0 && ST.nb(r.parPlant) > 0) pv = ST.nb(r.parPlant) / dosage;
-  var tc = ST.tauxCharges(f);
+  if (r.onglet === 'couts') { z.innerHTML = tableauCouts(); return; }
+  if (r.onglet === 'perf') { z.innerHTML = tableauPerformance(); return; }
 
-  var conseils = '<div class="carte"><h2>Prix conseillés</h2>' +
-    (tc > 0 ? '' : '<p class="muted" style="font-size:12px;margin:0 0 9px">Saisissez vos taux de ' +
-      'cotisations et d’impôt dans Réglages ▸ Entreprise pour tenir compte des charges.</p>') +
-    '<div class="kpi">' +
-    ['<div class="carte2"><b class="num">' + E.fmt(ST.prixPlancher(cout, f) || 0, 4) + ' €</b><small>plancher — couvre tout</small></div>',
-     '<div class="carte2"><b class="num">' + E.fmt(ST.prixAvecBenefice(cout, f, 0.1) || 0, 4) + ' €</b><small>+ 10 % de bénéfice</small></div>',
-     '<div class="carte2"><b class="num">' + E.fmt(ST.prixAvecMarge(cout, 0.3) || 0, 4) + ' €</b><small>30 % de marge brute</small></div>',
-     '<div class="carte2"><b class="num">' + E.fmt(ST.prixAvecMarge(cout, 0.5) || 0, 4) + ' €</b><small>50 % de marge brute</small></div>'
-    ].join('') + '</div>' +
-    (dosage > 0 ? '<p class="muted" style="font-size:12px;margin:10px 0 0">Par plant : ' +
-      E.fmt((ST.prixPlancher(cout, f) || 0) * dosage, 3) + ' € au plancher, ' +
-      E.fmt((ST.prixAvecMarge(cout, 0.5) || 0) * dosage, 3) + ' € à 50 % de marge.</p>' : '') +
-    '</div>';
+  var f = fiscStock(), e = echelle(art), cout = coutRetenu(art) * e.k;
+  var pv = r.mode === 'moyen' ? ST.prixVenteMoyen(art) * e.k : ST.nb(r.prix);
+  z.innerHTML = (pv ? blocRepartition(art, pv, cout, f, e) : '') +
+    blocPrixConseilles(art, cout, f, e);
+}
 
-  if (!pv) { z.innerHTML = conseils; return; }
+/* Simulateur : où part chaque euro encaissé. */
+function blocRepartition(art, pv, cout, f, e) {
   var d = ST.decomposer(pv, cout, f);
   var COUL = { cout: '#5B3A1E', cotisations: '#C4611B', impot: '#B98A00', cfe: '#7A8471', benefice: '#2E7D46' };
   var parts = [
-    { cle: 'cout', nom: 'Coût unitaire réel', v: d.cout, p: d.partCout },
-    { cle: 'cotisations', nom: 'Cotisations', v: d.cotisations, p: d.partCotisations },
-    { cle: 'impot', nom: 'Impôt sur le revenu', v: d.impot, p: d.partImpot },
-    { cle: 'cfe', nom: 'CFE', v: d.cfe, p: d.partCfe },
-    { cle: 'benefice', nom: 'Bénéfice net', v: d.benefice, p: d.partBenefice }
-  ].filter(function (x) { return x.v !== 0; });
+    { nom: 'Coût unitaire réel', valeur: d.cout, couleur: COUL.cout },
+    { nom: 'Cotisations MSA', valeur: d.cotisations, couleur: COUL.cotisations },
+    { nom: 'Impôt sur le revenu', valeur: d.impot, couleur: COUL.impot },
+    { nom: 'CFE', valeur: d.cfe, couleur: COUL.cfe },
+    { nom: 'Bénéfice net', valeur: d.benefice, couleur: COUL.benefice }
+  ].map(function (p) { p.texte = E.fmt(p.valeur, 4) + ' €'; return p; });
 
-  z.innerHTML =
-    '<div class="carte"><h2>À ' + E.fmt(pv, 4) + ' € l’unité' +
-    (dosage > 0 ? ' (' + E.fmt(pv * dosage, 3) + ' € le plant)' : '') + '</h2>' +
-    '<div class="jauge" style="height:17px">' + parts.filter(function (x) { return x.v > 0; }).map(function (x) {
-      return '<i style="width:' + Math.max(0, x.p) + '%;background:' + COUL[x.cle] + '"></i>';
-    }).join('') + '</div>' +
-    '<div style="margin-top:11px">' + parts.map(function (x) {
-      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:13.5px">' +
-        '<span><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:' +
-        COUL[x.cle] + ';margin-right:7px"></i>' + esc(x.nom) + '</span>' +
-        '<span><b class="num">' + E.fmt(x.v, 4) + ' €</b>' +
-        '<span class="muted" style="font-size:11.5px"> · ' + E.fmt(x.p, 1) + ' %</span></span></div>';
-    }).join('') + '</div>' +
-    '<div class="kpi" style="margin-top:11px">' +
+  return '<div class="carte"><h2>À ' + E.fmt(pv, 4) + ' € le ' + esc(e.nom) +
+    (e.k !== 1 ? ' — ' + E.fmt(pv / e.k, 4) + ' € par ' +
+      esc(ST.courtUniteArt(art.unite)) : '') + '</h2>' +
+    (A.revient.mode === 'moyen' ? '<p class="muted" style="font-size:12px;margin:-4px 0 10px">' +
+      'Prix moyen effectivement pratiqué sur vos sorties, débours exclus.</p>' : '') +
+    (d.viable
+      ? anneau(parts, { centre: E.fmt(d.partBenefice, 1) + ' %', sous: 'de bénéfice' })
+      : '<div class="retard" style="margin-bottom:10px">À ce prix vous perdez ' +
+        eur(-d.benefice) + ' par unité.</div>' +
+        anneau(parts.filter(function (p) { return p.valeur > 0; }), {})) +
+    '<div class="kpi" style="margin-top:12px">' +
     '<div class="carte2" style="border-color:' + (d.viable ? '#2E7D46' : '#B4231F') + '">' +
-    '<b class="num">' + E.fmt(d.partBenefice, 1) + ' %</b><small>de bénéfice net</small></div>' +
-    '<div class="carte2"><b class="num">' + E.fmt(d.tauxMarge, 1) + ' %</b><small>de marge brute</small></div>' +
+    '<b class="num">' + E.fmt(d.benefice, 4) + ' €</b><small>bénéfice net / ' + esc(e.nom) + '</small></div>' +
+    '<div class="carte2"><b class="num">' + E.fmt(d.partBenefice, 1) + ' %</b><small>taux de bénéfice net</small></div>' +
+    '<div class="carte2"><b class="num">' + E.fmt(d.marge, 4) + ' €</b><small>marge brute / ' + esc(e.nom) + '</small></div>' +
+    '<div class="carte2"><b class="num">' + E.fmt(d.tauxMarge, 1) + ' %</b><small>taux de marge brute</small></div>' +
     '</div>' +
-    (d.viable ? '' : '<p class="muted" style="font-size:12.5px;margin:10px 0 0;color:#B4231F">' +
-      'À ce prix vous perdez ' + eur(-d.benefice) + ' par unité. Le plancher est à ' +
-      E.fmt(ST.prixPlancher(cout, f) || 0, 4) + ' €.</p>') +
-    '</div>' + conseils;
+    '<p class="muted" style="font-size:11.5px;margin:10px 0 0">Charges totales ' +
+    E.fmt(d.charges, 4) + ' € par ' + esc(e.nom) + ', soit ' + E.fmt(ST.tauxCharges(f) * 100, 2) +
+    ' % du prix de vente : cotisations et impôt portent sur ' +
+    E.fmt((1 - f.abattement) * 100, 0) + ' % du chiffre d’affaires après abattement.</p></div>';
+}
+
+/* Les trois prix qui servent vraiment sur le terrain. */
+function blocPrixConseilles(art, cout, f, e) {
+  var tb = cibleBenefice() / 100, tm = cibleMarge() / 100;
+  var plancher = ST.prixPlancher(cout, f) || 0;
+  var avecBen = ST.prixAvecBenefice(cout, f, tb) || 0;
+  var avecMarge = ST.prixAvecMarge(cout, tm) || 0;
+  var pratique = ST.prixVenteMoyen(art) * e.k;
+  var l = [
+    { nom: 'Plancher', v: plancher, d: 'couvre le coût et les charges, zéro bénéfice' },
+    { nom: 'Avec ' + E.fmt(cibleBenefice(), 0) + ' % de bénéfice', v: avecBen, d: 'votre objectif de bénéfice net' },
+    { nom: 'Avec ' + E.fmt(cibleMarge(), 0) + ' % de marge brute', v: avecMarge, d: 'votre objectif de marge' }
+  ];
+  return '<div class="carte"><h2>Prix conseillés</h2>' +
+    (ST.tauxCharges(f) > 0 ? '' : '<p class="muted" style="font-size:12px;margin:0 0 10px">' +
+      'Renseignez vos taux de cotisations et d’impôt dans les hypothèses pour tenir compte des charges.</p>') +
+    l.map(function (x) {
+      return '<div style="display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--trait)">' +
+        '<span>' + esc(x.nom) + '<br><small class="muted" style="font-size:11.5px">' + esc(x.d) + '</small></span>' +
+        '<b class="num" style="font-size:17px">' + E.fmt(x.v, 4) + ' €' +
+        (e.k !== 1 ? '<br><small class="muted" style="font-size:11px">' +
+          E.fmt(x.v / e.k, 4) + ' € / ' + esc(ST.courtUniteArt(art.unite)) + '</small>' : '') + '</b></div>';
+    }).join('') +
+    (pratique ? '<p class="muted" style="font-size:12px;margin:10px 0 0">Vous vendez ce produit ' +
+      E.fmt(pratique, 4) + ' € le ' + esc(e.nom) + ' en moyenne, soit ' +
+      (pratique >= avecMarge ? 'au-dessus de' : pratique >= avecBen ? 'entre vos deux objectifs, sous'
+        : pratique >= plancher ? 'sous' : 'en dessous du plancher et de') +
+      ' votre objectif de marge.</p>' : '') +
+    '</div>';
+}
+
+/* Le tableau du classeur, ligne de commande par ligne de commande. */
+function tableauCouts() {
+  var f = fiscStock(), tb = cibleBenefice() / 100, tm = cibleMarge() / 100;
+  var lignes = [];
+  (A.commandes || []).forEach(function (c) {
+    if (ST.achatMort(c.statut)) return;
+    var parts = partsPort(c);
+    (c.lignes || []).forEach(function (l, i) {
+      var a = article(l.article); if (!a) return;
+      var q = ST.nb(l.qte), pu = ST.nb(l.prix), part = parts[i] || 0;
+      lignes.push({ cmd: c.num || '—', art: a, date: c.dateLiv || c.dateCmd, recu: ST.achatRecu(c.statut),
+        qte: q, achat: q * pu, quotePart: q * part, coutTotal: q * (pu + part),
+        coutUnit: pu + part, surcout: part });
+    });
+  });
+  if (!lignes.length) {
+    return '<div class="carte"><div class="vide"><p>Aucune commande enregistrée.</p></div></div>';
+  }
+  lignes.sort(function (x, y) { return (y.date || 0) - (x.date || 0); });
+  var tot = lignes.reduce(function (t, x) {
+    t.achat += x.achat; t.qp += x.quotePart; t.reel += x.coutTotal; return t;
+  }, { achat: 0, qp: 0, reel: 0 });
+
+  var stock = A.articles.filter(function (a) { return ST.valeurStock(a) > 0; })
+    .sort(function (a, b) { return ST.valeurStock(b) - ST.valeurStock(a); })
+    .map(function (a) {
+      return { nom: a.nom || '', valeur: ST.valeurStock(a),
+        detail: E.fmt(ST.quantite(a), 0) + ' ' + ST.courtUniteArt(a.unite) };
+    });
+
+  return '<div class="carte"><h2>Coût réel par commande</h2>' +
+    '<div class="tab-boite"><table><thead><tr>' +
+    '<th style="text-align:left">Commande</th><th style="text-align:left">Produit</th>' +
+    '<th class="num">Qté</th><th class="num">Achat</th><th class="num">Quote-part livr.</th>' +
+    '<th class="num">Coût total réel</th><th class="num">Coût unit. réel</th>' +
+    '<th class="num">Surcoût livr./u.</th><th class="num">Prix vente min</th>' +
+    '<th class="num">+ ' + E.fmt(cibleBenefice(), 0) + ' % bénéf.</th>' +
+    '<th class="num">' + E.fmt(cibleMarge(), 0) + ' % marge</th></tr></thead><tbody>' +
+    lignes.map(function (x) {
+      return '<tr' + (x.recu ? '' : ' class="epuise"') + '>' +
+        '<td style="text-align:left">' + esc(x.cmd) + (x.recu ? '' : ' <small class="muted">attendue</small>') + '</td>' +
+        '<td style="text-align:left">' + esc(x.art.nom || '') + '</td>' +
+        '<td class="num">' + E.fmt(x.qte, 0) + '</td>' +
+        '<td class="num">' + E.fmt(x.achat, 2) + '</td>' +
+        '<td class="num">' + E.fmt(x.quotePart, 2) + '</td>' +
+        '<td class="num">' + E.fmt(x.coutTotal, 2) + '</td>' +
+        '<td class="num"><b>' + E.fmt(x.coutUnit, 4) + '</b></td>' +
+        '<td class="num muted">' + E.fmt(x.surcout, 4) + '</td>' +
+        '<td class="num">' + E.fmt(ST.prixPlancher(x.coutUnit, f) || 0, 4) + '</td>' +
+        '<td class="num">' + E.fmt(ST.prixAvecBenefice(x.coutUnit, f, tb) || 0, 4) + '</td>' +
+        '<td class="num">' + E.fmt(ST.prixAvecMarge(x.coutUnit, tm) || 0, 4) + '</td></tr>';
+    }).join('') +
+    '<tr class="tot"><td style="text-align:left" colspan="3">Total</td>' +
+    '<td class="num">' + E.fmt(tot.achat, 2) + '</td>' +
+    '<td class="num">' + E.fmt(tot.qp, 2) + '</td>' +
+    '<td class="num">' + E.fmt(tot.reel, 2) + '</td>' +
+    '<td></td><td></td><td></td><td></td><td></td></tr>' +
+    '</tbody></table></div>' +
+    '<p class="muted" style="font-size:11.5px;margin:9px 0 0">La quote-part de livraison est ' +
+    'répartie au prorata des quantités de la commande, ou des montants si les unités diffèrent.</p></div>' +
+    (stock.length ? '<div class="carte"><h2>Où dort votre argent</h2>' +
+      barres(stock, '#5B3A1E') +
+      '<p class="muted" style="font-size:11.5px;margin:7px 0 0">Valeur du stock au coût réel : ' +
+      eur(ST.valeurTotale(A.articles)) + ' immobilisés.</p></div>' : '');
+}
+
+/* Ce que chaque produit a réellement rapporté, et qui tient l'objectif. */
+function tableauPerformance() {
+  var f = fiscStock(), tc = ST.tauxCharges(f), cm = cibleMarge();
+  var deb = ST.arr(A.articles.reduce(function (s, a) { return s + ST.caDebours(a); }, 0), 2);
+  var l = A.articles.filter(function (a) { return ST.quantiteVendue(a) > 0; });
+  if (!l.length) {
+    return '<div class="carte"><div class="vide"><p>Aucune vente enregistrée. ' +
+      'Les sorties de stock alimenteront ce tableau.</p></div></div>';
+  }
+  var tot = { q: 0, ca: 0, cout: 0 };
+  l = l.sort(function (a, b) { return ST.caVendu(b) - ST.caVendu(a); });
+  var lignes = l.map(function (a) {
+    var q = ST.quantiteVendue(a), ca = ST.caVendu(a), pv = ST.prixVenteMoyen(a), cu = ST.pmp(a);
+    var marge = pv - cu, charge = pv * tc, benef = marge - charge;
+    tot.q += q; tot.ca += ca; tot.cout += q * cu;
+    return '<tr><td style="text-align:left">' + esc(a.nom || '') + '</td>' +
+      '<td class="num">' + E.fmt(q, 0) + '</td>' +
+      '<td class="num">' + E.fmt(ca, 2) + '</td>' +
+      '<td class="num">' + E.fmt(pv, 4) + '</td>' +
+      '<td class="num">' + E.fmt(cu, 4) + '</td>' +
+      '<td class="num">' + E.fmt(marge, 4) + '</td>' +
+      '<td class="num">' + (pv > 0 ? E.fmt(marge / pv * 100, 1) + ' %' : '—') + '</td>' +
+      '<td class="num muted">' + E.fmt(charge, 4) + '</td>' +
+      '<td class="num">' + E.fmt(benef, 4) + '</td>' +
+      '<td class="num"' + (pv > 0 && benef < 0 ? ' style="color:#B4231F"' : '') + '>' +
+      (pv > 0 ? E.fmt(benef / pv * 100, 1) + ' %' : '—') + '</td></tr>';
+  }).join('');
+  var pvm = tot.q > 0 ? tot.ca / tot.q : 0, cum = tot.q > 0 ? tot.cout / tot.q : 0;
+
+  var gMarge = l.map(function (a) {
+    var pv = ST.prixVenteMoyen(a), cu = ST.pmp(a);
+    var t = pv > 0 ? (pv - cu) / pv * 100 : 0;
+    return { nom: a.nom || '', valeur: t, texte: E.fmt(t, 1) + ' %' };
+  }).sort(function (a, b) { return b.valeur - a.valeur; });
+  var gCa = l.map(function (a) {
+    return { nom: a.nom || '', valeur: ST.caVendu(a),
+      detail: E.fmt(ST.quantiteVendue(a), 0) + ' ' + ST.courtUniteArt(a.unite) };
+  }).sort(function (a, b) { return b.valeur - a.valeur; });
+
+  return '<div class="carte"><h2>Ce que chaque produit rapporte</h2>' +
+    '<div class="tab-boite"><table><thead><tr>' +
+    '<th style="text-align:left">Produit</th><th class="num">Vendu</th><th class="num">CA</th>' +
+    '<th class="num">Prix moyen</th><th class="num">Coût réel</th><th class="num">Marge / u.</th>' +
+    '<th class="num">Tx marge</th><th class="num">Charges / u.</th>' +
+    '<th class="num">Bénéf. net / u.</th><th class="num">Tx bénéf.</th></tr></thead><tbody>' + lignes +
+    '<tr class="tot"><td style="text-align:left">Total</td>' +
+    '<td class="num">' + E.fmt(tot.q, 0) + '</td>' +
+    '<td class="num">' + E.fmt(tot.ca, 2) + '</td>' +
+    '<td class="num">' + E.fmt(pvm, 4) + '</td>' +
+    '<td class="num">' + E.fmt(cum, 4) + '</td>' +
+    '<td class="num">' + E.fmt(pvm - cum, 4) + '</td>' +
+    '<td class="num">' + (pvm > 0 ? E.fmt((pvm - cum) / pvm * 100, 1) + ' %' : '—') + '</td>' +
+    '<td class="num muted">' + E.fmt(pvm * tc, 4) + '</td>' +
+    '<td class="num">' + E.fmt(pvm - cum - pvm * tc, 4) + '</td>' +
+    '<td class="num">' + (pvm > 0 ? E.fmt((pvm - cum - pvm * tc) / pvm * 100, 1) + ' %' : '—') + '</td></tr>' +
+    '</tbody></table></div>' +
+    '<p class="muted" style="font-size:11.5px;margin:9px 0 0">Bénéfice net : après cotisations et ' +
+    'impôt calculés sur le chiffre d’affaires après abattement, aux taux de vos hypothèses.' +
+    (deb ? ' Les ' + eur(deb) + ' refacturés en débours sont exclus.' : '') + '</p></div>' +
+    '<div class="carte"><h2>Taux de marge brute par produit</h2>' +
+    barresObjectif(gMarge, cm, { libObjectif: E.fmt(cm, 0) + ' %' }) + '</div>' +
+    '<div class="carte"><h2>Qui fait le chiffre</h2>' + barres(gCa, '#2E4A3C') + '</div>';
+}
+
+/* Les hypothèses fiscales, au même endroit que dans le classeur. */
+function ouvrirHypotheses() {
+  var c = A.cfg || {};
+  var ab = c.abattementVente != null ? c.abattementVente : 0.71;
+  modale('Hypothèses',
+    '<p class="muted" style="font-size:12.5px;margin:0 0 12px">Micro-BIC et MSA. ' +
+    'Ces taux servent partout : prix conseillés, bénéfice net, performance.</p>' +
+    '<div class="grille g2">' +
+    '<div class="champ"><label class="eyebrow" for="hy-ab">Abattement vente (%)</label>' +
+    '<input type="text" id="hy-ab" class="gros" inputmode="decimal" value="' + E.fmt(ab * 100, 0) + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="hy-cot">Cotisations MSA (%)</label>' +
+    '<input type="text" id="hy-cot" class="gros" inputmode="decimal" value="' +
+    (c.tauxCotisations != null ? String(c.tauxCotisations).replace('.', ',') : '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="hy-imp">Impôt sur le revenu (%)</label>' +
+    '<input type="text" id="hy-imp" class="gros" inputmode="decimal" value="' +
+    (c.tauxImpot != null ? String(c.tauxImpot).replace('.', ',') : '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="hy-cfe">CFE par unité (€)</label>' +
+    '<input type="text" id="hy-cfe" inputmode="decimal" value="' + (c.cfeUnitaire || '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="hy-ben">Bénéfice souhaité (%)</label>' +
+    '<input type="text" id="hy-ben" inputmode="decimal" value="' + E.fmt(cibleBenefice(), 0) + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="hy-mar">Marge brute souhaitée (%)</label>' +
+    '<input type="text" id="hy-mar" inputmode="decimal" value="' + E.fmt(cibleMarge(), 0) + '"></div>' +
+    '</div>' +
+    '<div class="carte2" id="hy-apercu" style="margin-top:11px"></div>' +
+    '<div class="btn-rang" style="margin-top:11px">' +
+    '<button class="btn primaire" id="hy-ok">Valider</button></div>');
+
+  var apercu = function () {
+    var t = ST.tauxCharges({
+      abattement: (FIN.nb($('#hy-ab').value) || 71) / 100,
+      cotisations: FIN.nb($('#hy-cot').value) / 100,
+      impot: FIN.nb($('#hy-imp').value) / 100
+    });
+    $('#hy-apercu').innerHTML = '<div style="display:flex;justify-content:space-between;font-size:13.5px">' +
+      '<span>Taux de charges sur le chiffre d’affaires</span><b class="num">' +
+      E.fmt(t * 100, 2) + ' %</b></div>' +
+      '<div class="muted" style="font-size:11.5px;margin-top:4px">Sur 100 € vendus, ' +
+      eur(ST.arr(t * 100, 2)) + ' de cotisations et d’impôt.</div>';
+  };
+  ['#hy-ab', '#hy-cot', '#hy-imp'].forEach(function (s) {
+    $(s).addEventListener('input', apercu);
+  });
+  apercu();
+
+  $('#hy-ok').addEventListener('click', function () {
+    var a = FIN.nb($('#hy-ab').value);
+    A.cfg.abattementVente = (a > 0 && a < 100) ? a / 100 : 0.71;
+    A.cfg.tauxCotisations = FIN.nb($('#hy-cot').value) || null;
+    A.cfg.tauxImpot = FIN.nb($('#hy-imp').value) || null;
+    A.cfg.cfeUnitaire = FIN.nb($('#hy-cfe').value) || null;
+    A.cfg.cibleBenefice = FIN.nb($('#hy-ben').value) || 10;
+    A.cfg.cibleMarge = FIN.nb($('#hy-mar').value) || 30;
+    sauverCfg();
+    fermerModale(); renderRevient(); renderReglages(); renderAnalyses();
+    toast('Hypothèses enregistrées.');
+  });
 }
 
 function renderReglagesCh() {
@@ -9140,7 +10379,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.3.0-20260725-0950';
+var VERSION = '4.7.0-20260726-1420';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
