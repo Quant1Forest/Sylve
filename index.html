@@ -648,7 +648,6 @@ td.act{width:1%;padding:3px 6px}
           <button class="chip" data-regl="cubage" aria-pressed="false">Cubage</button>
           <button class="chip" data-regl="bois" aria-pressed="false">Bois de chauffage</button>
         </div>
-        <div class="sous-onglets" id="regl-sous" role="tablist"></div>
       </div>
       <div id="regl-corps">
       <div data-sec="cubage">
@@ -694,6 +693,7 @@ td.act{width:1%;padding:3px 6px}
         </div>
         <p class="muted" style="font-size:12px;margin:10px 0 0" id="r-version"></p>
       </div>
+      <p class="eyebrow reg-titre" data-sec="ent" data-sous="gen" style="margin:4px 0 8px">Général</p>
       <div class="carte" data-sec="ent" data-sous="gen" id="c-ch-regl">
         <h2>Chantiers</h2>
         <div class="grille g2">
@@ -725,8 +725,36 @@ td.act{width:1%;padding:3px 6px}
         </label>
       </div>
 
+      <p class="eyebrow reg-titre" data-sec="ent" data-sous="listes" style="margin:22px 0 8px">Listes déroulantes</p>
+      <div class="carte" data-sec="ent" data-sous="listes">
+        <p class="muted" style="font-size:12.5px;margin:0 0 11px">
+          Tout ce qui vous est proposé ailleurs dans l'application se règle ici. Un nom saisi
+          à la volée n'est jamais ajouté sans vous le demander.
+        </p>
+        <div class="sous-onglets" id="rl-nav" role="tablist"></div>
+        <div id="rl-liste" style="margin-top:11px"></div>
+        <button class="btn-min" id="rl-add" style="margin-top:9px">Ajouter</button>
+      </div>
+      <p class="eyebrow reg-titre" data-sec="ent" data-sous="stock" style="margin:22px 0 8px">Stock et fournitures</p>
+      <div class="carte" data-sec="ent" data-sous="stock" id="c-four-regl">
+        <div class="carte-titre"><h2>Fournisseurs</h2>
+          <button class="btn-min" id="rf-add">Ajouter</button></div>
+        <p class="muted" style="font-size:12.5px;margin:0 0 10px">
+          Ce carnet alimente la liste déroulante des commandes.
+        </p>
+        <div id="rf-liste"></div>
+      </div>
+      <div class="carte" data-sec="ent" data-sous="stock" id="c-prod-regl">
+        <div class="carte-titre"><h2>Produits</h2>
+          <button class="btn-min" id="rp-add">Ajouter</button></div>
+        <p class="muted" style="font-size:12.5px;margin:0 0 10px">
+          Le catalogue de ce que vous achetez et revendez. Décrit une fois ici, un produit
+          se retrouve ensuite dans les commandes, les sorties et le prix de revient.
+        </p>
+        <div id="rp-liste"></div>
+      </div>
+      <p class="eyebrow reg-titre" data-sec="ent" data-sous="fin" style="margin:22px 0 8px">Financier</p>
       <div class="carte" data-sec="ent" data-sous="fin">
-        <h2>Hypothèses fiscales</h2>
         <div class="grille g2">
           <div class="champ"><label class="eyebrow" for="r-cot">Cotisations (%)</label>
             <input type="text" id="r-cot" inputmode="decimal" autocomplete="off"></div>
@@ -750,33 +778,6 @@ td.act{width:1%;padding:3px 6px}
         </p>
       </div>
 
-      <div class="carte" data-sec="ent" data-sous="listes">
-        <h2>Listes déroulantes</h2>
-        <p class="muted" style="font-size:12.5px;margin:0 0 11px">
-          Tout ce qui vous est proposé ailleurs dans l'application se règle ici. Un nom saisi
-          à la volée n'est jamais ajouté sans vous le demander.
-        </p>
-        <div class="sous-onglets" id="rl-nav" role="tablist"></div>
-        <div id="rl-liste" style="margin-top:11px"></div>
-        <button class="btn-min" id="rl-add" style="margin-top:9px">Ajouter</button>
-      </div>
-      <div class="carte" data-sec="ent" data-sous="stock" id="c-four-regl">
-        <div class="carte-titre"><h2>Fournisseurs</h2>
-          <button class="btn-min" id="rf-add">Ajouter</button></div>
-        <p class="muted" style="font-size:12.5px;margin:0 0 10px">
-          Ce carnet alimente la liste déroulante des commandes.
-        </p>
-        <div id="rf-liste"></div>
-      </div>
-      <div class="carte" data-sec="ent" data-sous="stock" id="c-prod-regl">
-        <div class="carte-titre"><h2>Produits</h2>
-          <button class="btn-min" id="rp-add">Ajouter</button></div>
-        <p class="muted" style="font-size:12.5px;margin:0 0 10px">
-          Le catalogue de ce que vous achetez et revendez. Décrit une fois ici, un produit
-          se retrouve ensuite dans les commandes, les sorties et le prix de revient.
-        </p>
-        <div id="rp-liste"></div>
-      </div>
       <div class="carte" data-sec="bois" id="c-bois-regl">
         <h2>Seuils d'humidité</h2>
         <p class="muted" style="font-size:12px;margin:0 0 10px">Tels que lus à l'humidimètre. Quatre états : vert, en séchage, sec, très sec.</p>
@@ -2520,6 +2521,34 @@ function trouve(liste, code) {
   return null;
 }
 function nomTravail(c) { var t = trouve(TRAVAUX, c); return t ? t.n : (c || ''); }
+
+/* Les prestations arrivent avec leurs taux de TVA officiels. On peut les
+   renommer et en ajouter ; le code, lui, ne bouge jamais. C'est ce qui
+   permet de changer un libellé partout d'un coup sans toucher à un seul
+   chantier déjà facturé. Retirer une prestation ne l'efface pas non plus :
+   elle disparaît des listes, mais reste lisible là où elle a servi. */
+function appliquerTravauxPerso(cfg) {
+  var perso = (cfg && cfg.travauxPerso) || {};
+  var retires = (cfg && cfg.travauxRetires) || [];
+  TRAVAUX.forEach(function (t) { t.retire = retires.indexOf(t.c) >= 0; });
+  Object.keys(perso).forEach(function (code) {
+    var p = perso[code], t = trouve(TRAVAUX, code);
+    if (t) {
+      if (p.n) t.n = p.n;
+      if (p.u) t.u = p.u;
+    } else {
+      TRAVAUX.push({ c: code, n: p.n || code, u: p.u || 'unite',
+        tvaSans: nb(p.tvaSans) || 20, tvaAvec: nb(p.tvaAvec) || 20,
+        fourniture: !!p.fourniture, perso: true, retire: retires.indexOf(code) >= 0 });
+    }
+  });
+}
+/* Les prestations proposées à la saisie : tout sauf celles mises de côté. */
+function travauxActifs(avecFournitures) {
+  return TRAVAUX.filter(function (t) {
+    return !t.retire && (avecFournitures || !t.fourniture);
+  });
+}
 function uniteDe(c) { var t = trouve(TRAVAUX, c); return t ? t.u : 'forfait'; }
 function nomUnite(c, n) {
   var u = trouve(UNITES, c);
@@ -3222,6 +3251,7 @@ var M = {
   uniteTravail: uniteTravail, quantiteTravail: quantiteTravail, rendementTravail: rendementTravail,
   similarite: similarite, references: references, estime: estime,
   nomTravail: nomTravail, uniteDe: uniteDe, nomUnite: nomUnite, courtUnite: courtUnite,
+  appliquerTravauxPerso: appliquerTravauxPerso, travauxActifs: travauxActifs,
   nomStatut: nomStatut, statutOuvert: statutOuvert, statutEngage: statutEngage, rangStatut: rangStatut,
   nb: nb, arr: arr,
   montantLigne: montantLigne, montant: montant, quantite: quantite, unitesPresentes: unitesPresentes,
@@ -4337,7 +4367,7 @@ function ecrire(k, o) { return Store.set(k, JSON.stringify(o)); }
 /* ---------------------------------------------------------------- état */
 var A = {
   cfg: null, index: [], bord: null, piles: [], chantiers: [], module: 'cubage', ici: null,
-  vuePiles: 'stock', filtreCh: 'ouverts', chOuvert: null, clients: [], proprios: [], estim: null, imp: null, articles: [], charges: [], fournisseurs: [], commandes: [], sorties: [], mvt: 'achats', journees: [], lieuxRegles: [], sousReglages: null, listeReglee: 'clients', revient: null, calMois: null, calJour: null, nbAlertes: 0, planifie: null,
+  vuePiles: 'stock', filtreCh: 'ouverts', chOuvert: null, clients: [], proprios: [], estim: null, imp: null, articles: [], charges: [], fournisseurs: [], commandes: [], sorties: [], mvt: 'achats', journees: [], lieuxRegles: [], listeReglee: 'clients', revient: null, calMois: null, calJour: null, nbAlertes: 0, planifie: null,
   depenses: [], periode: null, filtreDep: 'tous', vueAna: 'ensemble', secReglages: 'general',
   vue: 'saisie', sousVue: 'synthese', edition: null,
   memeGrume: false, classementRegl: 'Class. Comt', filtre: ''
@@ -5320,47 +5350,44 @@ function exportStockXlsx() {
 
 /* Les réglages vivent tous au même endroit, rangés par domaine. On y accède
    depuis l'accueil, ou depuis un module — qui ouvre alors sa propre section. */
+/* Un raccourci depuis un module ouvre le bon onglet et fait défiler jusqu'à
+   la bonne zone. */
 var SEC_DE_MODULE = { cubage: 'cubage', bois: 'bois', stock: 'ent' };
-/* Chaque onglet de réglages peut avoir ses sous-parties : les réglages de
-   l'entreprise ne se ressemblent pas d'un module à l'autre, et tout empiler
-   dans une seule page rend l'ensemble illisible. */
-var SOUS_REGLAGES = {
-  ent: [['gen', 'Général'], ['listes', 'Listes'], ['stock', 'Stock'], ['fin', 'Financier']]
+var RACCOURCIS_REGLAGES = {
+  stock: ['ent', 'stock'], listes: ['ent', 'listes'], fin: ['ent', 'fin'], gen: ['ent', 'gen']
 };
+/* Pas de second niveau d'onglets : un onglet déroule toutes ses zones, chacune
+   sous son propre sous-titre. On lit la page en descendant plutôt que de
+   chercher où cliquer. */
 function renderReglagesNav() {
   var z = $('#regl-corps'); if (!z) return;
   var sec = A.secReglages || 'general';
-  var sous = SOUS_REGLAGES[sec] || null;
   z.className = '';
   $$('#regl-nav .chip').forEach(function (b) {
     b.setAttribute('aria-pressed', String(b.dataset.regl === sec));
   });
-  var nav = $('#regl-sous');
-  if (!sous) { nav.innerHTML = ''; nav.hidden = true; }
-  else {
-    var actif = A.sousReglages && sous.some(function (x) { return x[0] === A.sousReglages; })
-      ? A.sousReglages : sous[0][0];
-    A.sousReglages = actif;
-    nav.hidden = false;
-    nav.innerHTML = sous.map(function (x) {
-      return '<button class="sous-onglet" data-sous="' + x[0] + '" role="tab" aria-selected="' +
-        (x[0] === actif) + '">' + esc(x[1]) + '</button>';
-    }).join('');
-  }
   Array.prototype.slice.call(z.children).forEach(function (el) {
-    var ok = el.dataset.sec === sec &&
-      (!sous || !el.dataset.sous || el.dataset.sous === A.sousReglages);
-    el.hidden = !ok;
+    el.hidden = el.dataset.sec !== sec;
   });
-  if (sec === 'ent' && A.sousReglages === 'listes') renderListesReglages();
+  if (sec === 'ent') renderListesReglages();
+}
+/* Amener la zone demandée sous les yeux, sans la faire clignoter. */
+function versZoneReglages(sous) {
+  if (!sous) return;
+  var t = $('#regl-corps [data-sous="' + sous + '"]');
+  if (t && t.scrollIntoView) t.scrollIntoView({ block: 'start', behavior: 'smooth' });
 }
 function allerReglages(sec) {
+  var r = RACCOURCIS_REGLAGES[sec];
+  var zone = null;
+  if (r) { sec = r[0]; zone = r[1]; }
   A.secReglages = sec || 'general';
   document.body.classList.remove('accueil-ouvert');
   if (!MODULES[A.module]) A.module = 'cubage';
   majOnglets();
   renderReglagesNav();
   aller('reglages');
+  if (zone) setTimeout(function () { versZoneReglages(zone); }, 60);
 }
 
 function renderReglagesBois() {
@@ -5625,7 +5652,7 @@ function brancher() {
   $('#a-reglages').addEventListener('click', function () { allerReglages('general'); });
   $('#regl-nav').addEventListener('click', function (e) {
     var b = e.target.closest('[data-regl]');
-    if (b) { A.secReglages = b.dataset.regl; A.sousReglages = null; renderReglagesNav(); }
+    if (b) { A.secReglages = b.dataset.regl; renderReglagesNav(); }
   });
   $('#b-accueil').addEventListener('click', allerAccueil);
   $('#b-module').addEventListener('change', function () { allerModule(this.value); });
@@ -5940,18 +5967,19 @@ function brancher() {
   /* --- stock : catalogue et fournisseurs --- */
   $('#rf-add').addEventListener('click', function () { ouvrirFournisseur(null); });
   $('#rp-add').addEventListener('click', function () { ouvrirArticle(null); });
-  $('#regl-sous').addEventListener('click', function (e) {
-    var b = e.target.closest('[data-sous]');
-    if (b) { A.sousReglages = b.dataset.sous; renderReglagesNav(); }
-  });
   $('#rl-nav').addEventListener('click', function (e) {
     var b = e.target.closest('[data-liste]');
     if (b) { A.listeReglee = b.dataset.liste; renderListesReglages(); }
   });
-  $('#rl-add').addEventListener('click', function () { ouvrirEntreeListe(null); });
+  $('#rl-add').addEventListener('click', function () {
+    if (LISTES[A.listeReglee] && LISTES[A.listeReglee].objets) ouvrirTravailRegle(null);
+    else ouvrirEntreeListe(null);
+  });
   $('#rl-liste').addEventListener('click', function (e) {
     var b = e.target.closest('[data-lmodif]');
-    if (b) ouvrirEntreeListe(b.dataset.lmodif);
+    if (!b) return;
+    if (LISTES[A.listeReglee] && LISTES[A.listeReglee].objets) ouvrirTravailRegle(b.dataset.lmodif);
+    else ouvrirEntreeListe(b.dataset.lmodif);
   });
   $('#regl-corps').addEventListener('click', function (e) {
     var f = e.target.closest('[data-fourmod]'), a = e.target.closest('[data-artmod]');
@@ -6355,6 +6383,7 @@ function init() {
       if (actif != null) {
         try { var p = JSON.parse(actif); if (typeof p === 'string') actif = p; } catch (e) { }
       }
+      C.appliquerTravauxPerso(A.cfg);
       migrerStock(); indexerStock(); migrerJournees(); indexerJournees(); majDatalistLieux();
       majOnglets(); renderPiles(); renderStock(); renderLieux(); renderReglagesBois();
       renderCarnet(); renderReglagesCh(); renderReglagesAlertes(); renderEstimer();
@@ -7633,8 +7662,10 @@ function ouvrirLigne(id, idx) {
   if (!l) return;
   modale(idx != null ? 'Modifier la ligne' : 'Ajouter des travaux',
     '<div class="champ"><label class="eyebrow" for="cl-trav">Travaux</label>' +
-    '<select id="cl-trav">' + C.TRAVAUX.map(function (t) {
-      return '<option value="' + t.c + '"' + (l.travail === t.c ? ' selected' : '') + '>' + t.n + '</option>';
+    '<select id="cl-trav">' + C.TRAVAUX.filter(function (t) {
+      return !t.retire || t.c === l.travail;
+    }).map(function (t) {
+      return '<option value="' + t.c + '"' + (l.travail === t.c ? ' selected' : '') + '>' + esc(t.n) + '</option>';
     }).join('') + '</select></div>' +
     '<div class="grille g3">' +
     '<div class="champ"><label class="eyebrow" for="cl-unite">Unité</label>' +
@@ -7796,8 +7827,10 @@ function renderEstimer() {
   z.innerHTML =
     '<div class="grille g2">' +
     '<div class="champ"><label class="eyebrow" for="es-trav">Travaux</label>' +
-    '<select id="es-trav">' + C.TRAVAUX.map(function (t) {
-      return '<option value="' + t.c + '"' + (e.travail === t.c ? ' selected' : '') + '>' + t.n + '</option>';
+    '<select id="es-trav">' + C.TRAVAUX.filter(function (t) {
+      return !t.retire || t.c === e.travail;
+    }).map(function (t) {
+      return '<option value="' + t.c + '"' + (e.travail === t.c ? ' selected' : '') + '>' + esc(t.n) + '</option>';
     }).join('') + '</select></div>' +
     '<div class="champ"><label class="eyebrow" for="es-qte">Quantité (' +
     esc(C.nomUnite(C.uniteDe(e.travail), 2)) + ')</label>' +
@@ -8685,8 +8718,23 @@ var LISTES = {
   proprios: { nom: 'Propriétaires', champ: 'proprios', cle: 'bordcub.proprios',
     aide: 'Ceux que vous facturez.' },
   lieux: { nom: 'Forêts et communes', champ: 'lieuxRegles', cle: 'bordcub.lieux',
-    aide: 'Proposés à la saisie d’une journée et d’un chantier.' }
+    aide: 'Proposés à la saisie d’une journée et d’un chantier.' },
+  travaux: { nom: 'Prestations', objets: true,
+    aide: 'Ce que vous savez faire. Renommer un libellé le change partout ; ' +
+      'une prestation déjà utilisée ne peut pas être retirée.' }
 };
+
+/* Combien de fois une prestation a déjà servi : c'est ce qui décide si on
+   peut la retirer ou seulement la renommer. */
+function usagesTravail(code) {
+  var ch = (A.chantiers || []).filter(function (c) {
+    return (c.lignes || []).some(function (l) { return l.travail === code; });
+  }).length;
+  var jr = (A.journees || []).filter(function (j) {
+    return (j.postes || []).some(function (p) { return p.travaux === code; });
+  }).length;
+  return { chantiers: ch, journees: jr, total: ch + jr };
+}
 function listeDe(k) {
   var d = LISTES[k]; if (!d) return [];
   A[d.champ] = A[d.champ] || [];
@@ -8706,13 +8754,107 @@ function renderListesReglages() {
     return '<button class="sous-onglet" data-liste="' + k + '" role="tab" aria-selected="' +
       (k === actif) + '">' + esc(LISTES[k].nom) + '</button>';
   }).join('');
+  var aide = '<p class="muted" style="font-size:12px;margin:0 0 9px">' +
+    esc(LISTES[actif].aide) + '</p>';
+  if (LISTES[actif].objets) {
+    var t = C.TRAVAUX.slice().sort(function (a, b) {
+      return (a.retire ? 1 : 0) - (b.retire ? 1 : 0) || a.n.localeCompare(b.n, 'fr');
+    });
+    $('#rl-liste').innerHTML = aide + t.map(function (x) {
+      var u = usagesTravail(x.c);
+      return '<div class="liste-item' + (x.retire ? ' epuise' : '') + '">' +
+        '<div class="li-c"><b>' + esc(x.n) + '</b><small>' +
+        esc(C.nomUnite(x.u, 2)) + ' · TVA ' + String(x.tvaAvec).replace('.', ',') + ' %' +
+        (u.total ? ' · utilisée ' + u.total + ' fois' : ' · jamais utilisée') +
+        (x.retire ? ' · retirée des listes' : '') + '</small></div>' +
+        '<button class="btn-min" data-lmodif="' + esc(x.c) + '">Modifier</button></div>';
+    }).join('');
+    return;
+  }
   var l = listeDe(actif).slice().sort(function (a, b) { return a.localeCompare(b, 'fr'); });
-  $('#rl-liste').innerHTML =
-    '<p class="muted" style="font-size:12px;margin:0 0 9px">' + esc(LISTES[actif].aide) + '</p>' +
+  $('#rl-liste').innerHTML = aide +
     (l.length ? l.map(function (x) {
       return '<div class="liste-item"><div class="li-c"><b>' + esc(x) + '</b></div>' +
         '<button class="btn-min" data-lmodif="' + esc(x) + '">Modifier</button></div>';
     }).join('') : '<p class="muted" style="font-size:12.5px;margin:0">Liste vide.</p>');
+}
+
+/* Renommer, ajouter, retirer une prestation. */
+function ouvrirTravailRegle(code) {
+  var t = code ? C.TRAVAUX.filter(function (x) { return x.c === code; })[0] : null;
+  if (code && !t) return;
+  var u = code ? usagesTravail(code) : { total: 0 };
+  modale(code ? 'Modifier la prestation' : 'Nouvelle prestation',
+    '<div class="champ"><label class="eyebrow" for="tr-nom">Nom</label>' +
+    '<input type="text" id="tr-nom" class="gros" autocomplete="off" value="' +
+    esc(t ? t.n : '') + '"></div>' +
+    '<div class="grille g2">' +
+    '<div class="champ"><label class="eyebrow" for="tr-unite">Unité de facturation</label>' +
+    '<select id="tr-unite">' + C.UNITES.map(function (x) {
+      return '<option value="' + x.c + '"' + (t && t.u === x.c ? ' selected' : '') + '>' +
+        esc(x.n) + '</option>';
+    }).join('') + '</select></div>' +
+    (code ? '' : '<div class="champ"><label class="eyebrow" for="tr-tva">TVA (%)</label>' +
+      '<select id="tr-tva">' + [20, 10, 5.5, 0].map(function (x) {
+        return '<option value="' + x + '"' + (x === 20 ? ' selected' : '') + '>' +
+          String(x).replace('.', ',') + ' %</option>';
+      }).join('') + '</select></div>') +
+    '</div>' +
+    (code && u.total
+      ? '<p class="muted" style="font-size:12px;margin:11px 0 0;padding:9px 11px;' +
+        'background:var(--carte2);border-radius:9px">Cette prestation figure sur ' +
+        (u.chantiers ? u.chantiers + ' chantier' + (u.chantiers > 1 ? 's' : '') : '') +
+        (u.chantiers && u.journees ? ' et ' : '') +
+        (u.journees ? u.journees + ' journée' + (u.journees > 1 ? 's' : '') : '') +
+        '. La renommer change le libellé partout, sans rien recalculer. ' +
+        'La retirer est impossible tant qu’elle sert.</p>'
+      : code ? '<p class="muted" style="font-size:12px;margin:11px 0 0">Jamais utilisée : ' +
+        'vous pouvez la retirer des listes.</p>' : '') +
+    (code && t.tvaAvec != null
+      ? '<p class="muted" style="font-size:11.5px;margin:9px 0 0">TVA ' +
+        String(t.tvaSans).replace('.', ',') + ' % sans SIREN, ' +
+        String(t.tvaAvec).replace('.', ',') + ' % avec. Les taux livrés ne se modifient pas.</p>' : '') +
+    '<div class="btn-rang" style="margin-top:12px">' +
+    '<button class="btn primaire" id="tr-ok">Valider</button>' +
+    (code && !t.retire && !u.total ? '<button class="btn danger btn-min" id="tr-sup">Retirer</button>' : '') +
+    (code && t.retire ? '<button class="btn btn-min" id="tr-remet">Remettre dans les listes</button>' : '') +
+    '</div>');
+
+  $('#tr-ok').addEventListener('click', function () {
+    var nom = $('#tr-nom').value.trim();
+    if (!nom) { toast('Donnez un nom.'); return; }
+    A.cfg.travauxPerso = A.cfg.travauxPerso || {};
+    if (code) {
+      if (nom !== t.n) {
+        if (!confirm('Renommer « ' + t.n +' » en « ' + nom + ' » ?' +
+          (u.total ? '\n\nLe nouveau nom s’affichera sur ' + u.total +
+            ' saisie' + (u.total > 1 ? 's' : '') + ' existante' + (u.total > 1 ? 's' : '') + '.' : ''))) return;
+        if (!confirm('Confirmer : « ' + nom + ' » remplacera « ' + t.n +
+          ' » partout dans l’application.')) return;
+      }
+      var e = A.cfg.travauxPerso[code] || (A.cfg.travauxPerso[code] = {});
+      e.n = nom; e.u = $('#tr-unite').value;
+    } else {
+      var neuf = 'X' + Date.now().toString(36).toUpperCase();
+      var tv = C.nb($('#tr-tva').value);
+      A.cfg.travauxPerso[neuf] = { n: nom, u: $('#tr-unite').value, tvaSans: tv, tvaAvec: tv };
+    }
+    C.appliquerTravauxPerso(A.cfg);
+    sauverCfg();
+    fermerModale(); renderListesReglages(); renderFiche(); renderRendements(); renderCarnet();
+    toast(code ? 'Prestation renommée.' : 'Prestation ajoutée.');
+  });
+  if ($('#tr-sup')) $('#tr-sup').addEventListener('click', function () {
+    if (!confirm('Retirer « ' + t.n + ' » des listes ?\n\nElle ne vous sera plus proposée.')) return;
+    A.cfg.travauxRetires = (A.cfg.travauxRetires || []).concat([code]);
+    C.appliquerTravauxPerso(A.cfg); sauverCfg();
+    fermerModale(); renderListesReglages(); toast('Prestation retirée.');
+  });
+  if ($('#tr-remet')) $('#tr-remet').addEventListener('click', function () {
+    A.cfg.travauxRetires = (A.cfg.travauxRetires || []).filter(function (x) { return x !== code; });
+    C.appliquerTravauxPerso(A.cfg); sauverCfg();
+    fermerModale(); renderListesReglages(); toast('Prestation rétablie.');
+  });
 }
 function ouvrirEntreeListe(nom) {
   var k = A.listeReglee, d = LISTES[k];
@@ -8856,7 +8998,7 @@ var pst = [];
 
 function optionsTravaux(sel) {
   return '<option value="">— prestation —</option>' + C.TRAVAUX.filter(function (t) {
-    return !t.fourniture;
+    return !t.fourniture && (!t.retire || t.c === sel);
   }).map(function (t) {
     return '<option value="' + t.c + '"' + (t.c === sel ? ' selected' : '') + '>' + esc(t.n) + '</option>';
   }).join('');
@@ -10867,7 +11009,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.9.0-20260727-1210';
+var VERSION = '4.9.2-20260727-1450';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
