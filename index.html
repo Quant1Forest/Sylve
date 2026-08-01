@@ -163,6 +163,10 @@ body:not(.m-chantiers) .mod-import{display:none}
 .badge.sec{color:#2E7D46}.badge.presume{color:#7A8471}
 .badge.sechage{color:#B98A00}.badge.vert{color:#B4231F}.badge.inconnu{color:#7A8471}
 .liste-item.epuise{opacity:.55}
+.etiq{
+  display:inline-block;font-style:normal;font-size:10.5px;font-weight:700;color:#fff;
+  padding:1px 6px;border-radius:20px;vertical-align:2px;margin-left:5px;letter-spacing:.02em;
+}
 .pile-c{flex-direction:column;align-items:stretch;gap:8px}
 .pile-c .li-h{display:flex;align-items:flex-start;gap:10px}
 .pile-c .li-actions{display:flex;flex-wrap:wrap;gap:6px;padding-left:24px}
@@ -343,7 +347,7 @@ td.act{width:1%;padding:3px 6px}
 }
 .liste-item:hover{border-color:var(--accent)}
 .liste-item .li-c{flex:1;min-width:0}
-.liste-item b{display:block;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.liste-item b{display:block;font-size:14.5px;overflow:hidden;text-overflow:ellipsis}
 .liste-item small{color:var(--gris);font-size:12px}
 .liste-item.actif{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-doux)}
 
@@ -1141,7 +1145,7 @@ td.act{width:1%;padding:3px 6px}
 <datalist id="liste-clients"></datalist>
 <datalist id="liste-proprios"></datalist>
 <datalist id="liste-fournisseurs"></datalist>
-<datalist id="liste-lieux"></datalist>
+<datalist id="lieux-connus"></datalist>
 
 <script>
 /* ==========================================================================
@@ -5956,7 +5960,7 @@ function brancher() {
     var m = e.target.closest('[data-cmdmod]'), r = e.target.closest('[data-cmdrecu]'),
       sm = e.target.closest('[data-srtmod]');
     if (m) ouvrirCommande(m.dataset.cmdmod);
-    else if (sm) ouvrirSortie(sm.dataset.srtmod);
+    else if (sm) ouvrirSortieStock(sm.dataset.srtmod);
     else if (e.target.closest('#cmd-vide')) nouveauMouvement();
     else if (r) {
       var c = commande(r.dataset.cmdrecu); if (!c) return;
@@ -6155,7 +6159,7 @@ function brancher() {
       pv = e.target.closest('[data-photovue]'), ms = e.target.closest('[data-mvtsup]');
     if (pv) { ouvrirPhotos(pv.dataset.photovue); return; }
     if (ms) { annulerSortie(ms.dataset.mvtsup); return; }
-    if (x) ouvrirSortie(x.dataset.sortie);
+    if (x) ouvrirSortiePile(x.dataset.sortie);
     else if (m) ouvrirMesure(m.dataset.mesure);
     else if (o) ouvrirPile(o.dataset.pile);
     else if (s2) {
@@ -6538,7 +6542,6 @@ function renderAccueil() {
   $('#a-bois-s').textContent = A.piles.length
     ? A.piles.length + (A.piles.length > 1 ? ' piles' : ' pile')
     : 'Aucune pile enregistrée';
-  if ($('#a-lieux-n')) { var n = tousLesPoints().length; $('#a-lieux-n').textContent = n || '—'; }
   renderNudgeSauvegarde(); renderMaJournee();
   renderEntreprise();
 }
@@ -6566,7 +6569,7 @@ function tousLesPoints() {
     if (p.gps && p.gps.lat != null) {
       var e = H.etat(p, Date.now(), A.cfg);
       pts.push({
-        gps: p.gps, type: 'pile', id: p.id, nom: p.nom || 'Pile',
+        gps: p.gps, type: 'pile', id: p.id, nom: p.nom || 'Pile', lieu: p.lieu || '',
         detail: E.fmt(H.restant(p), 2) + ' st · ' + e.texte
       });
     }
@@ -6587,7 +6590,9 @@ function renderLieux() {
     var p = t.o;
     return '<div class="liste-item">' +
       '<span class="pastille" style="background:#8A5A2B"></span>' +
-      '<div class="li-c"><b>▦ ' + esc(p.nom) + '</b><small>' + esc(p.detail) +
+      '<div class="li-c"><b>▦ ' + esc(p.nom) +
+      (p.lieu ? ' <i class="etiq" style="background:#5B3A1E">' + esc(p.lieu) + '</i>' : '') +
+      '</b><small>' + esc(p.detail) +
       ' · ' + esc(G.fmtCoord(p.gps)) + ' ' + esc(G.fmtPrecision(p.gps)) + '</small></div>' +
       (t.d != null ? '<span class="pt-dist">' + esc(G.fmtDistance(t.d)) + ' ' +
         esc(G.cap(A.ici, p.gps)) + '</span>' : '') +
@@ -6608,37 +6613,67 @@ function sauverPiles() {
 
 /* Carte schématique hors ligne : points positionnés les uns par rapport aux
    autres, sans fond de carte (inutile sous couvert, et pas de réseau). */
+/* Vraie carte, sans bibliothèque : les tuiles OpenStreetMap sont de simples
+   images posées côte à côte. Hors réseau elles ne chargent pas — la liste
+   des lieux dessous reste, elle, toujours lisible. */
+function tuileX(lon, z) { return (lon + 180) / 360 * Math.pow(2, z); }
+function tuileY(lat, z) {
+  var r = lat * Math.PI / 180;
+  return (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * Math.pow(2, z);
+}
 function dessinerCarte(points) {
   var z = $('#lieux-carte'); if (!z) return;
   var pts = points.filter(function (p) { return p.gps && p.gps.lat != null; });
-  if (pts.length < 1) { z.innerHTML = ''; return; }
+  if (!pts.length) { z.innerHTML = ''; return; }
+
   var lats = pts.map(function (p) { return p.gps.lat; });
   var lons = pts.map(function (p) { return p.gps.lon; });
   if (A.ici) { lats.push(A.ici.lat); lons.push(A.ici.lon); }
   var minLa = Math.min.apply(null, lats), maxLa = Math.max.apply(null, lats);
   var minLo = Math.min.apply(null, lons), maxLo = Math.max.apply(null, lons);
-  var W = 300, Hh = 200, pad = 26;
-  var dLa = (maxLa - minLa) || 0.0005, dLo = (maxLo - minLo) || 0.0005;
-  /* correction longitude selon la latitude (les degrés de lon rétrécissent) */
-  var kLon = Math.cos(minLa * Math.PI / 180);
-  var projX = function (lo) { return pad + (lo - minLo) / dLo * (W - 2 * pad); };
-  var projY = function (la) { return Hh - pad - (la - minLa) / dLa * (Hh - 2 * pad); };
-  var svg = '<svg viewBox="0 0 ' + W + ' ' + Hh + '" width="100%" style="max-width:340px;background:var(--carte2);border-radius:10px;border:1px solid var(--trait)">';
-  /* échelle : longueur d'un segment de référence */
-  var refM = H.arr(G.distance({ lat: minLa, lon: minLo }, { lat: minLa, lon: maxLo }) || 0, 0);
-  pts.forEach(function (p) {
-    var x = projX(p.gps.lon), y = projY(p.gps.lat);
-    svg += '<circle cx="' + x.toFixed(0) + '" cy="' + y.toFixed(0) + '" r="6" fill="#8A5A2B"/>';
-    svg += '<text x="' + x.toFixed(0) + '" y="' + (y - 9).toFixed(0) + '" font-size="9" text-anchor="middle" fill="#17251F">' + xmlEsc(p.nom.slice(0, 14)) + '</text>';
-  });
-  if (A.ici) {
-    var xi = projX(A.ici.lon), yi = projY(A.ici.lat);
-    svg += '<circle cx="' + xi.toFixed(0) + '" cy="' + yi.toFixed(0) + '" r="5" fill="#1D6FB8" stroke="#fff" stroke-width="1.5"/>';
-    svg += '<text x="' + xi.toFixed(0) + '" y="' + (yi + 15).toFixed(0) + '" font-size="8.5" text-anchor="middle" fill="#1D6FB8">vous</text>';
+  var cLa = (minLa + maxLa) / 2, cLo = (minLo + maxLo) / 2;
+
+  var W = z.clientWidth || 320, H2 = 240, T = 256;
+  /* On choisit le niveau de zoom le plus serré qui contient encore tout. */
+  var niv = 18;
+  for (; niv > 3; niv--) {
+    var dx = Math.abs(tuileX(maxLo, niv) - tuileX(minLo, niv)) * T;
+    var dy = Math.abs(tuileY(minLa, niv) - tuileY(maxLa, niv)) * T;
+    if (dx < W - 60 && dy < H2 - 60) break;
   }
-  svg += '</svg>';
-  z.innerHTML = '<p class="muted" style="font-size:11.5px;margin:12px 0 5px">Plan schématique' +
-    (refM ? ' — largeur ≈ ' + G.fmtDistance(refM) : '') + '</p>' + svg;
+  var cx = tuileX(cLo, niv), cy = tuileY(cLa, niv);
+  var gauche = cx * T - W / 2, haut = cy * T - H2 / 2;
+  var x0 = Math.floor(gauche / T), y0 = Math.floor(haut / T);
+  var nx = Math.ceil((gauche + W) / T) - x0, ny = Math.ceil((haut + H2) / T) - y0;
+  var max = Math.pow(2, niv), tuiles = '';
+  for (var i = 0; i < nx; i++) {
+    for (var j = 0; j < ny; j++) {
+      var tx = ((x0 + i) % max + max) % max, ty = y0 + j;
+      if (ty < 0 || ty >= max) continue;
+      tuiles += '<img src="https://tile.openstreetmap.org/' + niv + '/' + tx + '/' + ty +
+        '.png" alt="" loading="lazy" style="position:absolute;width:' + T + 'px;height:' + T +
+        'px;left:' + ((x0 + i) * T - gauche) + 'px;top:' + ((y0 + j) * T - haut) + 'px">';
+    }
+  }
+  var marque = function (gps, coul, txt) {
+    var mx = tuileX(gps.lon, niv) * T - gauche, my = tuileY(gps.lat, niv) * T - haut;
+    return '<span style="position:absolute;left:' + mx.toFixed(0) + 'px;top:' + my.toFixed(0) +
+      'px;transform:translate(-50%,-100%);pointer-events:none">' +
+      '<span style="display:block;width:13px;height:13px;border-radius:50% 50% 50% 0;' +
+      'background:' + coul + ';border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4);' +
+      'transform:rotate(-45deg)"></span>' +
+      (txt ? '<span style="position:absolute;left:50%;top:15px;transform:translateX(-50%);' +
+        'white-space:nowrap;font-size:10px;font-weight:700;color:#17251F;background:rgba(255,255,255,.82);' +
+        'padding:0 3px;border-radius:3px">' + xmlEsc(txt) + '</span>' : '') + '</span>';
+  };
+  var reperes = pts.map(function (p) { return marque(p.gps, '#8A5A2B', p.nom); }).join('') +
+    (A.ici ? marque(A.ici, '#1D6FB8', 'vous') : '');
+
+  z.innerHTML = '<div style="position:relative;width:100%;height:' + H2 + 'px;overflow:hidden;' +
+    'border-radius:var(--r-s);border:1px solid var(--trait);background:var(--carte2);margin-top:12px">' +
+    tuiles + reperes + '</div>' +
+    '<p class="muted" style="font-size:11px;margin:5px 0 0">Fond de carte © OpenStreetMap. ' +
+    'Il ne se charge qu’avec du réseau ; les positions et les distances, elles, marchent toujours.</p>';
 }
 function xmlEsc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
@@ -6654,8 +6689,13 @@ function formPile(p) {
     return '<button type="button" class="chip" data-buche="' + b.cm + '" aria-pressed="' +
       (Number(p.buche || 100) === b.cm) + '">' + b.nom + '</button>';
   }).join('');
-  return '<div class="champ"><label class="eyebrow" for="p-nom">Nom du tas ou du lieu</label>' +
+  return '<div class="champ"><label class="eyebrow" for="p-nom">Nom du tas</label>' +
     '<input type="text" id="p-nom" class="gros" autocomplete="off" value="' + esc(p.nom || '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="p-lieu">Lieu</label>' +
+    '<input type="text" id="p-lieu" list="lieux-connus" autocomplete="off" ' +
+    'placeholder="forêt, parcelle, hangar…" value="' + esc(p.lieu || '') + '">' +
+    '<p class="muted" style="font-size:11.5px;margin:4px 0 0">Un nom saisi ici vous sera ' +
+    'proposé ensuite, et rejoindra vos lieux dans les réglages.</p></div>' +
 
     '<label class="eyebrow">Longueur des bûches <span class="muted" style="font-weight:400">(largeur de la pile)</span></label>' +
     '<div class="chips" id="p-buche">' + larg + '</div>' +
@@ -6810,6 +6850,7 @@ function lirePile() {
   var prix = $('#p-prix') ? H.nb($('#p-prix').value) : 0;
   return {
     nom: $('#p-nom') ? $('#p-nom').value.trim() : '',
+    lieu: $('#p-lieu') ? $('#p-lieu').value.trim() : '',
     essences: pEss.slice(),
     pourcents: pEss.length > 1 ? (function () { var o = {}; pEss.forEach(function (c) { o[c] = H.nb(pPct[c]) || 0; }); return o; })() : {},
     buche: pBuche,
@@ -6870,6 +6911,10 @@ function ouvrirPile(id) {
   });
   $('#p-photos').addEventListener('click', function (e) {
     var d = e.target.closest('[data-photodel]'); if (d) { pPhotos.splice(+d.dataset.photodel, 1); renderPhotos(); }
+  });
+  var champLieu = $('#p-lieu');
+  if (champLieu) champLieu.addEventListener('blur', function () {
+    proposerAjoutListe('lieux', champLieu.value.trim());
   });
   $('#p-gps').addEventListener('click', function () {
     var b = this;
@@ -6954,8 +6999,11 @@ function ouvrirMesure(id) {
   });
 }
 
-/* ------------------------------------------------------------- sorties */
-function ouvrirSortie(id) {
+/* ------------------------------------------------------------- sorties
+   Attention : le module Stock a sa propre fenêtre de sortie, nommée
+   ouvrirSortieStock. Deux fonctions de même nom dans ce fichier et la
+   seconde écrase silencieusement la première. */
+function ouvrirSortiePile(id) {
   var p = pile(id); if (!p) return;
   var reste = H.restant(p);
   var h = (p.mouvements || []).slice().sort(function (x, y) { return y.date - x.date; });
@@ -8896,7 +8944,7 @@ function proposerAjoutListe(k, nom) {
   return sauverListe(k).then(function () { return true; });
 }
 function majDatalistLieux() {
-  var d = $('#liste-lieux');
+  var d = $('#lieux-connus');
   if (d) d.innerHTML = lieuxConnus().map(function (x) { return '<option value="' + esc(x) + '">'; }).join('');
 }
 
@@ -9059,10 +9107,10 @@ function ouvrirJournee(id, modele) {
     }).join('') + '</select></div>' +
     '<div class="grille g2">' +
     '<div class="champ"><label class="eyebrow" for="mj-lieu">Forêt</label>' +
-    '<input type="text" id="mj-lieu" list="liste-lieux" autocomplete="off" value="' +
+    '<input type="text" id="mj-lieu" list="lieux-connus" autocomplete="off" value="' +
     esc((src && src.lieu) || '') + '"></div>' +
     '<div class="champ"><label class="eyebrow" for="mj-commune">Commune</label>' +
-    '<input type="text" id="mj-commune" list="liste-lieux" autocomplete="off" value="' +
+    '<input type="text" id="mj-commune" list="lieux-connus" autocomplete="off" value="' +
     esc((src && src.commune) || '') + '"></div>' +
     '</div>' +
     '<label class="eyebrow" style="margin-top:6px;display:block">Ce que j’ai fait</label>' +
@@ -9305,6 +9353,7 @@ var COLS_STOCK = {
   prix: ['prix', 'prixunitaire', 'pu', 'puht', 'prixdevente'],
   livraison: ['livraison', 'fraisdelivraison', 'port', 'transport'],
   client: ['client', 'destinataire', 'acheteur'],
+  facture: ['facture', 'nfacture', 'numerodefacture', 'numero', 'piece'],
   debours: ['debours'],
   statut: ['statut', 'etat']
 };
@@ -9360,6 +9409,7 @@ function analyseCsvStock(txt) {
       date: C.dateFr(lue(r, 'date')), quantite: ST.nb(lue(r, 'quantite')),
       prix: ST.nb(lue(r, 'prix')), livraison: ST.nb(lue(r, 'livraison')),
       client: String(lue(r, 'client') || '').trim(),
+      facture: String(lue(r, 'facture') || '').trim(),
       debours: /oui|x|1|vrai/i.test(String(lue(r, 'debours') || '')),
       statut: statutSortieCsv(lue(r, 'statut'))
     });
@@ -9410,8 +9460,8 @@ function ouvrirImportStock() {
   $('#is-modele').addEventListener('click', function () {
     telecharger('Sylve-modele-commandes.csv',
       'commande;date;fournisseur;produit;quantite;prix;livraison\n' +
-      'DE252998;05/11/2025;E2D;Gaine de protection 14*120;500;0,70;265\n' +
-      'DE252998;05/11/2025;E2D;Tuteur en châtaignier;1500;0,60;\n', 'text/csv');
+      'CMD-001;05/11/2025;Mon fournisseur;Gaine de protection 14*120;500;0,70;265\n' +
+      'CMD-001;05/11/2025;Mon fournisseur;Tuteur en châtaignier;1500;0,60;\n', 'text/csv');
   });
   $('#is-resultat').addEventListener('click', function (e) {
     if (e.target.closest('#is-ok')) validerImportStock();
@@ -9512,9 +9562,12 @@ function validerImportStock() {
   } else {
     var srts = {};
     r.lignes.forEach(function (x) {
-      var k = x.client + '|' + (x.date || '');
+      /* Une facture regroupe ses lignes ; sans numéro on retombe sur le
+         couple client et date. */
+      var k = x.facture || (x.client + '|' + (x.date || ''));
       if (!srts[k]) {
-        srts[k] = { id: uid(), num: '', date: x.date || Date.now(), client: x.client || '',
+        srts[k] = { id: uid(), num: x.facture || '', date: x.date || Date.now(),
+          client: x.client || '',
           chantier: null, statut: x.statut || 'fini', perte: false, debours: x.debours,
           lignes: [], maj: Date.now() };
         A.sorties.push(srts[k]); ns++;
@@ -9751,7 +9804,7 @@ function ouvrirFicheArticle(id) {
     '<button class="btn btn-min" id="fa-mod">Modifier le produit</button></div>');
 
   $('#fa-cmd').addEventListener('click', function () { fermerModale(); ouvrirCommande(null, id); });
-  $('#fa-sortie').addEventListener('click', function () { fermerModale(); ouvrirSortie(null, false, id); });
+  $('#fa-sortie').addEventListener('click', function () { fermerModale(); ouvrirSortieStock(null, false, id); });
   $('#fa-mod').addEventListener('click', function () { fermerModale(); ouvrirArticle(id); });
 }
 
@@ -9759,7 +9812,7 @@ function ouvrirFicheArticle(id) {
 function nouveauMouvement() {
   var o = A.mvt || 'achats';
   if (o === 'achats') ouvrirCommande(null);
-  else ouvrirSortie(null, o === 'pertes');
+  else ouvrirSortieStock(null, o === 'pertes');
 }
 
 /* -------------------------------------------------- entrées et sorties */
@@ -9803,11 +9856,14 @@ function listeAchats() {
     var unite = mixte || !uu ? 'unités' : ST.courtUniteArt(uu);
     var march = (c.lignes || []).reduce(function (s, x) { return s + ST.nb(x.qte) * ST.nb(x.prix); }, 0);
     var recu = ST.achatRecu(c.statut), mort = ST.achatMort(c.statut);
-    return '<div class="liste-item pile-c' + (mort ? ' epuise' : '') + '"><div class="li-h">' +
+    return '<div class="liste-item' + (mort ? ' epuise' : '') + '">' +
       '<span class="pastille" style="background:' +
-      (mort ? '#8A9382' : recu ? '#2E7D46' : '#B98A00') + ';margin-top:4px"></span>' +
+      (mort ? '#8A9382' : recu ? '#2E7D46' : '#B98A00') +
+      ';align-self:flex-start;margin-top:3px"></span>' +
       '<div class="li-c"><b>' + esc(c.num || 'Sans numéro') + ' — ' +
-      eur(ST.arr(march + ST.nb(c.livraison), 2)) + '</b>' +
+      eur(ST.arr(march + ST.nb(c.livraison), 2)) +
+      (recu ? '' : ' <i class="etiq" style="background:#B98A00">' +
+        esc(ST.nomStatutAchat(c.statut).toLowerCase()) + '</i>') + '</b>' +
       '<small>' + dateCourte(c.dateLiv || c.dateCmd) +
       ' · ' + esc(ST.nomStatutAchat(c.statut)) +
       (c.fournisseur ? ' · ' + esc(nomFournisseur(c.fournisseur)) : '') +
@@ -9816,16 +9872,21 @@ function listeAchats() {
       (c.lignes || []).map(function (x) {
         var a = article(x.article);
         return esc(a ? a.nom : '?') + ' ' + E.fmt(ST.nb(x.qte), 0) + ' × ' + E.fmt(ST.nb(x.prix), 4) + ' €';
-      }).join(' · ') + '</small></div></div>' +
-      '<div class="li-actions">' +
-      (recu || mort ? '' : '<button class="btn-min" data-cmdrecu="' + c.id + '">Marquer reçue</button>') +
+      }).join(' · ') + '</small></div>' +
+      '<div style="display:flex;flex-direction:column;gap:5px;flex:none">' +
+      (recu || mort ? '' : '<button class="btn-min" data-cmdrecu="' + c.id + '">Reçue</button>') +
       '<button class="btn-min" data-cmdmod="' + c.id + '">Modifier</button></div></div>';
   }).join('');
 }
 
 function listeSorties(pertes) {
+  /* Du plus récent au plus ancien ; à date égale, le numéro de facture
+     tranche, ce qui remet les pièces d'une même journée dans leur ordre. */
   var l = (A.sorties || []).filter(function (s) { return !!s.perte === !!pertes; })
-    .sort(function (a, b) { return (b.date || 0) - (a.date || 0); });
+    .sort(function (a, b) {
+      return (b.date || 0) - (a.date || 0) ||
+        String(b.num || '').localeCompare(String(a.num || ''), 'fr', { numeric: true });
+    });
   if (!l.length) {
     return '<div class="vide"><p>' + (pertes
       ? 'Aucune perte enregistrée.'
@@ -9842,26 +9903,27 @@ function listeSorties(pertes) {
     var cout = (s.lignes || []).reduce(function (t, x) {
       var a = article(x.article); return t + ST.nb(x.qte) * (a ? ST.pmp(a) : 0);
     }, 0);
-    var coul = s.perte ? '#B4231F' : s.debours ? '#7A8471' : etat === 'sorti' ? '#8A5A2B'
+    var coul = s.perte ? '#B4231F' : s.debours ? '#5C6BA8' : etat === 'sorti' ? '#2E7D46'
       : etat === 'engage' ? '#B98A00' : etat === 'mort' ? '#8A9382' : '#7A8471';
-    return '<div class="liste-item pile-c' + (etat === 'mort' ? ' epuise' : '') + '"><div class="li-h">' +
-      '<span class="pastille" style="background:' + coul + ';margin-top:4px"></span>' +
-      '<div class="li-c"><b>' +
-      esc(s.num || (s.perte ? 'Perte' : ch ? (ch.nom || 'Chantier') : s.client || 'Sortie')) +
-      (s.perte ? '' : ' — ' + eur(ST.arr(ca, 2))) + '</b>' +
-      '<small>' + dateCourte(s.date) +
-      (s.perte ? (s.motif ? ' · ' + esc(s.motif) : '') : ' · ' + esc(ST.nomStatutVente(st))) +
-      (ch ? ' · ' + esc(ch.nom || 'chantier') + (s.chantier ? ' (statut du chantier)' : '') : '') +
-      (!ch && s.client && s.num ? ' · ' + esc(s.client) : '') +
-      (s.debours ? ' · débours' : '') +
-      (!s.perte && !s.debours && ca ? ' · marge ' + eur(ST.arr(ca - cout, 2)) : '') + '<br>' +
+    var titre = s.perte ? 'Perte' : (s.num || (ch ? (ch.nom || 'Chantier') : s.client || 'Sortie'));
+    var sous = [dateCourte(s.date)];
+    if (!s.perte && s.client) sous.push(esc(s.client));
+    if (ch) sous.push(esc(ch.nom || 'chantier'));
+    if (s.perte) { if (s.motif) sous.push(esc(s.motif)); }
+    else sous.push(esc(ST.nomStatutVente(st)));
+    if (!s.perte && !s.debours && ca) sous.push('marge ' + eur(ST.arr(ca - cout, 2)));
+    return '<div class="liste-item' + (etat === 'mort' ? ' epuise' : '') + '">' +
+      '<span class="pastille" style="background:' + coul + ';align-self:flex-start;margin-top:3px"></span>' +
+      '<div class="li-c"><b>' + esc(titre) +
+      (s.perte ? '' : ' — ' + eur(ST.arr(ca, 2))) +
+      (s.debours ? ' <i class="etiq" style="background:#5C6BA8">débours</i>' : '') + '</b>' +
+      '<small>' + sous.join(' · ') + '<br>' +
       (s.lignes || []).map(function (x) {
         var a = article(x.article);
         return esc(a ? a.nom : '?') + ' ' + E.fmt(ST.nb(x.qte), 0) +
           (s.perte ? '' : ' × ' + E.fmt(ST.nb(x.prix), 4) + ' €');
-      }).join(' · ') + '</small></div></div>' +
-      '<div class="li-actions">' +
-      '<button class="btn-min" data-srtmod="' + s.id + '">Modifier</button></div></div>';
+      }).join(' · ') + '</small></div>' +
+      '<button class="btn-min" data-srtmod="' + s.id + '">Modifier</button></div>';
   }).join('');
 }
 
@@ -10649,7 +10711,7 @@ function ouvrirCommande(id, artPref) {
 }
 
 /* ------------------------------------------------- une sortie, une perte */
-function ouvrirSortie(id, perte, artPref) {
+function ouvrirSortieStock(id, perte, artPref) {
   if (!A.articles.length) {
     toast('Créez d’abord un produit dans les réglages.');
     allerReglages('stock'); return;
@@ -11267,7 +11329,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.10.0-20260727-1830';
+var VERSION = '4.11.2-20260801-1030';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
