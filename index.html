@@ -610,18 +610,15 @@ td.act{width:1%;padding:3px 6px}
       <!-- propre au bois de chauffage -->
       <div class="mod-bois">
         <div class="carte">
-          <div class="carte-titre"><h2>Mes piles</h2>
-            <button class="btn primaire btn-min" id="p-nouvelle3">Nouvelle pile</button></div>
-          <div id="liste-piles-f"></div>
-        </div>
-        <div class="carte">
           <h2>Exporter le stock</h2>
-          <p class="muted" style="font-size:12.5px;margin:0 0 10px">Un tableau de toutes les piles : essences, volume, séchage, sorties.</p>
+          <p class="muted" style="font-size:12.5px;margin:0 0 10px">Un tableau de toutes les piles :
+            une colonne par essence avec sa proportion, volume, séchage, sorties.</p>
           <div class="btn-rang">
             <button class="btn" id="b-xlsx">Excel</button>
             <button class="btn" id="b-csv">CSV</button>
           </div>
         </div>
+        <div id="bois-analyses"></div>
       </div>
 
     </section>
@@ -750,8 +747,12 @@ td.act{width:1%;padding:3px 6px}
             <input type="text" id="r-imp" inputmode="decimal" autocomplete="off"></div>
           <div class="champ"><label class="eyebrow" for="r-abv">Abattement vente (%)</label>
             <input type="text" id="r-abv" inputmode="decimal" autocomplete="off"></div>
-          <div class="champ"><label class="eyebrow" for="r-cfe">CFE par unité (€)</label>
-            <input type="text" id="r-cfe" inputmode="decimal" autocomplete="off"></div>
+          <div class="champ"><label class="eyebrow" for="r-cfe">CFE annuelle (€)</label>
+            <input type="text" id="r-cfe" inputmode="decimal" autocomplete="off"
+              placeholder="montant de votre avis"></div>
+          <div class="champ"><label class="eyebrow" for="r-cfeca">Chiffre d'affaires de référence (€)</label>
+            <input type="text" id="r-cfeca" inputmode="decimal" autocomplete="off"
+              placeholder="celui d'une année type"></div>
         </div>
         <p class="muted" style="font-size:12px;margin:9px 0 0">
           Servent au prix de revient et à l'estimation des prélèvements. Ce sont vos taux :
@@ -777,6 +778,17 @@ td.act{width:1%;padding:3px 6px}
           <div class="champ"><label class="eyebrow" for="r-sts">Très sec sous (%)</label>
             <input type="text" id="r-sts" inputmode="decimal" autocomplete="off"></div>
         </div>
+        <p class="eyebrow" style="margin:16px 0 6px">Humidité de départ</p>
+        <p class="muted" style="font-size:12px;margin:0 0 8px">
+          Ce dont part une pile neuve, selon ce qu'on y met. Le bois mort resté sur pied
+          a déjà perdu une partie de son eau : sa pile sèche donc plus vite.
+        </p>
+        <div class="grille g2">
+          <div class="champ"><label class="eyebrow" for="r-dv">Bois vert (%)</label>
+            <input type="text" id="r-dv" inputmode="decimal" autocomplete="off"></div>
+          <div class="champ"><label class="eyebrow" for="r-ds">Bois mort (%)</label>
+            <input type="text" id="r-ds" inputmode="decimal" autocomplete="off"></div>
+        </div>
         <p class="muted" style="font-size:12px;margin:10px 0 0">
           Le stock est compté en stères empilés : une pile mesurée en bûches de 1 m ou 1,30 m
           donne directement son volume en stères. La recoupe éventuelle à la vente ne change
@@ -801,8 +813,13 @@ td.act{width:1%;padding:3px 6px}
       </div>
       <div class="carte" data-sec="general">
         <h2>Remise à zéro</h2>
+        <p class="muted" style="font-size:12.5px;margin:0 0 11px">
+          Rétablit les essences, les qualités et les seuils de cubage tels qu'ils étaient
+          à l'installation. Vos bordereaux, vos chantiers, votre stock et vos autres
+          réglages ne sont pas touchés.
+        </p>
         <div class="btn-rang">
-          <button class="btn danger" id="r-reset-cfg">Rétablir les listes d'origine</button>
+          <button class="btn danger btn-min" id="r-reset-cfg">Rétablir les listes de cubage</button>
         </div>
       </div>
       </div><!-- /regl-corps -->
@@ -819,7 +836,8 @@ td.act{width:1%;padding:3px 6px}
             </g>
             <path d="M11 32h42" stroke="#C4611B" stroke-width="3.5" stroke-linecap="round"/>
           </svg>
-          <div style="flex:1"><h1>Sylve</h1><p id="a-sous">Outil de terrain</p></div>
+          <div style="flex:1"><h1>Sylve</h1>
+            <p id="a-sous">Chantiers, cubage et bois de chauffage</p></div>
           <button class="tuile" id="a-reglages" title="Réglages"
             style="width:auto;flex:none;padding:11px 13px">⚙</button>
         </div>
@@ -848,11 +866,6 @@ td.act{width:1%;padding:3px 6px}
             <span class="chiffre"><b id="a-bois-n">—</b><span>stères</span></span>
           </button>
                 </div>
-        <p class="muted" style="font-size:11.5px;margin-top:26px;line-height:1.5">
-          Outil personnel, sans lien avec l'ONF ni FIBOIS. Les règles de cubage appliquées
-          sont celles en usage dans le classement comtois ; se référer au mémento
-          interprofessionnel pour leur application complète.
-        </p>
       </div>
     </section>
 
@@ -2209,6 +2222,10 @@ var TYPES = { dur: 'bois dur', blanc: 'bois blanc', res: 'résineux', mixte: 'm�
 /* Quatre états (valeurs de départ, modifiables) : vert > 40 · séchage 25-40 ·
    sec 20-25 · très sec < 20. Seuils lus à l'humidimètre. */
 var SEUILS_DEFAUT = { vert: 40, sec: 25, tresSec: 20 };
+/* Humidité de départ selon ce qu'on empile. Du bois mort resté sur pied a
+   déjà perdu une partie de son eau : il n'a pas le même chemin à faire que
+   du bois vert abattu du jour. Ces deux repères sont réglables. */
+var DEPART_DEFAUT = { vert: 45, sec: 30 };
 var SECHAGE = { dur: 24, blanc: 18, res: 18, mixte: 24 };   // mois avant « sec »
 var POIDS_TYPE = { dur: 0.6, blanc: 0.45, res: 0.4, mixte: 0.5 };  // t/stère
 
@@ -2334,8 +2351,18 @@ function tendance(mesures, seuilSec) {
   return { pente: a, secheVers: dateSec, tauxActuel: nb(dernier.taux), dateActuel: dernier.date };
 }
 
-function estimeTheorique(e, p, mois, maintenant) {
-  var attendu = SECHAGE[typePile(p.essences) || 'mixte'] || 24, reste = attendu - mois;
+function estimeTheorique(e, p, mois, maintenant, cfg) {
+  var attendu = SECHAGE[typePile(p.essences) || 'mixte'] || 24;
+  /* La durée annoncée vaut pour du bois vert. Une pile partie de plus bas a
+     moins de chemin à faire : on réduit la durée dans la même proportion. */
+  var s = seuils(cfg), d = depart(cfg);
+  var course = d.vert - s.sec;
+  if (course > 0) {
+    var reste0 = humiditeDepart(p, cfg) - s.sec;
+    attendu = Math.max(0, arr(attendu * Math.max(0, reste0) / course, 1));
+  }
+  e.attendu = attendu;
+  var reste = attendu - mois;
   if (reste > 0) {
     e.secheVers = maintenant + reste * MOIS;
     e.joursRestants = Math.round(reste * MOIS / JOUR);
@@ -2354,13 +2381,13 @@ function etat(p, maintenant, cfg) {
       e.secheVers = t.secheVers;
       e.joursRestants = Math.max(0, Math.round((t.secheVers - maintenant) / JOUR));
       e.methode = 'mesures';
-    } else if (mois != null) { estimeTheorique(e, p, mois, maintenant); }
+    } else if (mois != null) { estimeTheorique(e, p, mois, maintenant, cfg); }
     return e;
   }
   if (mois == null) return { statut: 'inconnu', mesure: false, mois: null, texte: LIBELLE.inconnu };
   var e2 = { statut: 'sechage', mesure: false, mois: mois, texte: '' };
-  estimeTheorique(e2, p, mois, maintenant);
-  var attendu = SECHAGE[typePile(p.essences) || 'mixte'] || 24;
+  estimeTheorique(e2, p, mois, maintenant, cfg);
+  var attendu = e2.attendu != null ? e2.attendu : (SECHAGE[typePile(p.essences) || 'mixte'] || 24);
   if (mois >= attendu) { e2.statut = 'presume'; e2.texte = 'Présumé sec après ' + mois + ' mois — à vérifier'; e2.sec = true; }
   else { e2.texte = mois > 0 ? 'En séchage depuis ' + mois + ' mois' : 'Empilée récemment'; }
   return e2;
@@ -2378,6 +2405,38 @@ function repartition(piles, perso) {
   return r;
 }
 function pourcent(part, total) { return total > 0 ? Math.round(part / total * 100) : 0; }
+
+/* ------------------------------------------------------------- vert / sec */
+function depart(cfg) {
+  var d = (cfg && cfg.depart) || {};
+  return {
+    vert: nb(d.vert) || DEPART_DEFAUT.vert,
+    sec: nb(d.sec) || DEPART_DEFAUT.sec
+  };
+}
+/* Ce que contient la pile : que du vert, que du bois mort, ou les deux. */
+function composition(p) {
+  var e = p && p.etatBois;
+  if (e !== 'vert' && e !== 'sec' && e !== 'mixte') return null;
+  var pv = e === 'vert' ? 100 : e === 'sec' ? 0 : Math.max(0, Math.min(100, nb(p.partVert)));
+  return { etat: e, partVert: pv, partSec: arr(100 - pv, 0) };
+}
+function libelleComposition(p) {
+  var c = composition(p);
+  if (!c) return '';
+  if (c.etat === 'vert') return 'bois vert';
+  if (c.etat === 'sec') return 'bois mort';
+  return c.partVert + ' % vert, ' + c.partSec + ' % mort';
+}
+/* L'humidité qui commande le séchage, c'est la plus élevée des deux : la
+   pile n'est prête que quand sa part la plus humide l'est. */
+function humiditeDepart(p, cfg) {
+  var c = composition(p), d = depart(cfg);
+  if (!c) return nb(p && p.humidite) || d.vert;
+  var v = c.partVert > 0 ? (nb(p.humiditeVert) || d.vert) : null;
+  var sc = c.partSec > 0 ? (nb(p.humiditeSec) || d.sec) : null;
+  return Math.max(v || 0, sc || 0) || d.vert;
+}
 function disponible(piles, maintenant, cfg) {
   var pret = 0, attente = 0;
   (piles || []).forEach(function (p) {
@@ -2392,6 +2451,8 @@ var M = {
   SECHAGE: SECHAGE, SEUILS_DEFAUT: SEUILS_DEFAUT, POIDS_TYPE: POIDS_TYPE, LIBELLE: LIBELLE,
   essence: essence, nomEssence: nomEssence, buche: buche, coefBuche: coefBuche, nomBuche: nomBuche,
   typePile: typePile, nb: nb, arr: arr,
+  DEPART_DEFAUT: DEPART_DEFAUT, depart: depart, composition: composition,
+  libelleComposition: libelleComposition, humiditeDepart: humiditeDepart,
   cotes: cotes, moyHauteurs: moyHauteurs, longueurMoyenne: longueurMoyenne, hauteurMoyenne: hauteurMoyenne,
   volumeEmpile: volumeEmpile, steres: steres, sorti: sorti, restant: restant,
   partsEssences: partsEssences, repartitionPile: repartitionPile, poids: poids, poidsPile: poidsPile,
@@ -5157,7 +5218,6 @@ function integrer(objet, source, remplace) {
       if (A.depenses.some(function (x) { return x.id === dp.id; })) dp.id = uid();
       A.depenses.push(dp); nd++;
     });
-    (s.clients || []).forEach(function (cl) { noterClient(cl); });
     var na = 0, ng = 0;
     (s.articles || []).forEach(function (ar) {
       if (!ar || !ar.nom) return;
@@ -5169,7 +5229,6 @@ function integrer(objet, source, remplace) {
       if (A.charges.some(function (x) { return x.id === cg.id; })) cg.id = uid();
       A.charges.push(cg); ng++;
     });
-    (s.proprios || []).forEach(function (p) { noterProprio(p); });
     var nf = 0, nm = 0;
     A.fournisseurs = A.fournisseurs || [];
     (s.fournisseurs || []).forEach(function (f2) {
@@ -5210,6 +5269,7 @@ function integrer(objet, source, remplace) {
     renderPiles(); renderStock(); renderLieux(); renderCarnet(); renderDepenses(); renderFinances();
     renderCharges(); indexerStock(); indexerJournees(); renderStockFournitures(); renderCommandes();
     renderRevient(); renderReglagesStock(); renderCarteChantiers();
+    moissonnerListes(s);
     var revenu = contenuSauvegarde();
     toast(revenu.length
       ? (remplace ? 'Remplacé par ' : 'Restauré : ') + listerContenu(revenu) + '.'
@@ -5224,18 +5284,111 @@ function renderFichiersModule() {
       ? 'Bordereau ouvert : ' + ((A.bord.meta && A.bord.meta.foret) || 'sans nom') + '.'
       : 'Ouvrez un bordereau pour l’exporter.';
   }
-  if (A.module === 'bois') {
-    var z = $('#liste-piles-f');
-    if (z) {
-      z.innerHTML = A.piles.length
-        ? A.piles.slice().sort(function (a, b) { return (b.maj || 0) - (a.maj || 0); }).map(function (p) {
-          return '<div class="liste-item"><span class="pastille" style="background:#8A5A2B"></span>' +
-            '<div class="li-c"><b>' + esc(p.nom || 'Pile') + '</b><small>' +
-            E.fmt(H.restant(p), 2) + ' stères</small></div></div>';
-        }).join('')
-        : '<div class="vide"><p>Aucune pile enregistrée.</p></div>';
-    }
+  if (A.module === 'bois') renderAnalysesBois();
+}
+
+/* Ce que le stock a fait dans le temps : ce qui est entré, ce qui est sorti,
+   ce que ça a rapporté. Le reste du module dit où en est le bois ; ici on
+   regarde derrière soi. */
+function renderAnalysesBois() {
+  var z = $('#bois-analyses'); if (!z) return;
+  if (!A.piles.length) {
+    z.innerHTML = '<div class="carte"><div class="vide"><p>Aucune pile enregistrée : ' +
+      'les analyses apparaîtront dès la première.</p></div></div>';
+    return;
   }
+  /* Douze mois glissants, entrées d'un côté, sorties de l'autre. */
+  var mois = [], cle = {}, maintenant = new Date();
+  for (var i = 11; i >= 0; i--) {
+    var d = new Date(maintenant.getFullYear(), maintenant.getMonth() - i, 1);
+    var k = d.getFullYear() + '-' + d.getMonth();
+    cle[k] = mois.length;
+    mois.push({ k: k, lib: d.toLocaleDateString('fr-FR', { month: 'short' }).replace('.', ''),
+      an: d.getFullYear(), entre: 0, sorti: 0, vendu: 0, ca: 0 });
+  }
+  var placer = function (ts) {
+    var d = new Date(ts); var i = cle[d.getFullYear() + '-' + d.getMonth()];
+    return i == null ? null : mois[i];
+  };
+  var totEntre = 0, totSorti = 0, totVendu = 0, totCa = 0;
+  A.piles.forEach(function (p) {
+    var m = p.empile ? placer(p.empile) : null;
+    var st = H.steres(p);
+    if (m) m.entre += st;
+    totEntre += st;
+    (p.mouvements || []).forEach(function (x) {
+      var mm = placer(x.date);
+      var q = H.nb(x.st);
+      totSorti += q;
+      if (mm) mm.sorti += q;
+      if (x.motif === 'Vendu') {
+        totVendu += q; totCa += H.nb(x.prix);
+        if (mm) { mm.vendu += q; mm.ca += H.nb(x.prix); }
+      }
+    });
+  });
+  var max = Math.max.apply(null, mois.map(function (m) { return Math.max(m.entre, m.sorti); }).concat([1]));
+  var prixMoyen = totVendu > 0 ? totCa / totVendu : 0;
+
+  z.innerHTML =
+    '<div class="carte"><h2>Douze derniers mois</h2>' +
+    '<div style="display:flex;align-items:flex-end;gap:3px;height:120px;margin:14px 0 0">' +
+    mois.map(function (m) {
+      var he = Math.round(m.entre / max * 100), hs = Math.round(m.sorti / max * 100);
+      return '<div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;' +
+        'align-items:center;gap:1px;height:100%">' +
+        '<div style="display:flex;align-items:flex-end;gap:1px;width:100%;height:100%">' +
+        '<div style="flex:1;height:' + he + '%;background:#2E7D46;border-radius:2px 2px 0 0" ' +
+        'title="' + E.fmt(m.entre, 2) + ' st empilés"></div>' +
+        '<div style="flex:1;height:' + hs + '%;background:#8A5A2B;border-radius:2px 2px 0 0" ' +
+        'title="' + E.fmt(m.sorti, 2) + ' st sortis"></div></div>' +
+        '<small style="font-size:9px;color:var(--doux)">' + esc(m.lib) + '</small></div>';
+    }).join('') + '</div>' +
+    '<div style="display:flex;gap:14px;margin-top:9px;font-size:12px">' +
+    '<span><i style="display:inline-block;width:9px;height:9px;border-radius:2px;' +
+    'background:#2E7D46;margin-right:5px"></i>empilé</span>' +
+    '<span><i style="display:inline-block;width:9px;height:9px;border-radius:2px;' +
+    'background:#8A5A2B;margin-right:5px"></i>sorti</span></div></div>' +
+
+    '<div class="carte"><h2>Depuis le début</h2><div class="kpi">' +
+    '<div class="carte2"><b class="num">' + E.fmt(totEntre, 1) + '</b><small>stères empilés</small></div>' +
+    '<div class="carte2"><b class="num">' + E.fmt(totSorti, 1) + '</b><small>stères sortis</small></div>' +
+    (totVendu ? '<div class="carte2"><b class="num">' + E.fmt(totVendu, 1) + '</b><small>stères vendus</small></div>' +
+      '<div class="carte2"><b class="num">' + eur(H.arr(totCa, 2)) + '</b><small>de ventes</small></div>' +
+      '<div class="carte2"><b class="num">' + E.fmt(prixMoyen, 2) + ' €</b><small>le stère en moyenne</small></div>' : '') +
+    '</div>' +
+    (totVendu ? '' : '<p class="muted" style="font-size:12px;margin:10px 0 0">' +
+      'Aucune vente enregistrée : sortez du bois avec le motif « Vendu » pour suivre vos prix.</p>') +
+    '</div>' + tableauSorties();
+}
+
+/* Le détail des sorties, du plus récent au plus ancien. */
+function tableauSorties() {
+  var l = [];
+  A.piles.forEach(function (p) {
+    (p.mouvements || []).forEach(function (m) {
+      l.push({ pile: p.nom || 'Pile', date: m.date, st: H.nb(m.st), motif: m.motif || '',
+        qui: m.qui || '', prix: H.nb(m.prix) });
+    });
+  });
+  if (!l.length) return '';
+  l.sort(function (a, b) { return b.date - a.date; });
+  var COUL = { 'Vendu': '#2E7D46', 'Déplacé': '#1D6FB8', 'Rentré': '#8A5A2B', 'Brûlé': '#B4231F' };
+  return '<div class="carte"><h2>Historique des sorties</h2>' +
+    '<div class="tab-boite"><table><thead><tr>' +
+    '<th style="text-align:left">Date</th><th style="text-align:left">Pile</th>' +
+    '<th style="text-align:left">Motif</th><th class="num">Stères</th>' +
+    '<th class="num">€</th><th class="num">€/st</th></tr></thead><tbody>' +
+    l.map(function (x) {
+      return '<tr><td style="text-align:left">' + new Date(x.date).toLocaleDateString('fr-FR') + '</td>' +
+        '<td style="text-align:left">' + esc(x.pile) + '</td>' +
+        '<td style="text-align:left"><i class="pt" style="background:' +
+        (COUL[x.motif] || '#7A8471') + '"></i>' + esc(x.motif) +
+        (x.qui ? ' <span class="muted">' + esc(x.qui) + '</span>' : '') + '</td>' +
+        '<td class="num">' + E.fmt(x.st, 2) + '</td>' +
+        '<td class="num">' + (x.prix ? E.fmt(x.prix, 2) : '—') + '</td>' +
+        '<td class="num">' + (x.prix && x.st ? E.fmt(x.prix / x.st, 2) : '—') + '</td></tr>';
+    }).join('') + '</tbody></table></div></div>';
 }
 
 function renderSauvegarde() {
@@ -5315,23 +5468,53 @@ function renderRecup() {
 
 /* ------------------------------------------------------------- fichiers */
 function lignesStock() {
-  var l = [['Nom', 'Essences', 'Type', 'Longueur bûche', 'Stères', 'Sortis', 'Restant',
-    'Prix/stère (€)', 'Valeur (€)', 'Empilé le', 'Humidité (%)', 'État', 'Sèche vers',
-    'Latitude', 'Longitude', 'Note']];
+  /* Une colonne par essence, avec sa proportion à côté : un tableur sait
+     alors trier, filtrer et faire des graphiques, ce qu'une case « Chêne 80 %
+     Hêtre 20 % » interdit. Le nombre de colonnes suit la pile la plus mêlée. */
+  var maxEss = A.piles.reduce(function (m, p) {
+    return Math.max(m, (p.essences || []).length);
+  }, 1);
+  var enTete = ['Nom', 'Lieu', 'Type'];
+  for (var k = 1; k <= maxEss; k++) enTete.push('Essence ' + k, 'Part ' + k + ' (%)');
+  enTete = enTete.concat(['Longueur bûche', 'Vert / mort', 'Part verte (%)',
+    'Stères', 'Sortis', 'Restant', 'Vendus', 'Recettes (€)', 'Prix moyen (€/st)',
+    'Empilé le', 'Humidité (%)', 'État', 'Sèche vers', 'Latitude', 'Longitude', 'Note']);
+  var l = [enTete];
+
   A.piles.forEach(function (p) {
     var e = H.etat(p, Date.now(), A.cfg);
     var m = H.derniereMesure(p);
-    l.push([
-      p.nom || '',
-      (p.essences || []).map(function (c) { var pc = p.pourcents && p.pourcents[c]; return H.nomEssence(c) + (pc ? ' ' + Math.round(pc) + '%' : ''); }).join(' '),
-      H.TYPES[H.typePile(p.essences) || 'mixte'] || '', H.nomBuche(p.buche),
+    var comp = H.composition(p);
+    var vendus = 0, recettes = 0;
+    (p.mouvements || []).forEach(function (x) {
+      if (x.motif === 'Vendu') { vendus += H.nb(x.st); recettes += H.nb(x.prix); }
+    });
+    var ligne = [
+      p.nom || '', p.lieu || '',
+      H.TYPES[H.typePile(p.essences) || 'mixte'] || ''
+    ];
+    var ess = p.essences || [];
+    for (var i = 0; i < maxEss; i++) {
+      var c = ess[i];
+      if (!c) { ligne.push('', ''); continue; }
+      var pc = p.pourcents && p.pourcents[c] != null ? H.nb(p.pourcents[c])
+        : (ess.length === 1 ? 100 : '');
+      ligne.push(H.nomEssence(c), pc === '' ? '' : E.fmt(pc, 0));
+    }
+    ligne = ligne.concat([
+      H.nomBuche(p.buche),
+      H.libelleComposition(p),
+      comp ? E.fmt(comp.partVert, 0) : '',
       E.fmt(H.steres(p), 2), E.fmt(H.sorti(p), 2), E.fmt(H.restant(p), 2),
-      p.prix ? E.fmt(H.nb(p.prix), 2) : '', H.valeur(p) ? E.fmt(H.valeur(p), 2) : '',
+      vendus ? E.fmt(vendus, 2) : '',
+      recettes ? E.fmt(recettes, 2) : '',
+      vendus > 0 && recettes > 0 ? E.fmt(recettes / vendus, 2) : '',
       p.empile ? new Date(p.empile).toLocaleDateString('fr-FR') : '',
       m ? E.fmt(m.taux, 1) : '', e.texte,
       e.secheVers && !e.sec ? new Date(e.secheVers).toLocaleDateString('fr-FR') : '',
       p.gps ? p.gps.lat.toFixed(5) : '', p.gps ? p.gps.lon.toFixed(5) : '', p.notes || ''
     ]);
+    l.push(ligne);
   });
   return l;
 }
@@ -5396,10 +5579,12 @@ function allerReglages(sec) {
 }
 
 function renderReglagesBois() {
-  var s = H.seuils(A.cfg);
+  var s = H.seuils(A.cfg), d = H.depart(A.cfg);
   if ($('#r-sv')) $('#r-sv').value = s.vert;
   if ($('#r-ss')) $('#r-ss').value = s.sec;
   if ($('#r-sts')) $('#r-sts').value = s.tresSec;
+  if ($('#r-dv')) $('#r-dv').value = d.vert;
+  if ($('#r-ds')) $('#r-ds').value = d.sec;
 }
 function brancherReglagesBois() {
   var maj = function () {
@@ -5413,6 +5598,19 @@ function brancherReglagesBois() {
   };
   ['#r-sv', '#r-ss', '#r-sts'].forEach(function (id) {
     var el = $(id); if (el) el.addEventListener('change', maj);
+  });
+  var majDepart = function () {
+    var v = H.nb($('#r-dv').value), sc = H.nb($('#r-ds').value);
+    var seuilSec = H.seuils(A.cfg).sec;
+    if (!(v > sc && sc > seuilSec && v <= 70)) {
+      toast('Le bois vert doit partir plus haut que le bois mort, lui-même au-dessus du seuil « sec ».');
+      renderReglagesBois(); return;
+    }
+    A.cfg.depart = { vert: v, sec: sc };
+    sauverCfg(); renderPiles(); renderStock(); renderAccueil();
+  };
+  ['#r-dv', '#r-ds'].forEach(function (id) {
+    var el = $(id); if (el) el.addEventListener('change', majDepart);
   });
 }
 
@@ -6181,7 +6379,6 @@ function brancher() {
     });
   });
   brancherReglagesBois();
-  $('#p-nouvelle3').addEventListener('click', function () { ouvrirPile(null); });
   $('#b-csv').addEventListener('click', exportStockCsv);
   $('#b-xlsx').addEventListener('click', exportStockXlsx);
   $('#s-tout').addEventListener('click', sauvegarderTout);
@@ -6279,11 +6476,19 @@ function brancher() {
     });
   });
   $('#r-reset-cfg').addEventListener('click', function () {
-    if (!confirm('Rétablir les essences, qualités et seuils d’origine ? Vos bordereaux ne sont pas touchés.')) return;
-    var mode = A.cfg.mode;
-    A.cfg = E.configDefaut(); A.cfg.mode = mode;
+    /* Ce bouton remettait A.cfg tout entier à ses valeurs d'usine — donc aussi
+       le prix de journée, les taux fiscaux, les prestations renommées, et les
+       marqueurs indiquant que les données ont déjà été reprises. Au
+       redémarrage suivant la reprise repartait et dupliquait tout. On ne
+       touche désormais qu'aux listes de cubage, nommément. */
+    if (!confirm('Rétablir les essences, les qualités et les seuils de cubage ?\n\n' +
+      'Le reste — bordereaux, chantiers, stock, prix de journée, taux — ne bouge pas.')) return;
+    if (!confirm('Confirmer : vos essences et qualités personnalisées seront perdues.')) return;
+    var d = E.configDefaut();
+    ['essences', 'qualites', 'seuilDiamSAP', 'seuilDiamEPC', 'seuilLongueur', 'favoris']
+      .forEach(function (k) { A.cfg[k] = d[k]; });
     sauverCfg(); renderReglages(); renderChipsEss(); renderChipsQual();
-    toast('Listes rétablies.');
+    toast('Listes de cubage rétablies.');
   });
 }
 function choisirEssence() {
@@ -6474,7 +6679,7 @@ var MODULES = {
   bois: {
     nom: 'Bois de chauffage', defaut: 'stock',
     vues: [['stock', '◱', 'Stock'], ['bois', '▦', 'Piles'], ['lieux', '⌖', 'Où ?'],
-    ['fichiers', '▣', 'Fichiers'], ['reglages', '⚙', 'Réglages']]
+    ['fichiers', '▣', 'Export et analyse'], ['reglages', '⚙', 'Réglages']]
   }
 };
 
@@ -6679,6 +6884,7 @@ function xmlEsc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;
 
 /* ------------------------------------------------------------- formulaire */
 var pEss = [], pBuche = 100, pPct = {}, pCotes = [], pPhotos = [];
+var pEtat = 'vert', pPartVert = 70, pHumV = null, pHumS = null;
 
 function formPile(p) {
   var chips = H.ESSENCES.map(function (e) {
@@ -6710,12 +6916,13 @@ function formPile(p) {
     '<div class="carte2" id="p-apercu" style="margin:12px 0"></div>' +
 
     '<div class="grille g2">' +
-    '<div class="champ"><label class="eyebrow" for="p-humi">Humidité (%)</label>' +
-    '<input type="text" id="p-humi" inputmode="decimal" autocomplete="off" placeholder="humidimètre" value="' +
-    (p.humidite != null ? esc(String(p.humidite).replace('.', ',')) : '') + '"></div>' +
-    '<div class="champ"><label class="eyebrow" for="p-prix">Prix au stère (€)</label>' +
-    '<input type="text" id="p-prix" inputmode="decimal" autocomplete="off" value="' +
-    (p.prix != null ? esc(String(p.prix).replace('.', ',')) : '') + '"></div>' +
+    '<label class="eyebrow" style="display:block;margin-top:4px">Ce que j’empile</label>' +
+    '<div class="chips" id="p-etat">' +
+    [['vert', 'Bois vert'], ['sec', 'Bois mort'], ['mixte', 'Les deux']].map(function (x) {
+      return '<button type="button" class="chip" data-etat="' + x[0] + '" aria-pressed="' +
+        ((p.etatBois || 'vert') === x[0]) + '">' + x[1] + '</button>';
+    }).join('') + '</div>' +
+    '<div id="p-bois"></div>' +
     '<div class="champ"><label class="eyebrow" for="p-emp">Mise en pile</label>' +
     '<input type="date" id="p-emp" value="' + (p.empile ? new Date(p.empile).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10)) + '"></div>' +
     '<div class="champ"><label class="eyebrow" for="p-notes">Note</label>' +
@@ -6737,7 +6944,8 @@ function renderPourcents() {
   var ok = Math.round(tot) === 100;
   z.innerHTML = '<div class="carte2" style="margin-top:9px">' +
     '<div class="eyebrow" style="margin-bottom:7px">Proportions ' +
-    '<span style="float:right;font-family:var(--mono);color:' + (ok ? 'var(--doux)' : '#B4231F') + '">' + Math.round(tot) + ' %</span></div>' +
+    '<span data-pcttot style="float:right;font-family:var(--mono);color:' +
+    (ok ? 'var(--doux)' : '#B4231F') + '">' + Math.round(tot) + ' %</span></div>' +
     pEss.map(function (c) {
       var v = pPct[c] != null ? pPct[c] : '';
       return '<div style="display:flex;align-items:center;gap:9px;margin:6px 0">' +
@@ -6745,7 +6953,52 @@ function renderPourcents() {
         '<input type="range" min="0" max="100" step="5" data-pctr="' + c + '" value="' + (H.nb(v) || 0) + '" style="flex:2">' +
         '<input type="text" inputmode="numeric" data-pct="' + c + '" value="' + esc(String(v)) + '" style="width:44px;text-align:right" class="mini"><span style="font-size:12px;color:var(--doux)">%</span></div>';
     }).join('') +
-    (ok ? '' : '<p class="muted" style="font-size:11.5px;margin:4px 0 0;color:#B4231F">Le total doit faire 100 %.</p>') + '</div>';
+    '<p class="muted" data-pctav style="font-size:11.5px;margin:4px 0 0;color:#B4231F"' +
+    (ok ? ' hidden' : '') + '>Le total doit faire 100 %.</p></div>';
+}
+/* Le total et son avertissement, sans toucher aux champs. */
+function majTotalPourcents() {
+  var z = $('#p-pourcents'); if (!z) return;
+  var tot = pEss.reduce(function (t, c) { return t + (H.nb(pPct[c]) || 0); }, 0);
+  var ok = Math.round(tot) === 100;
+  var e = z.querySelector('[data-pcttot]');
+  if (e) {
+    e.textContent = Math.round(tot) + ' %';
+    e.style.color = ok ? 'var(--doux)' : '#B4231F';
+  }
+  var av = z.querySelector('[data-pctav]');
+  if (av) av.hidden = ok;
+}
+/* Les humidités de départ, selon ce qu'on empile. Une seule si la pile est
+   homogène, deux si elle est mélangée — ce sont deux teneurs différentes. */
+function renderBois() {
+  var z = $('#p-bois'); if (!z) return;
+  var d = H.depart(A.cfg);
+  var champ = function (id, lib, val, repere) {
+    return '<div class="champ" style="margin:0"><label class="eyebrow" for="' + id + '">' + lib + '</label>' +
+      '<input type="text" id="' + id + '" inputmode="decimal" autocomplete="off" placeholder="' +
+      E.fmt(repere, 0) + '" value="' + (val != null ? esc(String(val).replace('.', ',')) : '') + '"></div>';
+  };
+  var pv = pEtat === 'mixte'
+    ? '<div class="carte2" style="margin:9px 0;padding:10px 11px">' +
+      '<div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:6px">' +
+      '<span>Vert <b class="num" id="p-partvert-n">' + Math.round(pPartVert) + ' %</b></span>' +
+      '<span>Mort <b class="num" id="p-partsec-n">' + Math.round(100 - pPartVert) + ' %</b></span></div>' +
+      '<input type="range" id="p-partvert" min="0" max="100" step="5" value="' +
+      Math.round(pPartVert) + '" style="width:100%"></div>'
+    : '';
+  z.innerHTML = pv + '<div class="grille g2">' +
+    (pEtat !== 'sec' ? champ('p-humi', pEtat === 'mixte' ? 'Humidité du vert (%)' : 'Humidité (%)',
+      pHumV, d.vert) : '') +
+    (pEtat !== 'vert' ? champ('p-humsec', pEtat === 'mixte' ? 'Humidité du mort (%)' : 'Humidité (%)',
+      pHumS, d.sec) : '') +
+    '</div>' +
+    '<p class="muted" style="font-size:11.5px;margin:5px 0 0">' +
+    (pEtat === 'vert' ? 'Laissé vide, le séchage part de ' + E.fmt(d.vert, 0) + ' %.'
+      : pEtat === 'sec' ? 'Du bois mort a déjà séché sur pied : le séchage part de ' +
+        E.fmt(d.sec, 0) + ' %, la pile sera prête bien plus tôt.'
+      : 'La date de séchage suit la part la plus humide : la pile n’est prête que ' +
+        'quand son bois vert l’est.') + '</p>';
 }
 function pctOk() {
   if (pEss.length < 2) return true;
@@ -6797,7 +7050,7 @@ function renderPhotos() {
   }).join('');
   z.innerHTML = vign + (pPhotos.length < 3
     ? '<label class="btn btn-min" style="display:inline-block;cursor:pointer">+ photo' +
-      '<input type="file" accept="image/*" capture="environment" id="p-photo-in" hidden></label>'
+      '<input type="file" accept="image/*" multiple id="p-photo-in" hidden></label>'
     : '');
 }
 function ajouterPhoto(file) {
@@ -6846,9 +7099,18 @@ function apercuPile() {
 function lirePile() {
   lireCotes();
   var d = $('#p-emp') && $('#p-emp').value;
-  var hum = $('#p-humi') ? H.nb($('#p-humi').value) : 0;
-  var prix = $('#p-prix') ? H.nb($('#p-prix').value) : 0;
+  var rep = H.depart(A.cfg);
+  var hv = $('#p-humi') ? H.nb($('#p-humi').value) : 0;
+  var hs = $('#p-humsec') ? H.nb($('#p-humsec').value) : 0;
+  if (pEtat !== 'sec' && !hv) hv = rep.vert;
+  if (pEtat !== 'vert' && !hs) hs = rep.sec;
+  /* L'humidité qui pilote le séchage est celle de la part la plus humide. */
+  var hum = Math.max(pEtat === 'sec' ? 0 : hv, pEtat === 'vert' ? 0 : hs);
   return {
+    etatBois: pEtat,
+    partVert: pEtat === 'mixte' ? Math.round(pPartVert) : (pEtat === 'vert' ? 100 : 0),
+    humiditeVert: pEtat !== 'sec' && hv > 0 ? hv : null,
+    humiditeSec: pEtat !== 'vert' && hs > 0 ? hs : null,
     nom: $('#p-nom') ? $('#p-nom').value.trim() : '',
     lieu: $('#p-lieu') ? $('#p-lieu').value.trim() : '',
     essences: pEss.slice(),
@@ -6856,7 +7118,6 @@ function lirePile() {
     buche: pBuche,
     cotes: cotesPropres(),
     humidite: hum > 0 ? hum : null,
-    prix: prix > 0 ? prix : null,
     empile: d ? new Date(d + 'T12:00:00').getTime() : null,
     notes: $('#p-notes') ? $('#p-notes').value.trim() : ''
   };
@@ -6868,6 +7129,10 @@ function ouvrirPile(id) {
   pEss = (p.essences || []).slice();
   pBuche = p.buche == null ? 100 : Number(p.buche);
   pPct = {}; if (p.pourcents) Object.keys(p.pourcents).forEach(function (k) { pPct[k] = p.pourcents[k]; });
+  pEtat = p.etatBois || 'vert';
+  pPartVert = p.partVert != null ? H.nb(p.partVert) : 70;
+  pHumV = p.humiditeVert != null ? p.humiditeVert : (p.etatBois ? null : p.humidite);
+  pHumS = p.humiditeSec != null ? p.humiditeSec : null;
   var cs = H.cotes(p);
   pCotes = cs.length
     ? cs.map(function (c) { return { lon: c.lon, hauteurs: (c.hauteurs || []).slice() }; })
@@ -6876,7 +7141,7 @@ function ouvrirPile(id) {
   var gps = p.gps || null;
 
   modale(id ? 'Modifier la pile' : 'Nouvelle pile', formPile(p));
-  renderPourcents(); renderCotes(); renderPhotos(); apercuPile();
+  renderPourcents(); renderBois(); renderCotes(); renderPhotos(); apercuPile();
 
   $('#p-buche').addEventListener('click', function (e) {
     var b = e.target.closest('[data-buche]'); if (!b) return;
@@ -6891,13 +7156,40 @@ function ouvrirPile(id) {
     b.setAttribute('aria-pressed', String(i < 0));
     renderPourcents(); apercuPile();
   });
+  /* Reconstruire le bloc à chaque caractère détruisait le champ en cours de
+     saisie, et le clavier du téléphone se refermait. On met donc à jour le
+     voisin et le total, jamais le champ dans lequel on écrit. */
   $('#p-pourcents').addEventListener('input', function (e) {
     var r = e.target.closest('[data-pctr]'), t = e.target.closest('[data-pct]');
-    if (r) { pPct[r.dataset.pctr] = H.nb(r.value); renderPourcents(); }
-    else if (t) { pPct[t.dataset.pct] = H.nb(t.value); renderPourcents(); }
+    if (r) {
+      pPct[r.dataset.pctr] = H.nb(r.value);
+      var jumeau = $('#p-pourcents [data-pct="' + r.dataset.pctr + '"]');
+      if (jumeau) jumeau.value = r.value;
+    } else if (t) {
+      pPct[t.dataset.pct] = H.nb(t.value);
+      var curseur = $('#p-pourcents [data-pctr="' + t.dataset.pct + '"]');
+      if (curseur) curseur.value = H.nb(t.value) || 0;
+    } else return;
+    majTotalPourcents();
   });
   $('#p-cotes').addEventListener('input', apercuPile);
-  if ($('#p-prix')) $('#p-prix').addEventListener('input', apercuPile);
+  $('#p-etat').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-etat]'); if (!b) return;
+    pEtat = b.dataset.etat;
+    $$('#p-etat .chip').forEach(function (x) {
+      x.setAttribute('aria-pressed', String(x.dataset.etat === pEtat));
+    });
+    renderBois(); apercuPile();
+  });
+  $('#p-bois').addEventListener('input', function (e) {
+    var pv = e.target.closest('#p-partvert');
+    if (pv) {
+      pPartVert = H.nb(pv.value);
+      var n = $('#p-partvert-n'); if (n) n.textContent = Math.round(pPartVert) + ' %';
+      var m = $('#p-partsec-n'); if (m) m.textContent = Math.round(100 - pPartVert) + ' %';
+    }
+    apercuPile();
+  });
   $('#p-cotes').addEventListener('click', function (e) {
     var hmes = e.target.closest('[data-hmes]'), hdel = e.target.closest('[data-hdel]'),
       cdel = e.target.closest('[data-cotedel]'), coteb = e.target.closest('#p-coteb');
@@ -6907,7 +7199,8 @@ function ouvrirPile(id) {
     else if (coteb) { lireCotes(); pCotes.push({ lon: '', hauteurs: [''] }); renderCotes(); apercuPile(); }
   });
   $('#p-photos').addEventListener('change', function (e) {
-    var i = e.target.closest('#p-photo-in'); if (i && i.files[0]) ajouterPhoto(i.files[0]);
+    var i = e.target.closest('#p-photo-in');
+    if (i && i.files) { [].slice.call(i.files).forEach(ajouterPhoto); i.value = ''; }
   });
   $('#p-photos').addEventListener('click', function (e) {
     var d = e.target.closest('[data-photodel]'); if (d) { pPhotos.splice(+d.dataset.photodel, 1); renderPhotos(); }
@@ -7007,23 +7300,42 @@ function ouvrirSortiePile(id) {
   var p = pile(id); if (!p) return;
   var reste = H.restant(p);
   var h = (p.mouvements || []).slice().sort(function (x, y) { return y.date - x.date; });
-  var MOTIFS = ['Vendu', 'Déplacé', 'Rentré', 'Brûlé'];
+  /* Le motif commande le reste : vendre demande un acheteur et un prix,
+     déplacer demande une destination, rentrer chez soi ne demande rien. */
+  var MOTIFS = [
+    { c: 'Vendu', n: 'Vendu', prix: true },
+    { c: 'Déplacé', n: 'Déplacé', vers: true },
+    { c: 'Rentré', n: 'Rentré pour mon chauffage' },
+    { c: 'Brûlé', n: 'Brûlé sur place' }
+  ];
   modale('Sortie — ' + (p.nom || 'pile'),
-    '<p class="muted" style="font-size:12.5px;margin:0 0 10px">Il reste ' + E.fmt(reste, 2) + ' stères sur ' + E.fmt(H.steres(p), 2) + '.</p>' +
-    '<div class="grille g2">' +
-    '<div class="champ"><label class="eyebrow" for="x-st">Stères sortis</label>' +
-    '<input type="text" id="x-st" class="gros" inputmode="decimal" autocomplete="off"></div>' +
+    '<p class="muted" style="font-size:12.5px;margin:0 0 10px">Il reste ' +
+    E.fmt(reste, 2) + ' stères sur ' + E.fmt(H.steres(p), 2) + '.</p>' +
     '<div class="champ"><label class="eyebrow" for="x-motif">Motif</label>' +
-    '<select id="x-motif">' + MOTIFS.map(function (m) { return '<option>' + m + '</option>'; }).join('') + '</select></div>' +
-    '<div class="champ"><label class="eyebrow" for="x-qui">À qui / précision</label>' +
-    '<input type="text" id="x-qui" autocomplete="off" placeholder="facultatif"></div>' +
+    '<select id="x-motif">' + MOTIFS.map(function (m) {
+      return '<option value="' + m.c + '">' + m.n + '</option>';
+    }).join('') + '</select></div>' +
+    '<label class="eyebrow" style="display:block">Quantité sortie</label>' +
+    '<div class="chips" id="x-mode">' +
+    '<button type="button" class="chip" data-xmode="st" aria-pressed="true">En stères</button>' +
+    '<button type="button" class="chip" data-xmode="dim" aria-pressed="false">Par dimensions</button>' +
+    '</div><div id="x-qte" style="margin-top:9px"></div>' +
+    '<div id="x-vente"><div class="grille g2">' +
+    '<div class="champ"><label class="eyebrow" for="x-qui">Acheteur</label>' +
+    '<input type="text" id="x-qui" list="liste-clients" autocomplete="off" placeholder="facultatif"></div>' +
     '<div class="champ"><label class="eyebrow" for="x-prix">Prix total (€)</label>' +
     '<input type="text" id="x-prix" inputmode="decimal" autocomplete="off" placeholder="' +
-    (p.prix ? 'défaut ' + E.fmt(reste * H.nb(p.prix), 0) : 'facultatif') + '"></div></div>' +
-    '<div id="x-depl" hidden><div class="btn-rang" style="margin:2px 0 4px">' +
-    '<button class="btn" id="x-gps">Position du nouvel emplacement</button>' +
+    (p.prix ? 'défaut ' + E.fmt(reste * H.nb(p.prix), 0) : 'facultatif') + '"></div></div></div>' +
+    '<div id="x-depl" hidden>' +
+    '<div class="champ"><label class="eyebrow" for="x-lieu">Nouvel emplacement</label>' +
+    '<input type="text" id="x-lieu" list="lieux-connus" autocomplete="off" placeholder="hangar, cour…"></div>' +
+    '<div class="btn-rang" style="margin:2px 0 4px">' +
+    '<button class="btn btn-min" id="x-gps">Relever la position</button>' +
     '<span class="muted" id="x-gps-etat" style="font-size:12px;align-self:center"></span></div>' +
-    '<p class="muted" style="font-size:11.5px;margin:0 0 4px">Un déplacement crée une pile à la nouvelle position.</p></div>' +
+    '<p class="muted" style="font-size:11.5px;margin:0 0 4px">Un déplacement crée une nouvelle pile. ' +
+    'La position peut attendre : vous la relèverez en modifiant la pile, une fois sur place.</p></div>' +
+    '<div class="champ"><label class="eyebrow" for="x-note">Note</label>' +
+    '<input type="text" id="x-note" autocomplete="off" placeholder="facultatif"></div>' +
     '<div class="btn-rang"><button class="btn primaire" id="x-ok">Enregistrer</button>' +
     '<button class="btn" id="x-tout">Tout sortir</button></div>' +
     (h.length ? '<p class="muted" style="font-size:12px;margin:14px 0 5px">Sorties précédentes</p>' +
@@ -7033,38 +7345,107 @@ function ouvrirSortiePile(id) {
           (m.qui ? ' · ' + esc(m.qui) : '') + (m.prix ? ' · ' + E.fmt(m.prix, 0) + ' €' : '') +
           (m.vers ? ' → ' + esc(m.vers) : '') + '</small></div></div>';
       }).join('') : ''));
-  var gpsDepl = null;
-  $('#x-motif').addEventListener('change', function () { $('#x-depl').hidden = this.value !== 'Déplacé'; });
+
+  var gpsDepl = null, xMode = 'st';
+
+  /* On sort rarement une pile au stère près : le plus souvent on connaît la
+     longueur et la hauteur de ce qu'on a chargé. Le volume s'en déduit avec
+     la longueur de bûche de la pile. */
+  var renderQte = function () {
+    var z = $('#x-qte');
+    z.innerHTML = xMode === 'st'
+      ? '<div class="champ" style="margin:0"><input type="text" id="x-st" class="gros" ' +
+        'inputmode="decimal" autocomplete="off" placeholder="stères"></div>'
+      : '<div class="grille g2">' +
+        '<div class="champ" style="margin:0"><label class="eyebrow" for="x-lon">Longueur (m)</label>' +
+        '<input type="text" id="x-lon" class="gros" inputmode="decimal" autocomplete="off"></div>' +
+        '<div class="champ" style="margin:0"><label class="eyebrow" for="x-haut">Hauteur (m)</label>' +
+        '<input type="text" id="x-haut" class="gros" inputmode="decimal" autocomplete="off"></div>' +
+        '</div><p class="muted" id="x-calc" style="font-size:12px;margin:6px 0 0">' +
+        'Bûches de ' + H.nomBuche(p.buche) + '.</p>';
+    if (xMode === 'dim') {
+      z.addEventListener('input', majCalc);
+      majCalc();
+    }
+  };
+  function volumeSaisi() {
+    if (xMode === 'st') return H.nb($('#x-st') ? $('#x-st').value : 0);
+    var lon = H.nb($('#x-lon') ? $('#x-lon').value : 0);
+    var ht = H.nb($('#x-haut') ? $('#x-haut').value : 0);
+    if (lon <= 0 || ht <= 0) return 0;
+    var c = H.coefBuche(p.buche, A.cfg) || 1;
+    return H.arr(lon * ht * (H.nb(p.buche) / 100) / c, 2);
+  }
+  function majCalc() {
+    var e = $('#x-calc'); if (!e) return;
+    var v = volumeSaisi();
+    e.textContent = v > 0
+      ? 'Bûches de ' + H.nomBuche(p.buche) + ' — soit ' + E.fmt(v, 2) + ' stères.'
+      : 'Bûches de ' + H.nomBuche(p.buche) + '.';
+  }
+  renderQte();
+  $('#x-mode').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-xmode]'); if (!b) return;
+    xMode = b.dataset.xmode;
+    $$('#x-mode .chip').forEach(function (x) {
+      x.setAttribute('aria-pressed', String(x.dataset.xmode === xMode));
+    });
+    renderQte();
+  });
+
+  var majMotif = function () {
+    var m = MOTIFS.filter(function (x) { return x.c === $('#x-motif').value; })[0] || MOTIFS[0];
+    $('#x-vente').hidden = !m.prix;
+    $('#x-depl').hidden = !m.vers;
+  };
+  $('#x-motif').addEventListener('change', majMotif);
+  majMotif();
+
   $('#x-gps').addEventListener('click', function () {
     var b = this;
     releverPosition(b, function (pt) { gpsDepl = pt; $('#x-gps-etat').textContent = 'Relevée ' + G.fmtPrecision(pt); });
   });
+
   var noter = function (st) {
     if (st <= 0) { toast('Quantité attendue.'); return; }
+    if (st > reste + 0.01 && !confirm('Vous sortez ' + E.fmt(st, 2) +
+      ' stères alors qu’il n’en reste que ' + E.fmt(reste, 2) + '. Continuer ?')) return;
     var motif = $('#x-motif').value;
+    var vend = motif === 'Vendu', depl = motif === 'Déplacé';
     var mvt = { date: Date.now(), st: H.arr(st, 2), motif: motif };
-    var qui = $('#x-qui').value.trim(); if (qui) mvt.qui = qui;
-    var prix = H.nb($('#x-prix').value); if (prix > 0) mvt.prix = H.arr(prix, 2);
-    else if (motif === 'Vendu' && p.prix) mvt.prix = H.arr(st * H.nb(p.prix), 2);
+    var note = $('#x-note').value.trim(); if (note) mvt.note = note;
+    if (vend) {
+      var qui = $('#x-qui').value.trim();
+      if (qui) { mvt.qui = qui; proposerAjoutListe('clients', qui); }
+      var prix = H.nb($('#x-prix').value);
+      if (prix > 0) mvt.prix = H.arr(prix, 2);
+      else if (p.prix) mvt.prix = H.arr(st * H.nb(p.prix), 2);
+    }
     p.mouvements = p.mouvements || [];
-    if (motif === 'Déplacé') {
+    if (depl) {
+      var lieu = $('#x-lieu').value.trim();
       var np = {
-        id: uid(), nom: (p.nom || 'Pile') + ' (déplacé)',
-        essences: (p.essences || []).slice(), pourcents: Object.assign({}, p.pourcents || {}),
+        id: uid(), nom: (p.nom || 'Pile') + (lieu ? ' — ' + lieu : ' (déplacé)'),
+        lieu: lieu, essences: (p.essences || []).slice(),
+        pourcents: Object.assign({}, p.pourcents || {}),
+        etatBois: p.etatBois || null, partVert: p.partVert != null ? p.partVert : null,
+        humiditeVert: p.humiditeVert || null, humiditeSec: p.humiditeSec || null,
         buche: p.buche || 100, cotes: [], humidite: p.humidite || null, prix: p.prix || null,
         empile: p.empile || Date.now(), notes: 'Déplacé depuis ' + (p.nom || 'pile'),
         gps: gpsDepl, photos: [], mesures: (p.mesures || []).slice(), mouvements: [],
         steresManuel: H.arr(st, 2), maj: Date.now()
       };
-      A.piles.push(np); mvt.vers = np.nom;
+      A.piles.push(np);
+      mvt.vers = np.nom;
+      if (lieu) proposerAjoutListe('lieux', lieu);
     }
     p.mouvements.push(mvt); p.maj = Date.now();
     sauverPiles().then(function () {
       fermerModale(); renderPiles(); renderStock(); renderLieux(); renderAccueil(); renderFichiersModule();
-      toast('Sortie enregistrée.');
+      toast(depl ? 'Déplacement enregistré.' : 'Sortie enregistrée.');
     });
   };
-  $('#x-ok').addEventListener('click', function () { noter(H.nb($('#x-st').value)); });
+  $('#x-ok').addEventListener('click', function () { noter(volumeSaisi()); });
   $('#x-tout').addEventListener('click', function () { noter(reste); });
 }
 
@@ -7096,7 +7477,7 @@ function renderPiles() {
     '<select id="sel-vuepile">' +
     opt('stock', 'Piles en stock', actives.length) +
     opt('sorties', 'Sorties', mvts.length) +
-    opt('vides', 'Piles épuisées', vides.length) +
+    opt('vides', 'Piles entièrement sorties', vides.length) +
     '</select></div>';
 
   if (vue === 'sorties') { z.innerHTML = entete + htmlSorties(mvts); return; }
@@ -7122,6 +7503,7 @@ function renderPiles() {
       '<div class="li-c"><b>' + esc(p.nom || 'Pile') + ' — ' + E.fmt(res, 2) + ' st' +
       (H.valeur(p) ? ' · ' + E.fmt(H.valeur(p), 0) + ' €' : '') + '</b>' +
       '<small>' + esc(ess || 'essences non précisées') + ' · ' + H.nomBuche(p.buche) +
+      (H.libelleComposition(p) ? ' · ' + esc(H.libelleComposition(p)) : '') +
       (res < tot ? ' · ' + E.fmt(H.sorti(p), 2) + ' st sortis sur ' + E.fmt(tot, 2) : '') +
       (t.d != null ? ' · ' + esc(G.fmtDistance(t.d)) : '') + '<br>' + badgeEtat(e) + '</small></div></div>' +
       '<div class="li-actions">' +
@@ -8287,7 +8669,8 @@ function renderReglagesAlertes() {
   if ($('#r-cot')) $('#r-cot').value = (A.cfg && A.cfg.tauxCotisations != null) ? A.cfg.tauxCotisations : '';
   if ($('#r-imp')) $('#r-imp').value = (A.cfg && A.cfg.tauxImpot != null) ? A.cfg.tauxImpot : '';
   if ($('#r-abv')) $('#r-abv').value = Math.round(((A.cfg && A.cfg.abattementVente != null) ? A.cfg.abattementVente : 0.71) * 100);
-  if ($('#r-cfe')) $('#r-cfe').value = (A.cfg && A.cfg.cfeUnitaire) || '';
+  if ($('#r-cfe')) $('#r-cfe').value = (A.cfg && A.cfg.cfeAnnuelle) || '';
+  if ($('#r-cfeca')) $('#r-cfeca').value = (A.cfg && A.cfg.cfeCaRef) || '';
   if ($('#r-l100')) $('#r-l100').value = (A.cfg && A.cfg.litres100) || 9;
   if ($('#r-pl')) $('#r-pl').value = (A.cfg && A.cfg.prixLitre) || 1.75;
   if ($('#r-rd')) $('#r-rd').value = (A.cfg && A.cfg.joursRelanceDevis) || 21;
@@ -8300,10 +8683,11 @@ function brancherReglagesAlertes() {
     A.cfg.tauxImpot = FIN.nb($('#r-imp').value) || null;
     var ab = FIN.nb($('#r-abv').value);
     A.cfg.abattementVente = (ab > 0 && ab < 100) ? ab / 100 : 0.71;
-    A.cfg.cfeUnitaire = FIN.nb($('#r-cfe').value) || null;
+    A.cfg.cfeAnnuelle = FIN.nb($('#r-cfe').value) || null;
+    A.cfg.cfeCaRef = FIN.nb($('#r-cfeca').value) || null;
     sauverCfg(); renderRevient(); renderAnalyses();
   };
-  ['#r-cot', '#r-imp', '#r-abv', '#r-cfe'].forEach(function (id) {
+  ['#r-cot', '#r-imp', '#r-abv', '#r-cfe', '#r-cfeca'].forEach(function (id) {
     var el = $(id); if (el) el.addEventListener('change', majFisc);
   });
   ['#r-l100', '#r-pl'].forEach(function (id) {
@@ -8932,6 +9316,40 @@ function ouvrirEntreeListe(nom) {
     });
   });
 }
+/* À l'import, les listes se remplissent seules : demander confirmation pour
+   chacun des cinquante noms d'un fichier serait intenable. */
+function ajouterListe(k, nom) {
+  if (!nom || !LISTES[k]) return false;
+  var l = listeDe(k), bas = String(nom).trim().toLowerCase();
+  if (!bas || l.some(function (x) { return x.toLowerCase() === bas; })) return false;
+  l.push(String(nom).trim());
+  return true;
+}
+/* Tout ce qu'un lot de données apporte comme noms nouveaux, d'un coup. */
+function moissonnerListes(src) {
+  var n = 0;
+  (src.clients || []).forEach(function (x) { if (ajouterListe('clients', x)) n++; });
+  (src.proprios || []).forEach(function (x) { if (ajouterListe('proprios', x)) n++; });
+  (src.chantiers || []).forEach(function (c) {
+    if (ajouterListe('clients', c.donneur)) n++;
+    if (ajouterListe('proprios', c.proprietaire)) n++;
+    if (ajouterListe('lieux', c.lieu)) n++;
+  });
+  (src.sorties || []).forEach(function (v) { if (ajouterListe('clients', v.client)) n++; });
+  (src.piles || []).forEach(function (v) { if (ajouterListe('lieux', v.lieu)) n++; });
+  (src.journees || []).forEach(function (j) {
+    if (ajouterListe('lieux', j.lieu)) n++;
+    if (ajouterListe('lieux', j.commune)) n++;
+  });
+  if (n) {
+    ecrire('bordcub.clients', listeDe('clients'));
+    ecrire('bordcub.proprios', listeDe('proprios'));
+    ecrire('bordcub.lieux', listeDe('lieux'));
+    majDatalistClients(); majDatalistLieux();
+  }
+  return n;
+}
+
 /* Un nom saisi ailleurs qu'ici : on propose de l'ajouter, on ne le fait pas
    à sa place. Retourne une promesse pour ne pas bloquer l'enregistrement. */
 function proposerAjoutListe(k, nom) {
@@ -9576,6 +9994,9 @@ function validerImportStock() {
     });
   }
 
+  /* Les clients rencontrés dans le fichier rejoignent la liste : c'est tout
+     l'intérêt d'importer plutôt que de ressaisir. */
+  moissonnerListes({ sorties: A.sorties });
   Promise.all([sauverArticles(), sauverFournisseurs(), sauverCommandes(), sauverSorties()])
     .then(function () {
       A.impStock = null;
@@ -10932,6 +11353,11 @@ function fiscStock() {
     abattement: c.abattementVente != null ? c.abattementVente : 0.71,
     cotisations: FIN.nb(c.tauxCotisations) / 100,
     impot: FIN.nb(c.tauxImpot) / 100,
+    /* La CFE est un montant annuel fixe. Rapportée au chiffre d'affaires
+       d'une année type, elle donne la part qu'elle pèse sur chaque euro
+       encaissé — et se recalcule seule quand l'avis change. */
+    cfeTaux: (FIN.nb(c.cfeAnnuelle) > 0 && FIN.nb(c.cfeCaRef) > 0)
+      ? FIN.nb(c.cfeAnnuelle) / FIN.nb(c.cfeCaRef) : 0,
     cfeUnitaire: FIN.nb(c.cfeUnitaire)
   };
 }
@@ -11329,7 +11755,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.11.2-20260801-1030';
+var VERSION = '4.13.1-20260801-1900';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
