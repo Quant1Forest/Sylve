@@ -44,6 +44,20 @@ button{cursor:pointer;background:none;border:none}
   font-size:10.5px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;
   color:var(--gris);
 }
+/* Petit « + liste » posé dans l'intitulé d'un champ : ajoute la valeur
+   saisie à la liste déroulante sans quitter le formulaire. */
+.mini-plus{
+  margin-left:7px;padding:1px 6px;border:1px solid var(--trait);border-radius:20px;
+  background:transparent;color:var(--gris);font:inherit;font-size:9.5px;cursor:pointer;
+  letter-spacing:.06em;
+}
+.mini-plus:hover{border-color:var(--encre);color:var(--encre)}
+.mini-plus[disabled]{opacity:.45;cursor:default}
+.jour-pris{font-size:11.5px;color:#8A6A00;margin:3px 0 0 2px;line-height:1.35}
+/* Sous-titre d'un bloc de la fiche : dit à quoi le bloc sert, pour qu'on
+   ne confonde plus le prévu (Journées) et le réel (Temps passé). */
+.sous-titre-bloc{font-size:12px;color:var(--doux);margin:0 0 10px;line-height:1.4}
+.sous-titre-bloc b{font-weight:700;color:var(--encre)}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 .muted{color:var(--gris)}
 
@@ -61,8 +75,7 @@ main{flex:1;padding:14px 14px 96px;max-width:1240px;width:100%;margin:0 auto}
 body.v-reglages #b-bordereau{display:none}
 body:not(.m-cubage) .mod-cubage,
 body:not(.m-bois) .mod-bois,
-body:not(.m-ent) .mod-ent,
-body:not(.m-chantiers) .mod-import{display:none}
+body:not(.m-ent) .mod-ent{display:none}
 .st{display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;white-space:nowrap;color:#fff}
 .retard{color:#B4231F;font-size:11.5px}
 .ligne-trav{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center;padding:7px 0;border-bottom:1px solid var(--trait)}
@@ -422,6 +435,7 @@ td.act{width:1%;padding:3px 6px}
   <header class="bandeau no-print">
     <div class="bandeau-in">
       <button class="bandeau-btn" id="b-accueil" title="Accueil Sylve" aria-label="Accueil">◈</button>
+      <button class="bandeau-btn" id="b-retour" title="Revenir au menu" aria-label="Retour" hidden>←</button>
       <div class="bandeau-nav">
         <select id="b-module" aria-label="Changer de partie"></select>
       </div>
@@ -767,6 +781,22 @@ td.act{width:1%;padding:3px 6px}
         </p>
       </div>
 
+      <p class="eyebrow reg-titre" data-sec="ent" data-sous="import" style="margin:22px 0 8px">Import de données</p>
+      <div class="carte" data-sec="ent" data-sous="import" id="c-import">
+        <div class="carte-titre"><h2>Reprendre l'historique</h2></div>
+        <p class="muted" style="font-size:12.5px;margin:0 0 10px">
+          Vos anciens chantiers alimentent les rendements et l'estimatif. Saisissez-les
+          un par un dans le carnet, ou importez-les ici depuis un tableur. Le stock a
+          son propre bouton d'import, dans l'inventaire.
+        </p>
+        <div class="btn-rang">
+          <button class="btn" id="imp-modele">Télécharger le modèle</button>
+          <label class="btn" style="cursor:pointer">Importer un CSV
+            <input type="file" accept=".csv,text/csv" id="imp-fichier" hidden></label>
+        </div>
+        <div id="imp-resultat"></div>
+      </div>
+
       <div class="carte" data-sec="bois" id="c-bois-regl">
         <h2>Seuils d'humidité</h2>
         <p class="muted" style="font-size:12px;margin:0 0 10px">Tels que lus à l'humidimètre. Quatre états : vert, en séchage, sec, très sec.</p>
@@ -912,19 +942,6 @@ td.act{width:1%;padding:3px 6px}
         <div class="carte-titre"><h2>Carnet</h2>
           <button class="btn primaire btn-min" id="c-nouveau">Nouveau chantier</button></div>
         <div id="carnet-totaux"></div>
-      </div>
-      <div class="carte mod-import" id="c-import">
-        <div class="carte-titre"><h2>Reprendre l'historique</h2></div>
-        <p class="muted" style="font-size:12.5px;margin:0 0 10px">
-          Vos anciens chantiers alimentent les rendements et l'estimatif. Saisissez-les
-          un par un, ou importez-les depuis un tableur.
-        </p>
-        <div class="btn-rang">
-          <button class="btn" id="imp-modele">Télécharger le modèle</button>
-          <label class="btn" style="cursor:pointer">Importer un CSV
-            <input type="file" accept=".csv,text/csv" id="imp-fichier" hidden></label>
-        </div>
-        <div id="imp-resultat"></div>
       </div>
       <div class="carte">
         <div class="carte-titre"><h2>Chantiers</h2></div>
@@ -1073,6 +1090,7 @@ td.act{width:1%;padding:3px 6px}
           <span><i style="background:#2E7D46"></i>confirmé</span>
           <span><i style="background:#B98A00"></i>provisoire (devis)</span>
           <span><i style="background:#1D6FB8"></i>travaillé</span>
+          <span id="cal-leg-sel" hidden><i style="background:var(--encre)"></i>jour retenu pour ce chantier</span>
         </div>
         <div id="cal-charge"></div>
       </div>
@@ -4469,7 +4487,7 @@ function sauver() {
     }
   }, 350);
 }
-function sauverCfg() { ecrire('bordcub.cfg', A.cfg); }
+function sauverCfg() { return ecrire('bordcub.cfg', A.cfg); }
 
 /* ------------------------------------------------------------- couleur */
 function appliquerCouleur() {
@@ -5858,6 +5876,7 @@ function brancher() {
     if (b) { A.secReglages = b.dataset.regl; renderReglagesNav(); }
   });
   $('#b-accueil').addEventListener('click', allerAccueil);
+  $('#b-retour').addEventListener('click', allerMenuParent);
   $('#b-module').addEventListener('change', function () { allerModule(this.value); });
   $('#b-ctx').addEventListener('click', function (e) {
     var b = e.target.closest('button'); if (!b) return;
@@ -5881,6 +5900,10 @@ function brancher() {
   document.addEventListener('click', function (ev) {
     var t = ev.target.closest ? ev.target.closest('[data-aller]') : null;
     if (t) aller(t.dataset.aller);
+  });
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest ? ev.target.closest('[data-ajlist]') : null;
+    if (b) ajouterAListeDepuisChamp(b.dataset.ajlist, b.dataset.ajchamp);
   });
   $('#b-entete').addEventListener('click', ouvrirEntete);
   $('#modale-x').addEventListener('click', fermerModale);
@@ -6020,6 +6043,9 @@ function brancher() {
     if (o) ouvrirChantier(o.dataset.chouvrir);
     else if (t) ouvrirTemps(t.dataset.chtemps);
     else if (s) ouvrirStatut(s.dataset.chstatut);
+  });
+  $('#fiche-chantier').addEventListener('change', function (e) {
+    if (e.target && e.target.id === 'f-choix' && e.target.value) ouvrirChantier(e.target.value);
   });
   $('#fiche-chantier').addEventListener('click', function (e) {
     var id = A.chOuvert, c = chantier(id);
@@ -6685,6 +6711,17 @@ var MODULES = {
 
 /* Le bandeau porte le nom de la partie ouverte, et permet d'en changer
    sans repasser par l'accueil. L'action à droite dépend du module. */
+var NOMS_GROUPE = { entreprise: 'Mon entreprise' };
+
+/* Remonter d'un cran : le menu de la partie si le module en a une,
+   l'accueil sinon. */
+function allerMenuParent() {
+  var g = (MODULES[A.module] || {}).groupe;
+  if (!g) { allerAccueil(); return; }
+  document.body.classList.add('accueil-ouvert');
+  aller(g);
+}
+
 var ACTIONS_MODULE = {
   cubage: [['b-entete2', 'En-tête']],
   bois: [['b-pile', '+ Pile']],
@@ -6704,6 +6741,15 @@ function majBandeauModule() {
   sel.innerHTML =
     (ent.length ? '<optgroup label="Entreprise">' + ent.join('') + '</optgroup>' : '') +
     (out.length ? '<optgroup label="Outils de terrain">' + out.join('') + '</optgroup>' : '');
+  /* Le retour ne remonte que d'un cran : depuis un module d'une partie
+     (Entreprise), il ramène au menu de cette partie. Ailleurs, l'accueil
+     suffit déjà : le bouton reste caché plutôt que de doubler ◈. */
+  var ret = $('#b-retour');
+  if (ret) {
+    var g = (MODULES[A.module] || {}).groupe;
+    ret.hidden = !g;
+    if (g) ret.title = 'Revenir à « ' + (NOMS_GROUPE[g] || g) + ' »';
+  }
   var act = ACTIONS_MODULE[A.module] || [];
   $('#b-ctx').innerHTML = act.map(function (x) {
     return '<button class="bandeau-btn" id="' + x[0] + '">' + esc(x[1]) + '</button>';
@@ -7720,6 +7766,24 @@ function ouvrirChantier(id) {
   if (A.module === 'chantiers') aller('chantier');
   else allerModule('chantiers', 'chantier');
 }
+/* Le sélecteur en haut de la fiche : passer d'un chantier à l'autre sans
+   repasser par le carnet. Les chantiers ouverts d'abord, les clos ensuite —
+   c'est presque toujours dans les ouverts qu'il veut aller. */
+function optionsChantiers(sel) {
+  var ouv = [], clos = [];
+  (A.chantiers || []).slice().sort(function (a, b) {
+    return (b.maj || b.cree || 0) - (a.maj || a.cree || 0);
+  }).forEach(function (c) {
+    var lieu = [c.commune, c.foret].filter(Boolean).join(', ');
+    var o = '<option value="' + esc(c.id) + '"' + (c.id === sel ? ' selected' : '') + '>' +
+      esc(c.nom || 'sans nom') + (lieu ? ' — ' + esc(lieu) : '') +
+      ' · ' + esc(C.nomStatut(c.statut)) + '</option>';
+    (C.statutOuvert(c.statut) ? ouv : clos).push(o);
+  });
+  return (ouv.length ? '<optgroup label="En cours">' + ouv.join('') + '</optgroup>' : '') +
+    (clos.length ? '<optgroup label="Clos">' + clos.join('') + '</optgroup>' : '');
+}
+
 function renderFiche() {
   var z = $('#fiche-chantier'); if (!z) return;
   var c = chantier(A.chOuvert);
@@ -7762,6 +7826,10 @@ function renderFiche() {
     !(c.temps || []).some(function (t) { return t.activite; });
 
   z.innerHTML =
+    '<div class="carte" style="padding-bottom:11px">' +
+    '<label class="eyebrow" for="f-choix">Chantier affiché</label>' +
+    '<select id="f-choix" style="margin-top:5px">' + optionsChantiers(c.id) + '</select>' +
+    '</div>' +
     '<div class="carte">' +
     '<div class="fiche-tete"><div><h2 style="margin:0">' + esc(c.nom || 'Chantier') + '</h2>' +
     '<p class="muted" style="font-size:12.5px;margin:3px 0 0">' +
@@ -7786,6 +7854,8 @@ function renderFiche() {
 
     '<div class="carte"><div class="carte-titre"><h2>Travaux</h2>' +
     '<button class="btn primaire btn-min" id="f-ligne">+ Ligne</button></div>' +
+    '<p class="sous-titre-bloc">Ce que vous facturez : une ligne par prestation, ' +
+    'avec sa quantité, son prix et sa TVA. C’est la matière de votre devis.</p>' +
     (lignes || '<div class="vide"><p>Aucune ligne. Ajoutez les travaux et leur chiffrage.</p></div>') +
     (m ? '<div style="display:flex;justify-content:space-between;margin-top:11px;padding-top:9px;border-top:2px solid var(--encre)">' +
       '<b>Total HT</b><b class="num" style="font-size:19px">' + eur(m) + '</b></div>' +
@@ -7796,7 +7866,11 @@ function renderFiche() {
     '</div>' +
 
     '<div class="carte"><div class="carte-titre"><h2>Journées</h2>' +
-    '<button class="btn primaire btn-min" id="f-planifier">Placer sur l’agenda</button></div>' +
+    '<button class="btn primaire btn-min" id="f-planifier">' +
+    (C.journeesPlacees(c).length ? 'Modifier les journées' : 'Placer sur l’agenda') +
+    '</button></div>' +
+    '<p class="sous-titre-bloc">Ce que vous avez <b>prévu</b> : les jours retenus sur l’agenda. ' +
+    'Ils y sont bloqués provisoirement tant que le chantier n’est pas signé.</p>' +
     (function () {
       var pl = C.journeesPlacees(c), est = C.nb(c.joursEstimes), tot = C.totalPlace(c);
       if (!pl.length) {
@@ -7821,6 +7895,9 @@ function renderFiche() {
 
     '<div class="carte"><div class="carte-titre"><h2>Temps passé</h2>' +
     '<button class="btn primaire btn-min" id="f-temps">+ Temps</button></div>' +
+    '<p class="sous-titre-bloc">Ce que vous avez <b>réellement</b> fait — à ne pas confondre avec ' +
+    'les journées prévues ci-dessus. Se remplit tout seul quand vous saisissez « Ma journée » ; ' +
+    'le bouton n’est qu’un rattrapage. C’est ce réel qui donne vos rendements.</p>' +
     (temps || '<div class="vide"><p>Aucun temps saisi. À remplir en fin de chantier.</p></div>') +
     (j ? '<div class="kpi">' +
       '<div class="carte2"><b class="num">' + E.fmt(j, 2) + '</b><small>jours-homme</small></div>' +
@@ -7893,10 +7970,14 @@ function formEnteteCh(c) {
   return '<div class="champ"><label class="eyebrow" for="ce-nom">Nom du chantier</label>' +
     '<input type="text" id="ce-nom" class="gros" autocomplete="off" value="' + esc(c.nom || '') + '"></div>' +
     '<div class="grille g2">' +
-    '<div class="champ"><label class="eyebrow" for="ce-donneur">Donneur d’ordre</label>' +
+    '<div class="champ"><label class="eyebrow" for="ce-donneur">Donneur d’ordre' +
+    '<button type="button" class="mini-plus" data-ajlist="clients" data-ajchamp="ce-donneur" ' +
+    'title="Ajouter à la liste">+ liste</button></label>' +
     '<input type="text" id="ce-donneur" autocomplete="off" list="liste-clients" placeholder="expert, gestionnaire…" value="' +
     esc(c.donneur || c.client || '') + '"></div>' +
-    '<div class="champ"><label class="eyebrow" for="ce-proprio">Propriétaire facturé</label>' +
+    '<div class="champ"><label class="eyebrow" for="ce-proprio">Propriétaire facturé' +
+    '<button type="button" class="mini-plus" data-ajlist="proprios" data-ajchamp="ce-proprio" ' +
+    'title="Ajouter à la liste">+ liste</button></label>' +
     '<input type="text" id="ce-proprio" autocomplete="off" list="liste-proprios" value="' + esc(c.proprietaire || '') + '"></div>' +
     '<div class="champ"><label class="eyebrow" for="ce-foret">Forêt</label>' +
     '<input type="text" id="ce-foret" autocomplete="off" value="' + esc(c.foret || '') + '"></div>' +
@@ -7904,8 +7985,6 @@ function formEnteteCh(c) {
     '<input type="text" id="ce-parc" autocomplete="off" value="' + esc(c.parcelles || '') + '"></div>' +
     '<div class="champ"><label class="eyebrow" for="ce-com">Commune</label>' +
     '<input type="text" id="ce-com" autocomplete="off" value="' + esc(c.commune || '') + '"></div>' +
-    '<div class="champ"><label class="eyebrow" for="ce-ech">À finir avant le</label>' +
-    '<input type="date" id="ce-ech" value="' + versChamp(c.echeance || c.fin) + '"></div>' +
     '<div class="champ"><label class="eyebrow" for="ce-numfact">N° de facture</label>' +
     '<input type="text" id="ce-numfact" autocomplete="off" placeholder="celui de votre logiciel" value="' +
     esc(c.numeroFacture || '') + '"></div>' +
@@ -7933,9 +8012,7 @@ function formEnteteCh(c) {
     '<p class="eyebrow" style="margin:14px 0 6px">Contexte du chantier <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">(pour comparer les rendements)</span></p>' +
     '<div class="grille g2">' +
     '<div class="champ"><label class="eyebrow" for="ce-ess">Essence</label>' +
-    '<select id="ce-ess"><option value="">—</option>' + C.ESSENCES_CH.map(function (e) {
-      return '<option value="' + e.c + '"' + (cr.essence === e.c ? ' selected' : '') + '>' + e.n + '</option>';
-    }).join('') + '</select></div>' +
+    '<select id="ce-ess">' + optionsEssenceCh(cr.essence) + '</select></div>' +
     '<div class="champ"><label class="eyebrow" for="ce-dens">Densité (tiges ou plants/ha)</label>' +
     '<input type="text" id="ce-dens" inputmode="numeric" autocomplete="off" value="' + (cr.densite || '') + '"></div>' +
     '<div class="champ"><label class="eyebrow" for="ce-haut">Hauteur moyenne (m)</label>' +
@@ -7957,19 +8034,52 @@ function formEnteteCh(c) {
     '<button class="btn primaire" id="ce-ok">Valider</button></div>';
 }
 
-var ceJours = [];
+var ceJours = [], ceChantierId = null;
+
+/* Ce qui est déjà retenu sur les jours qu'il est en train de poser. On ne
+   l'empêche pas de doubler — il lui arrive de faire une demi-journée ici et
+   une demi-journée là — mais il doit le voir avant de valider. */
+function occupationCeJours() {
+  var ds = ceJours.map(function (j) { return j.d; }).filter(Boolean);
+  if (!ds.length) return {};
+  return C.occupation(A.chantiers, Math.min.apply(null, ds), Math.max.apply(null, ds), A.cfg);
+}
+function prisCeJour(occ, ts) {
+  var o = ts ? occ[C.jourCle(ts)] : null; if (!o) return [];
+  var vus = {}, r = [];
+  o.prevus.concat(o.reels).forEach(function (p) {
+    var ch = p.chantier;
+    if (!ch || ch.id === ceChantierId || vus[ch.id]) return;
+    vus[ch.id] = 1; r.push(ch.nom || 'chantier sans nom');
+  });
+  return r;
+}
+
 function renderCeJours() {
   var z = $('#ce-jours'); if (!z) return;
   var total = ceJours.reduce(function (s, j) { return s + C.nb(j.p); }, 0);
   var vise = C.nb($('#ce-jest') ? $('#ce-jest').value : 0);
+  var occ = occupationCeJours(), nbPris = 0, vusDates = {};
   z.innerHTML = ceJours.map(function (j, i) {
-    return '<div style="display:flex;gap:7px;align-items:center;margin-bottom:6px">' +
-      '<input type="date" data-cej="' + i + '" value="' + versChamp(j.d) + '" style="flex:1">' +
+    var pris = prisCeJour(occ, j.d);
+    var doublon = j.d && vusDates[j.d];
+    if (j.d) vusDates[j.d] = 1;
+    if (pris.length) nbPris++;
+    return '<div style="margin-bottom:6px">' +
+      '<div style="display:flex;gap:7px;align-items:center">' +
+      '<input type="date" data-cej="' + i + '" value="' + versChamp(j.d) + '" style="flex:1' +
+      (pris.length || doublon ? ';border-color:#B98A00' : '') + '">' +
       '<button type="button" class="chip" data-cepart="' + i + '" aria-pressed="' + (C.nb(j.p) === 1) + '" ' +
       'style="flex:none">' + (C.nb(j.p) === 1 ? '1 j' : '½ j') + '</button>' +
-      '<button type="button" class="btn-min" data-cedel="' + i + '" style="flex:none">✕</button></div>';
+      '<button type="button" class="btn-min" data-cedel="' + i + '" style="flex:none">✕</button></div>' +
+      (doublon ? '<div class="jour-pris">déjà posé plus haut</div>'
+        : pris.length ? '<div class="jour-pris">déjà pris : ' + esc(pris.join(', ')) + '</div>' : '') +
+      '</div>';
   }).join('') +
-    '<button type="button" class="btn-min" id="ce-plusjour">+ une journée</button>';
+    '<button type="button" class="btn-min" id="ce-plusjour">+ une journée</button>' +
+    (nbPris ? '<p class="jour-pris" style="margin:8px 0 0">' + nbPris + ' journée' +
+      (nbPris > 1 ? 's' : '') + ' tombe' + (nbPris > 1 ? 'nt' : '') + ' sur un jour déjà retenu. ' +
+      'Rien ne l’interdit — une demi-journée de chaque côté, par exemple — mais vérifiez.</p>' : '');
   var tj = $('#ce-total-jours');
   if (tj) {
     tj.textContent = total ? E.fmt(total, total % 1 ? 1 : 0) : '—';
@@ -7988,21 +8098,31 @@ function ouvrirEnteteCh(id) {
   if (!c) return;
   var gps = c.gps || null;
   ceJours = C.journeesPlacees(c).map(function (x) { return { d: x.d, p: x.p }; });
+  ceChantierId = id || null;
   var diff = (c.criteres || {}).difficulte || '', terr = (c.criteres || {}).terrain || '';
 
   majDatalistClients();
   modale(id ? 'En-tête du chantier' : 'Nouveau chantier', formEnteteCh(c));
   renderCeJours();
+  brancherEssenceCh('ce-ess', (c.criteres || {}).essence || '');
   $('#ce-jest').addEventListener('input', renderCeJours);
   $('#ce-jours').addEventListener('click', function (e) {
     var plus = e.target.closest('#ce-plusjour'), part = e.target.closest('[data-cepart]'),
       del = e.target.closest('[data-cedel]');
     if (plus) {
       lireCeJours();
-      /* on propose le lendemain de la dernière journée placée, sinon aujourd'hui */
-      var base = ceJours.length ? ceJours[ceJours.length - 1].d + C.JOUR : Date.now();
-      while (C.estWeekend(base) && !(A.cfg && A.cfg.weekends)) base += C.JOUR;
-      ceJours.push({ d: C.minuit(base), p: 1 });
+      /* on propose le prochain jour réellement libre : ni week-end, ni déjà
+         posé ici, ni retenu par un autre chantier. Il peut toujours le
+         changer à la main derrière. */
+      var base = C.minuit(ceJours.length ? ceJours[ceJours.length - 1].d + C.JOUR : Date.now());
+      var occLibre = C.occupation(A.chantiers, base, base + 90 * C.JOUR, A.cfg);
+      var posesIci = {};
+      ceJours.forEach(function (j) { if (j.d) posesIci[j.d] = 1; });
+      var garde = 0;
+      while (garde++ < 90 && (
+        (C.estWeekend(base) && !(A.cfg && A.cfg.weekends)) ||
+        posesIci[base] || prisCeJour(occLibre, base).length)) base += C.JOUR;
+      ceJours.push({ d: base, p: 1 });
       renderCeJours();
     } else if (part) {
       lireCeJours();
@@ -8033,10 +8153,11 @@ function ouvrirEnteteCh(id) {
   $('#ce-ok').addEventListener('click', function () {
     var nom = $('#ce-nom').value.trim();
     if (!nom) { toast('Donnez un nom au chantier.'); return; }
-    var ech = versDate($('#ce-ech').value);
     var jest = C.nb($('#ce-jest').value);
+    var essv = $('#ce-ess').value;
+    if (essv === '__ajouter') essv = '';
     var criteres = {
-      essence: $('#ce-ess').value || null,
+      essence: essv || null,
       densite: C.nb($('#ce-dens').value) || null,
       hauteur: C.nb($('#ce-haut').value) || null,
       difficulte: diff || null,
@@ -8046,7 +8167,7 @@ function ouvrirEnteteCh(id) {
       nom: nom, donneur: $('#ce-donneur').value.trim(),
       proprietaire: $('#ce-proprio').value.trim(), foret: $('#ce-foret').value.trim(),
       parcelles: $('#ce-parc').value.trim(), commune: $('#ce-com').value.trim(),
-      echeance: ech, joursEstimes: jest > 0 ? jest : null,
+      joursEstimes: jest > 0 ? jest : null,
       prixJour: C.nb($('#ce-pj').value) || null,
       jours: (function () {
         lireCeJours();
@@ -8079,6 +8200,68 @@ function ouvrirEnteteCh(id) {
 }
 
 /* Donneurs d'ordre : liste alimentée par la saisie, proposée partout. */
+/* La liste d'essences d'un chantier = celles fournies avec l'application,
+   plus celles qu'il a ajoutées lui-même (le cèdre, par exemple). Une
+   essence personnelle est stockée sous son propre nom : nomEssenceCh
+   retombe dessus, donc elle s'affiche partout sans autre traitement. */
+function essencesChPerso() {
+  A.cfg = A.cfg || {};
+  A.cfg.essencesCh = A.cfg.essencesCh || [];
+  return A.cfg.essencesCh;
+}
+function optionsEssenceCh(sel) {
+  var fournies = C.ESSENCES_CH.map(function (e) {
+    return '<option value="' + esc(e.c) + '"' + (sel === e.c ? ' selected' : '') + '>' + esc(e.n) + '</option>';
+  }).join('');
+  var perso = essencesChPerso();
+  /* une essence choisie autrefois puis retirée de la liste doit rester
+     visible sur sa fiche, sinon le chantier perdrait son contexte */
+  var vus = C.ESSENCES_CH.map(function (e) { return e.c; }).concat(perso);
+  var orphelin = (sel && vus.indexOf(sel) < 0) ? [sel] : [];
+  var miennes = perso.concat(orphelin).map(function (n) {
+    return '<option value="' + esc(n) + '"' + (sel === n ? ' selected' : '') + '>' + esc(n) + '</option>';
+  }).join('');
+  return '<option value="">—</option>' + fournies +
+    (miennes ? '<optgroup label="Les miennes">' + miennes + '</optgroup>' : '') +
+    '<option value="__ajouter">＋ ajouter une essence…</option>';
+}
+function brancherEssenceCh(champId, avant) {
+  var s = $('#' + champId); if (!s) return;
+  s.addEventListener('change', function () {
+    if (this.value !== '__ajouter') { avant = this.value; return; }
+    var n = (prompt('Nom de l’essence à ajouter :') || '').trim();
+    if (!n) { this.value = avant || ''; return; }
+    var l = essencesChPerso(), bas = n.toLowerCase();
+    var deja = C.ESSENCES_CH.filter(function (e) { return e.n.toLowerCase() === bas; })[0];
+    if (deja) { this.value = deja.c; avant = deja.c; toast('Déjà proposée.'); return; }
+    if (!l.some(function (x) { return String(x).toLowerCase() === bas; })) l.push(n);
+    var self = this;
+    Promise.resolve(sauverCfg()).then(function () {
+      self.innerHTML = optionsEssenceCh(n); self.value = n; avant = n;
+      renderListesReglages();
+      toast('« ' + n + ' » ajoutée à vos essences.');
+    });
+  });
+}
+
+/* Le « + liste » d'un champ : geste explicite, donc pas de confirmation —
+   c'est justement pour éviter d'aller dans les réglages. La confirmation à
+   la validation reste, elle, pour les noms tapés sans y penser. */
+function ajouterAListeDepuisChamp(k, champId) {
+  var ch = $('#' + champId); if (!ch || !LISTES[k]) return;
+  var nom = (ch.value || '').trim();
+  if (!nom) { toast('Écrivez le nom d’abord.'); return; }
+  var l = listeDe(k), bas = nom.toLowerCase();
+  if (l.some(function (x) { return String(x).toLowerCase() === bas; })) {
+    toast('« ' + nom +' » y est déjà.'); return;
+  }
+  l.push(nom);
+  sauverListe(k).then(function () {
+    majDatalistClients(); majDatalistLieux(); renderListesReglages();
+    toast('« ' + nom + ' » ajouté à vos ' + LISTES[k].nom.toLowerCase() + '.');
+  });
+}
+
 function noterClient(nom) { return proposerAjoutListe('clients', nom); }
 function majDatalistClients() {
   var d = $('#liste-clients');
@@ -8379,6 +8562,7 @@ var MOIS_NOMS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin',
 function renderBandeauPlanif() {
   var z = $('#cal-planif'); if (!z) return;
   var c = A.planifie ? chantier(A.planifie) : null;
+  var lg = $('#cal-leg-sel'); if (lg) lg.hidden = !c;
   if (!c) { z.innerHTML = ''; return; }
   var placees = C.totalPlace(c), reste = C.resteAPlacer(c);
   z.innerHTML = '<div class="carte2" style="margin-bottom:11px;border-color:var(--encre)">' +
@@ -8388,7 +8572,8 @@ function renderBandeauPlanif() {
       ? placees + ' journée' + (placees > 1 ? 's' : '') + ' placée' + (placees > 1 ? 's' : '')
       : placees + ' / ' + Math.ceil(C.nb(c.joursEstimes)) + ' journées placées' +
         (reste > 0 ? ' — encore ' + reste : (reste < 0 ? ' — ' + (-reste) + ' de trop' : ' — compte atteint'))) +
-    '. Appuyez sur les jours voulus.</div>' +
+    '. Appuyez sur les jours voulus — ils passent en noir. Une seconde ' +
+    'pression donne une demi-journée, une troisième retire le jour.</div>' +
     '<div class="btn-rang" style="margin-top:8px">' +
     '<button class="btn primaire btn-min" id="cal-planif-fin">Terminer</button></div></div>';
 }
@@ -9153,6 +9338,9 @@ var LISTES = {
     aide: 'Ceux que vous facturez.' },
   lieux: { nom: 'Forêts et communes', champ: 'lieuxRegles', cle: 'bordcub.lieux',
     aide: 'Proposés à la saisie d’une journée et d’un chantier.' },
+  essencesCh: { nom: 'Essences', champ: 'essencesCh', cfg: true,
+    aide: 'Ce qui s’ajoute à la liste d’origine dans le contexte d’un chantier. ' +
+      'Les essences fournies (chêne, hêtre, douglas…) restent toujours proposées.' },
   travaux: { nom: 'Prestations', objets: true,
     aide: 'Ce que vous savez faire. Renommer un libellé le change partout ; ' +
       'une prestation déjà utilisée ne peut pas être retirée.' }
@@ -9171,12 +9359,14 @@ function usagesTravail(code) {
 }
 function listeDe(k) {
   var d = LISTES[k]; if (!d) return [];
-  A[d.champ] = A[d.champ] || [];
-  return A[d.champ];
+  var socle = d.cfg ? (A.cfg = A.cfg || {}) : A;
+  socle[d.champ] = socle[d.champ] || [];
+  return socle[d.champ];
 }
 function sauverListe(k) {
   var d = LISTES[k];
-  return ecrire(d.cle, listeDe(k)).then(function () {
+  listeDe(k);
+  return Promise.resolve(d.cfg ? sauverCfg() : ecrire(d.cle, listeDe(k))).then(function () {
     majDatalistClients(); majDatalistLieux();
   });
 }
@@ -11755,7 +11945,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.13.1-20260801-1900';
+var VERSION = '4.14.0-20260802-1100';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
