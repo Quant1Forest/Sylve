@@ -262,7 +262,8 @@ input.mini{padding:6px 7px;border:1px solid var(--trait);border-radius:7px;font-
   flex:1;padding:9px 2px 8px;font-size:11px;font-weight:600;color:var(--gris);
   border-top:2.5px solid transparent;letter-spacing:.02em;
 }
-.onglets button .ic{display:block;font-size:17px;line-height:1.15;margin-bottom:1px}
+.onglets button .ic{display:block;line-height:0;margin-bottom:3px}
+.onglets button .ic .pic{width:21px;height:21px;stroke-width:1.6}
 .onglets button[aria-selected=true]{color:var(--accent);border-top-color:var(--accent)}
 
 /* -------------------------------------------------------------- cartes */
@@ -6711,47 +6712,93 @@ function init() {
 /* ========================================================= MODULES SYLVE */
 var G = window.BCG, H = window.BCH;
 
+/* Les onglets d'un module : identifiant de vue et libellé. Le dessin vient
+   de PICTOS, indexé sur l'identifiant — une même vue porte donc le même
+   pictogramme d'un module à l'autre (les réglages, la carte, le carnet). */
+
+/* Un dessin par vue, partagé entre les modules : la carte du calendrier et
+   le « Où ? » du bois montrent le même repère, les réglages le même bloc de
+   curseurs. Formes tenues volontairement simples : à 20 px, tout détail
+   se referme. */
+var PICTOS = {
+  saisie:     '<path d="M4.6 19.4 8 18.7 18.9 7.8a1.9 1.9 0 0 0 0-2.7l-.6-.6a1.9 1.9 0 0 0-2.7 0L4.7 15.4Z"/>'
+            + '<path d="M14.5 6.5 18 10"/>',
+  bordereau:  '<rect x="4.2" y="4.4" width="15.6" height="15.2" rx="2"/>'
+            + '<path d="M4.2 9.4h15.6M9.6 9.4v10.2"/>',
+  syntheses:  '<path d="M5 7.2h14M5 11.2h14M5 15.2h8.6"/><path d="M5 19.2h14" stroke-width="2.7"/>',
+  fichiers:   '<path d="M4.2 7.6a2 2 0 0 1 2-2h3.5l2 2.4H17.8a2 2 0 0 1 2 2v8.4a2 2 0 0 1-2 2H6.2a2 2 0 0 1-2-2Z"/>',
+  reglages:   '<path d="M6 4v6.2M6 14.2v5.8M12 4v3.2M12 11.2v8.8M18 4v9.2M18 17.2v2.8"/>'
+            + '<circle cx="6" cy="12.2" r="2"/><circle cx="12" cy="9.2" r="2"/><circle cx="18" cy="15.2" r="2"/>',
+  carnet:     '<path d="M6 4.6h10.4a1.9 1.9 0 0 1 1.9 1.9v12.9H7.9a1.9 1.9 0 0 1-1.9-1.9Z"/>'
+            + '<path d="M6 17.5a1.9 1.9 0 0 1 1.9-1.9h10.4"/><path d="M9.6 8.6h5.2"/>',
+  chantier:   '<path d="M13.9 3.8H7.6a1.9 1.9 0 0 0-1.9 1.9v12.6a1.9 1.9 0 0 0 1.9 1.9h8.8a1.9 1.9 0 0 0 1.9-1.9V8.2Z"/>'
+            + '<path d="M13.9 3.8v4.4h4.4"/><path d="M8.8 13.2h6.4M8.8 16.4h4.2"/>',
+  calendrier: '<rect x="4" y="5.6" width="16" height="14" rx="2"/>'
+            + '<path d="M4 10.2h16M8.6 3.6v3.8M15.4 3.6v3.8"/>',
+  carte:      '<path d="M12 20.6s6.1-5.9 6.1-10A6.1 6.1 0 0 0 5.9 10.6c0 4.1 6.1 10 6.1 10Z"/>'
+            + '<circle cx="12" cy="10.4" r="2.3"/>',
+  rendements: '<path d="M4.6 19.6h14.8"/><path d="M7.7 19.6v-5.2M12 19.6v-8.8M16.3 19.6v-12.4"/>',
+  estimer:    '<rect x="5.6" y="3.7" width="12.8" height="16.6" rx="2"/>'
+            + '<path d="M8.7 7.6h6.6M8.7 12h1.9M11.6 12h1.9M14.5 12h.8M8.7 16h1.9M11.6 16h1.9M14.5 16h.8"/>',
+  finances:   '<path d="M16.4 7.6a5.7 5.7 0 0 0-8.5 4.5 5.7 5.7 0 0 0 8.5 4.5"/>'
+            + '<path d="M6.3 10.6h6.8M6.3 13.6h6.8"/>',
+  depenses:   '<path d="M6.2 3.8h11.6v16.4l-1.9-1.3-1.9 1.3-1.9-1.3-1.9 1.3-1.9-1.3-1.9 1.3Z"/>'
+            + '<path d="M9.2 8.4h5.6M9.2 12h5.6"/>',
+  charges:    '<path d="M19.2 12a7.2 7.2 0 1 1-2.2-5.1"/><path d="M19.6 4.4v4.3h-4.3"/>',
+  analyses:   '<circle cx="12" cy="12" r="7.9"/><path d="M12 4.1v7.9h7.9"/>',
+  stock2:     '<path d="M4.7 8.5 12 4.8l7.3 3.7v7L12 19.2l-7.3-3.7Z"/><path d="M4.7 8.5 12 12.2l7.3-3.7M12 12.2v7"/>',
+  commandes:  '<path d="M4.6 8.6h11"/><path d="M12.4 5.4 15.6 8.6l-3.2 3.2"/>'
+            + '<path d="M19.4 15.4h-11"/><path d="M11.6 12.2 8.4 15.4l3.2 3.2"/>',
+  revient:    '<path d="M11.4 3.9h7.4a1.3 1.3 0 0 1 1.3 1.3v7.4a1.3 1.3 0 0 1-.4.9l-7 7a1.3 1.3 0 0 1-1.8 0l-7.4-7.4a1.3 1.3 0 0 1 0-1.8l7-7a1.3 1.3 0 0 1 .9-.4Z"/>'
+            + '<circle cx="16" cy="8" r="1.3"/>',
+  stock:      '<circle cx="7.6" cy="15.6" r="4.3"/><circle cx="16.4" cy="15.6" r="4.3"/><circle cx="12" cy="7.6" r="4.3"/>',
+  bois:       '<rect x="4.4" y="14.2" width="15.2" height="5" rx="1.4"/>'
+            + '<rect x="6.6" y="8.7" width="10.8" height="5" rx="1.4"/>'
+            + '<rect x="8.8" y="3.2" width="6.4" height="5" rx="1.4"/>'
+};
+PICTOS.lieux = PICTOS.carte;      /* « Où ? » et « Carte », même repère */
+
 var MODULES = {
   cubage: {
     nom: 'Cubage', defaut: 'saisie',
-    vues: [['saisie', '✎', 'Saisie'], ['bordereau', '▤', 'Bordereau'], ['syntheses', '∑', 'Synthèses'],
-    ['fichiers', '▣', 'Bordereaux'], ['reglages', '⚙', 'Réglages']]
+    vues: [['saisie', 'Saisie'], ['bordereau', 'Bordereau'], ['syntheses', 'Synthèses'],
+    ['fichiers', 'Bordereaux'], ['reglages', 'Réglages']]
   },
   chantiers: {
     nom: 'Chantiers', defaut: 'carnet', groupe: 'entreprise',
-    vues: [['carnet', '▤', 'Carnet'], ['chantier', '▦', 'Fiche'], ['reglages', '⚙', 'Réglages']]
+    vues: [['carnet', 'Carnet'], ['chantier', 'Fiche'], ['reglages', 'Réglages']]
   },
   calendrier: {
     nom: 'Calendrier', defaut: 'calendrier', groupe: 'entreprise',
-    vues: [['calendrier', '▧', 'Agenda'], ['carte', '⌖', 'Carte'], ['carnet', '▤', 'Carnet'],
-    ['reglages', '⚙', 'Réglages']]
+    vues: [['calendrier', 'Agenda'], ['carte', 'Carte'], ['carnet', 'Carnet'],
+    ['reglages', 'Réglages']]
   },
   rendements: {
     nom: 'Rendements', defaut: 'rendements', groupe: 'entreprise',
-    vues: [['rendements', '⏱', 'Rendements'], ['estimer', '≈', 'Estimer'], ['reglages', '⚙', 'Réglages']]
+    vues: [['rendements', 'Rendements'], ['estimer', 'Estimer'], ['reglages', 'Réglages']]
   },
   devis: {
     nom: 'Devis et estimatif', defaut: 'estimer', groupe: 'entreprise',
-    vues: [['estimer', '≈', 'Estimer'], ['carnet', '▤', 'Devis'], ['reglages', '⚙', 'Réglages']]
+    vues: [['estimer', 'Estimer'], ['carnet', 'Devis'], ['reglages', 'Réglages']]
   },
   finances: {
     nom: 'Finances', defaut: 'finances', groupe: 'entreprise',
-    vues: [['finances', '€', 'Bilan'], ['depenses', '▤', 'Dépenses'], ['charges', '↻', 'Charges'],
-    ['reglages', '⚙', 'Réglages']]
+    vues: [['finances', 'Bilan'], ['depenses', 'Dépenses'], ['charges', 'Charges'],
+    ['reglages', 'Réglages']]
   },
   analyses: {
     nom: 'Analyses', defaut: 'analyses', groupe: 'entreprise',
-    vues: [['analyses', '◫', 'Analyses'], ['reglages', '⚙', 'Réglages']]
+    vues: [['analyses', 'Analyses'], ['reglages', 'Réglages']]
   },
   stock: {
     nom: 'Stock et fournitures', defaut: 'stock2', groupe: 'entreprise',
-    vues: [['stock2', '▥', 'Inventaire'], ['commandes', '⇄', 'Entrées / sorties'],
-    ['revient', '€', 'Prix de revient'], ['reglages', '⚙', 'Réglages']]
+    vues: [['stock2', 'Inventaire'], ['commandes', 'Entrées / sorties'],
+    ['revient', 'Prix de revient'], ['reglages', 'Réglages']]
   },
   bois: {
     nom: 'Bois de chauffage', defaut: 'stock',
-    vues: [['stock', '◱', 'Stock'], ['bois', '▦', 'Piles'], ['lieux', '⌖', 'Où ?'],
-    ['fichiers', '▣', 'Export et analyse'], ['reglages', '⚙', 'Réglages']]
+    vues: [['stock', 'Stock'], ['bois', 'Piles'], ['lieux', 'Où ?'],
+    ['fichiers', 'Export et analyse'], ['reglages', 'Réglages']]
   }
 };
 
@@ -6811,7 +6858,8 @@ function majOnglets() {
   majBandeauModule();
   $('#onglets').innerHTML = m.vues.map(function (v) {
     return '<button role="tab" data-vue="' + v[0] + '" aria-selected="false">' +
-      '<span class="ic">' + v[1] + '</span>' + v[2] + '</button>';
+      '<span class="ic"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true">' +
+      (PICTOS[v[0]] || '') + '</svg></span>' + v[1] + '</button>';
   }).join('');
 }
 function allerModule(m, vue) {
@@ -12031,7 +12079,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.19.0-20260803-0030';
+var VERSION = '4.20.0-20260803-0100';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
