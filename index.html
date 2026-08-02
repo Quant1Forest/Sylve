@@ -219,7 +219,7 @@ input.mini{padding:6px 7px;border:1px solid var(--trait);border-radius:7px;font-
 /* --------------------------------------------------------- bandeau --- */
 .bandeau{
   position:sticky;top:0;z-index:40;background:var(--encre);color:#EAEFE6;
-  border-bottom:3px solid var(--accent);
+  border-bottom:3px solid var(--brun-marque);
   padding:9px 14px calc(9px + env(safe-area-inset-bottom,0px)*0);
 }
 .bandeau-in{max-width:1240px;margin:0 auto;display:flex;align-items:center;gap:12px}
@@ -241,11 +241,13 @@ input.mini{padding:6px 7px;border:1px solid var(--trait);border-radius:7px;font-
 }
 /* Le logo remplace le losange. Il est presque entièrement en encre sombre :
    posé tel quel sur le bandeau sombre, il disparaîtrait. On lui donne donc
-   la même pastille crème que l'icône de l'application. */
+   la même pastille crème que l'icône de l'application, carrée et assez
+   grande pour qu'il se lise — c'est le repère de marque, il porte plus que
+   les autres boutons. */
 #b-accueil{
-  width:30px;height:26px;padding:0;background-color:#F7F1E6;
+  width:33px;height:33px;padding:0;background-color:#F7F1E6;
   background-image:var(--logo);background-repeat:no-repeat;
-  background-position:center;background-size:auto 19px;
+  background-position:center;background-size:auto 25px;
   border-color:rgba(255,255,255,.28);
 }
 .bandeau-btn:hover{background:rgba(255,255,255,.1)}
@@ -12029,7 +12031,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.18.0-20260802-2359';
+var VERSION = '4.19.0-20260803-0030';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
