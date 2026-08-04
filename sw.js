@@ -5,7 +5,7 @@
    ========================================================================== */
 'use strict';
 
-var VERSION = '4.20.0-20260803-0100';
+var VERSION = '4.21.0-20260804-1811';
 var CACHE = 'bordcub-' + VERSION;
 var FICHIERS = [
   './',
@@ -13,8 +13,7 @@ var FICHIERS = [
   './manifest.webmanifest',
   './icone-192.png',
   './icone-512.png',
-  './icone-maskable-512.png',
-  './logo.png'
+  './icone-maskable-512.png'
 ];
 
 self.addEventListener('install', function (ev) {

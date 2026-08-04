@@ -1,0 +1,513 @@
+#!/usr/bin/env node
+/* =====================================================================
+   Sylve — tests de non-régression
+   node outils/tests.js
+   Chaque scénario ouvre l'application dans un navigateur simulé, agit
+   comme le ferait un doigt, et vérifie le résultat. Un test rouge veut
+   dire qu'un comportement qui marchait ne marche plus.
+   Dépendance : npm install jsdom
+   ===================================================================== */
+'use strict';
+const fs = require('fs');
+const path = require('path');
+const { JSDOM } = require('jsdom');
+
+const APP = process.argv[2] || path.join(__dirname, '..', 'index.html');
+const html = fs.readFileSync(APP, 'utf8');
+
+let ok = 0, ko = 0;
+const scenarios = [];
+const scenario = (nom, fn) => scenarios.push({ nom, fn });
+function verifier(quoi, attendu, obtenu) {
+  const juste = JSON.stringify(attendu) === JSON.stringify(obtenu);
+  if (juste) { ok++; console.log('    ✓ ' + quoi); }
+  else { ko++; console.log(`    ✕ ${quoi}\n        attendu : ${JSON.stringify(attendu)}\n        obtenu  : ${JSON.stringify(obtenu)}`); }
+}
+function verifierVrai(quoi, valeur) { verifier(quoi, true, !!valeur); }
+
+/* Un champ date parle en heure locale. toISOString() répond en heure de
+   Greenwich et renvoie la veille dès qu'on est à l'est : minuit à Paris y est
+   22 h la veille. Un test qui s'en sert vise le mauvais jour et passe au vert
+   en Angleterre pendant qu'il ment en France. */
+const jourISO = ts => {
+  const d = new Date(ts);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+    '-' + String(d.getDate()).padStart(2, '0');
+};
+
+/* Ouvre l'application avec des données de départ et rend la main quand
+   elle a fini de démarrer. */
+function ouvrir(graines, options) {
+  options = options || {};
+  return new Promise(resolve => {
+    const dom = new JSDOM(html, {
+      runScripts: 'dangerously', pretendToBeVisual: true, url: 'https://local/',
+      beforeParse(w) {
+        for (const k in graines) w.localStorage.setItem('bordcub.' + k, JSON.stringify(graines[k]));
+        w.URL.createObjectURL = () => 'blob:test';
+        w.URL.revokeObjectURL = () => {};
+        w.Element.prototype.scrollIntoView = function () {};
+      }
+    });
+    const erreurs = [];
+    dom.window.addEventListener('error', e => erreurs.push(e.message));
+    dom.window.console.error = (...a) => erreurs.push(a.join(' '));
+    setTimeout(() => {
+      const w = dom.window, d = w.document;
+      resolve({
+        w, d, erreurs,
+        $: s => d.querySelector(s),
+        $$: s => [...d.querySelectorAll(s)],
+        texte: s => { const e = d.querySelector(s); return e ? e.textContent.replace(/\s+/g, ' ').trim() : null; },
+        clic: s => { const e = d.querySelector(s); if (e) e.click(); return !!e; },
+        saisir: (s, v) => { const e = d.querySelector(s); if (!e) return false; e.value = v; e.dispatchEvent(new w.Event('input', { bubbles: true })); return true; },
+        choisir: (s, v) => { const e = d.querySelector(s); if (!e) return false; e.value = v; e.dispatchEvent(new w.Event('change', { bubbles: true })); return true; },
+        stock: k => JSON.parse(w.localStorage.getItem('bordcub.' + k) || 'null'),
+        pause: ms => new Promise(r => setTimeout(r, ms || 350)),
+        fichier: (selecteur, nom, contenu) => {
+          w.FileReader = function () { this.readAsText = () => { this.result = contenu; this.onload && this.onload(); }; };
+          const i = d.querySelector(selecteur); if (!i) return false;
+          Object.defineProperty(i, 'files', { value: [{ name: nom }], configurable: true });
+          i.dispatchEvent(new w.Event('change', { bubbles: true }));
+          return true;
+        }
+      });
+    }, options.attente || 2400);
+  });
+}
+
+const VIDE = { index: [], piles: [], chantiers: [], articles: [], commandes: [], sorties: [], journees: [] };
+
+/* --------------------------------------------------------------------- */
+scenario('L\'application démarre sans erreur', async () => {
+  const t = await ouvrir(VIDE);
+  verifier('aucune erreur au démarrage', [], t.erreurs);
+  verifierVrai('le module de calcul du stock est chargé', t.w.BCS2);
+  verifierVrai('l\'accueil est présent', t.$('#vue-accueil'));
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Le bouton Sortie d\'une pile ouvre bien la sortie de bois', async () => {
+  /* Régression : deux fonctions ouvrirSortie portaient le même nom, celle
+     du stock écrasait celle du bois et renvoyait vers les réglages. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'bois',
+    piles: [{ id: 'p1', nom: 'Tas du haut', lieu: 'Forêt de Valbrune', essences: ['CHE'],
+      buche: 50, cotes: [{ lon: 4, hauteurs: [1.8] }], maj: Date.now(), mouvements: [] }]
+  }));
+  t.clic('[data-vue="bois"]');
+  await t.pause(200);
+  verifierVrai('le bouton Sortie existe', t.$('[data-sortie]'));
+  t.clic('[data-sortie]');
+  await t.pause(250);
+  verifier('la fenêtre est celle de la pile', 'Sortie — Tas du haut', t.texte('#modale-titre'));
+  verifierVrai('elle demande des stères', t.$('#x-st'));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Import CSV : le stock retombe sur les chiffres du tableur', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'stock' }));
+  const lire = f => fs.readFileSync(path.join(__dirname, 'exemples', f), 'utf8');
+  for (const f of ['produits.csv', 'commandes.csv', 'sorties.csv']) {
+    t.clic('#art-importer'); await t.pause(200);
+    t.fichier('#is-fichier', f, lire(f)); await t.pause(350);
+    t.clic('#is-ok'); await t.pause(450);
+  }
+  const lignes = t.$$('#stock-table tbody tr').map(r => [...r.children].map(c => c.textContent.trim()));
+  const par = n => lignes.find(l => l[0].indexOf(n) === 0);
+  verifier('gaine 14×120 : coût unitaire réel', '0,8905', par('Gaine de protection 14*120')[5]);
+  verifier('tuteur châtaignier : coût unitaire réel', '0,7325', par('Tuteur en châtaignier')[5]);
+  verifier('tuteur acacia : stock futur', '500', par('Tuteur en Acacia')[4]);
+  verifier('valeur totale du stock', '3703,00', lignes[lignes.length - 1].slice(-1)[0]);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Ma journée : rendement par prestation et temps porté au chantier', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'entreprise', cfg: { prixJourVise: 300, heuresJour: 8 },
+    chantiers: [{ id: 'c1', nom: 'Plantation Vaux', statut: 'accepte', prixJour: 320,
+      lignes: [{ travail: 'PLANT', unite: 'plant', quantite: 1200, prix: 1.1 }],
+      temps: [], maj: Date.now() }]
+  }));
+  t.clic('#a-jour'); await t.pause(300);
+  t.choisir('#mj-ch', 'c1');
+  t.choisir('[data-pstt="0"]', 'PLANT');
+  t.saisir('[data-psth="0"]', '3'); t.saisir('[data-pstq="0"]', '200');
+  t.clic('#pst-plus'); await t.pause(120);
+  t.choisir('[data-pstt="1"]', 'PROTEC');
+  t.saisir('[data-psth="1"]', '4'); t.saisir('[data-pstq="1"]', '150');
+  t.saisir('#mj-nonprod', '1'); t.saisir('#mj-km', '64');
+  const ap = t.texte('#mj-apercu');
+  verifierVrai('la journée fait 8 heures', /8,00 h/.test(ap));
+  verifierVrai('533 plants par jour', /533 plant\/jour/.test(ap));
+  verifierVrai('300 protections par jour', /300 u\/jour/.test(ap));
+  verifierVrai('le prix de journée du chantier prime', /320 €\/j/.test(ap));
+  t.clic('#mj-ok'); await t.pause(450);
+  const j = t.stock('journees');
+  verifier('une journée enregistrée', 1, j.length);
+  verifier('deux prestations', 2, j[0].postes.length);
+  verifier('le trajet reste à part', 1, j[0].nonProd);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Corbeille : supprimer, retrouver, effacer pour de bon', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'entreprise',
+    chantiers: [{ id: 'c1', nom: 'Éclaircie Chapelle', statut: 'encours', lignes: [], temps: [], maj: Date.now() }]
+  }));
+  t.w.confirm = () => true;
+  t.clic('[data-chouvrir="c1"]'); await t.pause(250);
+  t.clic('#f-sup'); await t.pause(400);
+  verifier('le chantier a quitté la liste', 0, t.stock('chantiers').length);
+  t.clic('[data-vue="reglages"]'); await t.pause(150);
+  t.clic('[data-regl="general"]');
+  t.clic('#s-recuperer'); await t.pause(450);
+  verifierVrai('il est dans la corbeille', t.$('[data-repecher]'));
+  t.clic('[data-repecher]'); await t.pause(500);
+  verifier('il est revenu', 1, t.stock('chantiers').length);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Réglages : quatre onglets et des zones qui défilent', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'stock' }));
+  t.clic('[data-vue="reglages"]'); await t.pause(150);
+  verifier('quatre onglets', ['Général', 'Entreprise', 'Cubage', 'Bois de chauffage'],
+    t.$$('#regl-nav .chip').map(b => b.textContent));
+  t.clic('[data-regl="ent"]'); await t.pause(120);
+  const zones = t.$$('#regl-corps .reg-titre').filter(e => !e.hidden).map(e => e.textContent);
+  verifier('les zones de l\'entreprise, dans l\'ordre',
+    ['Général', 'Listes déroulantes', 'Stock et fournitures', 'Financier', 'Import de données'], zones);
+  verifier('aucun second niveau d\'onglets', 0, t.$$('#regl-sous').length);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Prestations : renommer partout, ne pas retirer ce qui sert', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'accepte',
+      lignes: [{ travail: 'PLANT', unite: 'plant', quantite: 1200, prix: 1.1 }], temps: [], maj: Date.now() }]
+  }));
+  t.clic('[data-vue="reglages"]'); await t.pause(150);
+  t.clic('[data-regl="ent"]');
+  t.clic('#rl-nav [data-liste="travaux"]'); await t.pause(150);
+  t.clic('[data-lmodif="PLANT"]'); await t.pause(200);
+  verifier('pas de retrait possible : la prestation sert', null, t.$('#tr-sup'));
+  const demandes = [];
+  t.w.confirm = m => { demandes.push(m); return true; };
+  t.saisir('#tr-nom', 'Plantation');
+  t.clic('#tr-ok'); await t.pause(400);
+  verifier('double confirmation', 2, demandes.length);
+  t.clic('[data-vue="carnet"]'); await t.pause(150);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(250);
+  verifierVrai('le nouveau nom est sur la fiche', /Plantation1200 plant/.test(t.texte('#fiche-chantier').replace(/\s/g, '')) ||
+    t.texte('#fiche-chantier').indexOf('Plantation') >= 0);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Sauvegarde : le rappel compte toutes les données', async () => {
+  /* Régression : le rappel ne se déclenchait que s'il existait des
+     bordereaux de cubage — une année de chantiers ne l'allumait pas. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'entreprise', export: Date.now() - 45 * 86400000,
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'encours', lignes: [], temps: [], maj: Date.now() }]
+  }));
+  verifierVrai('le rappel est sur l\'accueil', t.$('#a-sauver'));
+  verifierVrai('il dit ce qu\'il y a à sauvegarder', /chantier/.test(t.texte('#a-journee') + t.texte('#a-sauvegarde')));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Bandeau : le retour remonte au menu de la partie', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'chantiers' }));
+  const ret = t.$('#b-retour');
+  verifierVrai('le bouton retour existe', ret);
+  verifier('il est visible dans un module de l\'entreprise', false, ret.hidden);
+  verifierVrai('il nomme la partie', /Mon entreprise/.test(ret.title));
+  t.clic('#b-retour'); await t.pause(200);
+  verifierVrai('on est revenu sur le menu de l\'entreprise',
+    t.$('#vue-entreprise') && !t.$('#vue-entreprise').hidden);
+  t.clic('[data-module="cubage"]'); await t.pause(250);
+  verifier('caché dans le cubage : ◈ suffit', true, t.$('#b-retour').hidden);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Chantier : plus d\'échéance, et les jours pris se voient', async () => {
+  /* Il ne raisonne pas en « à finir avant le » mais en journées à poser.
+     Et il doit voir ce qui est déjà retenu avant d'en poser une. */
+  const pris = new Date(); pris.setHours(0, 0, 0, 0);
+  while (pris.getDay() === 0 || pris.getDay() === 6) pris.setDate(pris.getDate() + 1);
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'accepte', lignes: [], temps: [],
+      jours: [{ d: pris.getTime(), p: 1 }], maj: Date.now() }]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(200);
+  t.clic('#c-nouveau'); await t.pause(300);
+  verifier('le champ « à finir avant le » a disparu', null, t.$('#ce-ech'));
+  t.clic('#ce-plusjour'); await t.pause(150);
+  const propose = t.$('[data-cej="0"]').value;
+  verifierVrai('la journée proposée évite le jour déjà pris',
+    propose !== jourISO(pris));
+  /* Le jour retenu et le jour affiché doivent être le même. Ils ont divergé :
+     le champ montrait la veille, c'est-à-dire le jour occupé que le code
+     venait justement d'écarter, et sans l'avertissement qui va avec. */
+  const libre = new Date(pris);
+  do { libre.setDate(libre.getDate() + 1); }
+  while (libre.getDay() === 0 || libre.getDay() === 6);
+  verifier('et c\'est bien ce jour-là qui s\'affiche', jourISO(libre), propose);
+  t.$('[data-cej="0"]').value = jourISO(pris);
+  t.choisir('[data-cej="0"]', jourISO(pris)); await t.pause(150);
+  verifierVrai('le chantier qui occupe le jour est nommé',
+    /Vaux/.test(t.texte('#ce-jours')));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Listes : ajouter sans quitter le formulaire', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'chantiers' }));
+  t.clic('[data-vue="carnet"]'); await t.pause(200);
+  t.clic('#c-nouveau'); await t.pause(300);
+  t.saisir('#ce-donneur', 'Jean Roman');
+  t.clic('[data-ajlist="clients"]'); await t.pause(400);
+  verifier('le donneur d\'ordre est dans la liste', ['Jean Roman'], t.stock('clients'));
+  const ess = t.$('#ce-ess');
+  verifierVrai('la liste des essences propose d\'en ajouter une',
+    [...ess.options].some(o => o.value === '__ajouter'));
+  t.w.prompt = () => 'Cèdre';
+  t.choisir('#ce-ess', '__ajouter'); await t.pause(400);
+  verifier('l\'essence ajoutée est retenue', 'Cèdre', t.$('#ce-ess').value);
+  verifier('elle est rangée dans les réglages', ['Cèdre'], (t.stock('cfg') || {}).essencesCh);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Fiche : changer de chantier sans repasser par le carnet', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [
+      { id: 'c1', nom: 'Vaux', statut: 'encours', lignes: [], temps: [], maj: Date.now() },
+      { id: 'c2', nom: 'Valbrune', statut: 'paye', lignes: [], temps: [], maj: Date.now() - 1000 }
+    ]
+  }));
+  t.clic('[data-chouvrir="c1"]'); await t.pause(250);
+  verifierVrai('le sélecteur est en haut de la fiche', t.$('#f-choix'));
+  verifierVrai('les chantiers clos sont à part',
+    [...t.$('#f-choix').querySelectorAll('optgroup')].map(g => g.label).join('|') === 'En cours|Clos');
+  t.choisir('#f-choix', 'c2'); await t.pause(300);
+  verifierVrai('la fiche a suivi', /Valbrune/.test(t.texte('#fiche-chantier')));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Fiche : prévu et réel ne se confondent plus', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'accepte', lignes: [], temps: [],
+      jours: [{ d: Date.now(), p: 1 }], maj: Date.now() }]
+  }));
+  t.clic('[data-chouvrir="c1"]'); await t.pause(250);
+  const f = t.texte('#fiche-chantier');
+  verifierVrai('le bloc Travaux dit ce qu\'il chiffre', /Ce que vous facturez/.test(f));
+  verifierVrai('le bloc Journées dit que c\'est du prévu', /Ce que vous avez prévu/.test(f));
+  verifierVrai('le bloc Temps passé dit que c\'est du réel', /Ce que vous avez réellement fait/.test(f));
+  verifierVrai('le bouton ne redemande pas de placer ce qui l\'est',
+    t.texte('#f-planifier') === 'Modifier les journées');
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Accueil : des pictogrammes dessinés, plus des caractères de remplissage', async () => {
+  const t = await ouvrir(VIDE);
+  ['entreprise', 'cubage', 'bois'].forEach(m => {
+    const tuile = t.$('[data-module="' + m + '"]');
+    verifierVrai(m + ' porte un pictogramme au trait',
+      tuile && tuile.querySelector('.ic svg.pic'));
+    verifierVrai(m + ' n’a plus de caractère de remplissage',
+      tuile && !/[▤▥▦▧▨▩]/.test(tuile.querySelector('.ic').textContent));
+  });
+  verifier('le bouton accueil n’affiche plus de losange', '', t.texte('#b-accueil'));
+  /* Second niveau : les sept tuiles de l'entreprise, cerclées. */
+  const sous = ['chantiers', 'calendrier', 'rendements', 'devis', 'analyses', 'stock', 'finances'];
+  const cercles = sous.filter(m => {
+    const b = t.$('#vue-entreprise [data-module="' + m + '"]');
+    return b && b.querySelector('.ic.rond svg.pic');
+  });
+  verifier('les sept tuiles de l’entreprise sont cerclées', sous, cercles);
+  verifierVrai('aucun caractère de remplissage ne subsiste dans les tuiles',
+    t.$$('.tuile .ic').every(e => !/[▤▥▦▧▨▩⏱≈◫]/.test(e.textContent)));
+  /* Le logo ne doit exister qu'une fois dans le fichier : l'accueil et le
+     bandeau passent tous les deux par la variable CSS. */
+  const brut = t.d.documentElement.outerHTML;
+  verifier('le logo n’est stocké qu’une fois', 1,
+    (brut.match(/--logo:url\("data:image\/png/g) || []).length);
+  verifierVrai('le bandeau s’en sert', /#b-accueil\{[^}]*var\(--logo\)/s.test(brut));
+  verifierVrai('l’accueil aussi', /\.marque-logo\{[^}]*var\(--logo\)/s.test(brut));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Bandeau : rien qui fasse doublon avec la page', async () => {
+  /* + Pile, + Chantier, + Dépense, + Commande existent déjà dans leur page :
+     il y passe, jamais par le haut. Le bandeau redevient de la navigation. */
+  const doublons = [
+    ['bois', '#p-nouvelle'], ['chantiers', '#c-nouveau'],
+    ['finances', '#dep-nouvelle'], ['stock', '#art-reception']
+  ];
+  for (const [mod, enPage] of doublons) {
+    const t = await ouvrir(Object.assign({}, VIDE, { module: mod }));
+    verifier(mod + ' : le bandeau n’a plus d’action', '', t.texte('#b-ctx'));
+    verifierVrai(mod + ' : le bouton est dans la page', t.$(enPage));
+    verifier(mod + ' : aucune erreur', [], t.erreurs);
+  }
+  /* Ceux qui n'ont pas d'équivalent restent, sinon on serait bloqué dehors. */
+  const t2 = await ouvrir(Object.assign({}, VIDE, { module: 'devis' }));
+  verifierVrai('devis : « Estimer » reste, c’est le seul accès', t2.$('#b-estimer'));
+  /* Le filet du bandeau est brun, plus bleu : c'était le reproche principal. */
+  const css = t2.d.documentElement.outerHTML;
+  verifierVrai('le filet du bandeau est brun',
+    /\.bandeau\{[^}]*border-bottom:3px solid var\(--brun-marque\)/s.test(css));
+  verifierVrai('le logo du bandeau a de la place',
+    /#b-accueil\{[^}]*width:33px;height:33px/s.test(css));
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Onglets : un dessin partout, le même d’un module à l’autre', async () => {
+  const attendu = {
+    cubage: 5, chantiers: 3, calendrier: 4, rendements: 3, devis: 3,
+    finances: 4, analyses: 2, stock: 4, bois: 5
+  };
+  for (const mod of Object.keys(attendu)) {
+    const t = await ouvrir(Object.assign({}, VIDE, { module: mod }));
+    const onglets = t.$$('#onglets button');
+    verifier(mod + ' : ' + attendu[mod] + ' onglets', attendu[mod], onglets.length);
+    verifier(mod + ' : tous dessinés', attendu[mod],
+      onglets.filter(b => b.querySelector('.ic svg.pic')).length);
+    verifierVrai(mod + ' : plus aucun caractère de remplissage',
+      onglets.every(b => !/[▤▥▦▧▣◱◫≈∑⚙⌖⏱⇄↻✎]/.test(b.textContent)));
+  }
+  /* Une même vue doit porter le même dessin partout : c'est ce qui rend la
+     navigation lisible quand on passe d'une partie à l'autre. */
+  const a = await ouvrir(Object.assign({}, VIDE, { module: 'calendrier' }));
+  const b = await ouvrir(Object.assign({}, VIDE, { module: 'bois' }));
+  const carte = a.$('#onglets [data-vue="carte"] svg').innerHTML;
+  const lieux = b.$('#onglets [data-vue="lieux"] svg').innerHTML;
+  verifier('la carte et le « Où ? » montrent le même repère', carte, lieux);
+  const rA = a.$('#onglets [data-vue="reglages"] svg').innerHTML;
+  const rB = b.$('#onglets [data-vue="reglages"] svg').innerHTML;
+  verifier('les réglages sont identiques d’un module à l’autre', rA, rB);
+  verifier('aucune erreur', [], a.erreurs.concat(b.erreurs));
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Débours : encaissé et visible, mais hors du chiffre d’affaires', async () => {
+  /* Une somme avancée pour le client et refacturée à l'euro près n'est pas
+     une recette. Comptée comme telle, elle gonflerait le CA, l'abattement
+     et les cotisations — et pousserait vers les plafonds du micro-BIC. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'entreprise',
+    chantiers: [{
+      id: 'c1', nom: 'Plantation Vaux', statut: 'facture', dateFacture: Date.now(),
+      temps: [], maj: Date.now(),
+      lignes: [
+        { travail: 'PLANT', nature: 'prestation', unite: 'plant', quantite: 1000, prix: 1, tva: 10 },
+        { travail: 'F_PLANTS', nature: 'vente', unite: 'plant', quantite: 1000, prix: 0.5, tva: 5.5 },
+        { travail: 'AUTRE', nature: 'debours', unite: 'forfait', prix: 300, tva: 0 }
+      ]
+    }]
+  }));
+  const FIN = t.w.BCF;
+  const ch = t.stock('chantiers');
+  const ca = FIN.chiffreAffaires(ch, null);
+  verifier('la prestation est comptée', 1000, ca.prestation);
+  verifier('la vente aussi', 500, ca.vente);
+  verifier('le débours est suivi à part', 300, ca.debours);
+  verifier('le chiffre d’affaires ne retient que les deux premières', 1500, ca.total);
+  verifier('et il reste hors de ce qui est à encaisser', 1500, ca.aEncaisser);
+  /* Abattements : 50 % sur la prestation, 71 % sur la vente, rien sur le débours. */
+  verifier('après abattement, le débours ne pèse toujours rien', 645, ca.totalApres);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Les listes suivent celles du carnet : dépenses et prestations', async () => {
+  const t = await ouvrir(VIDE);
+  const FIN = t.w.BCF, C = t.w.BCC;
+  const cats = FIN.CATEGORIES.map(x => x.n);
+  /* Trois catégories tenaient dans des fourre-tout ou n'existaient pas. */
+  verifierVrai('« Consommable » existe', cats.indexOf('Consommable') >= 0);
+  verifierVrai('« EPI ou équipement de terrain » est sorti du petit matériel',
+    cats.indexOf('EPI ou équipement de terrain') >= 0);
+  verifierVrai('« Frais de restauration » est sorti du déplacement',
+    cats.indexOf('Frais de restauration') >= 0);
+  verifier('le consommable n’est pas une immobilisation', false, FIN.estImmo('CONSO'));
+  /* La première de la liste est la plus achetée : elle doit tomber sous le pouce. */
+  verifier('la plus fréquente vient en tête', 'Consommable', cats[0]);
+
+  const trav = C.TRAVAUX.map(x => x.n);
+  ['Inventaire en plein', 'Repérage de chablis', 'Détourage',
+   'Travaux sylvicoles jardinatoires'].forEach(n =>
+    verifierVrai('« ' + n + ' » est proposé', trav.indexOf(n) >= 0));
+  verifierVrai('le balivage ne parle plus de martelage ni de comptage',
+    trav.indexOf('Balivage') >= 0 && !trav.some(n => /martelage|comptage/i.test(n)));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Écran de démarrage : il s’affiche, et un appui le fait sauter', async () => {
+  /* Trois secondes, parce que l'application ne rend la main qu'au bout de
+     2,4 : à 1,2 s l'écran serait déjà parti quand on vient le regarder. */
+  const t = await ouvrir(Object.assign({}, VIDE, { cfg: { demarrageDuree: 3 } }));
+  const e = t.$('#demarrage');
+  verifierVrai('l’écran est là au démarrage à froid', e && !e.classList.contains('parti'));
+  verifier('il porte le nom', 'Sylve', t.texte('.dem-nom'));
+  verifier('et la phrase retenue', 'Gestion et terrain, à portée de main', t.texte('.dem-sous'));
+  /* Les mains sont prises et l'écran ne sert qu'à faire joli : il ne doit
+     jamais retenir quelqu'un qui veut entrer. */
+  e.click();
+  verifierVrai('un appui le fait sauter', e.classList.contains('parti'));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Écran de démarrage : réglé sur zéro, il n’apparaît pas du tout', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, { cfg: { demarrageDuree: 0 } }));
+  const e = t.$('#demarrage');
+  verifierVrai('l’écran reste effacé', e && e.classList.contains('parti'));
+  /* Sans fondu : désactivé, il ne doit pas s'effacer sous les yeux au
+     lancement — il ne doit pas avoir existé. */
+  verifierVrai('et sans transition, donc invisible', e.classList.contains('sec'));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Écran de démarrage : le curseur des réglages mène la durée', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, { cfg: { demarrageDuree: 2 } }));
+  t.clic('[data-vue="reglages"]'); await t.pause(250);
+  verifier('le curseur porte la durée enregistrée', '2', t.$('#r-dem').value);
+  verifier('elle est écrite en clair à côté', '2 s', t.texte('#r-dem-val'));
+  t.choisir('#r-dem', '0'); await t.pause(250);
+  verifier('à zéro, le réglage dit « aucun »', 'aucun', t.texte('#r-dem-val'));
+  verifier('et la configuration a suivi', 0, t.stock('cfg').demarrageDuree);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+(async () => {
+  console.log('Sylve — tests de non-régression\n' + '─'.repeat(52));
+  for (const s of scenarios) {
+    console.log('\n  ' + s.nom);
+    try { await s.fn(); }
+    catch (e) { ko++; console.log('    ✕ le scénario s\'est interrompu : ' + e.message); }
+  }
+  console.log('\n' + '─'.repeat(52));
+  console.log(ko ? `✕ ${ko} vérification(s) en échec sur ${ok + ko}.`
+    : `✓ ${ok} vérifications, tout passe.`);
+  process.exit(ko ? 1 : 0);
+})();

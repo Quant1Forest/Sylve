@@ -1,0 +1,286 @@
+# Sylve
+
+Application de gestion pour un entrepreneur de travaux forestiers. Un seul
+fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
+ligne.
+
+Version courante : **4.21.0-20260804-1811**
+
+---
+
+## Pour qui
+
+Un entrepreneur de travaux forestiers, seul sur son entreprise. Travaux
+sylvicoles : plantation, protections, dégagement, début de cycle. Pas
+d'abattage à titre principal.
+
+Sylve est son outil, pas un produit. Il sert le téléphone dans la poche et les
+mains dans la terre.
+
+**Comment travailler ensemble :**
+
+- Les retours arrivent dictés depuis le téléphone, souvent mal transcrits :
+  lire l'intention plutôt que les mots.
+- Poser des **questions de cadrage** plutôt que supposer. Un point ouvert se
+  pose explicitement, il ne se tranche pas seul.
+- Réponses **courtes**. Ni listes exhaustives, ni précautions oratoires.
+- Avancer **module par module**, corriger d'un bloc, rendre la liste écrite de
+  ce qui a changé.
+- **« Continuer » n'est jamais un accord.** Ce mot vient d'un bouton de
+  l'interface, pas d'une intention. Un silence non plus. Attendre un oui
+  explicite avant toute modification structurelle. Cette règle a déjà coûté
+  cher : voir *Le chantier des rendements*, plus bas.
+- Le vocabulaire technique ne va pas de soi. « commit », « push », « service
+  worker », « cache » demandent une explication en français courant, une fois,
+  sans condescendance. Un mot lâché sans être expliqué bloque la conversation.
+- Pour le visuel, juger sur pièce : fabriquer une maquette HTML autonome
+  plutôt que décrire une intention. Les maquettes vont dans `maquettes/`, qui
+  n'est pas versionné : elles servent à trancher, puis n'ont plus d'objet.
+- **Le dépôt est public.** Rien qui identifie l'utilisateur n'y entre : ni nom,
+  ni commune, ni statut, ni chiffres réels. Ce fichier compris. Le vocabulaire
+  métier (micro-BIC, MSA) est autre chose : ce sont des fonctions de
+  l'application, elles restent.
+
+---
+
+## Vérifier avant de livrer
+
+```bash
+npm install        # une seule fois : jsdom
+npm run controle   # vérificateur + tests + reconstruction + tests du fichier seul
+```
+
+Doit afficher **« Bon pour livraison »** puis la suite complète au vert, deux
+fois — 149 vérifications à ce jour, une fois sur `index.html`, une fois sur
+`Sylve.html`.
+
+Compter **une dizaine de minutes** : chaque scénario ouvre l'application
+entière dans un navigateur simulé et attend qu'elle ait démarré. À accélérer
+le jour où l'attente devient un frein — l'attente fixe de 2,4 s par scénario
+est le premier levier.
+
+**Une correction sans vérification qui la couvre n'est pas finie.** Chaque
+changement de comportement s'accompagne d'un scénario dans `outils/tests.js`.
+C'est la règle la plus importante du projet : elle a déjà rattrapé plusieurs
+régressions silencieuses.
+
+Scripts séparés si besoin : `npm run verifier`, `npm test`,
+`npm run construire`.
+
+---
+
+## Livrer
+
+Le dépôt est publié par GitHub Pages : ce qui est poussé sur `main` devient
+l'application, et le téléphone propose la mise à jour à la prochaine ouverture
+avec du réseau.
+
+Donc : **on ne pousse jamais sans un « envoie » explicite.** Modifier les
+fichiers, faire vérifier le résultat, attendre le feu vert, pousser ensuite.
+Un `git push` est une publication, pas une sauvegarde.
+
+Livrer suppose aussi d'avoir monté la `VERSION` dans `index.html` **et** dans
+`sw.js` — sans quoi les téléphones déjà installés continuent de servir
+l'ancien code. Le vérificateur refuse de passer si les deux divergent.
+
+---
+
+## Structure
+
+| Fichier | Rôle |
+|---|---|
+| `index.html` | **Toute l'application.** ~11 600 lignes : HTML, CSS et JS dans un seul fichier. |
+| `Sylve.html` | Version autonome, fabriquée par `outils/construire.js`. Ne jamais l'éditer à la main. |
+| `sw.js` | Service worker. Sa constante `VERSION` doit être identique à celle de `index.html`. |
+| `manifest.webmanifest` | Nom, couleurs, icônes de la PWA. |
+| `icone-*.png` | Icônes d'installation. La version *maskable* garde toute son encre dans la zone de rognage d'Android. |
+| `outils/` | Vérificateur, tests, script de construction. |
+
+Les fichiers d'origine du logo ne sont pas dans le dépôt : ils sont gardés à
+part. Le dépôt étant public, il ne contient que ce qui est servi, plus de quoi
+travailler.
+
+---
+
+## Conventions
+
+- **ES5 uniquement** dans `index.html` : `var`, `function`, pas de flèche,
+  pas de `let`, pas de template literal. Le fichier s'ouvre parfois sur du
+  vieux matériel.
+- **Français partout**, y compris dans les noms de fonctions et de variables.
+- Les commentaires disent **pourquoi**, jamais **quoi**. Un commentaire qui
+  paraphrase la ligne suivante est du bruit.
+- Stockage local via `lire` / `ecrire`, sous les clés `bordcub.*`.
+- `A` porte l'état, `A.cfg` la configuration. **`A.cfg` part dans les
+  sauvegardes** : c'est donc le bon endroit pour les petites listes que
+  l'utilisateur enrichit.
+- Les couleurs passent par les variables de `:root`. Ne jamais écrire une
+  couleur en dur dans une règle.
+
+---
+
+## Pièges déjà rencontrés
+
+- **`Sylve.html` doit être reconstruit** après chaque modification de
+  `index.html`. Un fichier autonome en retard s'ouvre sans erreur et ment sur
+  la version. `npm run controle` s'en charge.
+- **`VERSION` existe en deux endroits**, `index.html` et `sw.js`. Le
+  vérificateur refuse de passer s'ils divergent.
+- **L'icône de l'écran d'accueil ne se met pas à jour** avec l'application :
+  le téléphone la copie une fois à l'installation. Il faut retirer puis
+  réinstaller — et **exporter une sauvegarde avant**, la désinstallation peut
+  emporter le stockage local.
+- **Le logo n'existe qu'une fois** dans le fichier, dans la variable CSS
+  `--logo`, en base64. L'accueil et le bandeau y puisent tous les deux. Une
+  vérification garde ça en place.
+- **`--doux` et `--vert-marque`** ont été utilisés avant d'être définis.
+  Vérifier qu'une variable existe dans `:root` avant de s'en servir.
+- **Deux vérifications s'adossent au texte du CSS** (`tests.js`, lignes 331 et
+  359 : la présence de `--logo:url(`, la taille de `#b-accueil`). Un simple
+  reformatage les casserait alors que le comportement serait intact. À
+  réécrire plus solidement le jour où ce CSS bouge.
+- **`toISOString()` n'est pas une date locale.** Un champ `<input type="date">`
+  parle en heure locale ; `toISOString()` répond en heure de Greenwich, où
+  minuit à Paris est 22 h la veille. Tout timestamp passé par `C.minuit()` en
+  ressortait donc décalé d'un jour. Corrigé le 3 août 2026 dans `versChamp`,
+  qui s'appuie désormais sur `C.jourCle`. Pour les dates, `jourCle` et
+  `minuit` sont les seules bonnes portes — et un test qui écrit
+  `toISOString()` passe au vert à Londres tout en mentant en heure française.
+
+---
+
+## Où en est le design
+
+Terminé :
+
+- Palette crème calée sur le logo (`--papier: #F4EDE2`).
+- Logo sur l'accueil et sur le bouton de retour du bandeau, nulle part ailleurs.
+- Bandeau vert foncé, filet brun de la marque. Le bleu en a été retiré.
+- Pictogrammes au trait partout : pastilles sombres pleines sur l'accueil,
+  ronds fins au second niveau, et les 33 onglets du bas.
+- `PICTOS` est indexé sur l'identifiant de vue, pas sur le module : une même
+  notion porte donc le même dessin partout. Deux vérifications le garantissent.
+- Le bandeau est redevenu de la navigation pure. Les actions qui doublonnaient
+  avec un bouton de page en ont été retirées.
+- **Le bleu `--accent: #1F5FA9` est validé et conservé.** Question tranchée le
+  3 août 2026 : il tient bien avec le crème et le vert, il rend les boutons
+  principaux lisibles, et il apporte la seule couleur vive de l'interface. Ne
+  plus rouvrir le sujet.
+
+Restent ouverts :
+
+- **Trois actions restent dans le bandeau** faute d'équivalent dans leur page :
+  *Estimer* (seul accès à l'écran d'estimation — le retirer bloquerait
+  dehors), *Aujourd'hui*, *En-tête*. À déplacer dans leur page avant de les
+  retirer du haut.
+- **L'icône Apple** déclarée dans `index.html` est la marque détourée. iOS ne
+  gère pas la transparence sur l'écran d'accueil et la remplit en noir.
+  Basculer sur la version crème le jour où un iPhone entre dans le tableau.
+
+Fait en 4.21.0 :
+
+- **Écran de démarrage.** Fond crème, logo, nom, filet brun, puis
+  *« Gestion et terrain, à portée de main »*. Il entre net et sort en fondu :
+  Android affiche déjà le même crème à partir de `background_color`, la
+  jointure entre son écran et le nôtre ne doit pas se voir. Au **démarrage à
+  froid seulement** — `sessionStorage` fait la frontière — et un appui
+  n'importe où le fait sauter.
+- La durée se règle dans **Réglages ▸ Général ▸ Application**, curseur de 0 à
+  3 s par pas de 0,2. Zéro le supprime. Le réglage vit dans
+  `A.cfg.demarrageDuree`, donc il part dans les sauvegardes.
+- Le bloc vit **hors de `#app`**, avec son propre `<script>` : il doit
+  s'afficher avant que l'application ait fini de charger et s'effacer même si
+  elle échoue. Il lit donc la durée en synchrone dans le miroir
+  `localStorage`, sans attendre que la configuration soit relue — sinon
+  l'écran clignoterait, ou s'afficherait alors qu'il est réglé sur « aucun ».
+
+---
+
+## Le chantier des rendements — à ne pas rouvrir sans son feu vert
+
+Le contexte à cinq critères posé au niveau du chantier (essence, densité,
+hauteur, difficulté, terrain) est une erreur de conception. Deux raisons :
+
+1. **Trop peu de matière.** Cinq critères à trois niveaux font 243
+   combinaisons, pour une trentaine de chantiers par an. Un modèle sortirait
+   des moyennes calculées sur un ou deux chantiers, avec un air d'assurance.
+   Pire que rien.
+2. **Mauvais niveau.** Ce n'est pas le chantier qui a une difficulté, c'est la
+   prestation. Ce qui ralentit une plantation (sol, portage) n'a rien à voir
+   avec ce qui ralentit un dégagement (ronce, retrouver les plants).
+
+Ce qui a été codé en conséquence, **sans validation** — deux « Continuer » lus
+comme un accord — et livré depuis la **4.15.0**, donc présent sur le téléphone :
+
+- L'en-tête du chantier ne garde qu'essence et densité. Hauteur, difficulté et
+  terrain n'y sont plus saisissables.
+- Chaque ligne de travaux porte une note de difficulté de 1 à 5 et une
+  précision libre.
+- L'estimatif ne modélise plus rien : il affiche les rendements passés pour la
+  prestation choisie (le plus bas, le médian, le plus haut) et situe le
+  chantier dedans. `similarite()` et `chipsNiveau()` ont été supprimées.
+
+**Les données anciennes sont intactes.** L'enregistrement fusionne par-dessus
+les critères existants (`Object.assign({}, c.criteres || {}, {essence,
+densite})`) : `hauteur`, `difficulte` et `terrain` restent en base et
+`critLibelle()` les affiche toujours quand elles sont présentes. Seule la
+saisie a disparu.
+
+Revenir en arrière coûterait : remettre les cinq champs dans l'en-tête,
+restaurer `similarite()`, refaire l'écran d'estimation — et les notes de
+difficulté portées par les lignes de travaux deviendraient orphelines.
+
+Le sujet a été garé, pas annulé : **« on verra plus tard »**. Signalé
+explicitement le 3 août 2026, décision reportée. Ne pas y toucher, dans un sens
+ou dans l'autre, sans demander.
+
+---
+
+## Les listes viennent du carnet Excel
+
+Les nomenclatures de `TRAVAUX`, `CATEGORIES` et `NATURES` reprennent celles du
+classeur comptable tenu jusqu'ici. Elles ne sont pas décoratives : les changer
+sans raison casse la correspondance avec l'historique à importer.
+
+- **`CATEGORIES` est rangée par fréquence d'achat réelle**, pas par ordre
+  alphabétique : la saisie se fait debout, une main sur le téléphone.
+  *Consommable* en tête (le gasoil du tracteur, le mélange, l'huile de chaîne,
+  les chaînes, les agrafes), puis restauration, carburant, EPI.
+- **Deux carburants** : *pro* pour l'utilitaire, *perso* pour le véhicule
+  personnel employé au travail. La distinction est voulue.
+- *Assurance* et *Cotisations, taxes* n'étaient pas dans le carnet : gardées,
+  parce qu'elles finiront par servir.
+- **`MARQ` s'intitule désormais « Balivage ».** Marquage, martelage et comptage
+  ont été retirés — ce n'est pas ce métier-là. Le code interne n'a pas bougé,
+  pour ne décrocher aucune ligne déjà saisie.
+- **Le débours est une nature à part** (`horsCA: true`) : somme avancée pour le
+  client et refacturée à l'euro près. Ni abattement, ni cotisations, et il ne
+  pèse pas sur les plafonds du micro-BIC. `chiffreAffaires` additionnait
+  aveuglément toutes les natures — le compter comme recette gonflait le CA.
+  Le module Stock, lui, distinguait déjà vente / débours / perte.
+
+## Facture et stock : le maillon manquant
+
+Le chaînage existe déjà **sauf un cran**. Une sortie de stock peut porter un
+`chantier` ; son état suit alors le statut de ce chantier tout seul
+(`VENTE_DE_CHANTIER`) : prévu au devis, engagé une fois accepté, réellement
+sorti quand le chantier passe à *facturé* ou *payé*.
+
+Ce qui manque : **une ligne de chantier ne pointe pas vers un article**. La
+sortie doit donc être ressaisie à la main dans le stock. L'objectif est qu'une
+ligne de fourniture porte son article, et que la sortie en découle.
+
+Le cas qui résiste : **le Trico**, facturé au plant mais acheté en bidons.
+Il faudrait un coefficient de couverture sur l'article, ou le laisser en
+saisie manuelle. Question posée le 4 août 2026, sans réponse à ce jour.
+
+## Ce qui n'a jamais été bouclé
+
+- **La boucle estimation → chantier → agenda.** Touche Devis et estimatif,
+  Rendements et Calendrier à la fois. Jamais fermée.
+- **Le rangement des réglages** : « j'ai du mal à savoir où va quoi ».
+- **La revue de la partie Entreprise** : seul le module Chantiers a été
+  parcouru. Calendrier, Rendements, Devis, Analyses, Stock et Finances
+  attendent.
+- **Les données historiques.** Les anciens classeurs doivent être convertis et
+  importés. L'import se fait dans Réglages ▸ Entreprise ▸ Import de données.

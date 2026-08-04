@@ -1,0 +1,10 @@
+node_modules/
+package-lock.json
+.DS_Store
+
+# Réglages de Claude Code propres à cette machine : rien à publier.
+.claude/
+
+# Maquettes jetables : elles servent à trancher un choix visuel, puis
+# n'ont plus d'objet. Elles ne font pas partie de l'application.
+maquettes/
