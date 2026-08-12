@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.21.0-20260804-1811**
+Version courante : **4.22.0-20260804-2039**
 
 ---
 
@@ -51,7 +51,7 @@ npm run controle   # vérificateur + tests + reconstruction + tests du fichier s
 ```
 
 Doit afficher **« Bon pour livraison »** puis la suite complète au vert, deux
-fois — 149 vérifications à ce jour, une fois sur `index.html`, une fois sur
+fois — 182 vérifications à ce jour, une fois sur `index.html`, une fois sur
 `Sylve.html`.
 
 Compter **une dizaine de minutes** : chaque scénario ouvre l'application
@@ -258,6 +258,40 @@ sans raison casse la correspondance avec l'historique à importer.
   pèse pas sur les plafonds du micro-BIC. `chiffreAffaires` additionnait
   aveuglément toutes les natures — le compter comme recette gonflait le CA.
   Le module Stock, lui, distinguait déjà vente / débours / perte.
+
+## Charges fixes
+
+Sept postes réels : deux assurances, trois abonnements ou logiciels, les frais
+de compte bancaire, un prêt. D'où les catégories `ABO`, `BANQUE` et `PRET`,
+qui n'existaient pas — sans elles tout finissait en « Frais administratif » et
+le graphique de répartition ne disait rien.
+
+- **`fixe: true`** marque les catégories qui ont un sens pour une charge
+  fixe ; `categoriesFixes()` filtre le formulaire. La catégorie déjà posée est
+  toujours conservée, sinon une charge saisie avant ce tri deviendrait muette
+  dans son propre formulaire.
+- Le champ s'intitule **« Payé à »**, pas « Bénéficiaire » : le mot était juste
+  — c'est bien lui qui reçoit — mais il se lisait comme le bénéficiaire du
+  contrat, donc l'utilisateur lui-même.
+- **Le bandeau annonce, il ne réclame pas.** Préavis suivant l'espacement :
+  14 j annuel, 10 j semestriel, 7 j trimestriel, 3 j mensuel. Seules les
+  échéances **à venir** sont remontées. Ces charges sont prélevées
+  automatiquement, sans facture, donc jamais pointées : réclamer un pointage
+  aurait posé une alerte permanente qui finit par ne plus être lue.
+- **Le rappel vit sur l'accueil** (`#a-echeances`), sous celui de sauvegarde.
+  Il avait d'abord été posé dans `#bandeau-alertes`, qui est *dans la vue
+  Carnet du module Chantiers* — invisible au lancement, donc inutile. Au-delà
+  de deux échéances il résume, sinon il mange l'accueil.
+- **Le formulaire ne demandait jamais l'année.** Un jour et un mois de
+  référence seulement : un abonnement souscrit en 2024 était indiscernable
+  d'un souscrit deux ans plus tard, et ses échéances remontaient depuis
+  toujours. `charge.debut` existait pourtant déjà dans `echeances()`, sans
+  jamais être saisi. C'est désormais « Date du premier paiement », d'où sont
+  déduits `jour` et `moisReference`.
+- **`sansTva` est branché** : sur assurance, cotisations et prêt, le champ TVA
+  passe à zéro et se ferme. Le drapeau existait depuis le début sans servir à
+  rien. Corollaire utile : seules les charges qui portent de la TVA méritent
+  d'être pointées en dépense, puisque c'est la TVA qui se récupère.
 
 ## Facture et stock : le maillon manquant
 
