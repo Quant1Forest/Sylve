@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.23.0-20260812-2117**
+Version courante : **4.24.0-20260812-2230**
 
 ---
 
@@ -51,7 +51,7 @@ npm run controle   # vérificateur + tests + reconstruction + tests du fichier s
 ```
 
 Doit afficher **« Bon pour livraison »** puis la suite complète au vert, deux
-fois — 194 vérifications à ce jour, une fois sur `index.html`, une fois sur
+fois — 203 vérifications à ce jour, une fois sur `index.html`, une fois sur
 `Sylve.html`.
 
 Compter **une dizaine de minutes** : chaque scénario ouvre l'application
@@ -332,6 +332,33 @@ node outils/importer-carnet.js "<classeur.xlsx>" [sortie.json]
   doit tomber au centime sur celui du tableau de bord, et l'écart sur le
   chiffre d'affaires doit valoir exactement les débours — le tableur les
   exclut, `chiffreAffaires` aussi.
+
+## Donneur d'ordre et propriétaire — le nommage piège
+
+Le stockage et l'interface ne disent pas la même chose, et l'import s'y est
+laissé prendre :
+
+| Champ à l'écran | Liste qui l'alimente | Champ du chantier |
+|---|---|---|
+| Donneur d'ordre | `clients` | `donneur` |
+| Propriétaire facturé | `proprios` | `proprietaire` |
+
+Le maître d'œuvre du carnet est donc un **client** au sens du stockage, et le
+client du carnet un **propriétaire**. Les intervertir remplit chaque menu
+déroulant avec la mauvaise moitié du carnet, et le bouton « + liste » ajoute
+au mauvais endroit. Vérifier ce tableau avant de toucher à l'un des deux.
+
+## Le libellé de facture prime sur l'intitulé des travaux
+
+`TRAVAUX` sert au taux de TVA et aux rendements : la liste doit rester courte
+et stable. Elle ne dit pas ce qui a été vendu — « Fourniture de tuteurs » là
+où la facture porte « tuteur châtaignier 9/11×150 ».
+
+Le champ `note` d'une ligne porte ce texte, sous l'intitulé **« Libellé sur la
+facture »**, et c'est lui qui s'affiche en tête de la ligne ; l'intitulé des
+travaux passe dessous, avec la quantité. Il s'appelait « Précision » et était
+noyé en quatrième position dans la ligne grise : l'utilisateur ne retrouvait
+pas sa propre facture.
 
 ## Deux contrôles qui ont menti
 

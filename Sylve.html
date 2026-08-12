@@ -8139,13 +8139,18 @@ function renderFiche() {
     var q = l.unite === 'forfait' ? 'forfait'
       : E.fmt(C.nb(l.quantite), C.nb(l.quantite) % 1 ? 2 : 0) + ' ' + C.courtUnite(l.unite) +
         ' × ' + E.fmt(C.nb(l.prix), 2) + ' €';
-    return '<div class="ligne-trav"><div><b>' + esc(C.nomTravail(l.travail)) + '</b>' +
-      '<div class="muted" style="font-size:12px">' + esc(q) +
+    /* Quand la ligne porte une précision, c'est elle le titre : c'est le
+       texte qui figure sur la facture du client. Le travail reste dessous —
+       il sert au taux de TVA et aux rendements — mais il ne doit plus
+       masquer ce qui a réellement été vendu. */
+    var titre = l.note ? l.note : C.nomTravail(l.travail);
+    return '<div class="ligne-trav"><div><b>' + esc(titre) + '</b>' +
+      '<div class="muted" style="font-size:12px">' +
+      (l.note ? esc(C.nomTravail(l.travail)) + ' · ' : '') + esc(q) +
       ' · TVA ' + String(C.tauxLigne(l, c)).replace('.', ',') + ' %' +
       (l.nature === 'vente' ? ' · fourniture' : '') +
       (l.tva != null && l.tva !== '' ? ' (forcé)' : '') +
-      (l.difficulte ? ' · difficulté ' + C.nb(l.difficulte) + '/5' : '') +
-      (l.note ? ' · ' + esc(l.note) : '') + '</div></div>' +
+      (l.difficulte ? ' · difficulté ' + C.nb(l.difficulte) + '/5' : '') + '</div></div>' +
       '<div style="text-align:right"><b class="num">' + eur(C.montantLigne(l)) + '</b><br>' +
       '<button class="btn-min" data-lmod="' + i + '">Modifier</button> ' +
       '<button class="btn-min" data-lsup="' + i + '">✕</button></div></div>';
@@ -8345,6 +8350,14 @@ function formEnteteCh(c) {
     '<div class="champ"><label class="eyebrow" for="ce-numfact">N° de facture</label>' +
     '<input type="text" id="ce-numfact" autocomplete="off" placeholder="celui de votre logiciel" value="' +
     esc(c.numeroFacture || '') + '"></div>' +
+    /* Changer le statut inscrit la date du jour faute de mieux. Sans ces deux
+       champs, une facture réglée le mois dernier restait datée d'aujourd'hui
+       et il n'y avait aucun moyen de la corriger — ni pour la TVA, ni pour
+       les relances, ni pour reprendre un historique. */
+    '<div class="champ"><label class="eyebrow" for="ce-datefact">Facturé le</label>' +
+    '<input type="date" id="ce-datefact" value="' + versChamp(c.dateFacture) + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="ce-datepaie">Payé le</label>' +
+    '<input type="date" id="ce-datepaie" value="' + versChamp(c.datePaiement) + '"></div>' +
     '<div class="champ"><label class="eyebrow" for="ce-jest">Journées estimées</label>' +
     '<input type="text" id="ce-jest" inputmode="decimal" autocomplete="off" value="' +
     (c.joursEstimes != null ? esc(String(c.joursEstimes).replace('.', ',')) : '') + '"></div>' +
@@ -8520,6 +8533,8 @@ function ouvrirEnteteCh(id) {
       })(),
       siren: $('#ce-siren').checked,
       numeroFacture: $('#ce-numfact').value.trim(),
+      dateFacture: versDate($('#ce-datefact').value),
+      datePaiement: versDate($('#ce-datepaie').value),
       criteres: criteres,
       statut: $('#ce-statut').value, notes: $('#ce-notes').value.trim(),
       gps: gps, maj: Date.now()
@@ -8643,8 +8658,13 @@ function ouvrirLigne(id, idx) {
     '<label class="eyebrow" style="display:block">Difficulté <span class="muted" ' +
     'style="font-weight:400;text-transform:none;letter-spacing:0">(1 très facile → 5 très difficile)</span></label>' +
     '<div class="chips" id="cl-diff" style="margin-top:5px">' + chipsDiff5('cldiff', l.difficulte) + '</div>' +
-    '<div class="champ" style="margin-top:9px"><label class="eyebrow" for="cl-note">Précision</label>' +
-    '<input type="text" id="cl-note" autocomplete="off" placeholder="sol caillouteux, portage 200 m, ronce haute…" value="' + esc(l.note || '') + '"></div>' +
+    /* La liste des travaux sert au taux de TVA et aux rendements : elle doit
+       rester courte et stable. Ce champ porte ce qui figure vraiment sur la
+       facture — « tuteur châtaignier 9/11×150 » là où la liste ne connaît
+       que « Fourniture de tuteurs » — et c'est lui qui s'affiche en tête. */
+    '<div class="champ" style="margin-top:9px"><label class="eyebrow" for="cl-note">Libellé sur la facture</label>' +
+    '<input type="text" id="cl-note" autocomplete="off" placeholder="tuteur châtaignier 9/11×150, et agrafes…" value="' + esc(l.note || '') + '">' +
+    '<p class="muted" style="font-size:11.5px;margin:5px 0 0">Laissé vide, c’est l’intitulé des travaux qui s’affiche.</p></div>' +
     '<p class="muted" style="font-size:12px;margin:7px 0 0">La note sert à situer vos rendements ' +
     'quand vous estimerez un chantier semblable. La précision, elle, ne sert qu’à vous : ' +
     'c’est ce que vous relirez dans deux ans.</p>' +
@@ -12396,7 +12416,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.23.0-20260812-2117';
+var VERSION = '4.24.0-20260812-2230';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
