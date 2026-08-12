@@ -138,6 +138,13 @@ body:not(.m-ent) .mod-ent{display:none}
 }
 .alerte .ic{flex:none;width:8px;height:8px;border-radius:50%;margin-top:5px}
 .alerte b{display:block;font-size:13.5px}
+/* Un rappel qu'on ne peut pas chasser finit par ne plus être lu. La croix
+   déborde volontiers de la zone du texte : c'est une cible de doigt. */
+.alerte .fermer{
+  flex:none;margin:-10px -12px -10px auto;padding:10px 13px;font:inherit;font-size:17px;
+  line-height:1;background:none;border:0;color:var(--gris-clair);cursor:pointer;
+}
+.alerte .fermer:hover{color:var(--encre)}
 .pastille-alerte:not(:empty){
   display:inline-block;min-width:18px;padding:1px 5px;border-radius:20px;background:#B4231F;
   color:#fff;font-size:10.5px;font-family:var(--corps);margin-top:3px;
@@ -5482,7 +5489,11 @@ function integrer(objet, source, remplace) {
     nCh = nc;
     var nd = 0;
     (s.depenses || []).forEach(function (dp) {
-      if (!dp || dp.ttc == null) return;
+      /* Une dépense porte soit des lignes, soit un montant à plat — le format
+         d'avant, que le formulaire efface désormais en enregistrant. N'exiger
+         que le montant à plat rejetait donc en silence toute dépense saisie
+         depuis : la sauvegarde ne les protégeait plus. */
+      if (!dp || (dp.ttc == null && !(dp.lignes && dp.lignes.length))) return;
       if (A.depenses.some(function (x) { return x.id === dp.id; })) dp.id = uid();
       A.depenses.push(dp); nd++;
     });
@@ -5693,14 +5704,20 @@ function renderNudgeSauvegarde() {
 /* Ce qui va tomber du compte se voit au même endroit que le rappel de
    sauvegarde, et pour la même raison. Au-delà de deux échéances la liste
    mangerait l'accueil : on résume, le détail est à un appui. */
+/* Chassé d'un doigt, il ne revient qu'au prochain démarrage à froid : une
+   échéance mensuelle reste annoncée trois jours, et un rappel qu'on ne peut
+   pas fermer finit par ne plus être lu du tout. */
+var echeancesChassees = false;
 function renderNudgeEcheances() {
   var z = $('#a-echeances'); if (!z) return;
-  var al = FIN.alertesCharges(A.charges, A.depenses, Date.now());
+  var al = echeancesChassees ? [] : FIN.alertesCharges(A.charges, A.depenses, Date.now());
   if (!al.length) { z.innerHTML = ''; return; }
   var bouton = function (titre, sous) {
-    return '<button class="alerte" data-echeance="1" style="margin-top:12px;width:100%">' +
+    return '<div class="alerte" data-echeance="1" style="margin-top:12px">' +
       '<i class="ic" style="background:#5B3A1E"></i>' +
-      '<span><b>' + esc(titre) + '</b><small>' + esc(sous) + '</small></span></button>';
+      '<span><b>' + esc(titre) + '</b><small>' + esc(sous) + '</small></span>' +
+      '<button class="fermer" id="a-ech-fermer" title="Masquer jusqu’au prochain lancement" ' +
+      'aria-label="Masquer">×</button></div>';
   };
   if (al.length <= 2) {
     z.innerHTML = al.map(function (a) {
@@ -6600,8 +6617,14 @@ function brancher() {
     var b = e.target.closest('[data-alerte]');
     if (b) ouvrirChantier(b.dataset.alerte);
   });
-  /* Le rappel d'échéances mène à la page des charges, pas à un chantier. */
+  /* Le rappel d'échéances mène à la page des charges, pas à un chantier —
+     sauf si c'est la croix qu'on vise. */
   $('#a-echeances').addEventListener('click', function (e) {
+    if (e.target.closest('#a-ech-fermer')) {
+      echeancesChassees = true;
+      renderNudgeEcheances();
+      return;
+    }
     if (e.target.closest('[data-echeance]')) allerModule('finances', 'charges');
   });
   $('#ent-alertes').addEventListener('click', function (e) {
@@ -12373,7 +12396,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.22.0-20260804-2039';
+var VERSION = '4.23.0-20260812-2117';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
