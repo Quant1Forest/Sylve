@@ -1020,6 +1020,7 @@ if (froid && s > 0) montrer(s);
             style="width:auto;flex:none;padding:11px 13px">⚙</button>
         </div>
         <div id="a-sauvegarde"></div>
+        <div id="a-echeances"></div>
         <p class="eyebrow" style="margin:22px 0 8px">Entreprise</p>
         <div class="tuiles">
           <button class="tuile" data-module="entreprise">
@@ -3562,16 +3563,26 @@ var CATEGORIES = [
     aide: 'pantalon anti-coupure, casque, gants, chaussures' },
   { c: 'PETITMAT', n: 'Petits outillages / matériels', immo: false },
   { c: 'FOURN', n: 'Achats de fourniture', immo: false, aide: 'plants, protections, tuteurs' },
-  { c: 'ADMIN', n: 'Frais administratif', immo: false },
+  { c: 'ADMIN', n: 'Frais administratif', immo: false, fixe: true },
   { c: 'ENTRETIEN', n: 'Réparation matériel', immo: false },
   { c: 'IMMO', n: 'Immobilisation', immo: true, aide: 'véhicule, matériel durable' },
   { c: 'DEPL', n: 'Frais de déplacement', immo: false, aide: 'péage, parking, nuitée' },
   { c: 'CARBPERSO', n: 'Frais de carburant perso', immo: false,
     aide: 'le véhicule personnel employé pour le travail' },
   { c: 'CREATION', n: 'Frais de création', immo: false },
-  { c: 'ASSUR', n: 'Assurance', immo: false },
+  /* Ce qui tombe tout seul du compte. « fixe » les remonte dans la liste
+     d'une charge fixe : y proposer « achats de fourniture » n'avait pas de
+     sens, et l'abonnement, la banque et le prêt n'existaient nulle part. */
+  /* Une assurance ne porte pas de TVA — elle relève de la taxe sur les
+     conventions d'assurance — et un remboursement de prêt n'en porte pas
+     davantage. Rien à récupérer, donc rien à pointer. */
+  { c: 'ASSUR', n: 'Assurance', immo: false, fixe: true, sansTva: true },
+  { c: 'ABO', n: 'Abonnement, logiciel', immo: false, fixe: true,
+    aide: 'comptabilité, bureautique, outils en ligne' },
+  { c: 'BANQUE', n: 'Frais bancaires', immo: false, fixe: true },
+  { c: 'PRET', n: 'Prêt, crédit', immo: false, fixe: true, sansTva: true },
   { c: 'COTIS', n: 'Cotisations, taxes', immo: false, sansTva: true },
-  { c: 'AUTRE', n: 'Frais divers', immo: false }
+  { c: 'AUTRE', n: 'Frais divers', immo: false, fixe: true }
 ];
 var TAUX_TVA = [20, 10, 5.5, 0];
 
@@ -3593,6 +3604,16 @@ function estImmo(c) { var x = trouve(CATEGORIES, c); return !!(x && x.immo); }
 function nomNature(c) { var x = trouve(NATURES, c); return x ? x.n : (c || ''); }
 function abattementDe(c) { var x = trouve(NATURES, c); return x ? x.abattement : 0.5; }
 function estHorsCA(c) { var x = trouve(NATURES, c); return !!(x && x.horsCA); }
+/* Les seules catégories qui aient un sens pour une charge fixe. La catégorie
+   déjà posée est gardée même si elle n'en fait pas partie : une charge saisie
+   avant ce tri ne doit pas se retrouver muette dans son propre formulaire. */
+function categoriesFixes(courante) {
+  return CATEGORIES.filter(function (x) { return x.fixe || x.c === courante; });
+}
+/* Ce qui ne porte pas de TVA du tout : assurance, cotisations, prêt. Le
+   drapeau existait depuis le début sans être branché nulle part — un taux
+   saisi là-dessus faisait croire à une TVA récupérable qui n'existe pas. */
+function sansTvaDe(c) { var x = trouve(CATEGORIES, c); return !!(x && x.sansTva); }
 
 function nb(v) {
   if (v == null || v === '') return 0;
@@ -3795,6 +3816,34 @@ function chargesDues(charges, depenses, b) {
   return out.sort(function (a, b2) { return a.date - b2.date; });
 }
 
+/* Le préavis suit l'espacement : annoncer quinze jours à l'avance une
+   échéance mensuelle la laisserait affichée la moitié du mois, et elle
+   deviendrait du décor qu'on ne lit plus. */
+var PREAVIS = { mensuel: 3, trimestriel: 7, semestriel: 10, annuel: 14 };
+function preavisDe(p) { return PREAVIS[p] != null ? PREAVIS[p] : 7; }
+
+/* Ce qui va tomber du compte. Uniquement ce qui vient : une échéance passée
+   n'est pas un oubli, elle a été prélevée toute seule. Réclamer un pointage
+   qui ne viendra jamais installerait une alerte permanente. */
+function alertesCharges(charges, depenses, maintenant) {
+  var now = maintenant || Date.now();
+  var JOURMS = 86400000;
+  var minuit = function (ts) { var d = new Date(ts); d.setHours(0, 0, 0, 0); return d.getTime(); };
+  var b = { debut: minuit(now), fin: minuit(now) + 40 * JOURMS };
+  var out = [];
+  chargesDues(charges, depenses, b).forEach(function (d) {
+    if (d.paye) return;
+    var jours = Math.round((minuit(d.date) - minuit(now)) / JOURMS);
+    if (jours < 0 || jours > preavisDe(d.charge.periodicite)) return;
+    out.push({ charge: d.charge, date: d.date, jours: jours, ttc: d.ttc,
+      texte: (jours === 0 ? 'prélevé aujourd’hui'
+        : jours === 1 ? 'prélevé demain'
+        : 'prélevé dans ' + jours + ' jours') +
+        (d.charge.beneficiaire ? ' · ' + d.charge.beneficiaire : '') });
+  });
+  return out.sort(function (x, y) { return x.date - y.date; });
+}
+
 /* ------------------------------------------------------------- dépenses */
 function totalDepenses(depenses, b) {
   var r = { ttc: 0, ht: 0, tva: 0, immo: 0, courant: 0, n: 0, parCategorie: {} };
@@ -3958,7 +4007,7 @@ function tauxReussite(chantiers) {
 var M = {
   CATEGORIES: CATEGORIES, TAUX_TVA: TAUX_TVA, NATURES: NATURES,
   nomCategorie: nomCategorie, estImmo: estImmo, nomNature: nomNature, abattementDe: abattementDe,
-  estHorsCA: estHorsCA,
+  estHorsCA: estHorsCA, categoriesFixes: categoriesFixes, sansTvaDe: sansTvaDe,
   nb: nb, arr: arr, htDe: htDe, tvaDe: tvaDe, ttcDe: ttcDe,
   lignesDepense: lignesDepense, htLigne: htLigne, tvaLigne: tvaLigne,
   bornes: bornes, dansPeriode: dansPeriode,
@@ -3972,7 +4021,8 @@ var M = {
   simulation: simulation,
   PERIODICITES: PERIODICITES, parAn: parAn, nomPeriodicite: nomPeriodicite,
   coutAnnuel: coutAnnuel, totalChargesAnnuel: totalChargesAnnuel,
-  echeances: echeances, chargesDues: chargesDues
+  echeances: echeances, chargesDues: chargesDues,
+  preavisDe: preavisDe, alertesCharges: alertesCharges
 };
 if (typeof window !== 'undefined') window.BCF = M;
 if (typeof module === 'object' && module.exports) module.exports = M;
@@ -5642,6 +5692,29 @@ function renderNudgeSauvegarde() {
     ' · ' + esc(listerContenu(c)) + '</small></span></button>';
 }
 
+/* Ce qui va tomber du compte se voit au même endroit que le rappel de
+   sauvegarde, et pour la même raison. Au-delà de deux échéances la liste
+   mangerait l'accueil : on résume, le détail est à un appui. */
+function renderNudgeEcheances() {
+  var z = $('#a-echeances'); if (!z) return;
+  var al = FIN.alertesCharges(A.charges, A.depenses, Date.now());
+  if (!al.length) { z.innerHTML = ''; return; }
+  var bouton = function (titre, sous) {
+    return '<button class="alerte" data-echeance="1" style="margin-top:12px;width:100%">' +
+      '<i class="ic" style="background:#5B3A1E"></i>' +
+      '<span><b>' + esc(titre) + '</b><small>' + esc(sous) + '</small></span></button>';
+  };
+  if (al.length <= 2) {
+    z.innerHTML = al.map(function (a) {
+      return bouton(a.charge.libelle || 'Charge', eur(a.ttc) + ' · ' + a.texte);
+    }).join('');
+    return;
+  }
+  var total = al.reduce(function (s, a) { return s + C.nb(a.ttc); }, 0);
+  z.innerHTML = bouton(al.length + ' prélèvements à venir — ' + eur(total),
+    'le premier ' + al[0].texte.split(' ·')[0] + ' : ' + (al[0].charge.libelle || 'charge'));
+}
+
 function renderRecup() {
   var z = $('#s-recup'); if (!z) return;
   z.innerHTML = '<p class="muted" style="font-size:12px;margin:12px 0 6px">Chargement…</p>';
@@ -6529,6 +6602,10 @@ function brancher() {
     var b = e.target.closest('[data-alerte]');
     if (b) ouvrirChantier(b.dataset.alerte);
   });
+  /* Le rappel d'échéances mène à la page des charges, pas à un chantier. */
+  $('#a-echeances').addEventListener('click', function (e) {
+    if (e.target.closest('[data-echeance]')) allerModule('finances', 'charges');
+  });
   $('#ent-alertes').addEventListener('click', function (e) {
     var b = e.target.closest('[data-alerte]');
     if (b) ouvrirChantier(b.dataset.alerte);
@@ -7035,7 +7112,7 @@ function renderAccueil() {
   $('#a-bois-s').textContent = A.piles.length
     ? A.piles.length + (A.piles.length > 1 ? ' piles' : ' pile')
     : 'Aucune pile enregistrée';
-  renderNudgeSauvegarde(); renderMaJournee();
+  renderNudgeSauvegarde(); renderNudgeEcheances(); renderMaJournee();
   renderEntreprise();
 }
 
@@ -11020,15 +11097,26 @@ function renderCharges() {
     : '<p class="muted" style="font-size:12.5px">Aucune échéance sur cette période.</p>';
 }
 
+/* Le formulaire ne demandait qu'un jour et un mois : sans année, un
+   abonnement souscrit en septembre 2024 était indiscernable d'un souscrit
+   deux ans plus tard, et les échéances remontaient depuis toujours. Les
+   charges d'avant sont recalées sur l'année en cours — approximatif, mais
+   moins faux que rien, et il suffit de rouvrir la fiche pour corriger. */
+function debutCharge(c) {
+  if (c.debut) return c.debut;
+  if (c.jour == null && c.moisReference == null) return null;
+  return new Date(new Date().getFullYear(), Number(c.moisReference || 0),
+    Math.min(Number(c.jour) || 1, 28), 12).getTime();
+}
 function ouvrirCharge(id) {
-  var c = id ? charge(id) : { periodicite: 'mensuel', taux: 20, categorie: 'ASSUR', jour: 5 };
+  var c = id ? charge(id) : { periodicite: 'mensuel', taux: 20, categorie: 'ASSUR' };
   if (!c) return;
   modale(id ? 'Modifier la charge' : 'Nouvelle charge fixe',
     '<div class="champ"><label class="eyebrow" for="cg-lib">Libellé</label>' +
     '<input type="text" id="cg-lib" class="gros" autocomplete="off" placeholder="assurance RC pro, prêt matériel…" value="' + esc(c.libelle || '') + '"></div>' +
     '<div class="grille g2">' +
-    '<div class="champ"><label class="eyebrow" for="cg-benef">Bénéficiaire</label>' +
-    '<input type="text" id="cg-benef" autocomplete="off" value="' + esc(c.beneficiaire || '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="cg-benef">Payé à</label>' +
+    '<input type="text" id="cg-benef" autocomplete="off" placeholder="l’assureur, la banque…" value="' + esc(c.beneficiaire || '') + '"></div>' +
     '<div class="champ"><label class="eyebrow" for="cg-ttc">Montant TTC (€)</label>' +
     '<input type="text" id="cg-ttc" class="gros" inputmode="decimal" value="' +
     (c.ttc != null ? esc(String(c.ttc).replace('.', ',')) : '') + '"></div>' +
@@ -11036,18 +11124,14 @@ function ouvrirCharge(id) {
     '<select id="cg-per">' + FIN.PERIODICITES.map(function (p) {
       return '<option value="' + p.c + '"' + (c.periodicite === p.c ? ' selected' : '') + '>' + p.n + '</option>';
     }).join('') + '</select></div>' +
-    '<div class="champ"><label class="eyebrow" for="cg-jour">Jour du prélèvement</label>' +
-    '<input type="text" id="cg-jour" inputmode="numeric" value="' + (c.jour || 5) + '"></div>' +
-    '<div class="champ"><label class="eyebrow" for="cg-mois">Premier mois</label>' +
-    '<select id="cg-mois">' + MOIS_NOMS.map(function (m, i) {
-      return '<option value="' + i + '"' + (Number(c.moisReference || 0) === i ? ' selected' : '') + '>' + m + '</option>';
-    }).join('') + '</select></div>' +
+    '<div class="champ"><label class="eyebrow" for="cg-debut">Date du premier paiement</label>' +
+    '<input type="date" id="cg-debut" value="' + versChamp(debutCharge(c)) + '"></div>' +
     '<div class="champ"><label class="eyebrow" for="cg-taux">TVA</label>' +
     '<select id="cg-taux">' + FIN.TAUX_TVA.map(function (t) {
       return '<option value="' + t + '"' + (C.nb(c.taux) === t ? ' selected' : '') + '>' + (t ? t + ' %' : 'sans TVA') + '</option>';
     }).join('') + '</select></div>' +
     '<div class="champ"><label class="eyebrow" for="cg-cat">Catégorie</label>' +
-    '<select id="cg-cat">' + FIN.CATEGORIES.map(function (x) {
+    '<select id="cg-cat">' + FIN.categoriesFixes(c.categorie).map(function (x) {
       return '<option value="' + x.c + '"' + (c.categorie === x.c ? ' selected' : '') + '>' + x.n + '</option>';
     }).join('') + '</select></div>' +
     '</div>' +
@@ -11067,15 +11151,33 @@ function ouvrirCharge(id) {
   $('#cg-ttc').addEventListener('input', apercu);
   $('#cg-per').addEventListener('change', apercu);
   apercu();
+
+  /* Une assurance ou un remboursement de prêt ne porte aucune TVA : le champ
+     se met à zéro et se ferme, plutôt que de laisser saisir une taxe qu'on
+     ne récupérera jamais. */
+  var majTva = function () {
+    var sans = FIN.sansTvaDe($('#cg-cat').value), sel = $('#cg-taux');
+    sel.disabled = sans;
+    if (sans) sel.value = '0';
+  };
+  $('#cg-cat').addEventListener('change', majTva);
+  majTva();
   $('#cg-ok').addEventListener('click', function () {
     var lib = $('#cg-lib').value.trim();
     if (!lib) { toast('Donnez un libellé.'); return; }
     var t = C.nb($('#cg-ttc').value);
     if (t <= 0) { toast('Montant attendu.'); return; }
+    var deb = versDate($('#cg-debut').value);
+    if (!deb) { toast('Indiquez la date du premier paiement.'); return; }
+    /* Le jour et le mois restent en base : c'est sur eux que le cycle des
+       échéances se cale. La date les porte tous les deux, plus l'année. */
+    var dd = new Date(deb);
+    var cat = $('#cg-cat').value;
     var maj = { libelle: lib, beneficiaire: $('#cg-benef').value.trim(), ttc: t,
-      periodicite: $('#cg-per').value, jour: C.nb($('#cg-jour').value) || 5,
-      moisReference: Number($('#cg-mois').value), taux: C.nb($('#cg-taux').value),
-      categorie: $('#cg-cat').value, arretee: $('#cg-arret').checked, maj: Date.now() };
+      periodicite: $('#cg-per').value, debut: deb,
+      jour: dd.getDate(), moisReference: dd.getMonth(),
+      taux: FIN.sansTvaDe(cat) ? 0 : C.nb($('#cg-taux').value),
+      categorie: cat, arretee: $('#cg-arret').checked, maj: Date.now() };
     if (id) { Object.keys(maj).forEach(function (k) { c[k] = maj[k]; }); }
     else { maj.id = uid(); A.charges.push(maj); }
     sauverCharges().then(function () {
@@ -12273,7 +12375,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.21.0-20260804-1811';
+var VERSION = '4.22.0-20260804-2039';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

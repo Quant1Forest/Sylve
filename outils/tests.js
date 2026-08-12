@@ -460,6 +460,129 @@ scenario('Les listes suivent celles du carnet : dépenses et prestations', async
 });
 
 /* --------------------------------------------------------------------- */
+scenario('Charges fixes : annoncées avant, jamais réclamées après', async () => {
+  /* Le préavis suit l'espacement de la charge. Et une échéance passée n'est
+     pas un oubli : un prélèvement automatique ne se pointe pas, réclamer
+     poserait une alerte qui ne s'éteindrait jamais. */
+  const jour = 86400000;
+  const dans = n => { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n); return d; };
+  const charge = (id, per, quand) => ({
+    id, libelle: 'Charge ' + id, ttc: 100, periodicite: per,
+    jour: quand.getDate(), moisReference: quand.getMonth(), taux: 0, categorie: 'ASSUR'
+  });
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'entreprise',
+    charges: [
+      charge('men', 'mensuel', dans(2)),        /* 3 jours de préavis  → annoncée */
+      charge('men2', 'mensuel', dans(8)),       /* au-delà des 3 jours → muette   */
+      charge('an', 'annuel', dans(10)),         /* 14 jours de préavis → annoncée */
+      charge('hier', 'mensuel', dans(-2))       /* déjà passée         → muette   */
+    ]
+  }));
+  const FIN = t.w.BCF;
+  verifier('le préavis dépend de la périodicité',
+    [3, 7, 10, 14],
+    ['mensuel', 'trimestriel', 'semestriel', 'annuel'].map(p => FIN.preavisDe(p)));
+  const al = FIN.alertesCharges(t.stock('charges'), [], Date.now());
+  const vus = al.map(a => a.charge.id).sort();
+  verifier('seules les échéances proches sont annoncées', ['an', 'men'], vus);
+  verifier('et elles disent quand', 'prélevé dans 2 jours',
+    al.filter(a => a.charge.id === 'men')[0].texte.split(' ·')[0]);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Accueil : ce qui va être prélevé se voit dès l’ouverture', async () => {
+  /* Le rappel doit être là où l'application s'ouvre, pas dans un écran qu'on
+     ne visite jamais — même règle que le rappel de sauvegarde. */
+  const dans = n => { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n); return d; };
+  const ch = (id, per, d) => ({ id, libelle: 'Charge ' + id, ttc: 100, periodicite: per,
+    categorie: 'ASSUR', taux: 0, debut: d.getTime(), jour: d.getDate(), moisReference: d.getMonth() });
+
+  const vide = await ouvrir(VIDE);
+  verifier('sans charge, rien ne s’affiche', '', vide.$('#a-echeances').textContent.trim());
+
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    charges: [ch('a', 'mensuel', dans(1)), ch('b', 'annuel', dans(6)), ch('c', 'trimestriel', dans(3))]
+  }));
+  const z = t.$('#a-echeances');
+  verifierVrai('trois échéances proches : elles sont résumées', /3 prélèvements à venir/.test(z.textContent));
+  verifierVrai('avec le total', /300/.test(z.textContent));
+  verifierVrai('et la plus proche nommée', /demain/.test(z.textContent));
+  /* Deux ou moins : on les nomme plutôt que de résumer. */
+  const t2 = await ouvrir(Object.assign({}, VIDE, { charges: [ch('a', 'mensuel', dans(1))] }));
+  verifierVrai('une seule échéance est nommée en clair',
+    /Charge a/.test(t2.$('#a-echeances').textContent));
+  verifier('aucune erreur', [], t.erreurs.concat(t2.erreurs, vide.erreurs));
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Charge fixe : la date de premier paiement porte enfin l’année', async () => {
+  /* Le formulaire ne demandait qu'un jour et un mois. Un abonnement souscrit
+     en septembre 2024 était indiscernable d'un souscrit deux ans plus tard,
+     et ses échéances remontaient depuis toujours. */
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'entreprise' }));
+  t.clic('[data-module="finances"]'); await t.pause(250);
+  t.clic('[data-vue="charges"]'); await t.pause(250);
+  t.clic('#chg-nouvelle'); await t.pause(300);
+  verifierVrai('le champ de date existe', t.$('#cg-debut'));
+  verifier('l’ancien « jour du prélèvement » a disparu', null, t.$('#cg-jour'));
+  verifier('l’ancien « premier mois » aussi', null, t.$('#cg-mois'));
+
+  t.saisir('#cg-lib', 'Logiciel de facturation');
+  t.saisir('#cg-ttc', '180');
+  t.choisir('#cg-per', 'annuel');
+  t.choisir('#cg-cat', 'ABO');
+  t.choisir('#cg-debut', '2024-09-01');
+  t.clic('#cg-ok'); await t.pause(400);
+
+  const c = (t.stock('charges') || [])[0];
+  verifierVrai('la charge est enregistrée', c);
+  verifier('le jour est retenu', 1, c.jour);
+  verifier('le mois aussi', 8, c.moisReference);
+  verifierVrai('et l’année, qui manquait', new Date(c.debut).getFullYear() === 2024);
+  /* Rien avant la souscription : la borne sert à ça. */
+  const FIN = t.w.BCF;
+  const avant = FIN.echeances(c, { debut: new Date(2023, 0, 1).getTime(), fin: new Date(2023, 11, 31).getTime() });
+  verifier('aucune échéance avant le premier paiement', 0, avant.length);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Charge fixe : pas de TVA là où il n’y en a pas', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'entreprise' }));
+  const FIN = t.w.BCF;
+  verifier('assurance, cotisations et prêt n’en portent pas',
+    [true, true, true], ['ASSUR', 'COTIS', 'PRET'].map(c => FIN.sansTvaDe(c)));
+  verifier('un abonnement, si', false, FIN.sansTvaDe('ABO'));
+  t.clic('[data-module="finances"]'); await t.pause(250);
+  t.clic('[data-vue="charges"]'); await t.pause(250);
+  t.clic('#chg-nouvelle'); await t.pause(300);
+  /* Le formulaire ouvre sur « Assurance » : le taux doit déjà être fermé. */
+  verifier('le champ TVA est fermé d’entrée', true, t.$('#cg-taux').disabled);
+  verifier('et à zéro', '0', t.$('#cg-taux').value);
+  t.choisir('#cg-cat', 'ABO'); await t.pause(150);
+  verifier('il se rouvre sur un abonnement', false, t.$('#cg-taux').disabled);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Charge fixe : le formulaire ne propose que ce qui tombe seul', async () => {
+  const t = await ouvrir(VIDE);
+  const FIN = t.w.BCF;
+  const noms = FIN.categoriesFixes().map(x => x.n);
+  /* Une fourniture ne se prélève pas tous les mois. */
+  verifierVrai('« Achats de fourniture » n’est pas proposé', noms.indexOf('Achats de fourniture') < 0);
+  verifierVrai('« Consommable » non plus', noms.indexOf('Consommable') < 0);
+  ['Assurance', 'Abonnement, logiciel', 'Frais bancaires', 'Prêt, crédit'].forEach(n =>
+    verifierVrai('« ' + n +' » est proposé', noms.indexOf(n) >= 0));
+  /* Une charge saisie avant ce tri doit rester lisible dans son formulaire. */
+  verifierVrai('une catégorie déjà posée est conservée',
+    FIN.categoriesFixes('FOURN').map(x => x.c).indexOf('FOURN') >= 0);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
 scenario('Écran de démarrage : il s’affiche, et un appui le fait sauter', async () => {
   /* Trois secondes, parce que l'application ne rend la main qu'au bout de
      2,4 : à 1,2 s l'écran serait déjà parti quand on vient le regarder. */
