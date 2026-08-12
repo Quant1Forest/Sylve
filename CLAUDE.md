@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.22.0-20260804-2039**
+Version courante : **4.23.0-20260812-2117**
 
 ---
 
@@ -51,7 +51,7 @@ npm run controle   # vérificateur + tests + reconstruction + tests du fichier s
 ```
 
 Doit afficher **« Bon pour livraison »** puis la suite complète au vert, deux
-fois — 182 vérifications à ce jour, une fois sur `index.html`, une fois sur
+fois — 194 vérifications à ce jour, une fois sur `index.html`, une fois sur
 `Sylve.html`.
 
 Compter **une dizaine de minutes** : chaque scénario ouvre l'application
@@ -307,6 +307,44 @@ ligne de fourniture porte son article, et que la sortie en découle.
 Le cas qui résiste : **le Trico**, facturé au plant mais acheté en bidons.
 Il faudrait un coefficient de couverture sur l'article, ou le laisser en
 saisie manuelle. Question posée le 4 août 2026, sans réponse à ce jour.
+
+## Reprendre le carnet tenu sous tableur
+
+`outils/importer-carnet.js` convertit le classeur comptable en un fichier de
+sauvegarde que l'application restaure d'un seul geste — bien plus loin que
+l'import CSV, qui ne sait reprendre que des chantiers.
+
+```bash
+node outils/importer-carnet.js "<classeur.xlsx>" [sortie.json]
+```
+
+- **Une facture donne un chantier**, ses lignes deviennent les lignes de
+  travaux. C'est la règle posée par l'utilisateur, et celle de l'application,
+  où une recette est une ligne de chantier.
+- Le nom vient de la prestation quand la facture n'en porte qu'une, de la
+  catégorie sinon, suivi du client.
+- **Le classeur ne doit jamais entrer dans le dépôt** : il porte des noms de
+  clients et des montants réels. Le fichier produit non plus. Le scénario de
+  test qui le vérifie se passe tout seul quand le fichier est absent.
+- Ce que le tableur ne contient pas ne s'invente pas : ni lieu, ni temps
+  passé. Les rendements resteront donc vides sur cet historique.
+- Deux repères pour savoir si la conversion est juste : le total des achats
+  doit tomber au centime sur celui du tableau de bord, et l'écart sur le
+  chiffre d'affaires doit valoir exactement les débours — le tableur les
+  exclut, `chiffreAffaires` aussi.
+
+## Deux contrôles qui ont menti
+
+- **La restauration rejetait les dépenses d'aujourd'hui.** `integrer()`
+  exigeait un `ttc` à la racine, le format d'avant les lignes multiples, que
+  le formulaire efface justement en enregistrant. Toute dépense saisie était
+  écartée en silence : la sauvegarde ne protégeait plus rien.
+- **Le vérificateur ne vérifiait plus les identifiants.** Il coupait le
+  fichier au premier `<script>` ; depuis que l'écran de démarrage en a posé un
+  en haut du `body`, il n'analysait plus que l'en-tête et annonçait « 1
+  identifiant, tous uniques ». Il retire désormais les blocs de code et refuse
+  de passer en dessous de cent identifiants — un contrôle qui n'inspecte plus
+  rien doit crier, pas rassurer.
 
 ## Ce qui n'a jamais été bouclé
 

@@ -1,6 +1,6 @@
 {
   "name": "sylve",
-  "version": "4.20.0",
+  "version": "4.23.0",
   "private": true,
   "description": "Sylve — gestion d'entreprise et outils de terrain pour travaux sylvicoles",
   "scripts": {
@@ -10,6 +10,7 @@
     "controle": "node outils/verifier.js && node outils/tests.js && node outils/construire.js && node outils/tests.js Sylve.html"
   },
   "devDependencies": {
+    "exceljs": "^4.4.0",
     "jsdom": "^24.0.0"
   }
 }

@@ -116,14 +116,24 @@ if (!orphelins) bien(`${vises.size} sélecteurs, tous rattachés à un identifia
 
 /* --- 3. identifiants HTML en double ---------------------------------- */
 console.log('\n3. Identifiants HTML');
-const html = src.split('<script>')[0];
+/* Tout le HTML, blocs de code retirés — et non « ce qui précède le premier
+   <script> ». Depuis que l'écran de démarrage a posé un script en haut du
+   body, cette coupe ne laissait plus que l'en-tête : le contrôle annonçait
+   « 1 identifiant, tous uniques » et ne vérifiait plus rien. */
+const html = src.replace(/<script>[\s\S]*?<\/script>/g, '');
 const ids = new Map();
 for (const m of html.matchAll(/\sid="([^"]+)"/g)) {
   if (ids.has(m[1])) grave(`id="${m[1]}" apparaît deux fois dans la page — ` +
     `les sélecteurs ne trouveront que le premier`);
   else ids.set(m[1], m.index);
 }
-if (!erreurs || ids.size) bien(`${ids.size} identifiants, tous uniques`);
+/* Un contrôle qui n'inspecte plus rien passe au vert sans rien dire. Le
+   seuil n'a pas à être juste : il doit seulement rendre l'effondrement
+   visible, comme celui qui a fait tomber ce compte de 234 à 1. */
+if (ids.size < 100) {
+  grave(`seulement ${ids.size} identifiants analysés — la découpe du HTML a changé, ` +
+    `ce contrôle ne vérifie probablement plus rien`);
+} else bien(`${ids.size} identifiants, tous uniques`);
 
 /* --- 4. version de l'application et du cache ------------------------- */
 console.log('\n4. Cohérence des versions');

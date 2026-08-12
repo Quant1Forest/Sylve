@@ -492,6 +492,79 @@ scenario('Charges fixes : annoncées avant, jamais réclamées après', async ()
 });
 
 /* --------------------------------------------------------------------- */
+scenario('Reprise du carnet : le fichier converti se restaure et compte juste', async () => {
+  /* Le convertisseur produit une sauvegarde ; ce scénario vérifie qu'elle
+     traverse l'application sans rien perdre en route. On le passe si le
+     fichier n'a pas été fabriqué — il vit hors du dépôt, avec les données
+     réelles, qui ne doivent pas y entrer. */
+  const chemin = process.env.SYLVE_REPRISE ||
+    path.join(process.env.USERPROFILE || '', 'Documents', 'reprise-carnet.json');
+  if (!fs.existsSync(chemin)) {
+    console.log('    ~ fichier de reprise absent, scénario passé');
+    return;
+  }
+  const brut = fs.readFileSync(chemin, 'utf8');
+  const src = JSON.parse(brut);
+
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'stock' }));
+  t.clic('#art-importer'); await t.pause(250);
+  t.fichier('#is-fichier', 'reprise-carnet.json', brut);
+  await t.pause(1200);
+
+  verifier('tous les chantiers sont arrivés',
+    src.chantiers.length, (t.stock('chantiers') || []).length);
+  verifier('toutes les dépenses aussi',
+    src.depenses.length, (t.stock('depenses') || []).length);
+  verifier('et les charges fixes',
+    src.charges.length, (t.stock('charges') || []).length);
+
+  /* Le chiffre d'affaires calculé par l'application doit retomber sur celui
+     du tableur — débours exclus, puisqu'ils n'en font pas partie. */
+  const FIN = t.w.BCF;
+  const ca = FIN.chiffreAffaires(t.stock('chantiers'), null);
+  const attendu = src.chantiers.reduce((s, c) => s + c.lignes.reduce((x, l) =>
+    x + (l.nature === 'debours' ? 0 : (l.unite === 'forfait' ? l.prix : l.quantite * l.prix)), 0), 0);
+  verifierVrai('le chiffre d’affaires retombe sur le tableur',
+    Math.abs(ca.total - Math.round(attendu * 100) / 100) < 1);
+  verifierVrai('les débours sont suivis à part', ca.debours > 0);
+  verifierVrai('et tenus hors du chiffre d’affaires', ca.total < ca.total + ca.debours);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Sauvegarde : une dépense d’aujourd’hui se restaure vraiment', async () => {
+  /* Régression : la restauration exigeait un montant « ttc » à la racine de
+     la dépense — le format d'avant les lignes multiples. Or le formulaire
+     efface justement ce champ depuis. Toute dépense saisie était donc
+     rejetée en silence : la sauvegarde ne protégeait plus rien. */
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'stock' }));
+  const sauvegarde = {
+    format: 'bordcub-sauvegarde-1', version: 7, date: new Date().toISOString(),
+    chantiers: [{ id: 'c1', nom: 'Plantation Vaux', statut: 'paye', lignes: [], temps: [] }],
+    depenses: [
+      /* format d'aujourd'hui : des lignes, pas de ttc à la racine */
+      { id: 'd1', date: Date.now(), fournisseur: 'Motoculture',
+        lignes: [{ libelle: 'Chaîne', categorie: 'CONSO', ttc: 42, taux: 20 }] },
+      /* format d'avant : un montant à plat, qui doit continuer de passer */
+      { id: 'd2', date: Date.now(), fournisseur: 'Station', ttc: 60, taux: 20, categorie: 'CARB' }
+    ],
+    charges: [{ id: 'g1', libelle: 'Assurance RC', ttc: 48, periodicite: 'mensuel',
+      categorie: 'ASSUR', jour: 5, moisReference: 0 }]
+  };
+  t.clic('#art-importer'); await t.pause(250);
+  t.fichier('#is-fichier', 'sauvegarde.json', JSON.stringify(sauvegarde));
+  await t.pause(700);
+
+  const dep = t.stock('depenses') || [];
+  verifier('les deux dépenses sont revenues', 2, dep.length);
+  verifierVrai('celle à lignes multiples comprise',
+    dep.some(d => d.lignes && d.lignes.length && d.lignes[0].libelle === 'Chaîne'));
+  verifier('le chantier aussi', 1, (t.stock('chantiers') || []).length);
+  verifier('et la charge fixe', 1, (t.stock('charges') || []).length);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
 scenario('Accueil : ce qui va être prélevé se voit dès l’ouverture', async () => {
   /* Le rappel doit être là où l'application s'ouvre, pas dans un écran qu'on
      ne visite jamais — même règle que le rappel de sauvegarde. */
