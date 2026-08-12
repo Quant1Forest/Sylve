@@ -492,6 +492,56 @@ scenario('Charges fixes : annoncées avant, jamais réclamées après', async ()
 });
 
 /* --------------------------------------------------------------------- */
+scenario('Chantier : les dates de facture et de paiement se corrigent', async () => {
+  /* Changer le statut inscrivait la date du jour et il n'existait aucun
+     champ pour la reprendre : une facture réglée le mois dernier restait
+     datée d'aujourd'hui, faussant la TVA et les relances. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers', chOuvert: 'c1',
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'facture', lignes: [], temps: [],
+      dateFacture: new Date(2026, 2, 10, 12).getTime(), maj: Date.now() }]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(350);
+  t.clic('#f-entete'); await t.pause(350);
+  verifierVrai('le champ « Facturé le » existe', t.$('#ce-datefact'));
+  verifierVrai('le champ « Payé le » aussi', t.$('#ce-datepaie'));
+  verifier('la date en base est bien affichée', '2026-03-10', t.$('#ce-datefact').value);
+  t.choisir('#ce-datepaie', '2026-04-02');
+  t.clic('#ce-ok'); await t.pause(400);
+  const c = (t.stock('chantiers') || [])[0];
+  verifierVrai('la date de paiement saisie est retenue',
+    c && new Date(c.datePaiement).getMonth() === 3 && new Date(c.datePaiement).getDate() === 2);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Fiche : le libellé de facture prime sur l’intitulé des travaux', async () => {
+  /* La liste des travaux sert au taux de TVA et aux rendements ; elle ne dit
+     pas ce qui a été vendu. « Fourniture de tuteurs » masquait « tuteur
+     châtaignier 9/11×150 », qui est le texte de la facture du client. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers', chOuvert: 'c1',
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'facture', temps: [], maj: Date.now(),
+      lignes: [
+        { travail: 'F_TUTEUR', unite: 'unite', quantite: 100, prix: 0.78, nature: 'vente',
+          note: 'Fourniture de tuteur en châtaigner 9/11*150' },
+        { travail: 'DEGAG', unite: 'ha', quantite: 2, prix: 250, nature: 'prestation' }
+      ] }]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+  const titres = t.$$('.ligne-trav b').map(e => e.textContent.trim());
+  verifierVrai('le libellé de facture est le titre',
+    titres.indexOf('Fourniture de tuteur en châtaigner 9/11*150') >= 0);
+  verifierVrai('sans libellé, l’intitulé des travaux reste le titre',
+    titres.indexOf('Dégagement manuel') >= 0);
+  verifierVrai('et le classement reste lisible dessous',
+    /Fourniture de tuteurs/.test(t.$('.ligne-trav').textContent));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
 scenario('Reprise du carnet : le fichier converti se restaure et compte juste', async () => {
   /* Le convertisseur produit une sauvegarde ; ce scénario vérifie qu'elle
      traverse l'application sans rien perdre en route. On le passe si le

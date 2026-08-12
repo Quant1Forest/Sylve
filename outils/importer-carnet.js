@@ -159,6 +159,22 @@ function quand(cell) {
   return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12).getTime();
 }
 
+/* Les intitulés de l'application, lus dans index.html plutôt que recopiés :
+   une seconde liste finirait par diverger de la première sans prévenir. Ils
+   servent à savoir si la sous-catégorie du tableur dit déjà la même chose,
+   auquel cas il n'y a rien à répéter en précision. */
+const NOMS_TRAVAUX = (() => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const bloc = src.match(/var TRAVAUX = \[([\s\S]*?)\n\];/);
+  const noms = {};
+  if (bloc) {
+    for (const m of bloc[1].matchAll(/\{\s*c:\s*'([^']+)'\s*,\s*n:\s*'([^']*)'/g)) noms[m[1]] = m[2];
+  }
+  if (!Object.keys(noms).length) throw new Error('liste TRAVAUX introuvable dans index.html');
+  return noms;
+})();
+const nomTravail = c => NOMS_TRAVAUX[c] || '';
+
 let compteur = 0;
 const uid = () => 'imp' + (Date.now().toString(36)) + (compteur++).toString(36);
 
@@ -212,6 +228,16 @@ function note(quoi, valeur) {
     const paiement = quand(R.getRow(r).getCell(18));
     if (paiement) f.paiements.push(paiement); else f.impayees++;
 
+    /* La liste de l'application est plus courte que la sienne : « Fourniture
+       de tuteurs » là où il écrit « en châtaigner 9/11*150 », « Nettoiement »
+       là où il ajoute « et préparation des îlots ». Ce qu'il a réellement
+       facturé va dans la précision, qui s'affiche à la suite du travail —
+       sans quoi la reprise lui rend une facture qui n'est plus la sienne. */
+    const complement = txt(R.getRow(r).getCell(8));
+    const precisions = [];
+    if (sous && clef(sous) !== clef(nomTravail(travail))) precisions.push(sous);
+    if (complement) precisions.push(complement);
+
     f.lignes.push({
       travail: travail || 'AUTRE',
       unite: unite || 'forfait',
@@ -219,10 +245,15 @@ function note(quoi, valeur) {
       prix: nombre(R.getRow(r).getCell(12)),
       nature: nature || 'prestation',
       tva: Math.round(nombre(R.getRow(r).getCell(13)) * 100 * 100) / 100,
-      note: sous && !TRAVAUX[clef(sous)] ? sous : ''
+      note: precisions.join(' ')
     });
-    if (f.client) clients.add(f.client);
-    if (f.mo) proprios.add(f.mo);
+    /* Attention au nommage de l'application : la liste « clients » alimente
+       le champ « Donneur d'ordre », et « proprios » le champ « Propriétaire
+       facturé ». Le maître d'œuvre du tableur est donc un client au sens du
+       stockage, et son client à lui un propriétaire. Les intervertir remplit
+       chaque menu déroulant avec la mauvaise moitié du carnet. */
+    if (f.mo) clients.add(f.mo);
+    if (f.client) proprios.add(f.client);
   }
 
   /* Le nom : la prestation quand la facture n'en porte qu'une, la catégorie
@@ -238,8 +269,7 @@ function note(quoi, valeur) {
       id: uid(),
       nom,
       donneur: f.mo || '',
-      client: f.client || '',
-      proprietaire: '',
+      proprietaire: f.client || '',
       foret: '', parcelles: '', commune: '',
       statut: paye ? 'paye' : 'facture',
       numeroFacture: f.num,
@@ -354,8 +384,10 @@ function note(quoi, valeur) {
     chantiers.filter(c => c.statut === 'facture').length + ' facturés non réglés');
   console.log('  ' + depenses.length + ' dépenses');
   console.log('  ' + charges.length + ' charges fixes');
-  console.log('  ' + sauvegarde.clients.length + ' clients, ' +
-    sauvegarde.proprios.length + ' donneurs d’ordre, ' +
+  /* Nommé du point de vue de l'utilisateur, pas du stockage : la liste
+     « clients » alimente le champ « Donneur d'ordre », et l'inverse. */
+  console.log('  ' + sauvegarde.clients.length + ' donneurs d’ordre, ' +
+    sauvegarde.proprios.length + ' propriétaires, ' +
     sauvegarde.fournisseurs.length + ' fournisseurs');
   console.log('');
   console.log('  chiffre d’affaires HT repris : ' + eur(caHT));
