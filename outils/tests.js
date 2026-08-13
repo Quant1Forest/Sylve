@@ -195,6 +195,9 @@ scenario('Prestations : renommer partout, ne pas retirer ce qui sert', async () 
   t.clic('[data-vue="reglages"]'); await t.pause(150);
   t.clic('[data-regl="ent"]');
   t.clic('#rl-nav [data-liste="travaux"]'); await t.pause(150);
+  /* La liste s'arrête à huit : il faut la déplier pour atteindre la
+     prestation cherchée, comme à l'écran. */
+  if (t.$('#rl-plus')) { t.clic('#rl-plus'); await t.pause(200); }
   t.clic('[data-lmodif="PLANT"]'); await t.pause(200);
   verifier('pas de retrait possible : la prestation sert', null, t.$('#tr-sup'));
   const demandes = [];
@@ -512,6 +515,10 @@ scenario('Réglages : une longue liste se replie', async () => {
   /* Une liste courte n'a pas à porter ce bouton. */
   t.clic('[data-liste="clients"]'); await t.pause(250);
   verifier('rien à replier sur une liste vide', null, t.$('#rl-plus'));
+  /* Les prestations sont la plus longue des listes : elles se replient aussi. */
+  t.clic('[data-liste="travaux"]'); await t.pause(250);
+  verifier('les prestations aussi s’arrêtent à huit', 8, t.$$('#rl-liste .liste-item').length);
+  verifierVrai('avec leur bouton', t.$('#rl-plus'));
   verifier('aucune erreur', [], t.erreurs);
 });
 

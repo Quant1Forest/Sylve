@@ -9510,7 +9510,7 @@ function renderDepenses() {
         '<div class="carte2"><b class="num">' + eur(t.ttc) + '</b><small>TTC sur ' + esc(libellePeriode()) + '</small></div>' +
         '<div class="carte2"><b class="num">' + eur(t.ht) + '</b><small>HT</small></div>' +
         '<div class="carte2"><b class="num">' + eur(t.tva) + '</b><small>TVA déductible</small></div>' +
-        '<div class="carte2"><b class="num">' + t.n + '</b><small>justificatifs</small></div></div>' +
+        '<div class="carte2"><b class="num">' + t.n + '</b><small>achats saisis</small></div></div>' +
         '<p class="muted" style="font-size:12px;margin:10px 0 0">La période se choisit dans Finances.</p>'
       : '<div class="vide"><p>Aucune dépense. Photographiez un ticket et saisissez le montant : ' +
         'la TVA se calcule toute seule.</p></div>';
@@ -9519,8 +9519,12 @@ function renderDepenses() {
   if ($('#dep-filtre')) {
     $('#dep-filtre').innerHTML = '<option value="tous"' + (f === 'tous' ? ' selected' : '') + '>Toutes les catégories</option>' +
       FIN.CATEGORIES.map(function (c) {
+        /* Compter sur la même période que la liste : sans ça, le menu
+           annonçait « Immobilisation (4) » — tout l'historique — pour une
+           liste qui n'en montrait qu'une, celle de l'année en cours. */
         var n = A.depenses.filter(function (d) {
-          return FIN.lignesDepense(d).some(function (x) { return x.categorie === c.c; });
+          return FIN.dansPeriode(d.date, b) &&
+            FIN.lignesDepense(d).some(function (x) { return x.categorie === c.c; });
         }).length;
         return n ? '<option value="' + c.c + '"' + (f === c.c ? ' selected' : '') + '>' + c.n + ' (' + n + ')</option>' : '';
       }).join('');
@@ -9801,7 +9805,10 @@ function renderListesReglages() {
     var t = C.TRAVAUX.slice().sort(function (a, b) {
       return (a.retire ? 1 : 0) - (b.retire ? 1 : 0) || a.n.localeCompare(b.n, 'fr');
     });
-    $('#rl-liste').innerHTML = aide + t.map(function (x) {
+    /* Cinquante prestations d'un bloc, c'est la liste la plus longue de
+       toutes : elle se replie comme les autres. */
+    var toutT = listeDepliee || t.length <= SEUIL_LISTE;
+    $('#rl-liste').innerHTML = aide + (toutT ? t : t.slice(0, SEUIL_LISTE)).map(function (x) {
       var u = usagesTravail(x.c);
       return '<div class="liste-item' + (x.retire ? ' epuise' : '') + '">' +
         '<div class="li-c"><b>' + esc(x.n) + '</b><small>' +
@@ -9809,7 +9816,12 @@ function renderListesReglages() {
         (u.total ? ' · utilisée ' + u.total + ' fois' : ' · jamais utilisée') +
         (x.retire ? ' · retirée des listes' : '') + '</small></div>' +
         '<button class="btn-min" data-lmodif="' + esc(x.c) + '">Modifier</button></div>';
-    }).join('');
+    }).join('') +
+      (t.length > SEUIL_LISTE
+        ? '<button class="btn-min" id="rl-plus" style="margin-top:9px">' +
+          (toutT ? 'Réduire la liste' : 'Voir les ' + (t.length - SEUIL_LISTE) + ' autres') +
+          '</button>'
+        : '');
     return;
   }
   var l = listeDe(actif).slice().sort(function (a, b) { return a.localeCompare(b, 'fr'); });
