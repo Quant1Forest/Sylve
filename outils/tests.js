@@ -516,16 +516,63 @@ scenario('Réglages : une longue liste se replie', async () => {
 });
 
 /* --------------------------------------------------------------------- */
-scenario('Accueil : la pastille dit ce qu’elle compte', async () => {
-  /* « 4 chantiers » surmontant un « 3 » nu se lisait comme une
-     contradiction, en corps 10 sur fond rouge. */
+scenario('Analyses : on n’additionne pas des jours et des plants', async () => {
+  /* Une même prestation facturée tantôt à la journée, tantôt au plant :
+     parPrestation() cumulait les quantités et gardait l'unité de la
+     première ligne. 4 jours et 1 705 plants donnaient « 1 709 jours ». */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'entreprise',
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'paye', temps: [], maj: Date.now(),
+      dateFacture: Date.now(), lignes: [
+        { travail: 'PLANT', unite: 'jour', quantite: 4, prix: 250, nature: 'prestation' },
+        { travail: 'PLANT', unite: 'plant', quantite: 1705, prix: 1, nature: 'prestation' },
+        { travail: 'DEGAG', unite: 'ha', quantite: 8, prix: 200, nature: 'prestation' }
+      ] }]
+  }));
+  const FIN = t.w.BCF;
+  const l = FIN.parPrestation(t.stock('chantiers'), null, c => c);
+  const plant = l.filter(x => x.travail === 'PLANT')[0];
+  const degag = l.filter(x => x.travail === 'DEGAG')[0];
+  verifier('unités mêlées : plus d’unité retenue', null, plant.unite);
+  verifier('unité homogène : elle est gardée', 'ha', degag.unite);
+  verifier('et sa quantité reste juste', 8, degag.quantite);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Tuiles : plus de second nombre à côté du premier', async () => {
+  /* « 4 chantiers » surmonté d'un « 2 » rouge se lisait comme une
+     contradiction. Le nombre à traiter se lit dans la zone « À traiter »,
+     qui le dit en toutes lettres. */
   const t = await ouvrir(Object.assign({}, VIDE, {
     chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'termine', lignes: [], temps: [],
       dateFin: Date.now() - 40 * 86400000, maj: Date.now() }]
   }));
-  const p = t.$('#a-ent-alerte');
-  verifierVrai('la pastille porte son mot', /à traiter/.test(p.textContent));
-  verifierVrai('et le nombre avec', /^\d+ à traiter$/.test(p.textContent.trim()));
+  verifier('aucune pastille rouge ne subsiste', 0, t.$$('.pastille-alerte').length);
+  ['#a-ent-alerte', '#e-ch-alerte', '#e-st-alerte'].forEach(s =>
+    verifier(s + ' a disparu', null, t.$(s)));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Navigation : ouvrir une fiche depuis « À traiter » laisse un retour', async () => {
+  /* Régression : ouvrirChantier() ne retirait « accueil-ouvert » que par le
+     chemin allerModule. Depuis l'écran Entreprise, module Chantiers déjà
+     actif, la fiche s'affichait sous un bandeau masqué — plus de bouton
+     retour, plus de sélecteur, aucun moyen de ressortir. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'facture', lignes: [], temps: [],
+      dateFacture: Date.now() - 70 * 86400000, maj: Date.now() }]
+  }));
+  /* On se met dans l'état exact : menu Entreprise ouvert par-dessus. */
+  t.w.document.body.classList.add('accueil-ouvert');
+  t.w.ouvrirChantier ? t.w.ouvrirChantier('c1') : t.clic('#ent-alertes [data-alerte]');
+  await t.pause(300);
+  verifier('le masque des menus est levé', false,
+    t.d.body.classList.contains('accueil-ouvert'));
+  verifierVrai('le bouton retour est utilisable',
+    t.$('#b-retour') && !t.$('#b-retour').hidden);
   verifier('aucune erreur', [], t.erreurs);
 });
 
