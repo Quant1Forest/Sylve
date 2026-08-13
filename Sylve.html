@@ -145,14 +145,10 @@ body:not(.m-ent) .mod-ent{display:none}
   line-height:1;background:none;border:0;color:var(--gris-clair);cursor:pointer;
 }
 .alerte .fermer:hover{color:var(--encre)}
-/* Un nombre nu posé sous un autre nombre ne dit pas ce qu'il compte : « 4
-   chantiers » et « 3 » se lisaient comme une contradiction. La pastille
-   porte donc son mot, ce qui la rend aussi assez large pour être lue. */
-.pastille-alerte:not(:empty){
-  display:inline-block;padding:2px 8px;border-radius:20px;background:#B4231F;
-  color:#fff;font-size:11.5px;font-weight:600;font-family:var(--corps);
-  margin-top:4px;white-space:nowrap;
-}
+/* Les pastilles rouges des tuiles ont été retirées : un second nombre posé
+   sous « 4 chantiers » se lisait comme une contradiction, et le lui faire
+   dire en toutes lettres ne l'a pas sauvé. Ce qui est à traiter se lit dans
+   la zone « À traiter », qui le dit déjà et que l'on comprend. */
 .alerte small{color:var(--doux);font-size:12px}
 .kpi small{font-size:11px;color:var(--doux)}
 
@@ -1035,8 +1031,7 @@ if (froid && s > 0) montrer(s);
           <button class="tuile" data-module="entreprise">
             <span class="ic"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><path d="M8.6 4H6.6A1.6 1.6 0 0 0 5 5.6v13.8A1.6 1.6 0 0 0 6.6 21h10.8a1.6 1.6 0 0 0 1.6-1.6V5.6A1.6 1.6 0 0 0 17.4 4h-2"/><rect x="8.6" y="2.4" width="6.8" height="3.4" rx="1.1"/><path d="M8.7 10.6h6.6M8.7 14h6.6M8.7 17.4h3.8"/></svg></span>
             <span><b>Mon entreprise</b><small>Chantiers, devis, rendements, finances</small></span>
-            <span class="chiffre"><b id="a-ent-n">—</b><span>chantiers</span>
-              <span id="a-ent-alerte" class="pastille-alerte"></span></span>
+            <span class="chiffre"><b id="a-ent-n">—</b><span>chantiers</span></span>
           </button>
         </div>
         <div id="a-journee"></div>
@@ -1067,8 +1062,7 @@ if (froid && s > 0) montrer(s);
         <div class="tuiles">
           <button class="tuile" data-module="chantiers"><span class="ic rond"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><path d="M12 20.6s6.1-5.9 6.1-10A6.1 6.1 0 0 0 5.9 10.6c0 4.1 6.1 10 6.1 10Z"/><circle cx="12" cy="10.4" r="2.3"/></svg></span>
             <span><b>Chantiers</b><small id="e-ch-s">En cours, terminés, à venir</small></span>
-            <span class="chiffre"><b id="e-ch-n">—</b><span>ouverts</span>
-              <span id="e-ch-alerte" class="pastille-alerte"></span></span></button>
+            <span class="chiffre"><b id="e-ch-n">—</b><span>ouverts</span></span></button>
           <button class="tuile" data-module="calendrier"><span class="ic rond"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><rect x="4" y="5.6" width="16" height="14" rx="2"/><path d="M4 10.2h16M8.6 3.6v3.8M15.4 3.6v3.8"/></svg></span>
             <span><b>Calendrier</b><small id="e-cal-s">Programmation, journées placées</small></span>
             <span class="chiffre"><b id="e-cal-n">—</b><span>j. ce mois</span></span></button>
@@ -1083,8 +1077,7 @@ if (froid && s > 0) montrer(s);
             <span class="chiffre"><b id="e-an-n">—</b><span>marge</span></span></button>
           <button class="tuile" data-module="stock"><span class="ic rond"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><path d="M4.7 8.5 12 4.8l7.3 3.7v7L12 19.2l-7.3-3.7Z"/><path d="M4.7 8.5 12 12.2l7.3-3.7M12 12.2v7"/></svg></span>
             <span><b>Stock et fournitures</b><small id="e-st-s">Protections, tuteurs, marges</small></span>
-            <span class="chiffre"><b id="e-st-n">—</b><span>en stock</span>
-              <span id="e-st-alerte" class="pastille-alerte"></span></span></button>
+            <span class="chiffre"><b id="e-st-n">—</b><span>en stock</span></span></button>
           <button class="tuile" data-module="finances"><span class="ic rond"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><path d="M16.4 7.6a5.7 5.7 0 0 0-8.5 4.5 5.7 5.7 0 0 0 8.5 4.5"/><path d="M6.3 10.6h6.8M6.3 13.6h6.8"/></svg></span>
             <span><b>Finances</b><small id="e-fi-s">Chiffre d'affaires, TVA, dépenses</small></span>
             <span class="chiffre"><b id="e-fi-n">—</b><span>facturé</span></span></button>
@@ -3934,6 +3927,10 @@ function parPrestation(chantiers, b, nomTravail) {
     var k = x.ligne.travail || 'AUTRE';
     if (!m[k]) m[k] = { travail: k, nom: nomTravail ? nomTravail(k) : k, ht: 0, n: 0, quantite: 0, unite: x.ligne.unite };
     m[k].ht += x.ht; m[k].n++;
+    /* Une même prestation facturée tantôt à la journée, tantôt au plant :
+       cumuler les deux donnait « 1 709 jours » pour 4 jours et 1 705 plants.
+       Unités mêlées, on renonce à la quantité plutôt que d'en inventer une. */
+    if (m[k].unite !== x.ligne.unite) m[k].unite = null;
     m[k].quantite += nb(x.ligne.quantite);
   });
   var l = Object.keys(m).map(function (k) {
@@ -8113,6 +8110,11 @@ function renderListeChantiers() {
 function ouvrirChantier(id) {
   A.chOuvert = id;
   renderFiche();
+  /* Ouvrir une fiche, c'est quitter les menus. Sans ce retrait, une fiche
+     ouverte depuis « À traiter » alors qu'on est déjà dans le module
+     s'affichait sous un bandeau masqué par « accueil-ouvert » : plus de
+     bouton retour, plus de sélecteur de partie, aucun moyen de ressortir. */
+  document.body.classList.remove('accueil-ouvert');
   if (A.module === 'chantiers') aller('chantier');
   else allerModule('chantiers', 'chantier');
 }
@@ -9224,7 +9226,6 @@ function renderEntreprise() {
         (bas.length ? ' · ' + bas.length + ' à recommander' : '')
       : 'Protections, tuteurs, marges';
   }
-  if ($('#e-st-alerte')) $('#e-st-alerte').textContent = bas.length || '';
 
   /* les alertes remontent aussi sur l'écran Entreprise */
   var al = C.alertes(A.chantiers, A.cfg, Date.now());
@@ -9239,7 +9240,6 @@ function renderEntreprise() {
       }).join('') + (al.length > 4 ? '<p class="muted" style="font-size:12px">et ' + (al.length - 4) + ' autre(s).</p>' : '')
       : '';
   }
-  if ($('#e-ch-alerte')) $('#e-ch-alerte').textContent = al.length || '';
 }
 
 function renderAlertes() {
@@ -9257,8 +9257,6 @@ function renderAlertes() {
   majPastilleEntreprise();
 }
 function majPastilleEntreprise() {
-  var t = $('#a-ent-alerte');
-  if (t) t.textContent = A.nbAlertes ? A.nbAlertes + ' à traiter' : '';
   var b = $('#b-pastille');
   if (b && A.module === 'chantiers') b.textContent = '';
 }
@@ -11443,7 +11441,8 @@ function htmlEnsemble(an, b) {
     '<div class="carte"><h2>Ce qui rapporte</h2>' +
     barres(FIN.parPrestation(A.chantiers, b, C.nomTravail).slice(0, 6).map(function (p) {
       return { nom: p.nom, valeur: p.ht, part: p.part,
-        detail: p.quantite ? E.fmt(p.quantite, 0) + ' ' + C.courtUnite(p.unite) : '' };
+        detail: (p.quantite && p.unite) ? E.fmt(p.quantite, 0) + ' ' + C.courtUnite(p.unite)
+          : (p.n > 1 ? p.n + ' lignes' : '') };
     }), '#2E4A3C') + '</div>' +
 
     '<div class="carte"><h2>Où part l’argent</h2>' +
@@ -11522,7 +11521,8 @@ function htmlRecettes(an, b) {
     '<div class="carte"><h2>Par type de travaux</h2>' +
     barres(pres.map(function (p) {
       return { nom: p.nom, valeur: p.ht, part: p.part,
-        detail: p.quantite ? E.fmt(p.quantite, 0) + ' ' + C.courtUnite(p.unite) : '' };
+        detail: (p.quantite && p.unite) ? E.fmt(p.quantite, 0) + ' ' + C.courtUnite(p.unite)
+          : (p.n > 1 ? p.n + ' lignes' : '') };
     }), '#2E4A3C') + '</div>' +
 
     '<div class="carte"><h2>Par donneur d’ordre</h2>' +
@@ -11572,11 +11572,15 @@ function htmlDepenses(an, b) {
       return { nom: f.fournisseur, valeur: f.ht, detail: f.n + ' achat' + (f.n > 1 ? 's' : '') };
     }), '#7A8471') + '</div>' +
 
-    (charges ? '<div class="carte"><h2>Charges fixes</h2>' +
+    /* Les barres portent le coût annuel : le titre doit le dire, et le détail
+       rappeler le montant réellement prélevé. « 2 280 € · tous les mois » se
+       lisait comme une mensualité de 2 280 €. */
+    (charges ? '<div class="carte"><h2>Charges fixes <span class="muted" ' +
+      'style="font-weight:400;font-size:13px">— coût annuel</span></h2>' +
       barres(A.charges.filter(function (c2) { return !c2.arretee; })
         .map(function (c2) {
           return { nom: c2.libelle || '', valeur: FIN.coutAnnuel(c2),
-            detail: FIN.nomPeriodicite(c2.periodicite) };
+            detail: eur(C.nb(c2.ttc)) + ' ' + FIN.nomPeriodicite(c2.periodicite).toLowerCase() };
         }).sort(function (x, y) { return y.valeur - x.valeur; }), '#5B3A1E') +
       '<p class="muted" style="font-size:12px;margin:9px 0 0">' + eur(charges) + ' par an, soit ' +
       eur(FIN.arr(charges / 12, 2)) + ' par mois.</p></div>' : '') +
@@ -12439,7 +12443,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.25.0-20260813-0657';
+var VERSION = '4.26.0-20260813-1914';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

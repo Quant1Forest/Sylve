@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.25.0-20260813-0657**
+Version courante : **4.26.0-20260813-1914**
 
 ---
 
@@ -51,7 +51,7 @@ npm run controle   # vérificateur + tests + reconstruction + tests du fichier s
 ```
 
 Doit afficher **« Bon pour livraison »** puis la suite complète au vert, deux
-fois — 212 vérifications à ce jour, une fois sur `index.html`, une fois sur
+fois — 221 vérifications à ce jour, une fois sur `index.html`, une fois sur
 `Sylve.html`.
 
 Compter **une dizaine de minutes** : chaque scénario ouvre l'application
@@ -139,6 +139,16 @@ travailler.
   359 : la présence de `--logo:url(`, la taille de `#b-accueil`). Un simple
   reformatage les casserait alors que le comportement serait intact. À
   réécrire plus solidement le jour où ce CSS bouge.
+- **`accueil-ouvert` masque le bandeau par CSS.** `ouvrirChantier()` ne le
+  retirait que par la branche `allerModule` ; ouvrir une fiche depuis « À
+  traiter » alors que le module Chantiers était déjà actif passait par
+  `aller()` et laissait le masque en place. La fiche s'affichait sans bouton
+  retour ni sélecteur de partie — aucun moyen de ressortir. Toute fonction
+  qui mène à une vue de contenu doit lever ce masque.
+- **Ne pas additionner des quantités d'unités différentes.** `parPrestation()`
+  cumulait sans regarder l'unité et gardait celle de la première ligne : une
+  plantation facturée 4 jours puis 1 705 plants ressortait en « 1 709 jours ».
+  Unités mêlées, on renonce à la quantité.
 - **Ne jamais réécrire un fichier avec `Set-Content` sous PowerShell 5.1.**
   `Get-Content -Raw` lit en ANSI, `Set-Content -Encoding utf8` réécrit en
   UTF-8 : chaque accent traverse deux fois l'encodage et ressort en `Ã©`,
