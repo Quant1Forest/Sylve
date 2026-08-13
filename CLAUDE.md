@@ -51,7 +51,7 @@ npm run controle   # vérificateur + tests + reconstruction + tests du fichier s
 ```
 
 Doit afficher **« Bon pour livraison »** puis la suite complète au vert, deux
-fois — 221 vérifications à ce jour, une fois sur `index.html`, une fois sur
+fois — 223 vérifications à ce jour, une fois sur `index.html`, une fois sur
 `Sylve.html`.
 
 Compter **une dizaine de minutes** : chaque scénario ouvre l'application
