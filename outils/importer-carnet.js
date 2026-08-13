@@ -191,7 +191,7 @@ function note(quoi, valeur) {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.readFile(SOURCE);
 
-  const clients = new Set(), proprios = new Set(), fournisseurs = new Map();
+  const clients = new Set(), proprios = new Set();
 
   /* ---- 1. Recettes → chantiers ------------------------------------- */
   const R = wb.getWorksheet('Recettes');
@@ -301,7 +301,10 @@ function note(quoi, valeur) {
       /* Le taux n'est renseigné dans le tableur que pour les exceptions :
          les 20 % ordinaires y sont laissés vides. */
       const taux = nombre(D.getRow(r).getCell(8));
-      if (vendeur) fournisseurs.set(clef(vendeur), vendeur);
+      /* Le vendeur reste du texte libre sur la dépense. La liste
+         « fournisseurs » est celle du module Stock — ceux qui livrent des
+         plants, des gaines, des tuteurs. Y verser les enseignes où l'on
+         achète un sandwich ou une paire de gants la rend inutilisable. */
       depenses.push({
         id: uid(),
         date,
@@ -366,7 +369,7 @@ function note(quoi, valeur) {
     clients: [...clients].sort(),
     proprios: [...proprios].sort(),
     articles: [], charges,
-    fournisseurs: [...fournisseurs.values()].sort().map(n => ({ id: uid(), nom: n, maj: Date.now() })),
+    fournisseurs: [],
     commandes: [], sorties: [], journees: []
   };
   fs.writeFileSync(CIBLE, JSON.stringify(sauvegarde, null, 1));
@@ -387,8 +390,7 @@ function note(quoi, valeur) {
   /* Nommé du point de vue de l'utilisateur, pas du stockage : la liste
      « clients » alimente le champ « Donneur d'ordre », et l'inverse. */
   console.log('  ' + sauvegarde.clients.length + ' donneurs d’ordre, ' +
-    sauvegarde.proprios.length + ' propriétaires, ' +
-    sauvegarde.fournisseurs.length + ' fournisseurs');
+    sauvegarde.proprios.length + ' propriétaires');
   console.log('');
   console.log('  chiffre d’affaires HT repris : ' + eur(caHT));
   console.log('  achats TTC repris            : ' + eur(achats));

@@ -492,6 +492,44 @@ scenario('Charges fixes : annoncées avant, jamais réclamées après', async ()
 });
 
 /* --------------------------------------------------------------------- */
+scenario('Réglages : une longue liste se replie', async () => {
+  /* Quarante-sept noms déroulés d'un bloc, c'est un écran entier à faire
+     défiler avant d'atteindre quoi que ce soit d'autre. */
+  const noms = [];
+  for (let i = 1; i <= 20; i++) noms.push('Propriétaire ' + String(i).padStart(2, '0'));
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'chantiers', proprios: noms }));
+  t.clic('[data-vue="reglages"]'); await t.pause(250);
+  t.clic('[data-regl="ent"]'); await t.pause(250);
+  t.clic('[data-liste="proprios"]'); await t.pause(250);
+
+  verifier('huit noms seulement au départ', 8, t.$$('#rl-liste .liste-item').length);
+  verifierVrai('et le compte des autres est annoncé',
+    /Voir les 12 autres/.test(t.$('#rl-liste').textContent));
+  t.clic('#rl-plus'); await t.pause(200);
+  verifier('déplié, la liste est entière', 20, t.$$('#rl-liste .liste-item').length);
+  t.clic('#rl-plus'); await t.pause(200);
+  verifier('et se replie', 8, t.$$('#rl-liste .liste-item').length);
+  /* Une liste courte n'a pas à porter ce bouton. */
+  t.clic('[data-liste="clients"]'); await t.pause(250);
+  verifier('rien à replier sur une liste vide', null, t.$('#rl-plus'));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Accueil : la pastille dit ce qu’elle compte', async () => {
+  /* « 4 chantiers » surmontant un « 3 » nu se lisait comme une
+     contradiction, en corps 10 sur fond rouge. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'termine', lignes: [], temps: [],
+      dateFin: Date.now() - 40 * 86400000, maj: Date.now() }]
+  }));
+  const p = t.$('#a-ent-alerte');
+  verifierVrai('la pastille porte son mot', /à traiter/.test(p.textContent));
+  verifierVrai('et le nombre avec', /^\d+ à traiter$/.test(p.textContent.trim()));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
 scenario('Chantier : les dates de facture et de paiement se corrigent', async () => {
   /* Changer le statut inscrivait la date du jour et il n'existait aucun
      champ pour la reprendre : une facture réglée le mois dernier restait

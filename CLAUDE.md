@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.24.0-20260812-2230**
+Version courante : **4.25.0-20260813-0657**
 
 ---
 
@@ -51,7 +51,7 @@ npm run controle   # vérificateur + tests + reconstruction + tests du fichier s
 ```
 
 Doit afficher **« Bon pour livraison »** puis la suite complète au vert, deux
-fois — 203 vérifications à ce jour, une fois sur `index.html`, une fois sur
+fois — 212 vérifications à ce jour, une fois sur `index.html`, une fois sur
 `Sylve.html`.
 
 Compter **une dizaine de minutes** : chaque scénario ouvre l'application
@@ -139,6 +139,13 @@ travailler.
   359 : la présence de `--logo:url(`, la taille de `#b-accueil`). Un simple
   reformatage les casserait alors que le comportement serait intact. À
   réécrire plus solidement le jour où ce CSS bouge.
+- **Ne jamais réécrire un fichier avec `Set-Content` sous PowerShell 5.1.**
+  `Get-Content -Raw` lit en ANSI, `Set-Content -Encoding utf8` réécrit en
+  UTF-8 : chaque accent traverse deux fois l'encodage et ressort en `Ã©`,
+  `â€™`, `Ãª`. Une seule commande a corrompu 1440 accents d'`index.html` et
+  ajouté un BOM. Pour un remplacement dans un fichier, passer par `sed` via
+  Bash, ou par l'outil d'édition. Un fichier ainsi abîmé se répare en le
+  relisant en UTF-8 puis en le réencodant en Windows-1252.
 - **`toISOString()` n'est pas une date locale.** Un champ `<input type="date">`
   parle en heure locale ; `toISOString()` répond en heure de Greenwich, où
   minuit à Paris est 22 h la veille. Tout timestamp passé par `C.minuit()` en
@@ -347,6 +354,11 @@ Le maître d'œuvre du carnet est donc un **client** au sens du stockage, et le
 client du carnet un **propriétaire**. Les intervertir remplit chaque menu
 déroulant avec la mauvaise moitié du carnet, et le bouton « + liste » ajoute
 au mauvais endroit. Vérifier ce tableau avant de toucher à l'un des deux.
+
+Le circuit réel, qui explique le nommage : **le donneur d'ordre démarche, fait
+le projet et reçoit la facture ; il la transmet au propriétaire, qui règle.**
+Le champ s'intitulait « Propriétaire facturé », ce qui laissait croire que la
+facture partait chez lui — c'est « Propriétaire » depuis la 4.25.0.
 
 ## Le libellé de facture prime sur l'intitulé des travaux
 

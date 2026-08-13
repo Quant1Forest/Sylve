@@ -147,9 +147,13 @@ body:not(.m-ent) .mod-ent{display:none}
   line-height:1;background:none;border:0;color:var(--gris-clair);cursor:pointer;
 }
 .alerte .fermer:hover{color:var(--encre)}
+/* Un nombre nu posé sous un autre nombre ne dit pas ce qu'il compte : « 4
+   chantiers » et « 3 » se lisaient comme une contradiction. La pastille
+   porte donc son mot, ce qui la rend aussi assez large pour être lue. */
 .pastille-alerte:not(:empty){
-  display:inline-block;min-width:18px;padding:1px 5px;border-radius:20px;background:#B4231F;
-  color:#fff;font-size:10.5px;font-family:var(--corps);margin-top:3px;
+  display:inline-block;padding:2px 8px;border-radius:20px;background:#B4231F;
+  color:#fff;font-size:11.5px;font-weight:600;font-family:var(--corps);
+  margin-top:4px;white-space:nowrap;
 }
 .alerte small{color:var(--doux);font-size:12px}
 .kpi small{font-size:11px;color:var(--doux)}
@@ -6483,13 +6487,15 @@ function brancher() {
   $('#rp-add').addEventListener('click', function () { ouvrirArticle(null); });
   $('#rl-nav').addEventListener('click', function (e) {
     var b = e.target.closest('[data-liste]');
-    if (b) { A.listeReglee = b.dataset.liste; renderListesReglages(); }
+    /* Changer d'onglet referme : on repart du haut d'une liste courte. */
+    if (b) { A.listeReglee = b.dataset.liste; listeDepliee = false; renderListesReglages(); }
   });
   $('#rl-add').addEventListener('click', function () {
     if (LISTES[A.listeReglee] && LISTES[A.listeReglee].objets) ouvrirTravailRegle(null);
     else ouvrirEntreeListe(null);
   });
   $('#rl-liste').addEventListener('click', function (e) {
+    if (e.target.closest('#rl-plus')) { listeDepliee = !listeDepliee; renderListesReglages(); return; }
     var b = e.target.closest('[data-lmodif]');
     if (!b) return;
     if (LISTES[A.listeReglee] && LISTES[A.listeReglee].objets) ouvrirTravailRegle(b.dataset.lmodif);
@@ -8339,7 +8345,10 @@ function formEnteteCh(c) {
     'title="Ajouter à la liste">+ liste</button></label>' +
     '<input type="text" id="ce-donneur" autocomplete="off" list="liste-clients" placeholder="expert, gestionnaire…" value="' +
     esc(c.donneur || c.client || '') + '"></div>' +
-    '<div class="champ"><label class="eyebrow" for="ce-proprio">Propriétaire facturé' +
+    /* « Propriétaire facturé » laissait croire que la facture part chez lui.
+       Elle part chez le donneur d'ordre, qui la transmet ; le propriétaire
+       est celui qui règle. */
+    '<div class="champ"><label class="eyebrow" for="ce-proprio">Propriétaire' +
     '<button type="button" class="mini-plus" data-ajlist="proprios" data-ajchamp="ce-proprio" ' +
     'title="Ajouter à la liste">+ liste</button></label>' +
     '<input type="text" id="ce-proprio" autocomplete="off" list="liste-proprios" value="' + esc(c.proprietaire || '') + '"></div>' +
@@ -9251,7 +9260,7 @@ function renderAlertes() {
 }
 function majPastilleEntreprise() {
   var t = $('#a-ent-alerte');
-  if (t) t.textContent = A.nbAlertes ? A.nbAlertes : '';
+  if (t) t.textContent = A.nbAlertes ? A.nbAlertes + ' à traiter' : '';
   var b = $('#b-pastille');
   if (b && A.module === 'chantiers') b.textContent = '';
 }
@@ -9739,9 +9748,12 @@ function validerImport() {
    qu'on le demande — sinon la moindre faute de frappe s'y installe. */
 var LISTES = {
   clients: { nom: 'Donneurs d’ordre', champ: 'clients', cle: 'bordcub.clients',
-    aide: 'Experts et gestionnaires forestiers qui vous confient les chantiers.' },
+    aide: 'Ceux qui vous confient les chantiers et à qui part la facture : experts, ' +
+      'gestionnaires, confrères en sous-traitance, ou un propriétaire qui vous ' +
+      'démarche lui-même.' },
   proprios: { nom: 'Propriétaires', champ: 'proprios', cle: 'bordcub.proprios',
-    aide: 'Ceux que vous facturez.' },
+    aide: 'Le propriétaire de la forêt, celui qui règle. À laisser vide quand c’est ' +
+      'le donneur d’ordre lui-même.' },
   lieux: { nom: 'Forêts et communes', champ: 'lieuxRegles', cle: 'bordcub.lieux',
     aide: 'Proposés à la saisie d’une journée et d’un chantier.' },
   essencesCh: { nom: 'Essences', champ: 'essencesCh', cfg: true,
@@ -9776,6 +9788,7 @@ function sauverListe(k) {
     majDatalistClients(); majDatalistLieux();
   });
 }
+var SEUIL_LISTE = 8, listeDepliee = false;
 function renderListesReglages() {
   var nav = $('#rl-nav'); if (!nav) return;
   var actif = A.listeReglee && LISTES[A.listeReglee] ? A.listeReglee : 'clients';
@@ -9802,11 +9815,21 @@ function renderListesReglages() {
     return;
   }
   var l = listeDe(actif).slice().sort(function (a, b) { return a.localeCompare(b, 'fr'); });
+  /* Quarante-sept noms déroulés d'un bloc, c'est un écran entier à faire
+     défiler pour atteindre le bouton suivant. On en montre huit. */
+  var tout = listeDepliee || l.length <= SEUIL_LISTE;
+  var vus = tout ? l : l.slice(0, SEUIL_LISTE);
   $('#rl-liste').innerHTML = aide +
-    (l.length ? l.map(function (x) {
+    (l.length ? vus.map(function (x) {
       return '<div class="liste-item"><div class="li-c"><b>' + esc(x) + '</b></div>' +
         '<button class="btn-min" data-lmodif="' + esc(x) + '">Modifier</button></div>';
-    }).join('') : '<p class="muted" style="font-size:12.5px;margin:0">Liste vide.</p>');
+    }).join('') +
+      (l.length > SEUIL_LISTE
+        ? '<button class="btn-min" id="rl-plus" style="margin-top:9px">' +
+          (tout ? 'Réduire la liste' : 'Voir les ' + (l.length - SEUIL_LISTE) + ' autres') +
+          '</button>'
+        : '')
+      : '<p class="muted" style="font-size:12.5px;margin:0">Liste vide.</p>');
 }
 
 /* Renommer, ajouter, retirer une prestation. */
@@ -12418,7 +12441,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.24.0-20260812-2230';
+var VERSION = '4.25.0-20260813-0657';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
