@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.26.0-20260813-1914**
+Version courante : **4.27.0-20260813-2139**
 
 ---
 
@@ -51,13 +51,14 @@ npm run controle   # vérificateur + tests + reconstruction + tests du fichier s
 ```
 
 Doit afficher **« Bon pour livraison »** puis la suite complète au vert, deux
-fois — 223 vérifications à ce jour, une fois sur `index.html`, une fois sur
+fois — 232 vérifications à ce jour, une fois sur `index.html`, une fois sur
 `Sylve.html`.
 
 Compter **une dizaine de minutes** : chaque scénario ouvre l'application
 entière dans un navigateur simulé et attend qu'elle ait démarré. À accélérer
 le jour où l'attente devient un frein — l'attente fixe de 2,4 s par scénario
-est le premier levier.
+est le premier levier. Le second passage a déjà manqué de mémoire : le
+relancer seul avec `node --max-old-space-size=4096 outils/tests.js Sylve.html`.
 
 **Une correction sans vérification qui la couvre n'est pas finie.** Chaque
 changement de comportement s'accompagne d'un scénario dans `outils/tests.js`.
@@ -139,6 +140,12 @@ travailler.
   359 : la présence de `--logo:url(`, la taille de `#b-accueil`). Un simple
   reformatage les casserait alors que le comportement serait intact. À
   réécrire plus solidement le jour où ce CSS bouge.
+- **Deux fonctions ont failli porter le même nom.** `dateChantier()` rend le
+  dernier jour *travaillé* — journées placées, sinon temps saisis — et sert au
+  calendrier. Le tri du carnet demandait autre chose : la dernière *étape*
+  franchie, paiement ou facture. D'où `dernierEvenement()`. Le vérificateur a
+  attrapé le doublon avant qu'il ne casse le calendrier en silence : c'est
+  exactement ce pour quoi il existe.
 - **`accueil-ouvert` masque le bandeau par CSS.** `ouvrirChantier()` ne le
   retirait que par la branche `allerModule` ; ouvrir une fiche depuis « À
   traiter » alors que le module Chantiers était déjà actif passait par

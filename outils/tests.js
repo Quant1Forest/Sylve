@@ -523,6 +523,59 @@ scenario('Réglages : une longue liste se replie', async () => {
 });
 
 /* --------------------------------------------------------------------- */
+scenario('Analyses : la tuile ne parle plus de marge', async () => {
+  /* « Marge » désignait recettes moins achats, qui ignore les cotisations,
+     l'impôt et l'amortissement. Ce n'est pas une marge, et la tuile ne
+     disait pas non plus sur quelle période elle comptait. */
+  const an = new Date().getFullYear();
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'entreprise',
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'paye', temps: [], maj: Date.now(),
+      dateFacture: Date.now(), datePaiement: Date.now(),
+      lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 4, prix: 250, nature: 'prestation' }] }],
+    depenses: [{ id: 'd1', date: Date.now(),
+      lignes: [{ libelle: 'Gasoil', categorie: 'CONSO', ttc: 120, taux: 20 }] }]
+  }));
+  const lib = t.texte('#e-an-p');
+  verifierVrai('le mot « marge » a disparu de la tuile', !/marge/i.test(lib || ''));
+  verifier('elle annonce ce qu’elle compte et quand', 'facturé ' + an, lib);
+  /* 4 ha × 250 € = 1000 € facturés, et non 1000 − 100 d'achats. */
+  verifier('et c’est bien le chiffre d’affaires', '1000 €', t.texte('#e-an-n'));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Carnet : le plus récent en tête, et sa date visible', async () => {
+  /* Le carnet était rangé par statut : un chantier accepté ce matin passait
+     derrière tous les devis, et on ne retrouvait pas ce qu'on venait
+     d'ouvrir. Aucune date n'apparaissait non plus. */
+  const j = n => new Date(2026, 0, n, 12).getTime();
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [
+      { id: 'vieux', nom: 'Vieux devis', statut: 'devis', lignes: [], temps: [],
+        debut: j(5), maj: j(5) },
+      { id: 'recent', nom: 'Accepté ce matin', statut: 'accepte', lignes: [], temps: [],
+        debut: j(28), maj: j(28) },
+      { id: 'facture', nom: 'Facturé hier', statut: 'facture', lignes: [], temps: [],
+        dateFacture: j(20), maj: j(20) }
+    ]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(300);
+  const noms = t.$$('#carnet-liste .liste-item b, #liste-chantiers .liste-item b')
+    .map(e => e.textContent.trim());
+  verifierVrai('le plus récent est en tête', /Accepté ce matin/.test(noms[0] || ''));
+  verifierVrai('le vieux devis est en dernier', /Vieux devis/.test(noms[noms.length - 1] || ''));
+  /* Le tri lui-même, indépendamment de l'écran. */
+  const C = t.w.BCC;
+  const ordre = C.tri(t.stock('chantiers')).map(c => c.id);
+  verifier('l’ordre est bien chronologique inverse', ['recent', 'facture', 'vieux'], ordre);
+  verifierVrai('et la date du chantier facturé s’affiche',
+    /facturé le/.test(t.$('#vue-carnet').textContent));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
 scenario('Analyses : on n’additionne pas des jours et des plants', async () => {
   /* Une même prestation facturée tantôt à la journée, tantôt au plant :
      parPrestation() cumulait les quantités et gardait l'unité de la

@@ -1074,7 +1074,7 @@ if (froid && s > 0) montrer(s);
             <span class="chiffre"><b id="e-dv-n">—</b><span>en attente</span></span></button>
           <button class="tuile" data-module="analyses"><span class="ic rond"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><circle cx="12" cy="12" r="7.9"/><path d="M12 4.1v7.9h7.9"/></svg></span>
             <span><b>Analyses</b><small id="e-an-s">Ce qui rapporte, où part l'argent</small></span>
-            <span class="chiffre"><b id="e-an-n">—</b><span>marge</span></span></button>
+            <span class="chiffre"><b id="e-an-n">—</b><span id="e-an-p">facturé</span></span></button>
           <button class="tuile" data-module="stock"><span class="ic rond"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><path d="M4.7 8.5 12 4.8l7.3 3.7v7L12 19.2l-7.3-3.7Z"/><path d="M4.7 8.5 12 12.2l7.3-3.7M12 12.2v7"/></svg></span>
             <span><b>Stock et fournitures</b><small id="e-st-s">Protections, tuteurs, marges</small></span>
             <span class="chiffre"><b id="e-st-n">—</b><span>en stock</span></span></button>
@@ -3448,11 +3448,22 @@ function analyseCsv(txt) {
 }
 
 /* --------------------------------------------------------------- carnet */
+/* Où en est le chantier dans le temps : sa dernière étape franchie. À ne pas
+   confondre avec dateChantier(), qui rend le dernier jour travaillé. */
+function dernierEvenement(c) {
+  if (!c) return 0;
+  return nb(c.datePaiement) || nb(c.dateFacture) || nb(c.dateFin) ||
+    nb(c.dateEnvoi) || nb(c.debut) || nb(c.maj) || 0;
+}
+/* Le carnet se lit du plus récent au plus ancien. Il était rangé par statut,
+   si bien qu'un chantier accepté ce matin passait derrière tous les devis :
+   on ne retrouvait pas ce qu'on venait d'ouvrir. Le statut ne sert plus qu'à
+   départager deux chantiers du même jour. */
 function tri(chantiers) {
   return (chantiers || []).slice().sort(function (a, b) {
-    var ra = rangStatut(a.statut), rb = rangStatut(b.statut);
-    if (ra !== rb) return ra - rb;
-    return (b.maj || 0) - (a.maj || 0);
+    var da = dernierEvenement(a), db = dernierEvenement(b);
+    if (da !== db) return db - da;
+    return rangStatut(a.statut) - rangStatut(b.statut);
   });
 }
 function filtre(chantiers, quoi) {
@@ -3525,6 +3536,7 @@ var M = {
   prixJourVise: prixJourVise, bilanJournees: bilanJournees, HEURES_JOUR: HEURES_JOUR,
   prixJour: prixJour, rendement: rendement,
   dureePrevue: dureePrevue, enRetard: enRetard, tri: tri, filtre: filtre, totaux: totaux,
+  dernierEvenement: dernierEvenement,
   jourCle: jourCle, minuit: minuit, ajouteJours: ajouteJours, estWeekend: estWeekend,
   journeesPlacees: journeesPlacees, placerJour: placerJour, resteAPlacer: resteAPlacer,
   totalPlace: totalPlace, partDuJour: partDuJour,
@@ -8027,6 +8039,18 @@ function sauverChantiers() {
   A.chantiers.forEach(function (c) { if (!c.maj) c.maj = Date.now(); });
   return ecrire('bordcub.chantiers', A.chantiers);
 }
+/* La date qui compte n'est pas la même selon où en est le chantier : c'est
+   celle du dernier événement, la seule qu'on cherche des yeux dans le
+   carnet. Le statut seul ne disait pas quand. */
+function dateStatut(c) {
+  if (!c) return '';
+  if (c.statut === 'paye' && c.datePaiement) return 'payé le ' + dateCourte(c.datePaiement);
+  if (c.dateFacture && (c.statut === 'facture' || c.statut === 'paye'))
+    return 'facturé le ' + dateCourte(c.dateFacture);
+  if (c.statut === 'termine' && c.dateFin) return 'terminé le ' + dateCourte(c.dateFin);
+  if (c.statut === 'envoye' && c.dateEnvoi) return 'envoyé le ' + dateCourte(c.dateEnvoi);
+  return '';
+}
 function badgeStatut(st) {
   return '<span class="st" style="background:' + (COUL_STATUT[st] || '#7A8471') + '">' +
     esc(C.nomStatut(st)) + '</span>';
@@ -8097,7 +8121,11 @@ function renderListeChantiers() {
       (C.totalPlace(c) ? ' · ' + E.fmt(C.totalPlace(c), C.totalPlace(c) % 1 ? 1 : 0) + ' j placée' +
         (C.totalPlace(c) > 1 ? 's' : '') : '') +
       ((c.echeance || c.fin) ? ' · avant le ' + dateCourte(c.echeance || c.fin) : '') +
+      /* Le badge et sa date tiennent toujours sur la dernière ligne, quel que
+         soit ce qui précède : sans ça, les lignes de longueur inégale font
+         danser les badges d'un chantier à l'autre. */
       '<br>' + badgeStatut(c.statut) +
+      (dateStatut(c) ? ' <span class="muted">' + esc(dateStatut(c)) + '</span>' : '') +
       (retard ? ' <span class="retard">en retard</span>' : '') + '</small></div></div>' +
       '<div class="li-actions">' +
       '<button class="btn-min" data-chouvrir="' + c.id + '">Ouvrir</button>' +
@@ -9212,7 +9240,12 @@ function renderEntreprise() {
   }
 
   var resAn = FIN.resultat(A.chantiers, A.depenses, periodeCourante());
-  if ($('#e-an-n')) $('#e-an-n').textContent = (resAn.recettes || resAn.achats) ? eur(resAn.marge) : '—';
+  /* La tuile annonçait « marge » une différence entre recettes et achats qui
+     ignore cotisations, impôt et amortissement — ce n'est pas une marge. Elle
+     porte le chiffre d'affaires, qui est ce qu'on vient y chercher, et la
+     période, faute de quoi on ne sait pas si c'est l'année ou le total. */
+  if ($('#e-an-n')) $('#e-an-n').textContent = (resAn.recettes || resAn.achats) ? eur(resAn.recettes) : '—';
+  if ($('#e-an-p')) $('#e-an-p').textContent = 'facturé ' + libellePeriode();
   if ($('#e-an-s')) {
     $('#e-an-s').textContent = (resAn.recettes || resAn.achats)
       ? eur(resAn.recettes) + ' facturés · ' + eur(resAn.achats) + ' achetés'
@@ -12455,7 +12488,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.26.0-20260813-1914';
+var VERSION = '4.27.0-20260813-2139';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
