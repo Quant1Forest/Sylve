@@ -7,7 +7,8 @@
     "verifier": "node outils/verifier.js",
     "test": "node outils/tests.js",
     "construire": "node outils/construire.js",
-    "controle": "node outils/verifier.js && node outils/tests.js && node outils/construire.js && node outils/tests.js Sylve.html"
+    "controle": "node outils/verifier.js && node outils/tests.js && node outils/construire.js && node outils/comparer.js",
+    "comparer": "node outils/comparer.js"
   },
   "devDependencies": {
     "exceljs": "^4.4.0",

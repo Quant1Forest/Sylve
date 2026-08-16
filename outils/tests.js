@@ -35,8 +35,11 @@ const jourISO = ts => {
     '-' + String(d.getDate()).padStart(2, '0');
 };
 
-/* Ouvre l'application avec des données de départ et rend la main quand
-   elle a fini de démarrer. */
+/* Ouvre l'application avec des données de départ et rend la main quand elle
+   a fini de démarrer — pas au bout d'une durée devinée. L'application pose
+   « data-pret » quand ses données sont relues et ses écrans rendus ; on
+   sonde jusque-là. L'attente fixe de 2,4 s dormait une seconde et demie à
+   chaque fois, quarante fois par passage. */
 function ouvrir(graines, options) {
   options = options || {};
   return new Promise(resolve => {
@@ -52,7 +55,9 @@ function ouvrir(graines, options) {
     const erreurs = [];
     dom.window.addEventListener('error', e => erreurs.push(e.message));
     dom.window.console.error = (...a) => erreurs.push(a.join(' '));
-    setTimeout(() => {
+    const plafond = options.attente || 8000;
+    const depart = Date.now();
+    const rendreLaMain = () => {
       const w = dom.window, d = w.document;
       resolve({
         w, d, erreurs,
@@ -72,7 +77,17 @@ function ouvrir(graines, options) {
           return true;
         }
       });
-    }, options.attente || 2400);
+    };
+    /* Au-delà du plafond on rend quand même la main : un démarrage qui
+       n'aboutit pas doit se voir sur les vérifications du scénario, pas
+       bloquer toute la suite. */
+    const sonder = () => {
+      const pret = dom.window.document.body &&
+        dom.window.document.body.getAttribute('data-pret') === '1';
+      if (pret || Date.now() - depart > plafond) rendreLaMain();
+      else setTimeout(sonder, 20);
+    };
+    sonder();
   });
 }
 
