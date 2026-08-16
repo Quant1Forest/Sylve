@@ -3307,6 +3307,22 @@ function alertes(chantiers, cfg, maintenant) {
           texte: 'facturé il y a ' + j2 + ' jours, non réglé' });
       }
     }
+    /* Ce qui est posé au calendrier dans les trois jours. Un chantier prévu
+       après-demain ne doit pas s'apprendre en ouvrant l'agenda : il doit
+       sauter aux yeux dès l'accueil. */
+    if (['accepte', 'encours', 'termine'].indexOf(ch.statut) >= 0) {
+      var proches = journeesPlacees(ch).filter(function (x) {
+        var d = Math.round((minuit(x.d) - minuit(now)) / JOUR);
+        return d >= 0 && d <= 3;
+      });
+      if (proches.length) {
+        var d0 = Math.round((minuit(proches[0].d) - minuit(now)) / JOUR);
+        var part = proches.reduce(function (s, x) { return s + nb(x.p); }, 0);
+        out.push({ type: 'approche', chantier: ch, gravite: 2, jours: d0,
+          texte: (d0 === 0 ? 'aujourd’hui' : d0 === 1 ? 'demain' : 'dans ' + d0 + ' jours') +
+            ' · ' + fmtJours(part) + (proches.length > 1 ? ' sur ' + proches.length + ' dates' : '') });
+      }
+    }
     /* Un chantier engagé — accepté ou commencé — doit dire ce qu'il reste à
        poser. Sans cela « À traiter » ne montrait que ce qui a mal tourné :
        impayés, retards. Le travail à venir, lui, n'y figurait pas. */
@@ -9371,10 +9387,12 @@ function ouvrirSaisieJour() {
 
 /* ------------------------------------------------------------- alertes */
 var COUL_ALERTE = { impaye: '#B4231F', retard: '#C4611B', afacturer: '#B98A00',
-  devis: '#7A8471', aprevoir: '#1F5FA9', aplacer: '#2E4A3C', encours: '#7A8471' };
+  devis: '#7A8471', aprevoir: '#1F5FA9', aplacer: '#2E4A3C', encours: '#7A8471',
+  approche: '#2E7D46' };
 var TITRE_ALERTE = { impaye: 'Facture impayée', retard: 'Chantier en retard',
   afacturer: 'À facturer', devis: 'Devis sans réponse',
-  aprevoir: 'À prévoir', aplacer: 'Journées à placer', encours: 'En cours' };
+  aprevoir: 'À prévoir', aplacer: 'Journées à placer', encours: 'En cours',
+  approche: 'Chantier prévu' };
 
 /* Écran Entreprise : un chiffre parlant sur chaque tuile. */
 function renderEntreprise() {
@@ -11828,14 +11846,33 @@ function htmlDepenses(an, b) {
     '<div class="carte2"><b class="num">' + eur(dep.ht) + '</b><small>HT</small></div>' +
     '<div class="carte2"><b class="num">' + eur(dep.courant) + '</b><small>courant</small></div>' +
     '<div class="carte2"><b class="num">' + eur(dep.immo) + '</b><small>immobilisations</small></div>' +
-    '<div class="carte2"><b class="num">' + dep.n + '</b><small>justificatifs</small></div>' +
+    '<div class="carte2"><b class="num">' + dep.n + '</b><small>achats saisis</small></div>' +
     '</div>' +
     (dep.immo ? '<p class="muted" style="font-size:11.5px;margin:10px 0 0">Les immobilisations pèsent ' +
       Math.round(dep.immo / (dep.ht || 1) * 100) + ' % de vos achats : un investissement fausse la lecture ' +
       'd’une année s’il est compté comme une dépense courante.</p>' : '') + '</div>' +
 
-    '<div class="carte"><h2>Mois par mois — ' + an + '</h2>' +
+    '<div class="carte"><h2>Mois par mois <span class="muted" style="font-weight:400;' +
+    'font-size:13px">— acheté, ' + an + '</span></h2>' +
     histoMois([{ nom: 'acheté HT', valeurs: FIN.depensesParMois(A.depenses, an), couleur: '#C4611B' }]) + '</div>' +
+
+    /* La TVA payée sur les achats est celle qui se récupère : elle a sa place
+       ici, à côté de ce qu'on a acheté, et pas seulement dans la balance
+       générale. L'immobilisation est isolée — elle pèse lourd un trimestre et
+       fausse la lecture si on la noie dans le reste. */
+    '<div class="carte"><h2>TVA payée sur ces achats</h2><div class="kpi">' +
+    '<div class="carte2"><b class="num">' + eur(bal.deductible.total) + '</b><small>déductible</small></div>' +
+    '<div class="carte2"><b class="num">' + eur(bal.deductible.courant) + '</b><small>sur le courant</small></div>' +
+    '<div class="carte2"><b class="num">' + eur(bal.deductible.immobilisations) +
+    '</b><small>sur les immobilisations</small></div>' +
+    '</div>' +
+    (Object.keys(bal.deductible.parTaux || {}).length > 1
+      ? '<p class="muted" style="font-size:12px;margin:10px 0 0">Par taux : ' +
+        Object.keys(bal.deductible.parTaux).sort(function (x, y) { return y - x; })
+          .map(function (tx) {
+            return String(tx).replace('.', ',') + ' % → ' + eur(bal.deductible.parTaux[tx]);
+          }).join(' · ') + '</p>'
+      : '') + '</div>' +
 
     '<div class="carte"><h2>Par catégorie</h2>' +
     barres(cat.map(function (c2) {
@@ -12719,7 +12756,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.33.0-20260816-1955';
+var VERSION = '4.34.0-20260816-2008';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
