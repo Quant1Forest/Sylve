@@ -6966,6 +6966,10 @@ function init() {
       }
     })
     .then(function () {
+      /* Le démarrage est fini : données relues, écrans rendus. Les tests s'y
+         accrochent au lieu de parier sur une durée — ils dormaient 2,4 s par
+         ouverture alors qu'une seconde suffit, et il y en a quarante. */
+      document.body.setAttribute('data-pret', '1');
       /* entretien de fond : copie du jour, purge de la corbeille, indicateur */
       renderSauvegarde();
       return purger().then(instantaneDuJour);

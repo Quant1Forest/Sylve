@@ -47,18 +47,24 @@ mains dans la terre.
 
 ```bash
 npm install        # une seule fois : jsdom
-npm run controle   # vérificateur + tests + reconstruction + tests du fichier seul
+npm run controle   # vérificateur + tests + reconstruction + conformité du fichier seul
 ```
 
-Doit afficher **« Bon pour livraison »** puis la suite complète au vert, deux
-fois — 240 vérifications à ce jour, une fois sur `index.html`, une fois sur
-`Sylve.html`.
+Doit afficher **« Bon pour livraison »**, puis la suite au vert — 240
+vérifications à ce jour — puis **« Sylve.html est conforme »**.
 
-Compter **une dizaine de minutes** : chaque scénario ouvre l'application
-entière dans un navigateur simulé et attend qu'elle ait démarré. À accélérer
-le jour où l'attente devient un frein — l'attente fixe de 2,4 s par scénario
-est le premier levier. Le second passage a déjà manqué de mémoire : le
-relancer seul avec `node --max-old-space-size=4096 outils/tests.js Sylve.html`.
+Compter **moins de deux minutes**. Ça a été dix, et deux choses l'expliquaient :
+
+- Les tests attendaient **2,4 s à chaque ouverture** alors que l'application
+  démarre en une seconde. Elle pose maintenant `data-pret` sur le `body`
+  quand ses données sont relues et ses écrans rendus ; `ouvrir()` sonde
+  jusque-là. Ne jamais revenir à une attente devinée.
+- La suite tournait **deux fois**, la seconde sur `Sylve.html`. Or ce fichier
+  ne diffère de `index.html` que par deux lignes : rejouer quarante scénarios
+  dessus, c'était retester du code déjà testé. `outils/comparer.js` prouve la
+  même chose en une seconde — comparaison ligne à ligne, puis démarrage réel.
+  Sa garde a été éprouvée dans les deux sens : elle sort en 1 dès que les
+  fichiers divergent.
 
 **Une correction sans vérification qui la couvre n'est pas finie.** Chaque
 changement de comportement s'accompagne d'un scénario dans `outils/tests.js`.
@@ -95,7 +101,7 @@ l'ancien code. Le vérificateur refuse de passer si les deux divergent.
 | `sw.js` | Service worker. Sa constante `VERSION` doit être identique à celle de `index.html`. |
 | `manifest.webmanifest` | Nom, couleurs, icônes de la PWA. |
 | `icone-*.png` | Icônes d'installation. La version *maskable* garde toute son encre dans la zone de rognage d'Android. |
-| `outils/` | Vérificateur, tests, script de construction. |
+| `outils/` | Vérificateur, tests, construction, conformité du fichier autonome, reprise du carnet. |
 
 Les fichiers d'origine du logo ne sont pas dans le dépôt : ils sont gardés à
 part. Le dépôt étant public, il ne contient que ce qui est servi, plus de quoi
