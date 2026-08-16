@@ -25,10 +25,15 @@ const fs = require('fs');
 const path = require('path');
 const ExcelJS = require('exceljs');
 
-const SOURCE = process.argv[2];
-const CIBLE = process.argv[3] || path.join(process.cwd(), 'reprise-carnet.json');
+const args = process.argv.slice(2);
+const classeurs = args.filter(a => /\.xlsx$/i.test(a));
+const SOURCE = classeurs[0];
+const STOCK = classeurs[1] || null;
+const CIBLE = args.filter(a => !/\.xlsx$/i.test(a))[0] ||
+  path.join(process.cwd(), 'reprise-carnet.json');
 if (!SOURCE) {
-  console.error('\n  Usage : node outils/importer-carnet.js "<classeur.xlsx>" [sortie.json]\n');
+  console.error('\n  Usage : node outils/importer-carnet.js "<comptabilité.xlsx>" ' +
+    '["<stock.xlsx>"] [sortie.json]\n');
   process.exit(1);
 }
 
@@ -52,6 +57,7 @@ const NATURES = {
 /* Sous-catégorie du tableur → code de prestation. */
 const TRAVAUX = {
   'degagement de plantation': 'DEGAG',
+  'degagement de plantation et taille de formation': 'DEGAG',
   'detourage et depressage': 'DEPRES',
   'detourage et elagage': 'DETOUR',
   'detourage': 'DETOUR',
@@ -107,6 +113,42 @@ const PERIODICITES = {
   'mensuel': 'mensuel', 'trimestriel': 'trimestriel',
   'semestriel': 'semestriel', 'annuel': 'annuel'
 };
+
+/* ----------------------------------------------------------------- stock */
+
+/* Le type se devine au nom du produit : le classeur range par famille
+   d'achat (« Matériel », « Ingrédient »), l'application par nature. */
+const TYPE_PRODUIT = [
+  [/gaine|protection|manchon|grillage/, 'protection'],
+  [/tuteur|piquet|bambou|echalas|échalas/, 'tuteur'],
+  [/trico|repuls|répuls|traitement|herbicide/, 'traitement'],
+  [/plant|semis/, 'plant'],
+  [/livraison|transport|port/, 'autre']
+];
+function typeProduit(nom) {
+  const k = clef(nom);
+  for (const [re, t] of TYPE_PRODUIT) if (re.test(k)) return t;
+  return 'autre';
+}
+
+const UNITES_STOCK = { u: 'unite', unite: 'unite', ml: 'ml', l: 'litre',
+  litre: 'litre', kg: 'kg', m: 'metre', metre: 'metre' };
+
+/* Les statuts du classeur portent un emoji ; on ne garde que les mots. */
+const STATUT_ACHAT = [
+  [/recu|reçu|livr/, 'recu'], [/devis accepte|commande/, 'commande'],
+  [/expedi/, 'expedie'], [/demande de devis|devis/, 'devis'], [/annul/, 'annule']
+];
+const STATUT_VENTE = [
+  [/fini|termin/, 'fini'], [/en cours/, 'encours'],
+  [/accepte|accepté/, 'accepte'], [/a prevoir|à prévoir/, 'aprevoir'],
+  [/potentiel/, 'potentiel'], [/annul/, 'annule']
+];
+function statutParmi(table, v, defaut) {
+  const k = clef(v);
+  for (const [re, s] of table) if (re.test(k)) return s;
+  return defaut;
+}
 
 /* ---------------------------------------------------------------- outils */
 
@@ -357,7 +399,146 @@ function note(quoi, valeur) {
     }
   }
 
-  /* ---- 4. Le fichier ------------------------------------------------ */
+  /* ---- 4. Le stock --------------------------------------------------- */
+  const articles = [], fournisseurs = [], commandes = [], sorties = [];
+  if (STOCK) {
+    const sk = new ExcelJS.Workbook();
+    await sk.xlsx.readFile(STOCK);
+
+    /* Les fournisseurs d'abord : les produits et les commandes s'y rattachent. */
+    const parNomF = new Map();
+    const WF = sk.getWorksheet('Fournisseurs');
+    if (WF) {
+      for (let r = 6; r <= WF.rowCount; r++) {
+        const nom = txt(WF.getRow(r).getCell(2));
+        if (!nom || parNomF.has(clef(nom))) continue;
+        /* L'adresse rejoint les notes : la fiche n'a pas de champ pour elle,
+           et une adresse perdue est plus gênante qu'une note un peu longue. */
+        const adresse = [txt(WF.getRow(r).getCell(7)), txt(WF.getRow(r).getCell(9)),
+          txt(WF.getRow(r).getCell(8))].filter(Boolean).join(' ');
+        const notes = [adresse, txt(WF.getRow(r).getCell(11))].filter(Boolean).join(' — ');
+        const f = { id: uid(), nom,
+          categorie: txt(WF.getRow(r).getCell(3)),
+          contact: txt(WF.getRow(r).getCell(4)),
+          tel: txt(WF.getRow(r).getCell(5)),
+          mail: txt(WF.getRow(r).getCell(6)),
+          ville: txt(WF.getRow(r).getCell(8)),
+          notes, maj: Date.now() };
+        fournisseurs.push(f);
+        parNomF.set(clef(nom), f.id);
+      }
+    }
+
+    /* Les produits ensuite. L'inventaire donne le nom et le fournisseur ; le
+       Trico se compte en millilitres, avec son dosage par plant. */
+    const parNomA = new Map();
+    const dosageTrico = (() => {
+      const W = sk.getWorksheet('Inventaire et stock');
+      for (let r = 5; r <= 12 && W; r++) {
+        if (/dosage par plant/i.test(txt(W.getRow(r).getCell(13))))
+          return nombre(W.getRow(r).getCell(14));
+      }
+      return null;
+    })();
+
+    const article = (nom, nomF) => {
+      if (!nom) return null;
+      const k = clef(nom);
+      if (parNomA.has(k)) return parNomA.get(k);
+      const estTrico = /trico/i.test(nom);
+      const a = { id: uid(), nom, designation: '',
+        type: typeProduit(nom),
+        unite: estTrico ? 'ml' : 'unite',
+        seuil: null,
+        dosage: estTrico ? dosageTrico : null,
+        fournisseur: nomF && parNomF.has(clef(nomF)) ? parNomF.get(clef(nomF)) : null,
+        mouvements: [], maj: Date.now() };
+      articles.push(a);
+      parNomA.set(k, a.id);
+      return a.id;
+    };
+
+    const WI = sk.getWorksheet('Inventaire et stock');
+    if (WI) for (let r = 6; r <= WI.rowCount; r++) {
+      const nom = txt(WI.getRow(r).getCell(2));
+      if (!nom || /^total/i.test(nom)) continue;
+      if (/livraison|transport|frais de port/i.test(nom)) continue;
+      article(nom, txt(WI.getRow(r).getCell(10)));
+    }
+
+    /* Les entrées. */
+    const WA = sk.getWorksheet('Achats');
+    const parCmd = new Map();
+    if (WA) for (let r = 10; r <= WA.rowCount; r++) {
+      const num = txt(WA.getRow(r).getCell(4));
+      const prod = txt(WA.getRow(r).getCell(5));
+      if (!num || !prod) continue;
+      if (!parCmd.has(num)) {
+        const c = { id: uid(), num,
+          dateCmd: quand(WA.getRow(r).getCell(2)) || Date.now(),
+          dateLiv: quand(WA.getRow(r).getCell(3)) || null,
+          fournisseur: parNomF.get(clef(txt(WA.getRow(r).getCell(11)))) || null,
+          statut: statutParmi(STATUT_ACHAT, txt(WA.getRow(r).getCell(10)), 'recu'),
+          livraison: 0, lignes: [], maj: Date.now() };
+        commandes.push(c);
+        parCmd.set(num, c);
+      }
+      const c = parCmd.get(num);
+      /* La livraison est une ligne du bon de commande, pas un produit : elle
+         se répartit sur le reste et pèse sur le prix de revient. À écarter
+         avant de créer quoi que ce soit, sinon elle entre à l'inventaire. */
+      if (/livraison|transport|frais de port/i.test(prod)) {
+        c.livraison = Math.round((c.livraison + nombre(WA.getRow(r).getCell(9))) * 100) / 100;
+        continue;
+      }
+      const u = UNITES_STOCK[clef(txt(WA.getRow(r).getCell(7)))];
+      const id = article(prod, txt(WA.getRow(r).getCell(11)));
+      if (u && id) {
+        const a = articles.filter(x => x.id === id)[0];
+        if (a && a.unite === 'unite' && u !== 'unite') a.unite = u;
+      }
+      c.lignes.push({ article: id, qte: nombre(WA.getRow(r).getCell(6)),
+        prix: nombre(WA.getRow(r).getCell(8)) });
+    }
+
+    /* Les sorties, rattachées à leur chantier par le numéro de facture —
+       c'est le même des deux côtés. Une sortie qui connaît son chantier suit
+       son statut toute seule au lieu de vivre sa vie dans son coin. */
+    const parFacture = new Map();
+    chantiers.forEach(c => { if (c.numeroFacture) parFacture.set(clef(c.numeroFacture), c); });
+    const WV = sk.getWorksheet('Ventes');
+    const parVente = new Map();
+    let rattachees = 0, orphelines = 0;
+    if (WV) for (let r = 7; r <= WV.rowCount; r++) {
+      const num = txt(WV.getRow(r).getCell(3));
+      const prod = txt(WV.getRow(r).getCell(5));
+      if (!prod) continue;
+      const cle = num || (txt(WV.getRow(r).getCell(4)) + '|' + (quand(WV.getRow(r).getCell(2)) || ''));
+      if (!parVente.has(cle)) {
+        const ch = num ? parFacture.get(clef(num)) : null;
+        if (ch) rattachees++; else orphelines++;
+        const s = { id: uid(), num: num || '',
+          date: quand(WV.getRow(r).getCell(2)) || Date.now(),
+          client: txt(WV.getRow(r).getCell(4)),
+          chantier: ch ? ch.id : null,
+          statut: statutParmi(STATUT_VENTE, txt(WV.getRow(r).getCell(9)), 'fini'),
+          perte: false,
+          debours: /debours|débours/i.test(txt(WV.getRow(r).getCell(10))),
+          lignes: [], maj: Date.now() };
+        sorties.push(s);
+        parVente.set(cle, s);
+      }
+      parVente.get(cle).lignes.push({
+        article: article(prod, ''),
+        qte: nombre(WV.getRow(r).getCell(6)),
+        prix: nombre(WV.getRow(r).getCell(7))
+      });
+    }
+    global.__rattachees = rattachees;
+    global.__orphelines = orphelines;
+  }
+
+  /* ---- 5. Le fichier ------------------------------------------------ */
   const sauvegarde = {
     format: 'bordcub-sauvegarde-1',
     version: 7,
@@ -368,9 +549,8 @@ function note(quoi, valeur) {
     depenses,
     clients: [...clients].sort(),
     proprios: [...proprios].sort(),
-    articles: [], charges,
-    fournisseurs: [],
-    commandes: [], sorties: [], journees: []
+    articles, charges, fournisseurs, commandes, sorties,
+    journees: []
   };
   fs.writeFileSync(CIBLE, JSON.stringify(sauvegarde, null, 1));
 
@@ -391,6 +571,13 @@ function note(quoi, valeur) {
      « clients » alimente le champ « Donneur d'ordre », et l'inverse. */
   console.log('  ' + sauvegarde.clients.length + ' donneurs d’ordre, ' +
     sauvegarde.proprios.length + ' propriétaires');
+  if (STOCK) {
+    console.log('');
+    console.log('  ' + articles.length + ' produits, ' + fournisseurs.length + ' fournisseurs');
+    console.log('  ' + commandes.length + ' commandes, ' + sorties.length + ' sorties');
+    console.log('     dont ' + (global.__rattachees || 0) + ' sorties rattachées à leur chantier, ' +
+      (global.__orphelines || 0) + ' sans facture correspondante');
+  }
   console.log('');
   console.log('  chiffre d’affaires HT repris : ' + eur(caHT));
   console.log('  achats TTC repris            : ' + eur(achats));

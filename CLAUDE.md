@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.27.0-20260813-2139**
+Version courante : **4.28.0-20260816-1549**
 
 ---
 
@@ -51,7 +51,7 @@ npm run controle   # vérificateur + tests + reconstruction + tests du fichier s
 ```
 
 Doit afficher **« Bon pour livraison »** puis la suite complète au vert, deux
-fois — 232 vérifications à ce jour, une fois sur `index.html`, une fois sur
+fois — 240 vérifications à ce jour, une fois sur `index.html`, une fois sur
 `Sylve.html`.
 
 Compter **une dizaine de minutes** : chaque scénario ouvre l'application
@@ -339,7 +339,7 @@ sauvegarde que l'application restaure d'un seul geste — bien plus loin que
 l'import CSV, qui ne sait reprendre que des chantiers.
 
 ```bash
-node outils/importer-carnet.js "<classeur.xlsx>" [sortie.json]
+node outils/importer-carnet.js "<comptabilité.xlsx>" ["<stock.xlsx>"] [sortie.json]
 ```
 
 - **Une facture donne un chantier**, ses lignes deviennent les lignes de
@@ -352,6 +352,15 @@ node outils/importer-carnet.js "<classeur.xlsx>" [sortie.json]
   test qui le vérifie se passe tout seul quand le fichier est absent.
 - Ce que le tableur ne contient pas ne s'invente pas : ni lieu, ni temps
   passé. Les rendements resteront donc vides sur cet historique.
+- **Le classeur de stock se donne en second argument.** Ses ventes portent le
+  même numéro de facture que le carnet comptable : chaque sortie est donc
+  rattachée à son chantier, et suit son statut au lieu de vivre à part.
+- **La livraison n'est pas un produit.** C'est un frais de port qui se
+  répartit sur la commande et pèse sur le prix de revient. L'écarter avant de
+  créer l'article, sinon elle entre à l'inventaire.
+- **Le Trico se compte en millilitres**, avec son dosage par plant lu dans
+  l'encadré du classeur — 6 ml. C'est ce qui rendra la déduction automatique
+  possible le jour où une ligne de chantier pointera vers un article.
 - Deux repères pour savoir si la conversion est juste : le total des achats
   doit tomber au centime sur celui du tableau de bord, et l'écart sur le
   chiffre d'affaires doit valoir exactement les débours — le tableur les
