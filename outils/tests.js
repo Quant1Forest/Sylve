@@ -650,6 +650,24 @@ scenario('À traiter montre aussi le travail à venir, pas que les ennuis', asyn
 });
 
 /* --------------------------------------------------------------------- */
+scenario('Mise à jour : l’avis reste posé au lieu de s’effacer', async () => {
+  /* Un toast disparaît en deux secondes et se rate. L'avis doit tenir
+     jusqu'à ce qu'on réponde, sans bloquer la saisie en cours. */
+  const t = await ouvrir(VIDE);
+  const z = t.$('#maj-avis');
+  verifierVrai('l’avis existe dans la page', z);
+  verifier('et reste caché tant qu’il n’y a rien à installer', true, z.hidden);
+  verifierVrai('il propose d’installer', t.$('#maj-oui'));
+  verifierVrai('et de repousser', t.$('#maj-non'));
+  verifierVrai('il rassure sur les données',
+    /données ne sont pas touchées/.test(z.textContent));
+  /* Il ne doit pas barrer l'écran : on doit pouvoir continuer à saisir. */
+  const st = t.w.getComputedStyle(z);
+  verifier('il se pose en bas, sans couvrir la page', 'fixed', st.position);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
 scenario('Analyses : la TVA payée sur les achats est montrée', async () => {
   /* C'est celle qui se récupère : elle a sa place à côté des achats, pas
      seulement dans la balance générale. */

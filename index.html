@@ -501,6 +501,29 @@ td.act{width:1%;padding:3px 6px}
 @keyframes dem-monte{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:none}}
 @keyframes dem-etale{from{opacity:0;transform:scaleX(.2)}to{opacity:.75;transform:none}}
 
+/* ------------------------------------------- avis de mise à jour */
+/* Un toast disparaît en deux secondes et se rate. Cet avis reste jusqu'à ce
+   qu'on réponde, sans bloquer : on peut travailler et l'installer plus tard.
+   Posé hors de #app, au-dessus des onglets du bas. */
+#maj-avis{
+  position:fixed;left:50%;transform:translateX(-50%);
+  bottom:calc(12px + env(safe-area-inset-bottom,0px));
+  z-index:90;width:min(560px,calc(100vw - 24px));
+  background:var(--encre);color:#EAEFE6;border-radius:13px;
+  border:1px solid rgba(255,255,255,.14);
+  box-shadow:0 6px 24px -6px rgba(0,0,0,.45);
+  padding:12px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+}
+#maj-avis[hidden]{display:none}
+#maj-avis .txt{flex:1;min-width:180px;font-size:13.5px;line-height:1.4}
+#maj-avis .txt b{display:block;font-size:14.5px}
+#maj-avis .txt small{color:#B9C6B2;font-size:12px}
+#maj-avis button{font:inherit;font-size:13px;border-radius:9px;padding:8px 13px;
+  border:0;cursor:pointer;flex:none}
+#maj-avis .oui{background:var(--accent);color:#fff;font-weight:600}
+#maj-avis .non{background:transparent;color:#B9C6B2;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.2)}
+
 @media(prefers-reduced-motion:reduce){*{transition:none !important;animation:none !important}}
 </style>
 </head>
@@ -1333,6 +1356,12 @@ if (froid && s > 0) montrer(s);
   </div>
 </div>
 <div id="toast" hidden role="status"></div>
+<div id="maj-avis" hidden role="dialog" aria-live="polite" aria-label="Mise à jour disponible">
+  <div class="txt"><b>Une mise à jour est prête</b>
+    <small id="maj-avis-det">Elle s’installe en une seconde, vos données ne sont pas touchées.</small></div>
+  <button class="non" id="maj-non">Plus tard</button>
+  <button class="oui" id="maj-oui">Installer</button>
+</div>
 <datalist id="liste-clients"></datalist>
 <datalist id="liste-proprios"></datalist>
 <datalist id="liste-fournisseurs"></datalist>
@@ -12756,7 +12785,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.34.0-20260816-2008';
+var VERSION = '4.35.0-20260816-2014';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
@@ -12813,8 +12842,23 @@ var rechargeEnCours = false;
 function proposerMaj(reg) {
   var b = $('#r-maj');
   if (b) { b.textContent = 'Installer la mise à jour'; b.classList.add('primaire'); }
-  toast('Nouvelle version prête — Réglages ▸ Application.');
   proposerMaj.attente = reg.waiting;
+  /* Un toast s'efface en deux secondes et se rate. L'avis reste posé jusqu'à
+     ce qu'on réponde — sans bloquer : on peut finir sa saisie et installer
+     après. Le téléchargement, lui, est déjà fait à ce stade. */
+  var z = $('#maj-avis');
+  if (!z) { toast('Nouvelle version prête — Réglages ▸ Application.'); return; }
+  z.hidden = false;
+  $('#maj-oui').addEventListener('click', function () {
+    $('#maj-avis-det').textContent = 'Installation…';
+    $('#maj-oui').disabled = true;
+    $('#maj-non').disabled = true;
+    if (!appliquerMaj()) { z.hidden = true; toast('Mise à jour indisponible.'); }
+  });
+  $('#maj-non').addEventListener('click', function () {
+    z.hidden = true;
+    toast('Vous pourrez l’installer dans Réglages ▸ Application.');
+  });
 }
 function appliquerMaj() {
   var reg = etat.reg;
