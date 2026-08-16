@@ -47,11 +47,12 @@ mains dans la terre.
 
 ```bash
 npm install        # une seule fois : jsdom
-npm run controle   # vérificateur + tests + reconstruction + conformité du fichier seul
+npm run controle   # vérificateur + service worker + tests + reconstruction + conformité
 ```
 
-Doit afficher **« Bon pour livraison »**, puis la suite au vert — 240
-vérifications à ce jour — puis **« Sylve.html est conforme »**.
+Doit afficher **« Bon pour livraison »**, puis **« le service worker tient »**
+(24 vérifications), puis la suite au vert — 240 à ce jour — puis
+**« Sylve.html est conforme »**.
 
 Compter **moins de deux minutes**. Ça a été dix, et deux choses l'expliquaient :
 
@@ -70,6 +71,17 @@ Compter **moins de deux minutes**. Ça a été dix, et deux choses l'expliquaien
 changement de comportement s'accompagne d'un scénario dans `outils/tests.js`.
 C'est la règle la plus importante du projet : elle a déjà rattrapé plusieurs
 régressions silencieuses.
+
+**Et un contrôle qu'on n'a jamais vu échouer ne prouve rien.** Avant
+d'adopter une vérification, la casser exprès et s'assurer qu'elle crie. Trois
+fois déjà, un contrôle passait au vert sans rien examiner : le vérificateur
+qui annonçait « 1 identifiant, tous uniques » après avoir coupé le fichier au
+premier `<script>` ; la première version de `comparer.js` ; et celle des tests
+du service worker, qui comparait le cache à la liste que le service worker
+annonce lui-même — retirer un fichier des deux côtés laissait le compte juste.
+Une vérification doit se croiser avec une source écrite ailleurs, pour
+d'autres raisons : c'est le manifeste qui dit maintenant quelles icônes
+doivent être en cache.
 
 Scripts séparés si besoin : `npm run verifier`, `npm test`,
 `npm run construire`.
@@ -101,7 +113,7 @@ l'ancien code. Le vérificateur refuse de passer si les deux divergent.
 | `sw.js` | Service worker. Sa constante `VERSION` doit être identique à celle de `index.html`. |
 | `manifest.webmanifest` | Nom, couleurs, icônes de la PWA. |
 | `icone-*.png` | Icônes d'installation. La version *maskable* garde toute son encre dans la zone de rognage d'Android. |
-| `outils/` | Vérificateur, tests, construction, conformité du fichier autonome, reprise du carnet. |
+| `outils/` | Vérificateur, tests, tests du service worker, construction, conformité du fichier autonome, reprise du carnet. |
 
 Les fichiers d'origine du logo ne sont pas dans le dépôt : ils sont gardés à
 part. Le dépôt étant public, il ne contient que ce qui est servi, plus de quoi
