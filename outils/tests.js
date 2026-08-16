@@ -723,6 +723,27 @@ scenario('Reprise du carnet : le fichier converti se restaure et compte juste', 
     Math.abs(ca.total - Math.round(attendu * 100) / 100) < 1);
   verifierVrai('les débours sont suivis à part', ca.debours > 0);
   verifierVrai('et tenus hors du chiffre d’affaires', ca.total < ca.total + ca.debours);
+
+  /* Le stock, quand le fichier en porte. */
+  if ((src.articles || []).length) {
+    verifier('les produits sont arrivés', src.articles.length, (t.stock('articles') || []).length);
+    verifier('les fournisseurs aussi', src.fournisseurs.length, (t.stock('fournisseurs') || []).length);
+    verifier('les commandes', src.commandes.length, (t.stock('commandes') || []).length);
+    verifier('les sorties', src.sorties.length, (t.stock('sorties') || []).length);
+    /* Une sortie qui connaît son chantier en suit le statut toute seule. */
+    const liees = (t.stock('sorties') || []).filter(s => s.chantier);
+    verifierVrai('la plupart des sorties sont rattachées à un chantier',
+      liees.length >= src.sorties.length - 1);
+    const ids = (t.stock('chantiers') || []).map(c => c.id);
+    verifierVrai('et le chantier visé existe bien',
+      liees.every(s => ids.indexOf(s.chantier) >= 0));
+    /* Le Trico se compte en millilitres, pas en bidons. */
+    const trico = (t.stock('articles') || []).filter(a => /trico/i.test(a.nom))[0];
+    if (trico) {
+      verifier('le Trico est en millilitres', 'ml', trico.unite);
+      verifierVrai('avec son dosage par plant', trico.dosage > 0);
+    }
+  }
   verifier('aucune erreur', [], t.erreurs);
 });
 
