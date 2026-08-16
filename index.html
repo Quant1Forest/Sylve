@@ -6387,7 +6387,9 @@ function brancher() {
     if (ls) {
       if (!confirm('Retirer cette ligne de travaux ?')) return;
       c.lignes.splice(Number(ls.dataset.lsup), 1); c.maj = Date.now();
-      sauverChantiers().then(function () { renderFiche(); renderCarnet(); renderAccueil(); });
+      sauverChantiers().then(function () { return synchroniserStock(c); }).then(function () {
+        renderFiche(); renderCarnet(); renderStockFournitures(); renderAccueil();
+      });
       return;
     }
     if (ts) {
@@ -8158,6 +8160,52 @@ function renderListeChantiers() {
   }).join('');
 }
 
+/* ------------------------------------------------- du chantier au stock
+   Une ligne de fourniture qui désigne un produit fait sortir ce produit du
+   stock. La sortie n'est pas saisie : elle découle de la facture, et se
+   refait à chaque modification — corriger 332 plants en 350 corrige la
+   sortie. Son état suit celui du chantier (VENTE_DE_CHANTIER), donc rien
+   ne quitte vraiment le stock avant que le chantier soit fait.
+
+   Sur un produit dosé, la ligne compte des plants et le stock des
+   millilitres : la quantité facturée reste celle que lit le client, la
+   conversion se fait ici. */
+function lignesStockDe(c) {
+  return (c.lignes || []).map(function (l) {
+    var a = article(l.article); if (!a) return null;
+    var q = C.nb(l.quantite), d = ST.nb(a.dosage);
+    if (!(q > 0)) return null;
+    return { article: a.id, qte: d > 0 ? ST.arr(q * d, 3) : q,
+      prix: d > 0 ? ST.arr(C.nb(l.prix) / d, 5) : C.nb(l.prix) };
+  }).filter(Boolean);
+}
+function sortieAutoDe(c) {
+  return (A.sorties || []).filter(function (s) { return s.auto && s.chantier === c.id; })[0] || null;
+}
+/* Rend une promesse : l'appelant enchaîne sur son propre enregistrement. */
+function synchroniserStock(c) {
+  if (!c) return Promise.resolve(false);
+  var lignes = lignesStockDe(c);
+  var s = sortieAutoDe(c);
+  if (!lignes.length) {
+    if (!s) return Promise.resolve(false);
+    A.sorties = A.sorties.filter(function (x) { return x !== s; });
+    return sauverSorties().then(function () { indexerStock(); return true; });
+  }
+  if (!s) {
+    s = { id: uid(), auto: true, chantier: c.id, num: c.numeroFacture || '',
+      client: c.donneur || c.proprietaire || '', perte: false, debours: false,
+      statut: 'fini', lignes: [], date: 0, maj: 0 };
+    A.sorties.push(s);
+  }
+  s.lignes = lignes;
+  s.num = c.numeroFacture || '';
+  s.client = c.donneur || c.proprietaire || '';
+  s.date = C.dernierEvenement(c) || Date.now();
+  s.maj = Date.now();
+  return sauverSorties().then(function () { indexerStock(); return true; });
+}
+
 /* -------------------------------------------------------------- la fiche */
 function ouvrirChantier(id) {
   A.chOuvert = id;
@@ -8721,6 +8769,22 @@ function ouvrirLigne(id, idx) {
     '<label class="eyebrow" style="display:block">Difficulté <span class="muted" ' +
     'style="font-weight:400;text-transform:none;letter-spacing:0">(1 très facile → 5 très difficile)</span></label>' +
     '<div class="chips" id="cl-diff" style="margin-top:5px">' + chipsDiff5('cldiff', l.difficulte) + '</div>' +
+    /* Ce qui relie la facture au stock. Laissé vide, rien ne sort : toutes
+       les fournitures ne sont pas stockées. Sur un produit dosé — un
+       répulsif à 6 ml par plant — la quantité de la ligne reste le nombre
+       de plants, c'est ce que lit le client ; c'est la sortie qui convertit. */
+    '<div class="champ" style="margin-top:9px"><label class="eyebrow" for="cl-art">Produit du stock</label>' +
+    '<select id="cl-art"><option value="">— aucun, rien ne sort du stock —</option>' +
+    (A.articles || []).slice().sort(function (x, y) {
+      return (x.nom || '').localeCompare(y.nom || '', 'fr');
+    }).map(function (a) {
+      var d = ST.nb(a.dosage);
+      return '<option value="' + a.id + '"' + (l.article === a.id ? ' selected' : '') + '>' +
+        esc(a.nom || 'Produit') +
+        (d > 0 ? ' — ' + E.fmt(d, d % 1 ? 2 : 0) + ' ' + esc(ST.courtUniteArt(a.unite)) + '/plant' : '') +
+        '</option>';
+    }).join('') + '</select>' +
+    '<p class="muted" style="font-size:11.5px;margin:5px 0 0" id="cl-art-aide"></p></div>' +
     /* La liste des travaux sert au taux de TVA et aux rendements : elle doit
        rester courte et stable. Ce champ porte ce qui figure vraiment sur la
        facture — « tuteur châtaignier 9/11×150 » là où la liste ne connaît
@@ -8740,9 +8804,28 @@ function ouvrirLigne(id, idx) {
       nature: C.estFourniture($('#cl-trav').value) ? 'vente' : 'prestation',
       tva: $('#cl-tva').value === '' ? null : C.nb($('#cl-tva').value),
       difficulte: clDiff || null,
+      article: $('#cl-art') ? ($('#cl-art').value || null) : (l.article || null),
       note: $('#cl-note').value.trim() };
   };
+  /* Ce que la ligne va réellement retirer du stock, dit avant de valider :
+     332 plants d'un répulsif dosé à 6 ml, ce sont 1 992 ml qui sortent. */
+  var aideStock = function () {
+    var z = $('#cl-art-aide'); if (!z) return;
+    var a = article($('#cl-art').value);
+    if (!a) { z.textContent = 'Aucun mouvement de stock pour cette ligne.'; return; }
+    var q = C.nb($('#cl-qte').value), d = ST.nb(a.dosage);
+    var sort = d > 0 ? ST.arr(q * d, 3) : q;
+    var ech = ST.echelleArt(a.unite, [sort, ST.quantite(a)]);
+    var lu = function (v) { var n = ST.arr(ST.nb(v) / ech.div, 2); return E.fmt(n, n % 1 ? 2 : 0); };
+    z.innerHTML = q > 0
+      ? 'Sortira <b>' + lu(sort) + ' ' + esc(ech.court) + '</b> du stock' +
+        (d > 0 ? ' (' + E.fmt(q, 0) + ' × ' + E.fmt(d, d % 1 ? 2 : 0) + ' ' +
+          esc(ST.courtUniteArt(a.unite)) + ')' : '') +
+        ' · il en reste ' + lu(ST.quantite(a)) + ' ' + esc(ech.court) + '.'
+      : 'Indiquez une quantité pour voir ce qui sortira du stock.';
+  };
   var apercu = function () {
+    aideStock();
     var x = lire(), m = C.montantLigne(x);
     var tx = C.tauxLigne(x, c);
     var attendu = C.tauxAttendu(x.travail, c.siren);
@@ -8773,7 +8856,9 @@ function ouvrirLigne(id, idx) {
     });
   });
   ['#cl-unite', '#cl-qte', '#cl-prix'].forEach(function (s) { $(s).addEventListener('input', apercu); });
-  ['#cl-unite', '#cl-tva'].forEach(function (s) { $(s).addEventListener('change', apercu); });
+  ['#cl-unite', '#cl-tva', '#cl-art'].forEach(function (s) {
+    if ($(s)) $(s).addEventListener('change', apercu);
+  });
   apercu();
   $('#cl-ok').addEventListener('click', function () {
     var x = lire();
@@ -8781,8 +8866,9 @@ function ouvrirLigne(id, idx) {
     c.lignes = c.lignes || [];
     if (idx != null) c.lignes[idx] = x; else c.lignes.push(x);
     c.maj = Date.now();
-    sauverChantiers().then(function () {
-      fermerModale(); renderFiche(); renderCarnet(); renderRendements(); renderFinances(); renderAccueil();
+    sauverChantiers().then(function () { return synchroniserStock(c); }).then(function () {
+      fermerModale(); renderFiche(); renderCarnet(); renderRendements(); renderFinances();
+      renderStockFournitures(); renderAccueil();
     });
   });
 }
@@ -12518,7 +12604,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.29.0-20260816-1648';
+var VERSION = '4.30.0-20260816-1724';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

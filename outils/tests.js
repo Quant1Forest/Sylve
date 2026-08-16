@@ -510,6 +510,60 @@ scenario('Charges fixes : annoncées avant, jamais réclamées après', async ()
 });
 
 /* --------------------------------------------------------------------- */
+scenario('Facturer un produit dosé le retire du stock, converti', async () => {
+  /* La facture compte des plants — c'est ce que lit le client — et le stock
+     des millilitres. 332 plants d'un répulsif dosé à 6 ml font 1 992 ml. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers', chOuvert: 'c1',
+    articles: [{ id: 'a1', nom: 'Trico', type: 'traitement', unite: 'millilitre',
+      dosage: 6, mouvements: [], maj: Date.now() }],
+    commandes: [{ id: 'k1', num: 'K1', dateCmd: Date.now(), dateLiv: Date.now(),
+      statut: 'recu', livraison: 0, maj: Date.now(),
+      lignes: [{ article: 'a1', qte: 10000, prix: 0.0178 }] }],
+    chantiers: [{ id: 'c1', nom: 'Plantation Vaux', statut: 'accepte', temps: [], maj: Date.now(),
+      lignes: [] }]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(300);
+  t.clic('#f-ligne'); await t.pause(300);
+
+  verifierVrai('la ligne propose les produits du stock', t.$('#cl-art'));
+  t.choisir('#cl-trav', 'F_REPULSIF');
+  t.saisir('#cl-qte', '332');
+  t.saisir('#cl-prix', '0,20');
+  t.choisir('#cl-art', 'a1'); await t.pause(200);
+  /* Le stock dépasse le litre : l'aide parle donc en litres, et rappelle le
+     calcul en millilitres pour qu'on puisse le vérifier d'un coup d'œil. */
+  const aide = t.texte('#cl-art-aide');
+  verifierVrai('elle annonce ce qui sortira, en litres', /1,99\s?L/.test(aide));
+  verifierVrai('en montrant la conversion', /332\s?×\s?6/.test(aide));
+  verifierVrai('et ce qu’il restera', /reste/.test(aide));
+  t.clic('#cl-ok'); await t.pause(500);
+
+  const s = (t.stock('sorties') || [])[0];
+  verifierVrai('une sortie est née de la facture', s && s.chantier === 'c1');
+  verifier('convertie en millilitres', 1992, s.lignes[0].qte);
+  /* Le chantier est accepté, pas fait : le produit est engagé, pas sorti. */
+  const ST = t.w.BCS2;
+  verifier('engagé tant que le chantier n’est pas fait', 'accepte',
+    ST.VENTE_DE_CHANTIER['accepte']);
+
+  /* Corriger la facture corrige la sortie. */
+  t.clic('[data-lmod="0"]'); await t.pause(300);
+  t.saisir('#cl-qte', '350');
+  t.clic('#cl-ok'); await t.pause(500);
+  const s2 = (t.stock('sorties') || [])[0];
+  verifier('corriger 332 en 350 corrige la sortie', 2100, s2.lignes[0].qte);
+  verifier('sans en créer une seconde', 1, (t.stock('sorties') || []).length);
+
+  /* Retirer la ligne retire la sortie. */
+  t.w.confirm = () => true;
+  t.clic('[data-lsup="0"]'); await t.pause(500);
+  verifier('retirer la ligne retire la sortie', 0, (t.stock('sorties') || []).length);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
 scenario('Stock : un répulsif se compte au millilitre et se lit au litre', async () => {
   /* « ml » désigne le mètre linéaire dans l'application : un produit dosé au
      millilitre a sa propre unité. Et 33 984 ml ne disent rien à personne —

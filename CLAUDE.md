@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.29.0-20260816-1648**
+Version courante : **4.30.0-20260816-1724**
 
 ---
 
@@ -51,7 +51,7 @@ npm run controle   # vérificateur + service worker + tests + reconstruction + c
 ```
 
 Doit afficher **« Bon pour livraison »**, puis **« le service worker tient »**
-(24 vérifications), puis la suite au vert — 251 à ce jour — puis
+(24 vérifications), puis la suite au vert — 262 à ce jour — puis
 **« Sylve.html est conforme »**.
 
 Compter **moins de deux minutes**. Ça a été dix, et deux choses l'expliquaient :
@@ -351,21 +351,21 @@ et demi, donc trois hectares : c’est ainsi que l’utilisateur raisonne.
 conversion plants ↔ millilitres. Elles attendaient seulement qu’une ligne de
 chantier sache à quel article elle se rapporte.
 
-## Facture et stock : le maillon manquant
+## Facture et stock : le maillon est branché
 
-Le chaînage existe déjà **sauf un cran**. Une sortie de stock peut porter un
-`chantier` ; son état suit alors le statut de ce chantier tout seul
-(`VENTE_DE_CHANTIER`) : prévu au devis, engagé une fois accepté, réellement
-sorti quand le chantier passe à *facturé* ou *payé*.
+Une ligne de chantier porte désormais un `article`. Quand elle en désigne un,
+`synchroniserStock()` refait la sortie liée au chantier — jamais saisie, elle
+découle de la facture et se refait à chaque modification. Elle est marquée
+`auto: true` pour ne pas écraser une sortie entrée à la main.
 
-Ce qui manque : **une ligne de chantier ne pointe pas vers un article**. La
-sortie doit donc être ressaisie à la main dans le stock. L'objectif est qu'une
-ligne de fourniture porte son article, et que la sortie en découle.
-
-Le cas qui résiste : **le Trico**, facturé au plant mais acheté en bidons.
-Il faudrait un coefficient de couverture sur l'article, ou le laisser en
-saisie manuelle. Question posée le 4 août 2026, sans réponse à ce jour.
-
+- **La facture compte ce que lit le client, le stock ce qui est consommé.**
+  332 plants restent 332 plants sur la ligne ; c'est la sortie qui convertit
+  en 1 992 ml, via le `dosage` de l'article.
+- **L'état suit le chantier** par `VENTE_DE_CHANTIER` : rien ne quitte le
+  stock avant que le chantier soit fait.
+- **Corriger la facture corrige la sortie** ; retirer la ligne la supprime.
+- Les lignes reprises du carnet **ne désignent aucun article** : le lien
+  n'existait pas au moment de la conversion.
 ## Reprendre le carnet tenu sous tableur
 
 `outils/importer-carnet.js` convertit le classeur comptable en un fichier de
