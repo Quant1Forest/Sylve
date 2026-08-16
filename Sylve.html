@@ -3275,6 +3275,12 @@ function chargeMois(chantiers, annee, mois, cfg) {
 /* ============================================================== ALERTES
    Calculées à l'ouverture : pas de notification système possible sans
    serveur, donc tout remonte dans un bandeau. */
+/* « 1 journée », « 2,5 journées » : le demi se dit, l'entier ne s'encombre
+   pas d'une décimale. */
+function fmtJours(n) {
+  var v = arr(nb(n), 2);
+  return String(v).replace('.', ',') + ' journée' + (v > 1 ? 's' : '');
+}
 function alertes(chantiers, cfg, maintenant) {
   var now = maintenant || Date.now();
   var relanceDevis = nb(cfg && cfg.joursRelanceDevis) || 21;
@@ -3297,6 +3303,23 @@ function alertes(chantiers, cfg, maintenant) {
       if (j2 >= relanceFacture) {
         out.push({ type: 'impaye', chantier: ch, gravite: 3, jours: j2,
           texte: 'facturé il y a ' + j2 + ' jours, non réglé' });
+      }
+    }
+    /* Un chantier engagé — accepté ou commencé — doit dire ce qu'il reste à
+       poser. Sans cela « À traiter » ne montrait que ce qui a mal tourné :
+       impayés, retards. Le travail à venir, lui, n'y figurait pas. */
+    if (ch.statut === 'accepte' || ch.statut === 'encours') {
+      var reste = resteAPlacer(ch);
+      var place = totalPlace(ch);
+      if (reste == null && !place) {
+        out.push({ type: 'aprevoir', chantier: ch, gravite: 1,
+          texte: 'aucune journée prévue — estimez et placez' });
+      } else if (reste != null && reste > 0) {
+        out.push({ type: 'aplacer', chantier: ch, gravite: 1, jours: reste,
+          texte: fmtJours(reste) + ' à placer sur ' + fmtJours(nb(ch.joursEstimes)) + ' estimées' });
+      } else if (reste == null && place > 0) {
+        out.push({ type: 'encours', chantier: ch, gravite: 0,
+          texte: fmtJours(place) + ' posée' + (place > 1 ? 's' : '') + ', pas d’estimation' });
       }
     }
     if (ch.statut === 'termine' && ch.dateFin) {
@@ -8191,11 +8214,22 @@ function lignesStockDe(c) {
 function sortieAutoDe(c) {
   return (A.sorties || []).filter(function (s) { return s.auto && s.chantier === c.id; })[0] || null;
 }
-/* Rend une promesse : l'appelant enchaîne sur son propre enregistrement. */
+/* Une sortie saisie à la main, ou reprise du carnet, sur ce même chantier.
+   Les chantiers importés en portent déjà une : y ajouter une sortie
+   automatique retirerait deux fois le même produit du stock, sans que rien
+   ne le signale. On s'arrête plutôt que de compter double. */
+function sortieManuelleDe(c) {
+  return (A.sorties || []).filter(function (s) {
+    return !s.auto && s.chantier === c.id && (s.lignes || []).length;
+  })[0] || null;
+}
+/* Rend une promesse : l'appelant enchaîne sur son propre enregistrement.
+   Résout sur 'double' quand une sortie existante empêche la synchronisation. */
 function synchroniserStock(c) {
   if (!c) return Promise.resolve(false);
   var lignes = lignesStockDe(c);
   var s = sortieAutoDe(c);
+  if (lignes.length && !s && sortieManuelleDe(c)) return Promise.resolve('double');
   if (!lignes.length) {
     if (!s) return Promise.resolve(false);
     A.sorties = A.sorties.filter(function (x) { return x !== s; });
@@ -8875,9 +8909,12 @@ function ouvrirLigne(id, idx) {
     c.lignes = c.lignes || [];
     if (idx != null) c.lignes[idx] = x; else c.lignes.push(x);
     c.maj = Date.now();
-    sauverChantiers().then(function () { return synchroniserStock(c); }).then(function () {
+    sauverChantiers().then(function () { return synchroniserStock(c); }).then(function (r) {
       fermerModale(); renderFiche(); renderCarnet(); renderRendements(); renderFinances();
       renderStockFournitures(); renderAccueil();
+      if (r === 'double') {
+        toast('Ce chantier a déjà une sortie de stock à part : rien n’a été déduit en double.');
+      }
     });
   });
 }
@@ -9300,9 +9337,11 @@ function ouvrirSaisieJour() {
 }
 
 /* ------------------------------------------------------------- alertes */
-var COUL_ALERTE = { impaye: '#B4231F', retard: '#C4611B', afacturer: '#B98A00', devis: '#7A8471' };
+var COUL_ALERTE = { impaye: '#B4231F', retard: '#C4611B', afacturer: '#B98A00',
+  devis: '#7A8471', aprevoir: '#1F5FA9', aplacer: '#2E4A3C', encours: '#7A8471' };
 var TITRE_ALERTE = { impaye: 'Facture impayée', retard: 'Chantier en retard',
-  afacturer: 'À facturer', devis: 'Devis sans réponse' };
+  afacturer: 'À facturer', devis: 'Devis sans réponse',
+  aprevoir: 'À prévoir', aplacer: 'Journées à placer', encours: 'En cours' };
 
 /* Écran Entreprise : un chiffre parlant sur chaque tuile. */
 function renderEntreprise() {
@@ -12647,7 +12686,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.31.0-20260816-1910';
+var VERSION = '4.32.0-20260816-1926';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

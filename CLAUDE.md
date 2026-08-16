@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.31.0-20260816-1910**
+Version courante : **4.32.0-20260816-1926**
 
 ---
 
@@ -51,7 +51,7 @@ npm run controle   # vérificateur + service worker + tests + reconstruction + c
 ```
 
 Doit afficher **« Bon pour livraison »**, puis **« le service worker tient »**
-(24 vérifications), puis la suite au vert — 273 à ce jour — puis
+(24 vérifications), puis la suite au vert — 283 à ce jour — puis
 **« Sylve.html est conforme »**.
 
 Compter **moins de deux minutes**. Ça a été dix, et deux choses l'expliquaient :
@@ -89,6 +89,10 @@ Scripts séparés si besoin : `npm run verifier`, `npm test`,
 ---
 
 ## Livrer
+
+**La 5.0 sera la version jugée aboutie** — partie Entreprise finie, telle
+que l'utilisateur la veut sur le terrain. D'ici là on reste en 4.x : le
+chiffre du milieu monte à chaque lot qui change quelque chose de visible.
 
 Le dépôt est publié par GitHub Pages : ce qui est poussé sur `main` devient
 l'application, et le téléphone propose la mise à jour à la prochaine ouverture

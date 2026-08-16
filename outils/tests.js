@@ -523,6 +523,39 @@ scenario('Charges fixes : annoncées avant, jamais réclamées après', async ()
 });
 
 /* --------------------------------------------------------------------- */
+scenario('À traiter montre aussi le travail à venir, pas que les ennuis', async () => {
+  /* La zone ne remontait que ce qui a mal tourné — impayés, retards. Un
+     chantier accepté sans journée posée n'y figurait pas, alors que c'est
+     exactement ce qu'on doit voir en ouvrant l'application. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [
+      { id: 'a', nom: 'Sans rien', statut: 'accepte', lignes: [], temps: [], maj: Date.now() },
+      { id: 'b', nom: 'Moitié posée', statut: 'accepte', lignes: [], temps: [], maj: Date.now(),
+        joursEstimes: 4, jours: [{ d: Date.now(), p: 1 }] },
+      { id: 'c', nom: 'Tout posé', statut: 'encours', lignes: [], temps: [], maj: Date.now(),
+        joursEstimes: 2, jours: [{ d: Date.now(), p: 1 }, { d: Date.now() + 86400000, p: 1 }] }
+    ]
+  }));
+  const C2 = t.w.BCC;
+  const al = C2.alertes(t.stock('chantiers'), null, Date.now());
+  const par = ty => al.filter(x => x.type === ty);
+
+  verifier('un chantier accepté sans rien de prévu est signalé', 1, par('aprevoir').length);
+  verifierVrai('et il dit quoi faire', /estimez et placez/.test(par('aprevoir')[0].texte));
+
+  verifier('un chantier à moitié posé annonce le reste', 1, par('aplacer').length);
+  verifierVrai('avec le compte exact',
+    /3 journées à placer sur 4 journées/.test(par('aplacer')[0].texte));
+
+  /* Un chantier dont tout est posé n'a rien à traiter : il ne doit pas
+     encombrer la liste. */
+  verifier('un chantier complet ne dit rien', 0,
+    al.filter(x => x.chantier.id === 'c').length);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
 scenario('Analyses : le graphique porte une échelle et dit ce qu’il montre', async () => {
   /* Une hauteur sans graduation ne se lit pas : on ne sait pas si la barre
      vaut cent euros ou dix mille. */
@@ -605,6 +638,35 @@ scenario('Facturer un produit dosé le retire du stock, converti', async () => {
   t.w.confirm = () => true;
   t.clic('[data-lsup="0"]'); await t.pause(500);
   verifier('retirer la ligne retire la sortie', 0, (t.stock('sorties') || []).length);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Stock : jamais deux sorties pour la même facture', async () => {
+  /* Les chantiers repris du carnet portent déjà leur sortie, importée du
+     classeur de stock. Rattacher après coup un article à leur ligne créerait
+     une seconde sortie par-dessus : le produit serait retiré deux fois, sans
+     que rien ne le dise. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers', chOuvert: 'c1',
+    articles: [{ id: 'a1', nom: 'Tuteur', type: 'tuteur', unite: 'unite',
+      mouvements: [], maj: Date.now() }],
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'facture', temps: [], maj: Date.now(),
+      lignes: [{ travail: 'F_TUTEUR', unite: 'unite', quantite: 100, prix: 0.78, nature: 'vente' }] }],
+    /* la sortie reprise du carnet : elle ne porte pas « auto » */
+    sorties: [{ id: 's1', chantier: 'c1', num: 'F-2025-0016', statut: 'fini',
+      date: Date.now(), lignes: [{ article: 'a1', qte: 100, prix: 0.78 }], maj: Date.now() }]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(300);
+  t.clic('[data-lmod="0"]'); await t.pause(300);
+  t.choisir('#cl-art', 'a1'); await t.pause(150);
+  t.clic('#cl-ok'); await t.pause(500);
+
+  const s = t.stock('sorties') || [];
+  verifier('la sortie reste unique', 1, s.length);
+  verifier('et c’est celle du carnet', 's1', s[0].id);
+  verifier('sa quantité n’a pas bougé', 100, s[0].lignes[0].qte);
   verifier('aucune erreur', [], t.erreurs);
 });
 
