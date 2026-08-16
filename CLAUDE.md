@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.32.0-20260816-1926**
+Version courante : **4.33.0-20260816-1955**
 
 ---
 
@@ -51,7 +51,7 @@ npm run controle   # vérificateur + service worker + tests + reconstruction + c
 ```
 
 Doit afficher **« Bon pour livraison »**, puis **« le service worker tient »**
-(24 vérifications), puis la suite au vert — 283 à ce jour — puis
+(24 vérifications), puis la suite au vert — 296 à ce jour — puis
 **« Sylve.html est conforme »**.
 
 Compter **moins de deux minutes**. Ça a été dix, et deux choses l'expliquaient :
