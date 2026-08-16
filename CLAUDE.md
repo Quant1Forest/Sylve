@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.30.0-20260816-1724**
+Version courante : **4.31.0-20260816-1910**
 
 ---
 
@@ -51,7 +51,7 @@ npm run controle   # vérificateur + service worker + tests + reconstruction + c
 ```
 
 Doit afficher **« Bon pour livraison »**, puis **« le service worker tient »**
-(24 vérifications), puis la suite au vert — 262 à ce jour — puis
+(24 vérifications), puis la suite au vert — 273 à ce jour — puis
 **« Sylve.html est conforme »**.
 
 Compter **moins de deux minutes**. Ça a été dix, et deux choses l'expliquaient :
@@ -211,6 +211,10 @@ Terminé :
 
 Restent ouverts :
 
+- **Les réglages vivent dans le bandeau**, plus dans les onglets du bas. Ils y
+  étaient répétés neuf fois, à une place différente selon le module, et
+  mangeaient un onglet là où il n'y en a que deux. Le bouton ouvre la section
+  correspondant à la partie courante.
 - **Trois actions restent dans le bandeau** faute d'équivalent dans leur page :
   *Estimer* (seul accès à l'écran d'estimation — le retirer bloquerait
   dehors), *Aujourd'hui*, *En-tête*. À déplacer dans leur page avant de les
