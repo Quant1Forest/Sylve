@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.28.0-20260816-1549**
+Version courante : **4.29.0-20260816-1648**
 
 ---
 
@@ -51,7 +51,7 @@ npm run controle   # vérificateur + service worker + tests + reconstruction + c
 ```
 
 Doit afficher **« Bon pour livraison »**, puis **« le service worker tient »**
-(24 vérifications), puis la suite au vert — 240 à ce jour — puis
+(24 vérifications), puis la suite au vert — 251 à ce jour — puis
 **« Sylve.html est conforme »**.
 
 Compter **moins de deux minutes**. Ça a été dix, et deux choses l'expliquaient :
@@ -334,6 +334,22 @@ le graphique de répartition ne disait rien.
   passe à zéro et se ferme. Le drapeau existait depuis le début sans servir à
   rien. Corollaire utile : seules les charges qui portent de la TVA méritent
   d'être pointées en dépense, puisque c'est la TVA qui se récupère.
+
+## Le millilitre n’est pas le mètre linéaire
+
+Dans `UNITES_ART`, **`ml` désigne le mètre linéaire** — celui du grillage.
+Un produit dosé au millilitre prend l’unité `millilitre`. L’import les avait
+confondus et rangeait le Trico en mètres.
+
+Un stock en millilitres **se lit en litres** dès qu’il dépasse le litre :
+`echelleArt(unite, valeurs)` rend le diviseur et le libellé. L’échelle se
+décide sur la plus grande valeur de la ligne, jamais colonne par colonne —
+« acheté 34 L, sorti 1 992 » serait pire que rien. 34 L, c’est trois bidons
+et demi, donc trois hectares : c’est ainsi que l’utilisateur raisonne.
+
+`pourPlants()`, `coutParPlant()` et `stockEnPlants()` faisaient déjà la
+conversion plants ↔ millilitres. Elles attendaient seulement qu’une ligne de
+chantier sache à quel article elle se rapporte.
 
 ## Facture et stock : le maillon manquant
 

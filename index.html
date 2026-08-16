@@ -4061,14 +4061,31 @@ if (typeof module === 'object' && module.exports) module.exports = M;
 (function () {
 'use strict';
 
+/* « ml » est le mètre linéaire, pas le millilitre : les deux s'abrègent
+   pareil mais ne se rencontrent jamais sur un même produit — l'un mesure du
+   grillage, l'autre du répulsif. Le millilitre a donc son propre code.
+   Un stock en millilitres se lit en litres dès qu'il dépasse le litre :
+   « 34 L » dit trois bidons et demi, « 33 984 ml » ne dit rien. */
 var UNITES_ART = [
   { c: 'unite', n: 'unité', court: 'u' },
   { c: 'ml', n: 'mètre linéaire', court: 'ml' },
   { c: 'rouleau', n: 'rouleau', court: 'rlx' },
   { c: 'kg', n: 'kilo', court: 'kg' },
   { c: 'sac', n: 'sac', court: 'sac' },
+  { c: 'millilitre', n: 'millilitre', court: 'ml', versLitre: 1000 },
   { c: 'litre', n: 'litre', court: 'L' }
 ];
+/* L'échelle à laquelle lire un produit. Elle se décide sur la plus grande
+   valeur de la ligne, pas colonne par colonne : « acheté 34 L, sorti 1 992,
+   reste 32 L » serait illisible. Tout bascule ensemble ou rien. */
+function echelleArt(unite, valeurs) {
+  var u = null, i;
+  for (i = 0; i < UNITES_ART.length; i++) if (UNITES_ART[i].c === unite) u = UNITES_ART[i];
+  var max = 0;
+  (valeurs || []).forEach(function (v) { max = Math.max(max, Math.abs(nb(v))); });
+  if (u && u.versLitre && max >= u.versLitre) return { div: u.versLitre, court: 'L' };
+  return { div: 1, court: u ? u.court : (unite || '') };
+}
 /* Un produit a un type : cela sert à trier l'inventaire et à ne pas mélanger
    une gaine de protection avec un répulsif dosé au millilitre. */
 var TYPES_ART = [
@@ -4365,6 +4382,7 @@ function decomposer(prixVente, cout, cfg) {
 
 var M = {
   UNITES_ART: UNITES_ART, nomUniteArt: nomUniteArt, courtUniteArt: courtUniteArt,
+  echelleArt: echelleArt,
   TYPES_ART: TYPES_ART, nomTypeArt: nomTypeArt,
   STATUTS_ACHAT: STATUTS_ACHAT, nomStatutAchat: nomStatutAchat,
   achatRecu: achatRecu, achatMort: achatMort,
@@ -10796,7 +10814,13 @@ function renderStockFournitures() {
     '<th class="num">Coût unit. réel</th><th class="num">Valeur</th>' +
     '</tr></thead><tbody>' +
     l.map(function (a) {
-      var q = ST.quantite(a), e = ST.etatStock(a), u = ST.courtUniteArt(a.unite);
+      var q = ST.quantite(a), e = ST.etatStock(a);
+      /* Un répulfif se compte au millilitre et se lit au litre : « 34 L »
+         dit trois bidons et demi, « 33 984 » ne dit rien. */
+      var ech = ST.echelleArt(a.unite,
+        [q, ST.quantiteAchetee(a), ST.quantiteSortie(a), ST.stockFutur(a), ST.stockPrevu(a)]);
+      var ech1 = function (v) { var x = ST.arr(ST.nb(v) / ech.div, 2); return E.fmt(x, x % 1 ? 2 : 0); };
+      var u = ech.court;
       var coul = e === 'rupture' ? '#B4231F' : e === 'faible' ? '#B98A00' : '#2E7D46';
       var att = ST.quantiteAttendue(a);
       tot.achat += ST.quantiteAchetee(a); tot.vendu += ST.quantiteSortie(a);
@@ -10804,12 +10828,12 @@ function renderStockFournitures() {
       return '<tr data-artfiche="' + a.id + '" style="cursor:pointer">' +
         '<td style="text-align:left"><i class="pt" style="background:' + coul + '"></i>' +
         esc(a.nom || 'Produit') +
-        '<small class="muted"> ' + esc(u) + (att ? ' · +' + E.fmt(att, 0) + ' attendus' : '') + '</small></td>' +
-        '<td class="num">' + E.fmt(ST.quantiteAchetee(a), 0) + '</td>' +
-        '<td class="num">' + E.fmt(ST.quantiteSortie(a), 0) + '</td>' +
-        '<td class="num"><b>' + E.fmt(q, q % 1 ? 2 : 0) + '</b></td>' +
-        (engage ? '<td class="num muted">' + E.fmt(ST.stockFutur(a), 0) + '</td>' : '') +
-        (prevu ? '<td class="num muted">' + E.fmt(ST.stockPrevu(a), 0) + '</td>' : '') +
+        '<small class="muted"> ' + esc(u) + (att ? ' · +' + ech1(att) + ' attendus' : '') + '</small></td>' +
+        '<td class="num">' + ech1(ST.quantiteAchetee(a)) + '</td>' +
+        '<td class="num">' + ech1(ST.quantiteSortie(a)) + '</td>' +
+        '<td class="num"><b>' + ech1(q) + '</b></td>' +
+        (engage ? '<td class="num muted">' + ech1(ST.stockFutur(a)) + '</td>' : '') +
+        (prevu ? '<td class="num muted">' + ech1(ST.stockPrevu(a)) + '</td>' : '') +
         '<td class="num">' + E.fmt(ST.pmp(a), 4) + '</td>' +
         '<td class="num">' + E.fmt(ST.valeurStock(a), 2) + '</td></tr>';
     }).join('') +
@@ -12494,7 +12518,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.28.0-20260816-1549';
+var VERSION = '4.29.0-20260816-1648';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

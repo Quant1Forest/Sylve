@@ -131,8 +131,10 @@ function typeProduit(nom) {
   return 'autre';
 }
 
+/* Attention à « ml » : dans l'application c'est le mètre linéaire, pas le
+   millilitre. Un répulsif dosé au millilitre prend « millilitre ». */
 const UNITES_STOCK = { u: 'unite', unite: 'unite', ml: 'ml', l: 'litre',
-  litre: 'litre', kg: 'kg', m: 'metre', metre: 'metre' };
+  litre: 'litre', kg: 'kg', sac: 'sac', rouleau: 'rouleau' };
 
 /* Les statuts du classeur portent un emoji ; on ne garde que les mots. */
 const STATUT_ACHAT = [
@@ -448,7 +450,7 @@ function note(quoi, valeur) {
       const estTrico = /trico/i.test(nom);
       const a = { id: uid(), nom, designation: '',
         type: typeProduit(nom),
-        unite: estTrico ? 'ml' : 'unite',
+        unite: estTrico ? 'millilitre' : 'unite',
         seuil: null,
         dosage: estTrico ? dosageTrico : null,
         fournisseur: nomF && parNomF.has(clef(nomF)) ? parNomF.get(clef(nomF)) : null,

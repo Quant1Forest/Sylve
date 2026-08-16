@@ -510,6 +510,35 @@ scenario('Charges fixes : annoncées avant, jamais réclamées après', async ()
 });
 
 /* --------------------------------------------------------------------- */
+scenario('Stock : un répulsif se compte au millilitre et se lit au litre', async () => {
+  /* « ml » désigne le mètre linéaire dans l'application : un produit dosé au
+     millilitre a sa propre unité. Et 33 984 ml ne disent rien à personne —
+     34 L, c'est trois bidons et demi, donc trois hectares. */
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'stock' }));
+  const ST = t.w.BCS2;
+  verifierVrai('le millilitre est une unité à part entière',
+    ST.UNITES_ART.some(u => u.c === 'millilitre'));
+  verifierVrai('et « ml » reste le mètre linéaire',
+    ST.UNITES_ART.filter(u => u.c === 'ml')[0].n === 'mètre linéaire');
+
+  const petit = ST.echelleArt('millilitre', [900]);
+  verifier('sous le litre, on reste en millilitres', 'ml', petit.court);
+  verifier('sans conversion', 1, petit.div);
+
+  const grand = ST.echelleArt('millilitre', [33984, 1992]);
+  verifier('au-delà, on passe en litres', 'L', grand.court);
+  verifier('en divisant par mille', 1000, grand.div);
+  verifierVrai('33 984 ml font bien 34 L', Math.round(33984 / grand.div) === 34);
+
+  /* L'échelle se décide sur toute la ligne : une colonne en litres à côté
+     d'une colonne en millilitres serait illisible. */
+  const melange = ST.echelleArt('millilitre', [33984, 12]);
+  verifier('une petite valeur suit la grande', 'L', melange.court);
+  verifier('les unités sans litre ne bougent pas', 'u', ST.echelleArt('unite', [50000]).court);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
 scenario('Réglages : une longue liste se replie', async () => {
   /* Quarante-sept noms déroulés d'un bloc, c'est un écran entier à faire
      défiler avant d'atteindre quoi que ce soit d'autre. */
@@ -755,8 +784,13 @@ scenario('Reprise du carnet : le fichier converti se restaure et compte juste', 
     /* Le Trico se compte en millilitres, pas en bidons. */
     const trico = (t.stock('articles') || []).filter(a => /trico/i.test(a.nom))[0];
     if (trico) {
-      verifier('le Trico est en millilitres', 'ml', trico.unite);
+      /* « ml » est le mètre linéaire dans l'application : un répulsif dosé
+         au millilitre prend l'unité qui porte ce nom. */
+      verifier('le Trico est en millilitres', 'millilitre', trico.unite);
       verifierVrai('avec son dosage par plant', trico.dosage > 0);
+      const ST = t.w.BCS2;
+      verifier('et son stock se lira en litres', 'L',
+        ST.echelleArt(trico.unite, [33984]).court);
     }
   }
   verifier('aucune erreur', [], t.erreurs);
