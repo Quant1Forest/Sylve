@@ -8579,6 +8579,27 @@ function prisCeJour(occ, ts) {
   return r;
 }
 
+/* Une journée ne se découpe pas qu'en deux. Le bouton ne proposait que « 1 j »
+   ou « ½ j » ; on part parfois trois heures sur un chantier avant d'aller
+   ailleurs. Les heures sont converties en part de journée d'après le réglage
+   « heures dans une journée », et une valeur déjà en base qui ne tombe sur
+   aucun cran reste proposée telle quelle. */
+function partsPossibles(courante) {
+  var hj = C.HEURES_JOUR(A.cfg) || 8;
+  var crans = [{ p: 1, n: '1 j' }, { p: 0.75, n: '¾ j' }, { p: 0.5, n: '½ j' }, { p: 0.25, n: '¼ j' }];
+  for (var h = 1; h < hj; h++) {
+    var p = C.arr(h / hj, 4);
+    if (!crans.some(function (x) { return x.p === p; })) crans.push({ p: p, n: h + ' h' });
+  }
+  if (courante > 0 && !crans.some(function (x) { return x.p === courante; })) {
+    crans.push({ p: courante, n: E.fmt(courante, 2) + ' j' });
+  }
+  crans.sort(function (a, b) { return b.p - a.p; });
+  return crans.map(function (x) {
+    return '<option value="' + x.p + '"' + (x.p === courante ? ' selected' : '') + '>' +
+      x.n + '</option>';
+  }).join('');
+}
 function renderCeJours() {
   var z = $('#ce-jours'); if (!z) return;
   var total = ceJours.reduce(function (s, j) { return s + C.nb(j.p); }, 0);
@@ -8593,8 +8614,8 @@ function renderCeJours() {
       '<div style="display:flex;gap:7px;align-items:center">' +
       '<input type="date" data-cej="' + i + '" value="' + versChamp(j.d) + '" style="flex:1' +
       (pris.length || doublon ? ';border-color:#B98A00' : '') + '">' +
-      '<button type="button" class="chip" data-cepart="' + i + '" aria-pressed="' + (C.nb(j.p) === 1) + '" ' +
-      'style="flex:none">' + (C.nb(j.p) === 1 ? '1 j' : '½ j') + '</button>' +
+      '<select data-cepart="' + i + '" style="flex:none;width:5.6em">' +
+      partsPossibles(C.nb(j.p)) + '</select>' +
       '<button type="button" class="btn-min" data-cedel="' + i + '" style="flex:none">✕</button></div>' +
       (doublon ? '<div class="jour-pris">déjà posé plus haut</div>'
         : pris.length ? '<div class="jour-pris">déjà pris : ' + esc(pris.join(', ')) + '</div>' : '') +
@@ -8616,6 +8637,10 @@ function lireCeJours() {
     var d = versDate(i.value);
     if (d) ceJours[Number(i.dataset.cej)].d = d;
   });
+  $$('#ce-jours [data-cepart]').forEach(function (s) {
+    var p = C.nb(s.value);
+    if (p > 0) ceJours[Number(s.dataset.cepart)].p = p;
+  });
 }
 function ouvrirEnteteCh(id) {
   var c = id ? chantier(id) : { statut: 'devis', lignes: [], temps: [] };
@@ -8630,8 +8655,7 @@ function ouvrirEnteteCh(id) {
   brancherEssenceCh('ce-ess', (c.criteres || {}).essence || '');
   $('#ce-jest').addEventListener('input', renderCeJours);
   $('#ce-jours').addEventListener('click', function (e) {
-    var plus = e.target.closest('#ce-plusjour'), part = e.target.closest('[data-cepart]'),
-      del = e.target.closest('[data-cedel]');
+    var plus = e.target.closest('#ce-plusjour'), del = e.target.closest('[data-cedel]');
     if (plus) {
       lireCeJours();
       /* on propose le prochain jour réellement libre : ni week-end, ni déjà
@@ -8648,10 +8672,6 @@ function ouvrirEnteteCh(id) {
       ceJours.push({ d: base, p: 1 });
       renderCeJours();
     } else if (part) {
-      lireCeJours();
-      var k = Number(part.dataset.cepart);
-      ceJours[k].p = C.nb(ceJours[k].p) === 1 ? 0.5 : 1;
-      renderCeJours();
     } else if (del) {
       lireCeJours();
       ceJours.splice(Number(del.dataset.cedel), 1);
@@ -8667,6 +8687,17 @@ function ouvrirEnteteCh(id) {
     var nom = $('#ce-nom').value.trim();
     if (!nom) { toast('Donnez un nom au chantier.'); return; }
     var jest = C.nb($('#ce-jest').value);
+    /* Placer plus de journées qu'on n'en a estimé n'est pas interdit — un
+       chantier déborde — mais ça ne se valide pas sans l'avoir vu. Un simple
+       avertissement se lisait après coup, une fois la fiche refermée. */
+    lireCeJours();
+    var pose = ceJours.reduce(function (s, j) { return s + C.nb(j.p); }, 0);
+    if (jest > 0 && pose > jest) {
+      var tropDe = C.arr(pose - jest, 2);
+      if (!confirm('Vous placez ' + E.fmt(pose, pose % 1 ? 1 : 0) + ' journées pour ' +
+        E.fmt(jest, jest % 1 ? 1 : 0) + ' estimées, soit ' +
+        String(tropDe).replace('.', ',') + ' de trop.\n\nEnregistrer quand même ?')) return;
+    }
     var essv = $('#ce-ess').value;
     if (essv === '__ajouter') essv = '';
     var criteres = Object.assign({}, c.criteres || {}, {
@@ -12688,7 +12719,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.32.0-20260816-1926';
+var VERSION = '4.33.0-20260816-1955';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

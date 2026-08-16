@@ -523,6 +523,67 @@ scenario('Charges fixes : annoncées avant, jamais réclamées après', async ()
 });
 
 /* --------------------------------------------------------------------- */
+scenario('Journées : on pose des heures, pas seulement des demi-journées', async () => {
+  /* On part parfois trois heures sur un chantier avant d'aller ailleurs :
+     « 1 j » ou « ½ j » ne suffisait pas. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers', cfg: { heuresJour: 8 },
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'accepte', lignes: [], temps: [],
+      joursEstimes: 4, maj: Date.now() }]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(300);
+  t.clic('#f-entete'); await t.pause(350);
+  t.clic('#ce-plusjour'); await t.pause(200);
+
+  const sel = t.$('[data-cepart="0"]');
+  verifierVrai('la part se choisit dans une liste', sel && sel.tagName === 'SELECT');
+  const libelles = [...sel.options].map(o => o.textContent);
+  ['1 j', '¾ j', '½ j', '¼ j'].forEach(x =>
+    verifierVrai('« ' + x + ' » est proposé', libelles.indexOf(x) >= 0));
+  verifierVrai('les heures aussi', libelles.indexOf('3 h') >= 0);
+  /* 3 h sur une journée de 8 h font 0,375 de journée. */
+  const troisH = [...sel.options].filter(o => o.textContent === '3 h')[0];
+  verifier('3 h valent la bonne part de journée', 0.375, Number(troisH.value));
+
+  t.choisir('[data-cepart="0"]', '0.375'); await t.pause(200);
+  t.clic('#ce-ok'); await t.pause(400);
+  const c = (t.stock('chantiers') || [])[0];
+  verifier('la part saisie est retenue', 0.375, C0(c).p);
+  verifier('aucune erreur', [], t.erreurs);
+
+  function C0(ch) { return (ch.jours || [])[0] || {}; }
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Journées : dépasser l’estimation demande confirmation', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'accepte', lignes: [], temps: [],
+      joursEstimes: 1, maj: Date.now() }]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(300);
+  t.clic('#f-entete'); await t.pause(350);
+  t.clic('#ce-plusjour'); await t.pause(150);
+  t.clic('#ce-plusjour'); await t.pause(150);
+
+  /* Refusé : rien ne doit être enregistré. */
+  let demande = '';
+  t.w.confirm = m => { demande = m; return false; };
+  t.clic('#ce-ok'); await t.pause(300);
+  verifierVrai('l’écart est annoncé en clair', /2 journées pour 1 estimée|de trop/.test(demande));
+  verifier('refuser n’enregistre rien', 0, ((t.stock('chantiers') || [])[0].jours || []).length);
+
+  /* Accepté : un chantier a le droit de déborder. */
+  t.w.confirm = () => true;
+  t.clic('#ce-ok'); await t.pause(400);
+  verifier('accepter enregistre les deux journées', 2,
+    ((t.stock('chantiers') || [])[0].jours || []).length);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
 scenario('À traiter montre aussi le travail à venir, pas que les ennuis', async () => {
   /* La zone ne remontait que ce qui a mal tourné — impayés, retards. Un
      chantier accepté sans journée posée n'y figurait pas, alors que c'est
