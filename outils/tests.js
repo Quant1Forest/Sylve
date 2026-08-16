@@ -584,6 +584,36 @@ scenario('Journées : dépasser l’estimation demande confirmation', async () =
 });
 
 /* --------------------------------------------------------------------- */
+scenario('À traiter : un chantier prévu dans les trois jours saute aux yeux', async () => {
+  /* Un chantier posé au calendrier après-demain ne doit pas s'apprendre en
+     ouvrant l'agenda. */
+  const jour = 86400000;
+  const dans = n => { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n); return d.getTime(); };
+  const ch = (id, quand, p) => ({ id, nom: 'Chantier ' + id, statut: 'accepte',
+    lignes: [], temps: [], joursEstimes: 5, jours: [{ d: quand, p: p || 1 }], maj: Date.now() });
+
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [ch('auj', dans(0)), ch('dem', dans(1)), ch('trois', dans(3)),
+      ch('loin', dans(10))]
+  }));
+  const al = t.w.BCC.alertes(t.stock('chantiers'), null, Date.now());
+  const app = al.filter(x => x.type === 'approche');
+  verifier('seuls les trois prochains jours remontent', ['auj', 'dem', 'trois'],
+    app.map(x => x.chantier.id).sort());
+  verifierVrai('aujourd’hui se dit « aujourd’hui »',
+    /aujourd/.test(app.filter(x => x.chantier.id === 'auj')[0].texte));
+  verifierVrai('et demain « demain »',
+    /^demain/.test(app.filter(x => x.chantier.id === 'dem')[0].texte));
+  verifierVrai('la journée posée est annoncée',
+    /journée/.test(app[0].texte));
+  /* Un chantier lointain n'a rien à faire là. */
+  verifier('le chantier à dix jours ne remonte pas', 0,
+    app.filter(x => x.chantier.id === 'loin').length);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
 scenario('À traiter montre aussi le travail à venir, pas que les ennuis', async () => {
   /* La zone ne remontait que ce qui a mal tourné — impayés, retards. Un
      chantier accepté sans journée posée n'y figurait pas, alors que c'est
@@ -594,8 +624,11 @@ scenario('À traiter montre aussi le travail à venir, pas que les ennuis', asyn
       { id: 'a', nom: 'Sans rien', statut: 'accepte', lignes: [], temps: [], maj: Date.now() },
       { id: 'b', nom: 'Moitié posée', statut: 'accepte', lignes: [], temps: [], maj: Date.now(),
         joursEstimes: 4, jours: [{ d: Date.now(), p: 1 }] },
+      /* Posé loin devant : sinon il remonterait comme chantier qui approche,
+         ce qui est un autre sujet et se vérifie ailleurs. */
       { id: 'c', nom: 'Tout posé', statut: 'encours', lignes: [], temps: [], maj: Date.now(),
-        joursEstimes: 2, jours: [{ d: Date.now(), p: 1 }, { d: Date.now() + 86400000, p: 1 }] }
+        joursEstimes: 2, jours: [{ d: Date.now() + 20 * 86400000, p: 1 },
+          { d: Date.now() + 21 * 86400000, p: 1 }] }
     ]
   }));
   const C2 = t.w.BCC;
@@ -613,6 +646,34 @@ scenario('À traiter montre aussi le travail à venir, pas que les ennuis', asyn
      encombrer la liste. */
   verifier('un chantier complet ne dit rien', 0,
     al.filter(x => x.chantier.id === 'c').length);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Analyses : la TVA payée sur les achats est montrée', async () => {
+  /* C'est celle qui se récupère : elle a sa place à côté des achats, pas
+     seulement dans la balance générale. */
+  const an = new Date().getFullYear();
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'analyses',
+    depenses: [
+      { id: 'd1', date: new Date(an, 3, 5, 12).getTime(), fournisseur: 'Motoculture',
+        lignes: [{ libelle: 'Chaîne', categorie: 'CONSO', ttc: 120, taux: 20 }] },
+      { id: 'd2', date: new Date(an, 3, 8, 12).getTime(), fournisseur: 'Jura',
+        lignes: [{ libelle: 'Débroussailleuse', categorie: 'IMMO', ttc: 960, taux: 20 }] },
+      { id: 'd3', date: new Date(an, 4, 2, 12).getTime(), fournisseur: 'Resto',
+        lignes: [{ libelle: 'Repas', categorie: 'REPAS', ttc: 21.1, taux: 5.5 }] }
+    ]
+  }));
+  t.clic('[data-ana="depenses"]'); await t.pause(350);
+  const txt = t.$('#ana-corps').textContent.replace(/\s+/g, ' ');
+  verifierVrai('un bloc annonce la TVA des achats', /TVA payée sur ces achats/.test(txt));
+  verifierVrai('elle distingue le courant', /sur le courant/.test(txt));
+  verifierVrai('et les immobilisations', /sur les immobilisations/.test(txt));
+  /* Deux taux dans la période : le détail doit les séparer. */
+  verifierVrai('les taux sont détaillés', /Par taux/.test(txt));
+  verifierVrai('« justificatifs » ne dit plus rien à personne', !/justificatif/.test(txt));
+  verifierVrai('on parle d’achats saisis', /achats saisis/.test(txt));
   verifier('aucune erreur', [], t.erreurs);
 });
 
