@@ -397,9 +397,13 @@ scenario('Bandeau : rien qui fasse doublon avec la page', async () => {
 
 /* --------------------------------------------------------------------- */
 scenario('Onglets : un dessin partout, le même d’un module à l’autre', async () => {
+  /* Un onglet de moins par module : les réglages sont passés dans le
+     bandeau. Ils étaient répétés en bas de chaque partie, à une place
+     différente selon le module — on s'y perdait, et ils mangeaient un
+     onglet là où il n'y en a que deux ou trois. */
   const attendu = {
-    cubage: 5, chantiers: 3, calendrier: 4, rendements: 3, devis: 3,
-    finances: 4, analyses: 2, stock: 4, bois: 5
+    cubage: 4, chantiers: 2, calendrier: 3, rendements: 2, devis: 2,
+    finances: 3, analyses: 1, stock: 3, bois: 4
   };
   for (const mod of Object.keys(attendu)) {
     const t = await ouvrir(Object.assign({}, VIDE, { module: mod }));
@@ -417,9 +421,18 @@ scenario('Onglets : un dessin partout, le même d’un module à l’autre', asy
   const carte = a.$('#onglets [data-vue="carte"] svg').innerHTML;
   const lieux = b.$('#onglets [data-vue="lieux"] svg').innerHTML;
   verifier('la carte et le « Où ? » montrent le même repère', carte, lieux);
-  const rA = a.$('#onglets [data-vue="reglages"] svg').innerHTML;
-  const rB = b.$('#onglets [data-vue="reglages"] svg').innerHTML;
-  verifier('les réglages sont identiques d’un module à l’autre', rA, rB);
+  /* Les réglages ne sont plus un onglet : ils vivent dans le bandeau, au
+     même endroit partout, et mènent à la section de la partie ouverte. */
+  verifier('plus d’onglet réglages en bas', null, a.$('#onglets [data-vue="reglages"]'));
+  verifierVrai('le bandeau en porte l’accès', a.$('#b-reglages'));
+  verifierVrai('avec un dessin', a.$('#b-reglages svg.pic'));
+  a.clic('#b-reglages'); await a.pause(300);
+  verifierVrai('et il ouvre bien les réglages',
+    a.$('#vue-reglages') && !a.$('#vue-reglages').hidden);
+  /* Depuis le calendrier — une partie de l'entreprise — c'est la section
+     Entreprise qui doit s'ouvrir, pas les réglages généraux. */
+  const actif = a.$$('#regl-nav .chip').filter(x => x.getAttribute('aria-pressed') === 'true')[0];
+  verifier('sur la section de la partie ouverte', 'ent', actif && actif.dataset.regl);
   verifier('aucune erreur', [], a.erreurs.concat(b.erreurs));
 });
 
@@ -506,6 +519,38 @@ scenario('Charges fixes : annoncées avant, jamais réclamées après', async ()
   verifier('seules les échéances proches sont annoncées', ['an', 'men'], vus);
   verifier('et elles disent quand', 'prélevé dans 2 jours',
     al.filter(a => a.charge.id === 'men')[0].texte.split(' ·')[0]);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Analyses : le graphique porte une échelle et dit ce qu’il montre', async () => {
+  /* Une hauteur sans graduation ne se lit pas : on ne sait pas si la barre
+     vaut cent euros ou dix mille. */
+  const an = new Date().getFullYear();
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'analyses',
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'paye', temps: [], maj: Date.now(),
+      dateFacture: new Date(an, 2, 10, 12).getTime(),
+      lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 8, prix: 1200, nature: 'prestation' }] }],
+    depenses: [{ id: 'd1', date: new Date(an, 4, 5, 12).getTime(), fournisseur: 'X',
+      lignes: [{ libelle: 'Gasoil', categorie: 'CONSO', ttc: 2400, taux: 20 }] }]
+  }));
+  await t.pause(300);
+  const corps = t.$('#ana-corps');
+  verifierVrai('le titre dit ce que montre le graphique',
+    /facturé et acheté/.test(corps.textContent));
+  const svg = corps.querySelector('svg');
+  verifierVrai('un graphique est dessiné', svg);
+  const etiquettes = [...svg.querySelectorAll('text')].map(e => e.textContent);
+  verifierVrai('les douze mois sont en abscisse',
+    ['janv', 'juil', 'déc'].every(m => etiquettes.some(e => e.toLowerCase().indexOf(m) === 0)));
+  verifierVrai('une graduation part de zéro', etiquettes.indexOf('0') >= 0);
+  verifierVrai('et monte jusqu’au haut de l’échelle',
+    etiquettes.some(e => /k€|€/.test(e) && e !== '0'));
+  /* L'échelle s'arrête sur un chiffre rond, sinon la moitié tombe faux. */
+  const BCUI = t.w;
+  verifierVrai('le haut de l’échelle est un chiffre rond',
+    etiquettes.some(e => /^(10|12|15|20|25|30|50) k€$/.test(e)));
   verifier('aucune erreur', [], t.erreurs);
 });
 

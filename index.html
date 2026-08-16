@@ -591,6 +591,13 @@ if (froid && s > 0) montrer(s);
         <select id="b-module" aria-label="Changer de partie"></select>
       </div>
       <div class="bandeau-ctx" id="b-ctx"></div>
+      <!-- Les réglages étaient un onglet parmi les autres, en bas et
+           différent d'un module à l'autre : on s'y perdait. Ici ils sont
+           au même endroit partout, et ne mangent plus une place dans la
+           barre du bas. -->
+      <button class="bandeau-btn" id="b-reglages" title="Réglages" aria-label="Réglages">
+        <svg viewBox="0 0 24 24" class="pic" aria-hidden="true" style="width:17px;height:17px;vertical-align:-3px"><path d="M6 4v6.2M6 14.2v5.8M12 4v3.2M12 11.2v8.8M18 4v9.2M18 17.2v2.8"/><circle cx="6" cy="12.2" r="2"/><circle cx="12" cy="9.2" r="2"/><circle cx="18" cy="15.2" r="2"/></svg>
+      </button>
     </div>
     <div class="bandeau-sous mod-cubage" id="b-bordereau">
       <span class="pastille" id="b-pastille"></span>
@@ -6200,6 +6207,12 @@ function brancher() {
   });
   $('#b-accueil').addEventListener('click', allerAccueil);
   $('#b-retour').addEventListener('click', allerMenuParent);
+  /* Les réglages du module courant, depuis n'importe où : la section
+     s'ouvre sur celle qui correspond à la partie où l'on se trouve. */
+  $('#b-reglages').addEventListener('click', function () {
+    var m = MODULES[A.module];
+    allerReglages(SEC_DE_MODULE[A.module] || (m && m.groupe === 'entreprise' ? 'ent' : 'general'));
+  });
   $('#b-module').addEventListener('change', function () { allerModule(this.value); });
   $('#b-ctx').addEventListener('click', function (e) {
     var b = e.target.closest('button'); if (!b) return;
@@ -7049,43 +7062,41 @@ var MODULES = {
   cubage: {
     nom: 'Cubage', defaut: 'saisie',
     vues: [['saisie', 'Saisie'], ['bordereau', 'Bordereau'], ['syntheses', 'Synthèses'],
-    ['fichiers', 'Bordereaux'], ['reglages', 'Réglages']]
+    ['fichiers', 'Bordereaux']]
   },
   chantiers: {
     nom: 'Chantiers', defaut: 'carnet', groupe: 'entreprise',
-    vues: [['carnet', 'Carnet'], ['chantier', 'Fiche'], ['reglages', 'Réglages']]
+    vues: [['carnet', 'Carnet'], ['chantier', 'Fiche']]
   },
   calendrier: {
     nom: 'Calendrier', defaut: 'calendrier', groupe: 'entreprise',
-    vues: [['calendrier', 'Agenda'], ['carte', 'Carte'], ['carnet', 'Carnet'],
-    ['reglages', 'Réglages']]
+    vues: [['calendrier', 'Agenda'], ['carte', 'Carte'], ['carnet', 'Carnet']]
   },
   rendements: {
     nom: 'Rendements', defaut: 'rendements', groupe: 'entreprise',
-    vues: [['rendements', 'Rendements'], ['estimer', 'Estimer'], ['reglages', 'Réglages']]
+    vues: [['rendements', 'Rendements'], ['estimer', 'Estimer']]
   },
   devis: {
     nom: 'Devis et estimatif', defaut: 'estimer', groupe: 'entreprise',
-    vues: [['estimer', 'Estimer'], ['carnet', 'Devis'], ['reglages', 'Réglages']]
+    vues: [['estimer', 'Estimer'], ['carnet', 'Devis']]
   },
   finances: {
     nom: 'Finances', defaut: 'finances', groupe: 'entreprise',
-    vues: [['finances', 'Bilan'], ['depenses', 'Dépenses'], ['charges', 'Charges'],
-    ['reglages', 'Réglages']]
+    vues: [['finances', 'Bilan'], ['depenses', 'Dépenses'], ['charges', 'Charges']]
   },
   analyses: {
     nom: 'Analyses', defaut: 'analyses', groupe: 'entreprise',
-    vues: [['analyses', 'Analyses'], ['reglages', 'Réglages']]
+    vues: [['analyses', 'Analyses']]
   },
   stock: {
     nom: 'Stock et fournitures', defaut: 'stock2', groupe: 'entreprise',
     vues: [['stock2', 'Inventaire'], ['commandes', 'Entrées / sorties'],
-    ['revient', 'Prix de revient'], ['reglages', 'Réglages']]
+    ['revient', 'Prix de revient']]
   },
   bois: {
     nom: 'Bois de chauffage', defaut: 'stock',
     vues: [['stock', 'Stock'], ['bois', 'Piles'], ['lieux', 'Où ?'],
-    ['fichiers', 'Export et analyse'], ['reglages', 'Réglages']]
+    ['fichiers', 'Export et analyse']]
   }
 };
 
@@ -11500,34 +11511,67 @@ function demanderMotifRefus(c) {
 }
 
 /* ===================================================== ANALYSES */
-var MOIS_ABBR = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+/* Trois lettres et non l'initiale : « J F M A M J J A S O N D » offre trois
+   J et trois M identiques, et il faut compter sur ses doigts pour savoir
+   quel mois on regarde. */
+var MOIS_ABBR = ['janv', 'févr', 'mars', 'avr', 'mai', 'juin',
+  'juil', 'août', 'sept', 'oct', 'nov', 'déc'];
 
 /* Histogramme mensuel, une ou deux séries, en SVG : rien à charger, ça
    marche hors ligne et ça s'imprime. */
+/* Un montant en trois caractères pour une graduation : « 12 k€ » plutôt que
+   « 12 340 € », qui déborderait et qu'on ne lit pas de toute façon. */
+function eurCourt(v) {
+  var n = C.nb(v);
+  if (n === 0) return '0';
+  if (Math.abs(n) >= 1000) return E.fmt(C.arr(n / 1000, 1), n % 1000 ? 1 : 0) + ' k€';
+  return E.fmt(Math.round(n), 0) + ' €';
+}
+/* Le haut de l'échelle, arrondi au cran supérieur : 13 574 devient 15 000,
+   ce qui donne une moitié à 7 500 plutôt qu'à 6 787. */
+function paliersJoli(max) {
+  if (!(max > 0)) return 1;
+  var p = Math.pow(10, Math.floor(Math.log(max) / Math.LN10));
+  var r = max / p;
+  var cran = r <= 1 ? 1 : r <= 1.5 ? 1.5 : r <= 2 ? 2 : r <= 3 ? 3 : r <= 5 ? 5 : 10;
+  return cran * p;
+}
 function histoMois(series, options) {
   var o = options || {};
   var toutes = series.reduce(function (a, s) { return a.concat(s.valeurs); }, []);
   var max = Math.max.apply(null, toutes.concat([0]));
   if (max <= 0) return '<p class="muted" style="font-size:12.5px">Aucun mouvement sur cette année.</p>';
-  var W = 320, H = 130, padB = 16, padT = 6;
-  var lm = W / 12, n = series.length;
+  /* Une hauteur sans graduation ne se lit pas : on ne sait pas si la barre
+     vaut cent euros ou dix mille. Trois repères suffisent — zéro, la moitié,
+     le haut — arrondis à un chiffre rond pour qu'ils tombent juste. */
+  var H = 140, padB = 16, padT = 8, padL = 34;
+  var W = 320 + padL;
+  var haut = paliersJoli(max);
+  var lm = (W - padL) / 12, n = series.length;
   var lb = Math.min(9, (lm - 4) / n);
-  var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="max-width:420px">';
-  /* ligne de base */
-  svg += '<line x1="0" y1="' + (H - padB) + '" x2="' + W + '" y2="' + (H - padB) +
-    '" stroke="var(--trait)" stroke-width="1"/>';
+  var yDe = function (v) { return H - padB - (v / haut) * (H - padB - padT); };
+
+  var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="max-width:460px">';
+  [0, haut / 2, haut].forEach(function (v) {
+    var y = yDe(v);
+    svg += '<line x1="' + padL + '" y1="' + y.toFixed(1) + '" x2="' + W + '" y2="' + y.toFixed(1) +
+      '" stroke="var(--trait)" stroke-width="1"' + (v > 0 ? ' stroke-dasharray="2 3"' : '') + '/>' +
+      '<text x="' + (padL - 4) + '" y="' + (y + 3).toFixed(1) +
+      '" font-size="8.5" text-anchor="end" fill="var(--doux)">' + xmlEsc(eurCourt(v)) + '</text>';
+  });
   for (var m = 0; m < 12; m++) {
     series.forEach(function (s, i) {
       var v = s.valeurs[m] || 0;
       if (v <= 0) return;
-      var h = (v / max) * (H - padB - padT);
-      var x = m * lm + (lm - n * lb) / 2 + i * lb;
-      svg += '<rect x="' + x.toFixed(1) + '" y="' + (H - padB - h).toFixed(1) + '" width="' +
-        (lb - 1).toFixed(1) + '" height="' + h.toFixed(1) + '" rx="1.5" fill="' + s.couleur + '">' +
+      var y = yDe(v);
+      var x = padL + m * lm + (lm - n * lb) / 2 + i * lb;
+      svg += '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' +
+        (lb - 1).toFixed(1) + '" height="' + (H - padB - y).toFixed(1) +
+        '" rx="1.5" fill="' + s.couleur + '">' +
         '<title>' + xmlEsc(MOIS_NOMS[m] + ' : ' + eur(v)) + '</title></rect>';
     });
-    svg += '<text x="' + (m * lm + lm / 2).toFixed(1) + '" y="' + (H - 4) +
-      '" font-size="8.5" text-anchor="middle" fill="var(--doux)">' + MOIS_ABBR[m] + '</text>';
+    svg += '<text x="' + (padL + m * lm + lm / 2).toFixed(1) + '" y="' + (H - 4) +
+      '" font-size="7.5" text-anchor="middle" fill="var(--doux)">' + MOIS_ABBR[m] + '</text>';
   }
   svg += '</svg>';
   var leg = '<div class="legende" style="margin-top:5px">' + series.map(function (s) {
@@ -11593,10 +11637,11 @@ function htmlEnsemble(an, b) {
     'elle ignore les cotisations, l’impôt et le fait qu’une immobilisation se consomme sur plusieurs années.</p>' +
     '</div>' +
 
-    '<div class="carte"><h2>Année ' + an + '</h2>' +
+    '<div class="carte"><h2>Mois par mois <span class="muted" style="font-weight:400;' +
+    'font-size:13px">— facturé et acheté, ' + an + '</span></h2>' +
     histoMois([
-      { nom: 'facturé', valeurs: FIN.recettesParMois(A.chantiers, an), couleur: '#2E4A3C' },
-      { nom: 'acheté', valeurs: FIN.depensesParMois(A.depenses, an), couleur: '#C4611B' }
+      { nom: 'facturé HT', valeurs: FIN.recettesParMois(A.chantiers, an), couleur: '#2E4A3C' },
+      { nom: 'acheté HT', valeurs: FIN.depensesParMois(A.depenses, an), couleur: '#C4611B' }
     ]) + '</div>' +
 
     '<div class="carte"><h2>Ce qui rapporte</h2>' +
@@ -12604,7 +12649,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.30.0-20260816-1724';
+var VERSION = '4.31.0-20260816-1910';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
