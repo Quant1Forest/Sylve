@@ -134,7 +134,9 @@ scenario('Import CSV : le stock retombe sur les chiffres du tableur', async () =
   verifier('gaine 14×120 : coût unitaire réel', '0,8384', par('Gaine de protection 14*120')[5]);
   verifier('tuteur châtaignier : coût unitaire réel', '0,7865', par('Tuteur en châtaignier')[5]);
   verifier('tuteur acacia : stock futur', '488', par('Tuteur en Acacia')[4]);
-  verifier('valeur totale du stock', '3801,79', lignes[lignes.length - 1].slice(-1)[0]);
+  /* Les milliers sont séparés par une espace insécable (U+00A0) depuis la
+     4.37 : « 3 801,79 » se lit, « 3801,79 » se déchiffre. */
+  verifier('valeur totale du stock', '3 801,79', lignes[lignes.length - 1].slice(-1)[0]);
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -584,6 +586,35 @@ scenario('Journées : dépasser l’estimation demande confirmation', async () =
 });
 
 /* --------------------------------------------------------------------- */
+scenario('Journées : la croix retire bien la journée de trop', async () => {
+  /* Le gestionnaire de clic testait une variable qui n'existait pas : chaque
+     clic dans la zone des journées levait une erreur avant d'arriver à la
+     branche de suppression. La croix ne faisait donc rien, et une journée
+     posée en trop ne pouvait plus être retirée. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'accepte', lignes: [], temps: [],
+      joursEstimes: 3, maj: Date.now() }]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(300);
+  t.clic('#f-entete'); await t.pause(350);
+  t.clic('#ce-plusjour'); await t.pause(150);
+  t.clic('#ce-plusjour'); await t.pause(150);
+  verifier('deux journées posées', 2, t.$$('#ce-jours [data-cej]').length);
+  const second = t.$('[data-cej="1"]').value;
+
+  t.clic('[data-cedel="0"]'); await t.pause(200);
+  verifier('la croix en retire une', 1, t.$$('#ce-jours [data-cej]').length);
+  verifier('c’est bien la première qui est partie', second, t.$('[data-cej="0"]').value);
+  verifier('aucune erreur', [], t.erreurs);
+
+  t.clic('#ce-ok'); await t.pause(400);
+  verifier('une seule journée enregistrée', 1,
+    ((t.stock('chantiers') || [])[0].jours || []).length);
+});
+
+/* --------------------------------------------------------------------- */
 scenario('À traiter : un chantier prévu dans les trois jours saute aux yeux', async () => {
   /* Un chantier posé au calendrier après-demain ne doit pas s'apprendre en
      ouvrant l'agenda. */
@@ -720,10 +751,11 @@ scenario('Analyses : le graphique porte une échelle et dit ce qu’il montre', 
   verifierVrai('une graduation part de zéro', etiquettes.indexOf('0') >= 0);
   verifierVrai('et monte jusqu’au haut de l’échelle',
     etiquettes.some(e => /k€|€/.test(e) && e !== '0'));
-  /* L'échelle s'arrête sur un chiffre rond, sinon la moitié tombe faux. */
-  const BCUI = t.w;
+  /* L'échelle s'arrête sur un chiffre rond, sinon la moitié tombe faux.
+     L'espace devant l'unité est insécable (U+00A0) : c'est ce qui empêche le
+     « € » de tomber seul à la ligne sur une tuile étroite. */
   verifierVrai('le haut de l’échelle est un chiffre rond',
-    etiquettes.some(e => /^(10|12|15|20|25|30|50) k€$/.test(e)));
+    etiquettes.some(e => /^(10|12|15|20|25|30|50) k€$/.test(e)));
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -885,7 +917,8 @@ scenario('Analyses : la tuile ne parle plus de marge', async () => {
   verifierVrai('le mot « marge » a disparu de la tuile', !/marge/i.test(lib || ''));
   verifier('elle annonce ce qu’elle compte et quand', 'facturé ' + an, lib);
   /* 4 ha × 250 € = 1000 € facturés, et non 1000 − 100 d'achats. */
-  verifier('et c’est bien le chiffre d’affaires', '1000 €', t.texte('#e-an-n'));
+  /* t.texte() replie les blancs : l'insécable y ressort en espace ordinaire. */
+  verifier('et c’est bien le chiffre d’affaires', '1 000 €', t.texte('#e-an-n'));
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -1172,6 +1205,9 @@ scenario('Charge fixe : la date de premier paiement porte enfin l’année', asy
   t.saisir('#cg-ttc', '180');
   t.choisir('#cg-per', 'annuel');
   t.choisir('#cg-cat', 'ABO');
+  /* Depuis la 4.37, une charge portée en dépense réclame son taux : sans lui
+     il n'y a rien à récupérer. Le scénario doit donc le choisir. */
+  t.choisir('#cg-taux', '20');
   t.choisir('#cg-debut', '2024-09-01');
   t.clic('#cg-ok'); await t.pause(400);
 
@@ -1261,9 +1297,511 @@ scenario('Écran de démarrage : le curseur des réglages mène la durée', asyn
 });
 
 /* --------------------------------------------------------------------- */
+/* Cocher une case et prévenir l'application, comme le ferait un doigt. */
+const cocher = (t, sel, v) => {
+  const e = t.$(sel); if (!e) return false;
+  e.checked = v;
+  e.dispatchEvent(new t.w.Event('change', { bubbles: true }));
+  return true;
+};
+/* Les intitulés d'un <select>, dans l'ordre. */
+const options = (t, sel) => [...t.$(sel).options].map(o => o.textContent);
+
+scenario('Devis : la case commande les étapes, et les mots qu’elles portent', async () => {
+  /* Tout chantier ne part pas d'un devis. « Devis à envoyer » et « Sans
+     suite » ne veulent alors rien dire : les étapes de devis sortent de la
+     liste, et « Accepté » redevient « À planifier ». */
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'chantiers' }));
+  t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.clic('#c-nouveau'); await t.pause(350);
+
+  verifierVrai('un chantier neuf part avec un devis', t.$('#ce-adevis').checked);
+  let l = options(t, '#ce-statut');
+  verifierVrai('« Devis à envoyer » est proposé', l.indexOf('Devis à envoyer') >= 0);
+  verifierVrai('« Devis signé, à planifier » aussi', l.indexOf('Devis signé, à planifier') >= 0);
+  verifierVrai('et « Devis refusé »', l.indexOf('Devis refusé') >= 0);
+  verifierVrai('les champs du devis sont visibles', t.$('#ce-devis-bloc').style.display !== 'none');
+
+  cocher(t, '#ce-adevis', false); await t.pause(200);
+  l = options(t, '#ce-statut');
+  verifier('sans devis, six étapes restent', 6, l.length);
+  verifierVrai('« Devis à envoyer » a disparu', l.indexOf('Devis à envoyer') < 0);
+  verifierVrai('« Devis envoyé » aussi', l.indexOf('Devis envoyé') < 0);
+  verifierVrai('« À planifier » a pris la place de « Devis signé »', l.indexOf('À planifier') >= 0);
+  verifierVrai('et « Sans suite » celle de « Devis refusé »', l.indexOf('Sans suite') >= 0);
+  verifier('les champs du devis sont masqués', 'none', t.$('#ce-devis-bloc').style.display);
+  verifier('l’étape retenue est celle où il en est vraiment', 'accepte', t.$('#ce-statut').value);
+
+  t.saisir('#ce-nom', 'Sans devis'); await t.pause(100);
+  t.clic('#ce-ok'); await t.pause(400);
+  const c = (t.stock('chantiers') || [])[0];
+  verifier('la réponse est enregistrée', false, c.aDevis);
+  verifierVrai('et le badge du carnet dit « À planifier »',
+    /À planifier/.test(t.$('#liste-chantiers').textContent));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Devis : numéro, date d’édition et validité tiennent sur la fiche', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'chantiers' }));
+  t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.clic('#c-nouveau'); await t.pause(350);
+  t.saisir('#ce-nom', 'Coupe des Places'); await t.pause(100);
+  t.saisir('#ce-numdevis', 'D-2026-014'); await t.pause(100);
+  t.choisir('#ce-datedevis', '2026-01-31'); await t.pause(150);
+  t.choisir('#ce-validite', '1'); await t.pause(200);
+
+  /* Un devis édité un 31 janvier et valable un mois court jusqu'au 28
+     février, pas jusqu'au 3 mars : le jour se replie sur la fin du mois. */
+  verifier('la fin de validité est annoncée en clair',
+    'Valable jusqu’au 28/02/2026.', t.texte('#ce-validite-fin'));
+
+  t.clic('#ce-ok'); await t.pause(450);
+  const c = (t.stock('chantiers') || [])[0];
+  verifier('le numéro est retenu', 'D-2026-014', c.numeroDevis);
+  verifier('la validité aussi', 1, c.validiteDevis);
+  verifier('et la date d’édition', '2026-01-31', jourISO(c.dateDevis));
+  verifierVrai('la fiche affiche le numéro du devis',
+    /D-2026-014/.test(t.$('#vue-chantier').textContent));
+  verifierVrai('et jusqu’à quand il vaut',
+    /valable jusqu’au 28\/02\/2026/.test(t.$('#vue-chantier').textContent));
+
+  /* Décoché, plus de devis : garder un numéro ferait ressortir un fantôme. */
+  t.clic('#f-entete'); await t.pause(350);
+  cocher(t, '#ce-adevis', false); await t.pause(200);
+  t.clic('#ce-ok'); await t.pause(450);
+  const c2 = (t.stock('chantiers') || [])[0];
+  verifier('décocher efface le numéro', '', c2.numeroDevis);
+  verifier('et la date', null, c2.dateDevis);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Devis en attente : c’est la validité qui appelle, et l’accueil qui le dit', async () => {
+  const ilYa = n => { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() - n); return d.getTime(); };
+  const devis = (id, nom, jours, mois) => ({ id, nom, statut: 'envoye', aDevis: true,
+    lignes: [], temps: [], dateEnvoi: ilYa(jours), dateDevis: ilYa(jours),
+    validiteDevis: mois, maj: ilYa(jours) });
+
+  /* Trois mois de validité, édité il y a 85 jours : la fin approche. */
+  const t = await ouvrir(Object.assign({}, VIDE, { chantiers: [devis('c1', 'Vaux', 85, 3)] }));
+  verifierVrai('l’accueil annonce le devis en attente',
+    /Devis en attente/.test(t.$('#a-devis').textContent));
+  verifierVrai('il est nommé', /Vaux/.test(t.$('#a-devis').textContent));
+  verifierVrai('et l’avis parle de validité, pas du jour de l’envoi',
+    /valable/.test(t.$('#a-devis').textContent));
+
+  /* Le même devis avec un an de validité : rien à relancer aujourd'hui. */
+  const loin = await ouvrir(Object.assign({}, VIDE, { chantiers: [devis('c1', 'Vaux', 85, 12)] }));
+  verifier('un devis encore largement valable ne remonte pas',
+    '', loin.$('#a-devis').textContent.trim());
+
+  /* Passée la date, l'avis durcit. */
+  const fini = await ouvrir(Object.assign({}, VIDE, { chantiers: [devis('c1', 'Vaux', 200, 3)] }));
+  verifierVrai('un devis expiré le dit', /expiré/.test(fini.$('#a-devis').textContent));
+
+  /* Sans validité saisie, on retombe sur le délai réglable. */
+  const sansVal = await ouvrir(Object.assign({}, VIDE, {
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'envoye', aDevis: true, lignes: [], temps: [],
+      dateEnvoi: ilYa(40), maj: ilYa(40) }]
+  }));
+  verifierVrai('faute de validité, le délai sans réponse parle',
+    /40 jours/.test(sansVal.$('#a-devis').textContent));
+
+  /* Chassé d'un doigt, il s'efface. */
+  t.clic('#a-devis-fermer'); await t.pause(200);
+  verifier('un appui sur la croix le masque', '', t.$('#a-devis').textContent.trim());
+  verifier('aucune erreur', [], t.erreurs.concat(loin.erreurs, fini.erreurs, sansVal.erreurs));
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Carnet : un numéro de facture retrouve son chantier, même payé', async () => {
+  /* Un chantier facturé est rangé hors des « ouverts » : chercher son numéro
+     et ne rien voir sortir serait le pire des deux. La recherche passe donc
+     outre le filtre. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [
+      { id: 'c1', nom: 'Vaux plantation', statut: 'paye', aDevis: false, lignes: [], temps: [],
+        numeroFacture: 'F-2026-031', donneur: 'Cabinet Dubois', datePaiement: Date.now(), maj: Date.now() },
+      { id: 'c2', nom: 'Places dégagement', statut: 'encours', aDevis: false, lignes: [], temps: [],
+        commune: 'Foncine', maj: Date.now() }
+    ]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(300);
+  verifierVrai('le filtre par défaut cache le chantier payé',
+    !/Vaux plantation/.test(t.$('#liste-chantiers').textContent));
+
+  t.saisir('#c-rech', 'F-2026-031'); await t.pause(250);
+  const z = t.$('#liste-chantiers').textContent;
+  verifierVrai('la recherche le fait sortir', /Vaux plantation/.test(z));
+  verifierVrai('et elle écarte l’autre', !/Places dégagement/.test(z));
+  verifierVrai('elle dit sur quoi elle a cherché', /1 chantier sur 2/.test(z));
+
+  /* Les accents et les majuscules ne comptent pas, et deux mots peuvent
+     tomber dans deux champs différents. */
+  t.saisir('#c-rech', 'foncine'); await t.pause(250);
+  verifierVrai('une commune en minuscules suffit',
+    /Places dégagement/.test(t.$('#liste-chantiers').textContent));
+  t.saisir('#c-rech', 'dubois vaux'); await t.pause(250);
+  verifierVrai('deux mots dans deux champs se retrouvent',
+    /Vaux plantation/.test(t.$('#liste-chantiers').textContent));
+  t.saisir('#c-rech', 'zzz'); await t.pause(250);
+  verifierVrai('et rien qui corresponde se dit',
+    /Rien qui corresponde/.test(t.$('#liste-chantiers').textContent));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Facturé : le numéro est demandé là où on bascule', async () => {
+  /* Il vivait dans l'en-tête, six champs plus haut : au moment de passer en
+     « Facturé » on n'allait pas l'y chercher. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'termine', aDevis: false, lignes: [], temps: [],
+      dateFin: Date.now(), maj: Date.now() }]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.clic('[data-chstatut="c1"]'); await t.pause(300);
+  t.clic('[data-setstatut="facture"]'); await t.pause(350);
+
+  verifierVrai('le numéro est demandé aussitôt', t.$('#nf-num'));
+  t.saisir('#nf-num', 'F-2026-044'); await t.pause(100);
+  t.clic('#nf-ok'); await t.pause(400);
+  const c = (t.stock('chantiers') || [])[0];
+  verifier('le statut a changé', 'facture', c.statut);
+  verifier('et le numéro est posé', 'F-2026-044', c.numeroFacture);
+
+  /* Déjà renseigné, on ne redemande pas. */
+  t.clic('[data-chstatut="c1"]'); await t.pause(300);
+  t.clic('[data-setstatut="paye"]'); await t.pause(400);
+  verifier('rien n’est redemandé quand le numéro est là', null, t.$('#nf-num'));
+  verifier('le statut a bien suivi', 'paye', (t.stock('chantiers') || [])[0].statut);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Devis : l’historique repris du carnet n’en avait pas', async () => {
+  /* Les 32 chantiers convertis du classeur comptable sont tous facturés,
+     sans devis. Les compter comme des devis gagnés fausserait le taux de
+     réussite, et « Devis refusé » n'aurait aucun sens sur eux. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [
+      { id: 'c1', nom: 'Repris du carnet', statut: 'paye', lignes: [], temps: [],
+        numeroFacture: 'F-2025-007', datePaiement: Date.now(), maj: Date.now() },
+      { id: 'c2', nom: 'Devis en cours', statut: 'envoye', lignes: [], temps: [],
+        dateEnvoi: Date.now(), maj: Date.now() }
+    ]
+  }));
+  const ch = t.stock('chantiers') || [];
+  const par = id => ch.filter(x => x.id === id)[0];
+  verifier('le chantier repris est marqué sans devis', false, par('c1').aDevis);
+  verifier('celui passé par « devis envoyé » en a un', true, par('c2').aDevis);
+  verifier('la migration ne se rejoue pas', true, t.stock('cfg').devisMigres);
+
+  /* Le taux de réussite ne compte que ce qui a été proposé. */
+  const tr = t.w.BCF.tauxReussite(ch, t.w.BCC.aDevis);
+  verifier('un seul devis proposé', 1, tr.proposes);
+  verifier('et aucun tranché', 0, tr.gagnes + tr.perdus);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Charges : la case décide une fois, les dépenses suivent toutes seules', async () => {
+  /* Le pointage mensuel a disparu : ce qui doit entrer dans les dépenses se
+     décide sur la charge, et les échéances déjà passées y entrent d'elles-
+     mêmes depuis le premier paiement. C'est la TVA qu'on récupère. */
+  const an = new Date().getFullYear();
+  const debut = new Date(an, 0, 5, 12).getTime();
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'finances',
+    charges: [
+      { id: 'g1', libelle: 'Logiciel', beneficiaire: 'l’éditeur', ttc: 12, periodicite: 'mensuel',
+        categorie: 'ABO', taux: 20, dansDepenses: true, debut: debut, jour: 5, moisReference: 0 },
+      { id: 'g2', libelle: 'Prêt matériel', beneficiaire: 'la banque', ttc: 385, periodicite: 'mensuel',
+        categorie: 'PRET', taux: 0, dansDepenses: false, debut: debut, jour: 5, moisReference: 0 }
+    ]
+  }));
+  const auto = () => (t.stock('depenses') || []).filter(d => d.auto);
+  const mois = new Date().getMonth() + 1;
+  verifier('une dépense par échéance passée du logiciel', mois, auto().length);
+  verifierVrai('toutes rattachées à la charge', auto().every(d => d.charge === 'g1'));
+  verifierVrai('le prêt n’en crée aucune', !auto().some(d => d.charge === 'g2'));
+  verifierVrai('la catégorie de la charge est reprise',
+    auto().every(d => d.lignes[0].categorie === 'ABO'));
+  verifierVrai('et son taux de TVA', auto().every(d => d.lignes[0].taux === 20));
+  /* Rien au-delà d'aujourd'hui : on ne paie pas une échéance à venir. */
+  verifierVrai('aucune échéance future n’est comptée',
+    auto().every(d => d.date <= Date.now()));
+
+  /* Corriger le montant corrige les dépenses, sans en créer de nouvelles. */
+  t.clic('[data-vue="charges"]'); await t.pause(250);
+  t.clic('[data-chgmod="g1"]'); await t.pause(300);
+  t.saisir('#cg-ttc', '24');
+  t.clic('#cg-ok'); await t.pause(500);
+  verifier('le nombre de dépenses ne bouge pas', mois, auto().length);
+  verifierVrai('mais le montant a suivi', auto().every(d => d.lignes[0].ttc === 24));
+
+  /* Décocher retire les dépenses automatiques, et elles seules. */
+  t.clic('[data-chgmod="g1"]'); await t.pause(300);
+  const dep = t.$('#cg-dep');
+  dep.checked = false;
+  dep.dispatchEvent(new t.w.Event('change', { bubbles: true }));
+  t.clic('#cg-ok'); await t.pause(500);
+  verifier('décocher les retire toutes', 0, auto().length);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Charges : une échéance pointée à la main n’est jamais comptée deux fois', async () => {
+  /* Garde essentielle : l'ancien pointage manuel a laissé des dépenses en
+     base. Les recréer automatiquement doublerait la TVA déduite. */
+  const an = new Date().getFullYear();
+  const debut = new Date(an, 0, 5, 12).getTime();
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    charges: [{ id: 'g1', libelle: 'Logiciel', ttc: 12, periodicite: 'mensuel',
+      categorie: 'ABO', taux: 20, dansDepenses: true, debut: debut, jour: 5, moisReference: 0 }],
+    depenses: [{ id: 'd1', date: debut, charge: 'g1', fournisseur: 'l’éditeur',
+      lignes: [{ libelle: 'Logiciel', categorie: 'ABO', ttc: 12, taux: 20 }] }]
+  }));
+  const toutes = t.stock('depenses') || [];
+  const surJanvier = toutes.filter(d => new Date(d.date).getMonth() === 0);
+  verifier('janvier ne porte qu’une seule dépense', 1, surJanvier.length);
+  verifierVrai('c’est celle qui avait été pointée à la main', !surJanvier[0].auto);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Charge fixe : la TVA devient obligatoire dès qu’on porte en dépense', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'finances' }));
+  t.clic('[data-vue="charges"]'); await t.pause(250);
+  t.clic('#chg-nouvelle'); await t.pause(300);
+
+  /* Une catégorie sans TVA ferme le champ et change le libellé du montant :
+     sans TVA, il n'y a ni HT ni TTC, juste un montant. */
+  t.choisir('#cg-cat', 'PRET'); await t.pause(150);
+  verifierVrai('le taux est verrouillé sur un prêt', t.$('#cg-taux').disabled);
+  verifier('le libellé ne parle plus de TTC', 'Montant (€)', t.texte('#cg-ttc-lab'));
+  verifier('et la case des dépenses se décoche', false, t.$('#cg-dep').checked);
+
+  t.choisir('#cg-cat', 'ABO'); await t.pause(150);
+  verifierVrai('sur un abonnement le taux s’ouvre', !t.$('#cg-taux').disabled);
+  verifier('le libellé redevient TTC', 'Montant TTC (€)', t.texte('#cg-ttc-lab'));
+  verifier('et la case se recoche', true, t.$('#cg-dep').checked);
+  verifierVrai('le taux manquant est signalé en rouge',
+    /B4231F|rgb\(180, 35, 31\)/.test(t.$('#cg-taux').style.borderColor || ''));
+
+  /* Enregistrer sans taux est refusé : une dépense à 0 % ne récupère rien. */
+  t.saisir('#cg-lib', 'Cartographie');
+  t.saisir('#cg-ttc', '96');
+  t.choisir('#cg-debut', '2026-01-05');
+  t.clic('#cg-ok'); await t.pause(300);
+  verifier('rien n’est enregistré sans le taux', 0, (t.stock('charges') || []).length);
+
+  t.choisir('#cg-taux', '20'); await t.pause(150);
+  verifierVrai('le rouge s’en va', !/B4231F|rgb\(180, 35, 31\)/.test(t.$('#cg-taux').style.borderColor || ''));
+  t.clic('#cg-ok'); await t.pause(400);
+  verifier('avec le taux, la charge passe', 1, (t.stock('charges') || []).length);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Charges fixes : deux graphiques, et le jour du prélèvement en clair', async () => {
+  const an = new Date().getFullYear();
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'finances',
+    charges: [
+      { id: 'g1', libelle: 'Prêt matériel', ttc: 385, periodicite: 'mensuel', categorie: 'PRET',
+        taux: 0, debut: new Date(an, 0, 5, 12).getTime(), jour: 5, moisReference: 0 },
+      { id: 'g2', libelle: 'Assurance RC pro', ttc: 480, periodicite: 'annuel', categorie: 'ASSUR',
+        taux: 0, debut: new Date(an, 2, 15, 12).getTime(), jour: 15, moisReference: 2 }
+    ]
+  }));
+  t.clic('[data-vue="charges"]'); await t.pause(300);
+  const z = t.$('#charges-resume');
+  verifierVrai('le graphique des douze mois est là', /Quand l’argent part/.test(z.textContent));
+  verifierVrai('la répartition par catégorie aussi', /Où il part/.test(z.textContent));
+  verifierVrai('les bâtons sont empilés par catégorie',
+    z.querySelectorAll('svg rect[fill="#8A5A2B"]').length > 1);
+  verifierVrai('l’assurance a sa propre couleur',
+    z.querySelectorAll('svg rect[fill="#1D6FB8"]').length === 1);
+
+  /* Le jour du prélèvement, pas « tous les mois ». */
+  verifierVrai('le jour du mois est écrit', /le 5 de chaque mois/.test(z.textContent));
+  verifierVrai('et la date de l’annuelle', /le 15 mars de chaque année/.test(z.textContent));
+
+  /* Un appui sur un mois écrit son détail, sans refaire l'écran. */
+  verifierVrai('le détail annonce d’abord le mois le plus chargé',
+    /mars/.test(t.texte('#chg-mois-detail')));
+  /* La zone tactile d'un mois est un <rect> SVG. Un doigt le touche et
+     l'événement remonte, mais SVGElement n'a pas de .click() : on envoie donc
+     un vrai clic qui bouillonne, comme le ferait le pouce. */
+  const rect = t.$('[data-chgmois="6"]');
+  rect.dispatchEvent(new t.w.MouseEvent('click', { bubbles: true }));
+  await t.pause(200);
+  verifierVrai('appuyer sur juillet écrit juillet',
+    /juillet/.test(t.texte('#chg-mois-detail')));
+  verifierVrai('avec le pourcentage par catégorie',
+    /%/.test(t.texte('#chg-mois-detail')));
+  verifierVrai('plus rien à pointer', !t.$('[data-chgpay]'));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Entreprise : le bilan est au-dessus des tuiles, et chaque bulle mène quelque part', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'entreprise',
+    chantiers: [
+      { id: 'c1', nom: 'Vaux', statut: 'accepte', lignes: [{ travail: 'PLANT', unite: 'plant',
+        quantite: 1000, prix: 0.5, nature: 'prestation' }], temps: [], joursEstimes: 4,
+        jours: [{ d: Date.now(), p: 1 }], maj: Date.now() },
+      { id: 'c2', nom: 'Les Places', statut: 'encours', lignes: [], temps: [], maj: Date.now() },
+      { id: 'c3', nom: 'Foncine', statut: 'facture', lignes: [{ travail: 'DEGAG', unite: 'ha',
+        quantite: 2, prix: 900, nature: 'prestation' }], temps: [], donneur: 'Cabinet Dubois',
+        numeroFacture: 'F-9', dateFacture: Date.now() - 70 * 86400000, maj: Date.now() }
+    ]
+  }));
+  const bilan = t.$('#ent-bilan');
+  verifierVrai('le bilan est rendu', /Où j’en suis/.test(bilan.textContent));
+  verifierVrai('les journées restant à planifier y sont', /journées à planifier/.test(bilan.textContent));
+  /* Une journée posée sur quatre estimées : il en reste trois. On lit la
+     valeur de la bulle elle-même, pas le texte de l'écran — un chiffre isolé
+     s'y retrouverait par hasard. */
+  verifier('3 sur 4 estimées restent à poser', '3',
+    bilan.querySelector('[data-bulle="calendrier"] .v').textContent);
+  verifierVrai('les devis signés', /devis signés/.test(bilan.textContent));
+  verifierVrai('les chantiers en cours', /chantiers en cours/.test(bilan.textContent));
+  verifierVrai('les impayés', /impayés/.test(bilan.textContent));
+  verifierVrai('le chiffre d’affaires', /chiffre d’affaires/.test(bilan.textContent));
+  verifierVrai('la TVA déductible', /TVA déductible/.test(bilan.textContent));
+
+  /* Le bilan précède les tuiles dans le document : c'est ce qu'on vient
+     chercher, et en dessous il tombait hors de l'écran. */
+  const tuiles = t.$('#vue-entreprise .tuiles');
+  verifierVrai('il est placé avant les tuiles',
+    bilan.compareDocumentPosition(tuiles) & 4);
+
+  /* L'impayé garde son nom, son montant et son ancienneté dans « À traiter ». */
+  const at = t.$('#ent-alertes').textContent;
+  verifierVrai('l’impayé est nommé', /Foncine/.test(at));
+  /* Le millier est séparé par une espace insécable, jamais par une ordinaire :
+     un montant coupé en bout de ligne se lit comme deux nombres. */
+  verifierVrai('avec son montant', /1 800/.test(at));
+  verifierVrai('et ce montant ne peut pas se couper', !/1 800/.test(at));
+  verifierVrai('depuis combien de temps', /70 jours/.test(at));
+  verifierVrai('et par qui il passe', /Cabinet Dubois/.test(at));
+
+  /* Une bulle mène à la liste filtrée. */
+  t.clic('[data-bulle="facture"]'); await t.pause(350);
+  verifier('la bulle des impayés filtre le carnet', 'facture', t.$('#c-filtre').value);
+  verifierVrai('et le chantier concerné est visible',
+    /Foncine/.test(t.$('#liste-chantiers').textContent));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('À traiter : des notes à soi-même, qui restent tant qu’on ne les efface pas', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'entreprise' }));
+  verifierVrai('la zone invite à s’écrire une note',
+    /\+ note/.test(t.$('#ent-alertes').textContent));
+
+  t.clic('#ent-note-plus'); await t.pause(300);
+  t.saisir('#nt-titre', 'Rappeler le gestionnaire');
+  t.saisir('#nt-texte', 'pour la parcelle du haut');
+  t.clic('[data-ntcoul="#B4231F"]'); await t.pause(120);
+  t.clic('#nt-ok'); await t.pause(400);
+
+  const z = t.$('#ent-alertes');
+  verifierVrai('la note s’affiche', /Rappeler le gestionnaire/.test(z.textContent));
+  verifierVrai('avec sa précision', /parcelle du haut/.test(z.textContent));
+  verifierVrai('et sa couleur', /B4231F|rgb\(180, 35, 31\)/.test(z.innerHTML));
+  /* Elle part dans les sauvegardes : elle vit donc dans la configuration. */
+  const n = (t.stock('cfg') || {}).notes || [];
+  verifier('une note est en base', 1, n.length);
+  verifier('son titre est retenu', 'Rappeler le gestionnaire', n[0].titre);
+
+  /* Elle se rouvre pour être corrigée. */
+  t.clic('[data-note]'); await t.pause(300);
+  t.saisir('#nt-titre', 'Rappeler l’expert');
+  t.clic('#nt-ok'); await t.pause(400);
+  verifierVrai('la correction est prise', /Rappeler l’expert/.test(t.$('#ent-alertes').textContent));
+  verifier('sans en créer une seconde', 1, ((t.stock('cfg') || {}).notes || []).length);
+
+  /* Et elle ne s'efface que sur demande. */
+  t.w.confirm = () => true;
+  t.clic('[data-notesup]'); await t.pause(400);
+  verifier('effacée, il n’en reste rien', 0, ((t.stock('cfg') || {}).notes || []).length);
+  verifierVrai('et la zone le dit', /\+ note/.test(t.$('#ent-alertes').textContent));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Onglets : un module qui n’a qu’une vue n’affiche pas de barre', async () => {
+  /* Analyses n'a qu'une vue : un onglet unique étiré sur toute la largeur ne
+     propose rien et mange une bande d'écran. */
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'analyses' }));
+  await t.pause(250);
+  verifierVrai('la barre est masquée sur Analyses',
+    t.d.body.classList.contains('sans-onglets'));
+  verifier('un seul onglet était prévu', 1, t.$$('#onglets button').length);
+
+  t.clic('[data-module="finances"]'); await t.pause(300);
+  verifierVrai('elle revient sur un module à plusieurs vues',
+    !t.d.body.classList.contains('sans-onglets'));
+  verifierVrai('et l’onglet des charges s’appelle « Charges fixes »',
+    /Charges fixes/.test(t.$('#onglets').textContent));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Milliers : séparés à l’écran, jamais dans un fichier', async () => {
+  const t = await ouvrir(VIDE);
+  const E = t.w.BC;
+  const NBSP = ' ';
+
+  verifier('un millier se sépare', '1' + NBSP + '800,00', E.fmt(1800));
+  verifier('un million aussi', '1' + NBSP + '250' + NBSP + '000', E.fmt(1250000, 0));
+  verifier('en dessous du millier, rien ne change', '999,50', E.fmt(999.5));
+  verifier('les décimales ne se groupent jamais', '1' + NBSP + '000,25', E.fmt(1000.25));
+  verifier('un négatif garde son signe collé', '-1' + NBSP + '800', E.fmt(-1800, 0));
+  /* L'espace doit être insécable : avec une ordinaire, « 1 800 € » se couperait
+     en bout de ligne et se lirait comme deux nombres. */
+  verifierVrai('l’espace est insécable', E.fmt(1800, 0).indexOf(NBSP) > 0);
+  verifierVrai('et jamais une espace ordinaire', E.fmt(1800, 0).indexOf(' ') < 0);
+
+  /* Ce qui part dans un tableur ne se groupe pas : une espace au milieu d'un
+     nombre et la cellule cesse d'être un nombre. */
+  verifier('la version brute ne groupe pas', '1800,00', E.fmtBrut(1800));
+  verifier('elle garde la virgule décimale', '1800,25', E.fmtBrut(1800.25));
+
+  /* Un nombre groupé relu dans un champ doit revenir entier : parseFloat
+     s'arrêtait à l'espace et rendait 25 pour « 25 000 ». */
+  const C = t.w.BCC, FIN = t.w.BCF;
+  verifier('nb() retrouve le nombre groupé', 25000, C.nb('25' + NBSP + '000'));
+  verifier('même avec une espace ordinaire', 25000, C.nb('25 000'));
+  verifier('les finances aussi', 1800.5, FIN.nb('1' + NBSP + '800,5'));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+/* Un troisième argument ne joue que les scénarios dont le nom le contient.
+   Sert à éprouver un contrôle en le cassant exprès : rejouer les quarante
+   autres pour vérifier qu'un seul crie coûte deux minutes pour rien.
+   node outils/tests.js index.html "double compte" */
 (async () => {
-  console.log('Sylve — tests de non-régression\n' + '─'.repeat(52));
-  for (const s of scenarios) {
+  const filtre = (process.argv[3] || '').toLowerCase();
+  const joues = filtre
+    ? scenarios.filter(s => s.nom.toLowerCase().includes(filtre))
+    : scenarios;
+  console.log('Sylve — tests de non-régression' +
+    (filtre ? ` — filtre « ${process.argv[3]} » : ${joues.length} scénario(s)` : '') +
+    '\n' + '─'.repeat(52));
+  if (filtre && !joues.length) {
+    console.log('✕ aucun scénario ne correspond à « ' + process.argv[3] + ' ».');
+    process.exit(1);
+  }
+  for (const s of joues) {
     console.log('\n  ' + s.nom);
     try { await s.fn(); }
     catch (e) { ko++; console.log('    ✕ le scénario s\'est interrompu : ' + e.message); }

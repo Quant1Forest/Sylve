@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.35.0-20260816-2014**
+Version courante : **4.37.0-20260817-2118**
 
 ---
 
@@ -82,6 +82,22 @@ annonce lui-même — retirer un fichier des deux côtés laissait le compte jus
 Une vérification doit se croiser avec une source écrite ailleurs, pour
 d'autres raisons : c'est le manifeste qui dit maintenant quelles icônes
 doivent être en cache.
+
+**Un seul passage, à la fin.** Ne pas relancer la suite après chaque
+modification : écrire le code et ses scénarios, puis contrôler l'ensemble une
+fois, avant de rendre la liste de ce qui a changé. Dix passages dans une
+séance rejouent surtout des scénarios déjà verts, et c'est l'essentiel du
+temps d'attente.
+
+**Pour casser un contrôle exprès, filtrer.** `outils/tests.js` prend un
+troisième argument : seuls les scénarios dont le nom le contient sont joués.
+
+```bash
+node outils/tests.js index.html "double compte"
+```
+
+Éprouver cinq gardes en rejouant chaque fois les quarante scénarios coûtait
+dix minutes ; avec le filtre, quelques secondes chacune.
 
 Scripts séparés si besoin : `npm run verifier`, `npm test`,
 `npm run construire`.
@@ -185,6 +201,12 @@ travailler.
   ajouté un BOM. Pour un remplacement dans un fichier, passer par `sed` via
   Bash, ou par l'outil d'édition. Un fichier ainsi abîmé se répare en le
   relisant en UTF-8 puis en le réencodant en Windows-1252.
+- **Une variable non déclarée tue toute la branche.** Le gestionnaire de clic
+  des journées testait `else if (part)` — `part` n'existait ni en local ni en
+  global. Chaque clic dans la zone levait un `ReferenceError` avant d'arriver
+  à la branche de suppression : la croix ne retirait jamais rien, et sans
+  console ouverte rien ne le disait. Une branche morte dans un `if/else if`
+  ne se voit pas, elle se teste.
 - **`toISOString()` n'est pas une date locale.** Un champ `<input type="date">`
   parle en heure locale ; `toISOString()` répond en heure de Greenwich, où
   minuit à Paris est 22 h la veille. Tout timestamp passé par `C.minuit()` en
@@ -343,6 +365,85 @@ le graphique de répartition ne disait rien.
   rien. Corollaire utile : seules les charges qui portent de la TVA méritent
   d'être pointées en dépense, puisque c'est la TVA qui se récupère.
 
+## Les dépenses, c'est la TVA — pas la trésorerie
+
+Règle posée par l'utilisateur, et elle tranche beaucoup de choses : **le
+module Dépenses ne sert qu'à calculer la TVA payée et à repérer les
+immobilisations.** Un remboursement de prêt n'y a rien à faire — c'est un
+remboursement, pas une charge d'exploitation, et il ne porte aucune TVA.
+
+D'où la case **« Enregistrer les échéances dans les dépenses »** sur la
+charge fixe (`c.dansDepenses`). La question se pose **une fois, à la
+création**, plus tous les mois : `synchroniserDepensesCharges()` crée les
+dépenses des échéances déjà passées, depuis `charge.debut`.
+
+Même mécanique que la sortie de stock d'une facture, et pour les mêmes
+raisons : jamais saisie, refaite à chaque modification, marquée `auto: true`.
+Trois gardes protègent l'historique :
+
+- **rien au-delà d'aujourd'hui** : on ne paie pas une échéance à venir ;
+- **une échéance déjà pointée à la main est laissée telle quelle** (`d.charge`
+  sans `d.auto`, à moins de vingt jours). Sans cette garde la TVA déduite
+  doublerait sur tout ce que l'ancien pointage manuel avait enregistré ;
+- **décocher ne retire que les dépenses automatiques.**
+
+Le pointage manuel (`pointerCharge`) a disparu, et avec lui le bouton
+« Enregistrer » dont personne ne comprenait le nom. Une dépense automatique
+se corrige sur sa charge : dans la liste des dépenses, son bouton ouvre la
+charge, sinon la correction serait effacée à la synchronisation suivante.
+
+**La TVA est obligatoire dès que la case est cochée**, et le champ passe en
+rouge tant qu'elle manque : une dépense à 0 % ne récupère rien, et c'est
+l'oubli le plus facile. À l'inverse, `sansTva` ferme le champ — assurance,
+prêt, cotisations, et **frais bancaires** depuis la 4.37 (services bancaires
+exonérés). Le libellé du montant suit : « Montant TTC » n'a pas de sens sans
+TVA, c'est « Montant » tout court.
+
+## L'écran Entreprise : bulles au-dessus, notes en dessous
+
+Le regroupement des sept tuiles en trois titres a été **écarté** après
+maquette : un appui de plus à chaque navigation, pour toujours, et la barre
+d'onglets du bas — rangée par module — n'aurait plus su quoi faire d'un titre
+qui en regroupe quatre. Ce que l'utilisateur cherchait était l'**état des
+lieux**, pas moins de routes.
+
+`#ent-bilan` porte donc six bulles, **au-dessus** des tuiles : journées à
+planifier, devis signés, chantiers en cours, impayés, chiffre d'affaires,
+TVA déductible. Un seul chiffre par bulle — deux nombres côte à côte et on ne
+sait plus lequel on lit. Chacune mène à la liste qui la détaille.
+
+`#ent-alertes` garde les trois alertes qui portent un nom de chantier — en
+retard, à facturer, impayé — puis les **notes que l'utilisateur s'écrit**
+(`A.cfg.notes` : titre, précision, couleur choisie parmi six). Elles vivent
+dans la configuration parce qu'elle part dans les sauvegardes.
+
+**La bulle et l'alerte ne font pas doublon** : la bulle donne le compte et le
+montant, l'alerte dit lequel et depuis quand. C'est précisément ce qu'on veut
+savoir d'un impayé — l'avoir retiré une première fois était une erreur, le
+scénario de navigation l'a rattrapée.
+
+**Un module qui n'a qu'une vue n'affiche pas d'onglet** (`sans-onglets`) : un
+onglet unique étiré sur la largeur ne propose rien. Analyses est le seul cas.
+
+## Deux détails de typographie qui comptent
+
+- **Espace insécable devant l'unité.** `eur()` et `eurCourt()` collent le
+  « € » au nombre par un U+00A0 : avec une espace ordinaire, une tuile étroite
+  coupait la ligne et le symbole tombait seul en dessous. Un test l'épingle —
+  attention, une regex avec une espace ordinaire ne matche plus.
+- **`fmt()` groupe les milliers** par une espace insécable depuis la 4.37 :
+  « 1 800 € », plus « 1800 € ». Trois conséquences à connaître :
+  - **`fmtBrut()` existe pour les fichiers.** Les deux exports CSV
+    (`lignesStock`, `exportCsv`) y passent : une espace au milieu d'un nombre
+    et la cellule cesse d'être un nombre pour le tableur.
+  - **Les quatre `nb()` retirent les espaces** avant d'analyser. Sans ça, un
+    montant formaté relu dans un champ de saisie — `#hy-ben` le fait —
+    donnait 25 pour « 25 000 ».
+  - **`t.texte()` des tests replie tous les blancs** sur une espace ordinaire :
+    une attente lue par cette porte s'écrit avec une espace ordinaire, alors
+    qu'une attente lue sur `textContent` brut garde l'insécable. Deux heures
+    perdues sur un « attendu 1 000 € / obtenu 1 000 € » qui se lisaient pareil.
+
 ## Le millilitre n’est pas le mètre linéaire
 
 Dans `UNITES_ART`, **`ml` désigne le mètre linéaire** — celui du grillage.
@@ -407,6 +508,51 @@ node outils/importer-carnet.js "<comptabilité.xlsx>" ["<stock.xlsx>"] [sortie.j
   doit tomber au centime sur celui du tableau de bord, et l'écart sur le
   chiffre d'affaires doit valoir exactement les débours — le tableur les
   exclut, `chiffreAffaires` aussi.
+
+## Le devis, quand il y en a un
+
+Tout chantier ne part pas d'un devis : un client qui rappelle pour finir une
+parcelle, un dépannage. La fiche porte donc la réponse — `c.aDevis` — et les
+statuts suivent, sans qu'aucun code de statut ne bouge :
+
+- `devisSeul` retire l'étape quand il n'y a pas de devis : « Devis à envoyer »
+  et « Devis envoyé » sortent de la liste.
+- `sansDevis` donne l'autre mot : `accepte` se lit « Devis signé, à planifier »
+  ou « À planifier », `sansuite` « Devis refusé » ou « Sans suite ».
+- `nomStatut(code, chantier)` prend le chantier en second argument. Appelée
+  avec le seul code — le filtre du carnet, qui parle de tous les chantiers à
+  la fois — elle rend l'intitulé complet.
+
+**La règle ne vit qu'à un endroit.** `migrerDevis()` inscrit la réponse une
+fois pour de bon sur l'existant, plutôt que de la déduire à chaque lecture :
+sinon elle aurait vécu dans le module chantiers *et* dans les finances, et
+aurait fini par diverger. Le repli de `aDevis()` ne sert plus qu'aux données
+restaurées d'une sauvegarde antérieure à la 4.36. Pour la même raison,
+`tauxReussite()` reçoit le prédicat en second argument au lieu d'appeler
+l'autre module.
+
+Trois champs vont avec : `numeroDevis` (souvent rempli plus tard),
+`dateDevis`, `validiteDevis` en mois. `finValiditeDevis()` en déduit la fin
+— et replie le jour sur la fin du mois d'arrivée : un devis édité un 31
+janvier et valable un mois court jusqu'au 28 février, pas au 3 mars.
+
+**C'est la validité qui appelle, pas le délai.** Un devis envoyé remonte
+quatorze jours avant sa fin de validité, puis passe en gravité 2 une fois
+expiré. Le délai réglable (`joursRelanceDevis`, 21 j) ne sert plus que faute
+de validité saisie. L'avis vit sur l'accueil (`#a-devis`), sous celui des
+échéances, et se chasse d'un doigt jusqu'au prochain lancement.
+
+**Le numéro de facture se demande où l'on bascule.** Il existait depuis
+longtemps dans l'en-tête, sixième champ — donc jamais rempli. Passer un
+chantier en « Facturé » sans numéro ouvre maintenant `demanderNumeroFacture()`,
+qui propose aussi la date et laisse toujours la porte de sortie « Plus tard ».
+
+**La recherche du carnet passe outre le filtre.** Un numéro de facture
+appartient presque toujours à un chantier payé, donc rangé hors des
+« ouverts » : taper le bon numéro et ne rien voir sortir serait le pire des
+deux. `chercher()` regarde nom, donneur, propriétaire, forêt, parcelles,
+commune, les deux numéros et la note ; plusieurs mots doivent tous se
+retrouver, pas forcément dans le même champ.
 
 ## Donneur d'ordre et propriétaire — le nommage piège
 
