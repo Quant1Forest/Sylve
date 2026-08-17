@@ -453,13 +453,40 @@ pas sa propre facture.
   de passer en dessous de cent identifiants — un contrôle qui n'inspecte plus
   rien doit crier, pas rassurer.
 
+## Où en est le chantier — 16 août 2026
+
+L'historique est repris : 32 chantiers, 124 dépenses, 6 charges fixes, 6
+produits, 3 fournisseurs, 3 commandes, 9 sorties. Il vit sur le téléphone.
+Le fichier se refabrique avec `outils/importer-carnet.js` à partir des deux
+classeurs, qui restent chez l'utilisateur.
+
+Une longue tournée de retours a été traitée d'un bloc : le bandeau qui
+disparaissait, les pastilles illisibles, la fausse « marge », le carnet sans
+ordre ni dates, les listes interverties, les libellés de facture perdus, les
+dates non modifiables, « 1 709 jours », « 2 280 € tous les mois », les
+listes à rallonge, les réglages qui égaraient, les graphiques sans échelle,
+« À traiter » qui ne montrait que les ennuis, les heures sur une journée, le
+dépassement d'estimation, la TVA des achats, l'avis de mise à jour.
+
+**La façon de travailler qui marche** : l'utilisateur parcourt l'application
+en dictant ce qui coince, et ses retours trouvent plus de vrais défauts que
+la lecture du code. Trois exemples : la sauvegarde qui ne restaurait plus les
+dépenses, le bandeau bloqué, les quantités d'unités mêlées. À chaque fois le
+symptôme était juste, l'explication qu'il en donnait rarement — creuser le
+symptôme, pas l'explication.
+
 ## Ce qui n'a jamais été bouclé
 
 - **La boucle estimation → chantier → agenda.** Touche Devis et estimatif,
   Rendements et Calendrier à la fois. Jamais fermée.
-- **Le rangement des réglages** : « j'ai du mal à savoir où va quoi ».
-- **La revue de la partie Entreprise** : seul le module Chantiers a été
-  parcouru. Calendrier, Rendements, Devis, Analyses, Stock et Finances
-  attendent.
-- **Les données historiques.** Les anciens classeurs doivent être convertis et
-  importés. L'import se fait dans Réglages ▸ Entreprise ▸ Import de données.
+- **Le rangement des réglages.** Les onglets sont sortis du bas, mais le
+  contenu reste à ranger : « j'ai du mal à savoir où va quoi ».
+- **La revue de la partie Entreprise** : Chantiers, Finances et Analyses ont
+  été parcourus. Calendrier, Rendements et Devis attendent.
+- **Une barre de téléchargement.** Elle n'aurait de sens que pendant le
+  téléchargement de fond du service worker, avant que l'avis n'apparaisse —
+  à ce moment-là tout est déjà arrivé. Proposé, pas demandé.
+- **Les lignes de chantier reprises du carnet ne désignent aucun article.**
+  Ne pas les rattacher : leur sortie de stock existe déjà, importée du
+  classeur. Une garde empêche la double déduction, mais la tentation
+  reviendra.
