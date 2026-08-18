@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.38.0-20260818-1856**
+Version courante : **4.39.0-20260818-1915**
 
 ---
 
@@ -465,6 +465,41 @@ retour du bandeau lisait le module courant : on ressortait des réglages dans
 « Mon entreprise », jamais sur l'écran quitté. `aller()` retient donc
 `A.vueAvantReglages`, et `allerMenuParent()` y redescend d'abord — à
 condition que cette vue appartienne encore au module ouvert.
+
+## Le rangement des réglages
+
+« J'ai du mal à savoir où va quoi » avait deux causes, et aucune n'était le
+nombre d'onglets.
+
+1. **Une carte intitulée « Chantiers » tenait quatre sujets sans lien** : la
+   journée de travail, le véhicule, les relances, les week-ends. Rien ne
+   disait que la consommation du fourgon se réglait sous « Chantiers ». Elle
+   est éclatée en trois zones titrées — *Ma journée de travail*, *Véhicule*,
+   *Relances et calendrier*.
+2. **Le bouton du bandeau ne choisissait que l'onglet, jamais la zone.**
+   Depuis Finances, il déposait au sommet d'un onglet Entreprise qui déroule
+   sept zones, et dont la première parlait des heures de travail.
+   `SEC_DE_MODULE` porte maintenant une zone par module, et
+   `versZoneReglages()` y descend.
+
+| On vient de | On arrive sur |
+|---|---|
+| Chantiers, Rendements | Ma journée de travail |
+| Calendrier | Relances et calendrier |
+| Finances | Financier |
+| Stock et fournitures | Stock et fournitures |
+| Cubage, Bois | leur propre onglet |
+
+**Pas de second niveau d'onglets.** Décision ancienne, toujours valable : un
+onglet déroule ses zones sous leurs titres, et on lit en descendant plutôt
+que de chercher où cliquer. Un scénario le garde (`#regl-sous` doit rester
+introuvable). C'est pour ça que la réponse a été de nommer les zones et de
+viser juste, pas d'ajouter des sous-onglets.
+
+**Le défilement se teste en espionnant `scrollIntoView`.** Le banc d'essai le
+neutralise au démarrage ; un scénario le remplace par un mouchard et lit quel
+élément l'a reçu. Sans ça, « le bouton descend au bon endroit » n'était pas
+vérifiable.
 
 ## Deux détails de typographie qui comptent
 
