@@ -13157,45 +13157,115 @@ function optionsFournisseurs(sel) {
 }
 function jourIso(ts) { return new Date(ts || Date.now()).toISOString().slice(0, 10); }
 
+/* Un produit dosé se consomme au plant : on plante 332 arbres, on ne verse
+   pas 1 992 millilitres. La saisie parle donc en plants, et la conversion se
+   fait à la frontière — ce qui est enregistré reste dans l'unité du stock,
+   dont dépend tout le calcul. Un sélecteur permet de repasser dans l'unité
+   du produit quand c'est elle qu'on a sous les yeux.
+   À l'achat, non : on commande des bidons, pas des plants. */
+function doseLigne(l) {
+  var a = article(l && l.article);
+  var d = a ? ST.nb(a.dosage) : 0;
+  return (l && l.par === 'plant' && d > 0) ? d : 1;
+}
 /* Le bloc de lignes est commun aux commandes, aux sorties et aux pertes ;
-   seule l'étiquette du prix change. */
-function renderLignes(prixLabel) {
+   l'étiquette du prix change, et seules les sorties raisonnent au plant. */
+function renderLignes(prixLabel, auPlant) {
   $('#lg-lignes').innerHTML = lg.map(function (l, i) {
     var art = article(l.article);
+    var dose = art ? ST.nb(art.dosage) : 0;
+    var dosable = auPlant && dose > 0;
+    var enPlants = dosable && l.par === 'plant';
+    var uniteLue = enPlants ? 'plant' : (art ? ST.courtUniteArt(art.unite) : '');
+    var q = ST.nb(l.qte);
     return '<div class="carte2" style="margin-bottom:7px;padding:9px 10px">' +
       '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">' +
       '<select data-lgart="' + i + '" style="flex:1">' + optionsArticles(l.article) + '</select>' +
       (lg.length > 1 ? '<button type="button" class="btn-min" data-lgsup="' + i + '">✕</button>' : '') + '</div>' +
       '<div class="grille g2">' +
       '<div class="champ" style="margin:0"><label class="eyebrow">Quantité' +
-      (art ? ' (' + ST.courtUniteArt(art.unite) + ')' : '') + '</label>' +
+      (uniteLue ? ' (' + esc(uniteLue) + ')' : '') + '</label>' +
       '<input type="text" data-lgqte="' + i + '" class="gros" inputmode="decimal" value="' + esc(l.qte) + '"></div>' +
-      (prixLabel ? '<div class="champ" style="margin:0"><label class="eyebrow">' + prixLabel + '</label>' +
+      (prixLabel ? '<div class="champ" style="margin:0"><label class="eyebrow">' + prixLabel +
+        (enPlants ? ' / plant' : '') + '</label>' +
         '<input type="text" data-lgprix="' + i + '" class="gros" inputmode="decimal" value="' + esc(l.prix) + '"></div>' : '') +
-      '</div></div>';
+      '</div>' +
+      (dosable
+        ? '<div style="display:flex;gap:7px;align-items:center;margin-top:7px;flex-wrap:wrap">' +
+          '<select data-lgpar="' + i + '" style="flex:none;width:auto">' +
+          '<option value="plant"' + (enPlants ? ' selected' : '') + '>saisir en plants</option>' +
+          '<option value=""' + (enPlants ? '' : ' selected') + '>saisir en ' +
+          esc(ST.courtUniteArt(art.unite)) + '</option></select>' +
+          '<span class="muted" style="font-size:12px" data-lgconv="' + i + '">' +
+          (q > 0 && enPlants
+            ? '<span class="muted" style="font-size:12px">' + E.fmt(q, 0) + ' × ' +
+              E.fmt(dose, dose % 1 ? 2 : 0) + ' ' + esc(ST.courtUniteArt(art.unite)) + ' = <b>' +
+              E.fmt(ST.arr(q * dose, 2), 0) + ' ' + esc(ST.courtUniteArt(art.unite)) +
+              '</b> sortiront du stock'
+            : '') + '</span></div>'
+        : '') +
+      '</div>';
   }).join('') + '<button type="button" class="btn-min" id="lg-plus">+ un produit</button>';
+}
+/* La phrase de conversion, réécrite seule : redessiner le bloc entier à
+   chaque touche ferait perdre le curseur au milieu du nombre. */
+function majConversions(auPlant) {
+  $$('#lg-lignes [data-lgconv]').forEach(function (z) {
+    var l = lg[Number(z.dataset.lgconv)], a = article(l && l.article);
+    var dose = a ? ST.nb(a.dosage) : 0, q = ST.nb(l && l.qte);
+    if (!auPlant || !dose || l.par !== 'plant' || !(q > 0)) { z.textContent = ''; return; }
+    var u = ST.courtUniteArt(a.unite);
+    z.innerHTML = E.fmt(q, 0) + ' × ' + E.fmt(dose, dose % 1 ? 2 : 0) + ' ' + esc(u) +
+      ' = <b>' + E.fmt(ST.arr(q * dose, 2), 0) + ' ' + esc(u) + '</b> sortiront du stock';
+  });
 }
 function lireLignes() {
   $$('#lg-lignes [data-lgart]').forEach(function (i) { lg[Number(i.dataset.lgart)].article = i.value; });
   $$('#lg-lignes [data-lgqte]').forEach(function (i) { lg[Number(i.dataset.lgqte)].qte = i.value; });
   $$('#lg-lignes [data-lgprix]').forEach(function (i) { lg[Number(i.dataset.lgprix)].prix = i.value; });
+  $$('#lg-lignes [data-lgpar]').forEach(function (i) { lg[Number(i.dataset.lgpar)].par = i.value; });
+  /* Un produit non dosé ne se saisit jamais au plant : changer d'article
+     remet la ligne dans son unité. */
+  lg.forEach(function (l) {
+    var a = article(l.article);
+    if (!a || !ST.nb(a.dosage)) l.par = '';
+  });
 }
-function brancherLignes(prixLabel, apercu) {
-  renderLignes(prixLabel);
-  $('#lg-lignes').addEventListener('input', function () { lireLignes(); apercu(); });
-  $('#lg-lignes').addEventListener('change', function () { lireLignes(); apercu(); });
+function brancherLignes(prixLabel, apercu, auPlant) {
+  renderLignes(prixLabel, auPlant);
+  $('#lg-lignes').addEventListener('input', function () {
+    lireLignes(); majConversions(auPlant); apercu();
+  });
+  /* Un changement d'article ou d'unité redessine : l'étiquette et la
+     conversion doivent suivre immédiatement. */
+  $('#lg-lignes').addEventListener('change', function () {
+    lireLignes(); renderLignes(prixLabel, auPlant); apercu();
+  });
   $('#lg-lignes').addEventListener('click', function (e) {
     var plus = e.target.closest('#lg-plus'), sup = e.target.closest('[data-lgsup]');
-    if (plus) { lireLignes(); lg.push({ article: A.articles[0].id, qte: '', prix: '' }); }
+    if (plus) {
+      lireLignes();
+      var a0 = A.articles[0];
+      lg.push({ article: a0.id, qte: '', prix: '',
+        par: (auPlant && ST.nb(a0.dosage)) ? 'plant' : '' });
+    }
     else if (sup) { lireLignes(); lg.splice(Number(sup.dataset.lgsup), 1); }
     else return;
-    renderLignes(prixLabel); apercu();
+    renderLignes(prixLabel, auPlant); apercu();
   });
   apercu();
 }
+/* La conversion se fait ici, à la sortie du formulaire, et nulle part
+   ailleurs : tout ce qui suit — aperçu, enregistrement, stock — continue de
+   raisonner dans l'unité du produit. Le prix suit la quantité : un prix par
+   plant devient un prix par millilitre. */
 function lignesValides() {
   return lg.filter(function (l) { return l.article && ST.nb(l.qte) > 0; })
-    .map(function (l) { return { article: l.article, qte: ST.nb(l.qte), prix: ST.nb(l.prix) }; });
+    .map(function (l) {
+      var k = doseLigne(l);
+      return { article: l.article, qte: ST.arr(ST.nb(l.qte) * k, 3),
+        prix: k !== 1 ? ST.arr(ST.nb(l.prix) / k, 6) : ST.nb(l.prix) };
+    });
 }
 
 /* ---------------------------------------------------------- une commande */
@@ -13379,10 +13449,19 @@ function ouvrirSortieStock(id, perte, artPref) {
   var s = id ? sortie(id) : null;
   if (id && !s) return;
   if (s) perte = !!s.perte;
+  var auPlant = function (idArt) {
+    var a = article(idArt);
+    return a && ST.nb(a.dosage) ? 'plant' : '';
+  };
   lg = s ? (s.lignes || []).map(function (l) {
-    return { article: l.article, qte: String(l.qte), prix: String(l.prix) };
-  }) : [{ article: artPref || A.articles[0].id, qte: '', prix: '' }];
-  if (!lg.length) lg = [{ article: A.articles[0].id, qte: '', prix: '' }];
+    var par = auPlant(l.article), d = par ? ST.nb(article(l.article).dosage) : 1;
+    return { article: l.article, par: par,
+      qte: String(ST.arr(ST.nb(l.qte) / d, 3)),
+      prix: String(ST.arr(ST.nb(l.prix) * d, 4)) };
+  }) : [{ article: artPref || A.articles[0].id, qte: '', prix: '',
+    par: auPlant(artPref || A.articles[0].id) }];
+  if (!lg.length) lg = [{ article: A.articles[0].id, qte: '', prix: '',
+    par: auPlant(A.articles[0].id) }];
 
   var chs = A.chantiers.slice().sort(function (x, y) { return (y.maj || 0) - (x.maj || 0); });
   modale(id ? (perte ? 'Modifier la perte' : 'Modifier la sortie')
@@ -13458,7 +13537,7 @@ function ouvrirSortieStock(id, perte, artPref) {
         'le chiffre d’affaires vient de là, pas d’ici.</div>';
     }
   };
-  brancherLignes(perte ? '' : 'Prix de vente unitaire', apercu);
+  brancherLignes(perte ? '' : 'Prix de vente unitaire', apercu, true);
 
   var noteCh = function () {
     var e = $('#so-note-ch'); if (!e) return;
@@ -14103,7 +14182,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.42.0-20260818-2300';
+var VERSION = '4.43.0-20260818-2334';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

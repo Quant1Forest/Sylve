@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.42.0-20260818-2300**
+Version courante : **4.43.0-20260818-2334**
 
 ---
 
@@ -220,6 +220,13 @@ travailler.
   cumulait sans regarder l'unité et gardait celle de la première ligne : une
   plantation facturée 4 jours puis 1 705 plants ressortait en « 1 709 jours ».
   Unités mêlées, on renonce à la quantité.
+- **Écrire les scripts de retouche dans un fichier, jamais dans `node -e`.**
+  Passé à travers les guillemets du shell, `[\s\S]` arrive dans le fichier
+  en `[sS]` et `\u00A0` en `M`. Trois essais perdus le 18 août 2026 sur une
+  seule expression régulière. Corollaire : quand on remplace un texte qui
+  contient `$$` — les sélecteurs `t.$$()` des tests — `String.replace` le lit
+  comme un `$` littéral. Utiliser `split().join()` ou une fonction de
+  remplacement.
 - **Ne jamais réécrire un fichier avec `Set-Content` sous PowerShell 5.1.**
   `Get-Content -Raw` lit en ANSI, `Set-Content -Encoding utf8` réécrit en
   UTF-8 : chaque accent traverse deux fois l'encodage et ressort en `Ã©`,
@@ -580,6 +587,35 @@ vérifiable.
     une attente lue par cette porte s'écrit avec une espace ordinaire, alors
     qu'une attente lue sur `textContent` brut garde l'insécable. Deux heures
     perdues sur un « attendu 1 000 € / obtenu 1 000 € » qui se lisaient pareil.
+
+## Le plant se saisit, le millilitre se stocke
+
+La règle vaut désormais aux **trois** endroits où une quantité s'écrit, et
+elle n'était appliquée qu'à un seul :
+
+| Où | Ce qu'on saisit | Pourquoi |
+|---|---|---|
+| Ligne de chantier | des plants | c'est ce que lit le client |
+| Sortie ou perte | des **plants** par défaut | on plante 332 arbres, on ne verse pas 1 992 ml |
+| Commande | l'unité du produit | on achète des bidons, pas des plants |
+
+**La conversion vit à un seul endroit** : `lignesValides()`, à la sortie du
+formulaire. Tout ce qui suit — aperçu, enregistrement, arithmétique du stock
+— continue de raisonner dans l'unité du produit. `doseLigne()` donne le
+facteur, et **le prix suit la quantité** : 0,30 € par plant devient 0,05 €
+par millilitre. Ne jamais convertir ailleurs.
+
+Un sélecteur par ligne permet de repasser dans l'unité du produit, et la
+phrase de conversion s'écrit sous le champ — réécrite seule à chaque frappe
+par `majConversions()`, car redessiner le bloc entier ferait perdre le
+curseur au milieu du nombre.
+
+**Les sorties saisies avant la 4.43 sont incohérentes entre elles** : sur
+certaines il a tapé des plants dans un champ qui attendait des millilitres.
+Elles ressortiront donc avec un nombre de plants bizarre (332 stockés / 6 =
+55,3). Il l'a vu, il corrigera lui-même. **Ne pas tenter de les rattraper
+automatiquement** : rien ne distingue de façon sûre un 332 mal saisi d'un
+332 juste.
 
 ## Le stock : ce qui se totalise et ce qui ne se totalise pas
 

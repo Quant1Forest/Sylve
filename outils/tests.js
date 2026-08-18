@@ -2471,6 +2471,78 @@ scenario('Simulateur : le dosage se change sans toucher au produit', async () =>
 });
 
 /* --------------------------------------------------------------------- */
+scenario('Sortie : un produit dosé se saisit au plant, se stocke au millilitre', async () => {
+  /* On plante 332 arbres, on ne verse pas 1 992 millilitres. La saisie parle
+     donc en plants ; ce qui est enregistré reste dans l'unité du stock, dont
+     dépend tout le calcul. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'stock',
+    articles: [{ id: 'a1', nom: 'Trico', unite: 'millilitre', dosage: 6 },
+      { id: 'a2', nom: 'Tuteur', unite: 'unite' }],
+    commandes: [{ id: 'k1', statut: 'recu', dateCmd: Date.now(), dateLiv: Date.now(),
+      lignes: [{ article: 'a1', qte: 34000, prix: 0.02 }] }]
+  }));
+  t.clic('[data-vue="commandes"]'); await t.pause(300);
+  /* Un seul bouton de création : son intitulé suit le sous-onglet ouvert. */
+  t.clic('[data-mvt="sorties"]'); await t.pause(250);
+  t.clic('#cmd-nouvelle'); await t.pause(400);
+
+  /* Le produit dosé s'ouvre en plants. */
+  verifierVrai('un sélecteur d’unité est proposé', t.$('[data-lgpar="0"]'));
+  verifier('on saisit en plants par défaut', 'plant', t.$('[data-lgpar="0"]').value);
+  verifierVrai('l’étiquette le dit', /plant/.test(t.$('#lg-lignes').textContent));
+
+  t.saisir('[data-lgqte="0"]', '332');
+  t.saisir('[data-lgprix="0"]', '0,30');
+  await t.pause(250);
+  /* Le séparateur de milliers est une espace insécable : on lit la phrase
+     telle qu'elle est écrite, sans expression régulière à échapper. */
+  const conv = t.$('[data-lgconv="0"]').textContent;
+  verifier('la conversion est écrite en clair',
+    '332 × 6 ml = 1 992 ml sortiront du stock', conv);
+
+  t.clic('#so-ok'); await t.pause(450);
+  const so = (t.stock('sorties') || [])[0];
+  verifierVrai('la sortie est enregistrée', so);
+  verifier('332 plants font 1 992 ml', 1992, so.lignes[0].qte);
+  /* 0,30 € par plant, c'est 0,05 € par millilitre. */
+  verifier('et le prix suit la quantité', 0.05, so.lignes[0].prix);
+
+  /* Rouverte, elle se relit en plants. */
+  t.clic('[data-mvt="sorties"]'); await t.pause(250);
+  t.clic('[data-srtmod="' + so.id + '"]'); await t.pause(400);
+  verifier('elle se relit en plants', '332', t.$('[data-lgqte="0"]').value);
+  verifier('et son prix par plant', '0.3', t.$('[data-lgprix="0"]').value);
+
+  /* Le sélecteur ramène dans l'unité du produit. */
+  t.choisir('[data-lgpar="0"]', ''); await t.pause(300);
+  verifierVrai('l’étiquette repasse au millilitre',
+    /Quantité \(ml\)/.test(t.$('#lg-lignes').textContent));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Commande : on achète des bidons, jamais des plants', async () => {
+  /* La règle du plant ne vaut qu'à la sortie : une commande porte ce que le
+     fournisseur facture. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'stock',
+    articles: [{ id: 'a1', nom: 'Trico', unite: 'millilitre', dosage: 6 }]
+  }));
+  t.clic('[data-vue="commandes"]'); await t.pause(300);
+  t.clic('#cmd-nouvelle'); await t.pause(350);
+  verifier('aucun sélecteur d’unité à l’achat', null, t.$('[data-lgpar="0"]'));
+  verifierVrai('la quantité est en millilitres',
+    /Quantité \(ml\)/.test(t.$('#lg-lignes').textContent));
+  t.saisir('[data-lgqte="0"]', '34000');
+  t.saisir('[data-lgprix="0"]', '0,02');
+  t.clic('#cm-ok'); await t.pause(450);
+  const k = (t.stock('commandes') || [])[0];
+  verifier('34 000 ml commandés, sans conversion', 34000, k.lignes[0].qte);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
 /* Un troisième argument ne joue que les scénarios dont le nom le contient.
    Sert à éprouver un contrôle en le cassant exprès : rejouer les quarante
    autres pour vérifier qu'un seul crie coûte deux minutes pour rien.
