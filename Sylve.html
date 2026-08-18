@@ -919,9 +919,8 @@ if (froid && s > 0) montrer(s);
         <p class="muted" style="font-size:12px;margin:8px 0 0" id="r-dem-aide"></p>
         <p class="muted" style="font-size:12px;margin:10px 0 0" id="r-version"></p>
       </div>
-      <p class="eyebrow reg-titre" data-sec="ent" data-sous="gen" style="margin:4px 0 8px">Général</p>
-      <div class="carte" data-sec="ent" data-sous="gen" id="c-ch-regl">
-        <h2>Chantiers</h2>
+      <p class="eyebrow reg-titre" data-sec="ent" data-sous="journee" style="margin:4px 0 8px">Ma journée de travail</p>
+      <div class="carte" data-sec="ent" data-sous="journee" id="c-ch-regl">
         <div class="grille g2">
           <div class="champ"><label class="eyebrow" for="r-hj">Heures dans une journée</label>
             <input type="text" id="r-hj" inputmode="decimal" autocomplete="off"></div>
@@ -932,20 +931,33 @@ if (froid && s > 0) montrer(s);
           Sert à convertir les heures en jours-homme et à comparer le prix de journée
           réellement obtenu sur chaque chantier.
         </p>
-        <p class="eyebrow" style="margin:16px 0 6px">Véhicule</p>
+      </div>
+
+      <p class="eyebrow reg-titre" data-sec="ent" data-sous="vehicule" style="margin:22px 0 8px">Véhicule</p>
+      <div class="carte" data-sec="ent" data-sous="vehicule">
         <div class="grille g2">
           <div class="champ"><label class="eyebrow" for="r-l100">Consommation (L/100 km)</label>
             <input type="text" id="r-l100" inputmode="decimal" autocomplete="off"></div>
           <div class="champ"><label class="eyebrow" for="r-pl">Prix du litre (€)</label>
             <input type="text" id="r-pl" inputmode="decimal" autocomplete="off"></div>
         </div>
-        <p class="eyebrow" style="margin:16px 0 6px">Alertes</p>
+        <p class="muted" style="font-size:12px;margin:10px 0 0">
+          Le carburant d'un chantier est estimé d'après les kilomètres que vous saisissez.
+        </p>
+      </div>
+
+      <p class="eyebrow reg-titre" data-sec="ent" data-sous="alertes" style="margin:22px 0 8px">Relances et calendrier</p>
+      <div class="carte" data-sec="ent" data-sous="alertes">
         <div class="grille g2">
           <div class="champ"><label class="eyebrow" for="r-rd">Relancer un devis après (jours)</label>
             <input type="text" id="r-rd" inputmode="numeric" autocomplete="off"></div>
           <div class="champ"><label class="eyebrow" for="r-rf">Relancer une facture après (jours)</label>
             <input type="text" id="r-rf" inputmode="numeric" autocomplete="off"></div>
         </div>
+        <p class="muted" style="font-size:12px;margin:9px 0 0">
+          Le délai du devis ne sert que faute de validité saisie : un devis qui porte une
+          date de fin est relancé d'après elle.
+        </p>
         <label class="ligne-check" style="margin-top:10px;display:flex;align-items:center;gap:8px;font-size:13.5px">
           <input type="checkbox" id="r-we"> Compter les week-ends comme jours travaillables
         </label>
@@ -6145,9 +6157,18 @@ function exportStockXlsx() {
    depuis l'accueil, ou depuis un module — qui ouvre alors sa propre section. */
 /* Un raccourci depuis un module ouvre le bon onglet et fait défiler jusqu'à
    la bonne zone. */
-var SEC_DE_MODULE = { cubage: 'cubage', bois: 'bois', stock: 'ent' };
+/* De quel écran on vient décide non seulement de l'onglet des réglages, mais
+   de la zone : déposer au sommet d'un onglet qui déroule six sujets revenait à
+   ne rien indiquer du tout. */
+var SEC_DE_MODULE = {
+  cubage: 'cubage', bois: 'bois',
+  chantiers: 'journee', calendrier: 'alertes', rendements: 'journee',
+  finances: 'fin', stock: 'stock'
+};
 var RACCOURCIS_REGLAGES = {
-  stock: ['ent', 'stock'], listes: ['ent', 'listes'], fin: ['ent', 'fin'], gen: ['ent', 'gen']
+  stock: ['ent', 'stock'], listes: ['ent', 'listes'], fin: ['ent', 'fin'],
+  journee: ['ent', 'journee'], vehicule: ['ent', 'vehicule'],
+  alertes: ['ent', 'alertes']
 };
 /* Pas de second niveau d'onglets : un onglet déroule toutes ses zones, chacune
    sous son propre sous-titre. On lit la page en descendant plutôt que de
@@ -13636,7 +13657,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.38.0-20260818-1856';
+var VERSION = '4.39.0-20260818-1915';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

@@ -196,8 +196,11 @@ scenario('Réglages : quatre onglets et des zones qui défilent', async () => {
     t.$$('#regl-nav .chip').map(b => b.textContent));
   t.clic('[data-regl="ent"]'); await t.pause(120);
   const zones = t.$$('#regl-corps .reg-titre').filter(e => !e.hidden).map(e => e.textContent);
+  /* Le fourre-tout « Général » a été éclaté : la journée de travail, le
+     véhicule et les relances ont chacun leur zone et leur titre. */
   verifier('les zones de l\'entreprise, dans l\'ordre',
-    ['Général', 'Listes déroulantes', 'Stock et fournitures', 'Financier', 'Import de données'], zones);
+    ['Ma journée de travail', 'Véhicule', 'Relances et calendrier',
+      'Listes déroulantes', 'Stock et fournitures', 'Financier', 'Import de données'], zones);
   verifier('aucun second niveau d\'onglets', 0, t.$$('#regl-sous').length);
   verifier('aucune erreur', [], t.erreurs);
 });
@@ -1867,6 +1870,73 @@ scenario('Mise à jour : un téléphone resté sur un module retiré ne tombe pa
   verifier('un module inconnu retombe sur le cubage', 'cubage', inconnu.stock('module'));
   verifier('aucune erreur', [],
     surDevis.erreurs.concat(surAnalyses.erreurs, inconnu.erreurs));
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Réglages : chaque zone porte son sujet, plus de fourre-tout', async () => {
+  /* Une carte intitulée « Chantiers » tenait quatre sujets sans lien : la
+     journée de travail, le véhicule, les relances, les week-ends. Rien ne
+     disait que la consommation du fourgon se réglait là. */
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'chantiers' }));
+  t.clic('#b-reglages'); await t.pause(350);
+  t.clic('[data-regl="ent"]'); await t.pause(250);
+
+  const zones = t.$$('#regl-corps .reg-titre[data-sec="ent"]')
+    .map(p => [p.dataset.sous, p.textContent.trim()]);
+  const parNom = Object.fromEntries(zones);
+  verifier('la journée de travail a sa zone', 'Ma journée de travail', parNom.journee);
+  verifier('le véhicule a la sienne', 'Véhicule', parNom.vehicule);
+  verifier('les relances aussi', 'Relances et calendrier', parNom.alertes);
+  verifierVrai('les listes déroulantes sont toujours là', !!parNom.listes);
+  verifierVrai('le stock aussi', !!parNom.stock);
+  verifierVrai('et le financier', !!parNom.fin);
+
+  /* Chaque réglage est resté joignable, et sous le bon titre. */
+  const dansZone = (sous, champ) => {
+    const carte = t.$('#regl-corps .carte[data-sous="' + sous + '"]');
+    return !!(carte && carte.querySelector(champ));
+  };
+  verifierVrai('les heures sont sous « Ma journée »', dansZone('journee', '#r-hj'));
+  verifierVrai('le prix de journée aussi', dansZone('journee', '#r-pj'));
+  verifierVrai('la consommation est sous « Véhicule »', dansZone('vehicule', '#r-l100'));
+  verifierVrai('le prix du litre aussi', dansZone('vehicule', '#r-pl'));
+  verifierVrai('les relances sont sous « Relances »', dansZone('alertes', '#r-rd'));
+  verifierVrai('les week-ends aussi', dansZone('alertes', '#r-we'));
+
+  /* Décision tenue depuis longtemps : pas de second niveau d'onglets. */
+  verifier('aucun second niveau d’onglets', 0, t.$$('#regl-sous').length);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Réglages : le bouton descend sur la zone de l’écran quitté', async () => {
+  /* Il ne choisissait que l'onglet et déposait au sommet d'un défilement de
+     six sujets : depuis Finances, on atterrissait sur les heures de travail. */
+  const vise = async (module, sectionAttendue, zoneAttendue) => {
+    const t = await ouvrir(Object.assign({}, VIDE, { module: module }));
+    const vus = [];
+    t.w.Element.prototype.scrollIntoView = function () { vus.push(this); };
+    t.clic('#b-reglages'); await t.pause(400);
+    verifierVrai(module + ' : les réglages sont ouverts',
+      t.$('#vue-reglages').classList.contains('actif'));
+    const onglet = t.$$('#regl-nav .chip')
+      .filter(b => b.getAttribute('aria-pressed') === 'true')[0];
+    verifier(module + ' : onglet « ' + sectionAttendue + ' »', sectionAttendue,
+      onglet && onglet.dataset.regl);
+    if (zoneAttendue) {
+      const zones = vus.map(e => e.dataset && e.dataset.sous).filter(Boolean);
+      verifierVrai(module + ' : descend sur « ' + zoneAttendue + ' »',
+        zones.indexOf(zoneAttendue) >= 0);
+    }
+    verifier(module + ' : aucune erreur', [], t.erreurs);
+  };
+  await vise('chantiers', 'ent', 'journee');
+  await vise('calendrier', 'ent', 'alertes');
+  await vise('rendements', 'ent', 'journee');
+  await vise('finances', 'ent', 'fin');
+  await vise('stock', 'ent', 'stock');
+  await vise('cubage', 'cubage', null);
+  await vise('bois', 'bois', null);
 });
 
 /* --------------------------------------------------------------------- */
