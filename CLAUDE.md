@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.43.0-20260818-2334**
+Version courante : **4.44.0-20260818-2357**
 
 ---
 
@@ -587,6 +587,53 @@ vérifiable.
     une attente lue par cette porte s'écrit avec une espace ordinaire, alors
     qu'une attente lue sur `textContent` brut garde l'insécable. Deux heures
     perdues sur un « attendu 1 000 € / obtenu 1 000 € » qui se lisaient pareil.
+
+## Sa marque, et le nom qu'on a retiré
+
+**L'application ne s'appelle plus que Sylve.** Toute référence à celle dont
+elle est partie — le tableur de cubage de l'ONF — a été retirée de l'écran
+**et des commentaires** en 4.44 : elle l'a inspiré au début, il s'en est
+complètement écarté depuis. Le mode de calcul s'appelle « Historique », et
+son explication parle de « vos anciens bordereaux ».
+
+**Les clés `bordcub.*` et le nom de la base IndexedDB ne changeront jamais.**
+Les renommer ferait chercher les données dans un tiroir vide : chantiers,
+dépenses, stock, tout serait perdu. Ce nom n'apparaît nulle part à l'écran,
+et un scénario le vérifie — en écartant le source des `<script>`, car
+`body.textContent` l'embarque et ferait croire à une fuite.
+
+**Son logo et le nom de son entreprise** vivent dans `A.cfg.logoEntreprise`
+et `A.cfg.nomEntreprise`, donc ils partent dans les sauvegardes. Deux
+endroits seulement, choisis par lui sur maquette :
+
+- l'écran **Mon entreprise**, où le nom remplace l'intitulé ;
+- l'**écran de démarrage**, en signature discrète sous la phrase de l'outil.
+  Variante retenue : *Sylve d'abord, lui ensuite*. L'accueil général garde la
+  marque de l'outil — les mélanger brouillerait les deux.
+
+**L'image est réduite à 256 px avant d'être gardée** (`reduireImage`), en
+PNG pour préserver la transparence d'un logo. Une photo de téléphone non
+réduite pèserait plusieurs mégaoctets dans le stockage local, qui n'est pas
+extensible — et elle partirait telle quelle dans chaque sauvegarde.
+
+**La signature du démarrage se lit en synchrone**, comme la durée : ajoutée
+après coup elle apparaîtrait en cours d'animation.
+
+## Les notes de mise à jour
+
+`NOTES_MAJ` porte les **cinq dernières** versions, en clair, dans Réglages ▸
+Général. Au-delà de cinq on ne remonte plus, et la liste devient un journal
+qu'on ne lit pas.
+
+**Elles s'écrivent à la main à chaque livraison.** Une liste engendrée depuis
+les commits dirait « corrections diverses », ce qui n'apprend rien. Trois à
+quatre lignes par version, dans ses mots à lui, pas dans le vocabulaire du
+code.
+
+Une ligne qui porte `vue` devient cliquable et mène à l'écran concerné —
+c'est ce qu'il demandait : « me donner accès aux endroits où il y a des
+modifications ». **Ne pas oublier d'ajouter la nouvelle version en tête à
+chaque envoi**, et de retirer la sixième.
 
 ## Le plant se saisit, le millilitre se stocke
 

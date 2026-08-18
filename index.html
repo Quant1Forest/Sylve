@@ -99,6 +99,14 @@ body:not(.m-ent) .mod-ent{display:none}
   text-underline-offset:2px;cursor:pointer;
 }
 .offre-liste.faite{color:var(--vert-marque)}
+/* Une note de mise à jour : cliquable quand elle mène quelque part, muette
+   sinon. Le chevron suffit à faire la différence. */
+.note-maj{
+  display:block;width:100%;text-align:left;font:inherit;font-size:13px;
+  color:var(--encre);background:none;border:0;padding:5px 0;line-height:1.4;
+}
+.note-maj[data-notevue]{color:var(--accent);cursor:pointer}
+.note-maj.sans{color:var(--doux)}
 .acompleter-bloc{
   margin:9px 0 0;padding:8px 11px;border-radius:var(--r-s);
   background:#F5EBCB;color:#6B5200;font-size:12.5px;
@@ -193,6 +201,14 @@ body.v-reglages .onglets{display:none}
   background:var(--logo) center/contain no-repeat;
 }
 .marque h1{font-size:29px;letter-spacing:-.02em;margin:0;font-weight:600;color:var(--vert-marque)}
+/* Le logo de l'entreprise, sur son écran à elle. L'accueil général garde la
+   marque de l'outil : les mélanger brouillerait les deux. */
+.logo-ent{
+  flex:none;width:46px;height:46px;border-radius:12px;background:var(--carte);
+  border:1px solid var(--trait);display:flex;align-items:center;justify-content:center;
+  box-shadow:var(--ombre);overflow:hidden;
+}
+.logo-ent img{width:100%;height:100%;object-fit:contain}
 .marque p{margin:1px 0 0;font-size:12.5px;color:var(--doux)}
 .tuiles{display:grid;gap:11px;margin-top:22px}
 .tuile{
@@ -574,6 +590,15 @@ td.act{width:1%;padding:3px 6px}
   margin:13px 0 0;opacity:.75}
 .dem-sous{font-size:13px;line-height:1.5;color:var(--doux);margin:12px 0 0;
   max-width:34ch;letter-spacing:.01em}
+/* La marque de l'entreprise signe l'écran de démarrage : discrète, en
+   dernier, après la phrase de l'outil. */
+.dem-ent{display:flex;align-items:center;gap:9px;margin:22px 0 0;
+  padding:7px 13px;border:1px solid var(--trait);border-radius:20px;
+  background:var(--carte);max-width:min(88vw,22rem)}
+.dem-ent img{width:22px;height:22px;object-fit:contain;flex:none;border-radius:4px}
+.dem-ent span{font-size:13px;color:var(--doux);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+#demarrage.joue .dem-ent{animation:dem-monte .42s cubic-bezier(.22,.7,.3,1) .46s both}
 #demarrage.joue .dem-logo {animation:dem-monte .42s cubic-bezier(.22,.7,.3,1) both}
 #demarrage.joue .dem-nom  {animation:dem-monte .42s cubic-bezier(.22,.7,.3,1) .16s both}
 #demarrage.joue .dem-filet{animation:dem-etale .40s cubic-bezier(.22,.7,.3,1) .30s both}
@@ -616,6 +641,10 @@ td.act{width:1%;padding:3px 6px}
     <!-- « à portée de main » soudé : sur un écran étroit la phrase doit
          casser après la virgule, jamais au milieu de la locution. -->
     <p class="dem-sous">Gestion et terrain, à&nbsp;portée&nbsp;de&nbsp;main</p>
+    <!-- L'outil se présente, l'entreprise signe en dessous. Rempli en
+         synchrone par le script ci-dessous, sinon la pastille apparaîtrait
+         après coup, une fois l'écran déjà là. -->
+    <div class="dem-ent" id="dem-ent" hidden></div>
   </div>
 </div>
 <script>
@@ -634,13 +663,27 @@ var el = document.getElementById('demarrage');
 if (!el) return;
 var DEFAUT = 1.2, minuterie = null;
 
-function duree() {
-  try {
-    var c = JSON.parse(localStorage.getItem('bordcub.cfg') || 'null');
-    if (c && c.demarrageDuree != null) return Number(c.demarrageDuree) || 0;
-  } catch (e) { }
-  return DEFAUT;
+function config() {
+  try { return JSON.parse(localStorage.getItem('bordcub.cfg') || 'null') || {}; }
+  catch (e) { return {}; }
 }
+function duree() {
+  var c = config();
+  return c.demarrageDuree != null ? (Number(c.demarrageDuree) || 0) : DEFAUT;
+}
+/* La signature se pose avant le premier rendu : ajoutée après coup, elle
+   apparaîtrait en cours d'animation. */
+function signer() {
+  var z = document.getElementById('dem-ent'); if (!z) return;
+  var c = config();
+  var nom = (c.nomEntreprise || '').trim(), logo = c.logoEntreprise || '';
+  if (!nom && !logo) { z.hidden = true; return; }
+  z.hidden = false;
+  z.innerHTML = (logo ? '<img alt="">' : '') + '<span></span>';
+  if (logo) z.querySelector('img').src = logo;
+  z.querySelector('span').textContent = nom;
+}
+signer();
 function cacher(fondu) {
   clearTimeout(minuterie);
   if (!fondu) el.classList.add('sec');
@@ -914,7 +957,7 @@ if (froid && s > 0) montrer(s);
       <div class="carte">
         <h2>Mode de calcul</h2>
         <div class="chips" id="r-mode">
-          <button class="chip" data-mode="historique" aria-pressed="true">Identique à Bord-Cub</button>
+          <button class="chip" data-mode="historique" aria-pressed="true">Historique</button>
           <button class="chip" data-mode="corrige" aria-pressed="false">Corrigé</button>
         </div>
         <p class="muted" style="font-size:12.5px;margin:10px 0 0" id="r-mode-txt"></p>
@@ -943,7 +986,27 @@ if (froid && s > 0) montrer(s);
         <button class="btn-min" id="r-qual-add" style="margin-top:9px">Ajouter une qualité</button>
       </div>
       </div><!-- /mod-cubage -->
-      <div class="carte" data-sec="general" id="c-appli">
+      <p class="eyebrow reg-titre" data-sec="general" data-sous="marque" style="margin:4px 0 8px">Mon entreprise</p>
+      <div class="carte" data-sec="general" data-sous="marque" id="c-marque">
+        <div class="champ"><label class="eyebrow" for="r-ent-nom">Nom de l’entreprise</label>
+          <input type="text" id="r-ent-nom" autocomplete="off" placeholder="Mon entreprise"></div>
+        <p class="eyebrow" style="margin:14px 0 7px">Logo</p>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <span class="logo-ent" id="r-ent-apercu" hidden></span>
+          <label class="btn btn-min" style="cursor:pointer;margin:0">Choisir une image
+            <input type="file" id="r-ent-fichier" accept="image/*" hidden></label>
+          <button class="btn-min" id="r-ent-retirer" hidden>Retirer</button>
+        </div>
+        <p class="muted" style="font-size:11.5px;margin:9px 0 0">L’image est réduite à
+          256 pixels avant d’être gardée : elle part dans vos sauvegardes, autant qu’elle
+          reste légère. Elle apparaît sur cet écran d’entreprise et au démarrage.</p>
+      </div>
+
+      <p class="eyebrow reg-titre" data-sec="general" data-sous="maj" style="margin:22px 0 8px">Ce qui a changé</p>
+      <div class="carte" data-sec="general" data-sous="maj" id="c-notes-maj"></div>
+
+      <p class="eyebrow reg-titre" data-sec="general" data-sous="appli" style="margin:22px 0 8px">L’application</p>
+      <div class="carte" data-sec="general" data-sous="appli" id="c-appli">
         <h2>Application</h2>
         <p class="muted" style="font-size:12.5px;margin:0 0 10px" id="r-appli-etat"></p>
         <div class="btn-rang">
@@ -1182,7 +1245,8 @@ if (froid && s > 0) montrer(s);
       <div class="accueil">
         <div class="marque">
           <button class="tuile" data-module="accueil" style="width:auto;padding:9px 13px">↩</button>
-          <div><h1 style="font-size:24px">Mon entreprise</h1><p>Chantiers sylvicoles</p></div>
+          <span class="logo-ent" id="ent-logo" hidden></span>
+          <div><h1 style="font-size:24px" id="ent-nom">Mon entreprise</h1><p>Chantiers sylvicoles</p></div>
         </div>
         <!-- Le bilan passe au-dessus des tuiles : c'est ce qu'on vient
              chercher en arrivant, et en dessous il tombait sous la ligne
@@ -1463,8 +1527,8 @@ if (froid && s > 0) montrer(s);
 
 <script>
 /* ==========================================================================
-   BordCub — moteur de calcul
-   Portage fidèle de Bord-Cub V3-2 (Bord_prg_v3.xls, modules M_Cubage,
+   Sylve — moteur de calcul
+   Portage fidèle du tableur de cubage d’origine (modules M_Cubage,
    M_Synthèse, M_Synthèse_Bûcheron, M_Synthèse_Financière,
    M_Synthèse_Martelage). Aucune dépendance au DOM : testable seul.
    ========================================================================== */
@@ -1609,7 +1673,7 @@ function nomQualite(code, classement, cfg) {
 
 // Classe de diamètre médian sous écorce.
 // dRef = diamètre servant à la coupure a/b :
-//   mode 'historique'  -> diamètre saisi (reproduit Bord-Cub)
+//   mode 'historique'  -> diamètre saisi (calcul des anciens bordereaux)
 //   mode 'corrige'     -> diamètre sous écorce (cohérent avec l'intitulé)
 function classeDiam(dSous, dRef) {
   var c = Math.floor(dSous / 10);
@@ -1653,7 +1717,7 @@ function cuberTout(bord, cfg) {
 
 /* ------------------------------------------- billons de valeur nulle (Z) */
 
-// Seuils effectifs. En mode historique on reproduit Bord-Cub, qui applique
+// Seuils effectifs. En mode historique on reproduit le tableur d’origine, qui applique
 // toujours l'abattement d'écorce (le test lisait la cellule F2, vide, au lieu
 // de J1) et tronque le résultat à l'entier (variables déclarées As Integer).
 function seuilsNuls(bord, cfg) {
@@ -1782,7 +1846,7 @@ function syntheseBucheron(bord, cfg) {
 }
 
 // Feuille « Martelage » : tiges par parcelle × essence × classe de D 1,30.
-// Bord-Cub exigeait un multiple exact de 5 et perdait silencieusement les
+// Le tableur d’origine exigeait un multiple exact de 5 et perdait silencieusement les
 // autres valeurs : on classe désormais à la classe de 5 cm la plus proche.
 function classeMartelage(d) {
   if (!(d > 0)) return null;
@@ -1829,7 +1893,7 @@ function syntheseMartelage(bord, cfg) {
 }
 
 // Feuille « Synthèse Financière ».
-// Le prix peut être saisi à trois niveaux ; Bord-Cub retient le MAX des trois
+// Le prix peut être saisi à trois niveaux ; le calcul d’origine retient le MAX des trois
 // montants possibles (formule MAX(...) de la colonne N, ligne « Total »).
 function syntheseFinanciere(bord, cfg) {
   var L = cuberTout(bord, cfg);
@@ -2138,7 +2202,7 @@ if (typeof window !== 'undefined') window.BCX = BCX_API;
 </script>
 <script>
 /* ==========================================================================
-   Construction du classeur d'export : reprend les cinq feuilles de Bord-Cub
+   Construction du classeur d'export : reprend les cinq feuilles du tableur d'origine
    (Volumes, Synthèse, Synthèse Financière, Bûcheron, Martelage) avec la même
    disposition, pour que les fichiers restent lisibles par les destinataires
    habitués à l'ancien logiciel.
@@ -4803,7 +4867,7 @@ if (typeof module === 'object' && module.exports) module.exports = M;
 </script>
 <script>
 /* ==========================================================================
-   BordCub — stockage
+   Sylve — stockage
    IndexedDB en principal (quota large, protégé par persist()), localStorage
    en miroir. Deux copies indépendantes : si l'une est vidée ou abîmée,
    l'autre remet l'application d'aplomb toute seule.
@@ -4813,6 +4877,9 @@ if (typeof module === 'object' && module.exports) module.exports = M;
 'use strict';
 
 var PREFIXE = 'bordcub.';
+/* Le nom de la base et le préfixe des clés datent des débuts et ne changeront
+   pas : les renommer ferait chercher les données dans un tiroir vide, et tout
+   serait perdu. Ce nom n'apparaît nulle part à l'écran. */
 var DB = 'bordcub', MAGASIN = 'kv', DELAI = 4000;
 
 var mode = 'memoire';
@@ -4978,7 +5045,7 @@ window.BCS = S;
 </script>
 <script>
 /* ==========================================================================
-   BordCub — sauvegarde et récupération (logique pure, sans DOM)
+   Sylve — sauvegarde et récupération (logique pure, sans DOM)
    ========================================================================== */
 (function () {
 'use strict';
@@ -5104,7 +5171,7 @@ if (typeof module === 'object' && module.exports) module.exports = window.BCB;
 </script>
 <script>
 /* ==========================================================================
-   BordCub — interface
+   Sylve — interface
    ========================================================================== */
 (function () {
 'use strict';
@@ -5654,12 +5721,12 @@ function ouvrirEntete() {
 function renderReglages() {
   $$('#r-mode .chip').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.mode === A.cfg.mode)); });
   $('#r-mode-txt').innerHTML = A.cfg.mode === 'historique'
-    ? 'Reproduit Bord-Cub à l’identique, y compris ses deux anomalies : la coupure des classes 2a/2b et 3a/3b se fait ' +
-    'sur le diamètre saisi et non sur le diamètre sous écorce, et les seuils de billons nuls sont toujours abaissés ' +
-    'de l’écorce même en mesure sur écorce. À conserver pour rester cohérent avec vos anciens bordereaux.'
+    ? 'Reprend le calcul de vos anciens bordereaux, avec ses deux anomalies : la coupure des classes 2a/2b et 3a/3b ' +
+    'se fait sur le diamètre saisi et non sur le diamètre sous écorce, et les seuils de billons nuls sont toujours ' +
+    'abaissés de l’écorce même en mesure sur écorce. À conserver pour rester cohérent avec ce que vous avez déjà rendu.'
     : 'Les classes 2a/2b et 3a/3b sont coupées sur le diamètre sous écorce, comme l’indique l’intitulé des colonnes, ' +
     'et les seuils de billons nuls ne sont abaissés que si les mesures sont prises sous écorce. ' +
-    'Attention : les classes de certains billons peuvent changer par rapport à Bord-Cub.';
+    'Attention : les classes de certains billons peuvent changer par rapport au calcul historique.';
   $('#r-slon').value = String(A.cfg.seuilLongueur).replace('.', ',');
   $('#r-ssap').value = String(A.cfg.seuilDiamSAP).replace('.', ',');
   $('#r-sepc').value = String(A.cfg.seuilDiamEPC).replace('.', ',');
@@ -6348,6 +6415,122 @@ function allerReglages(sec) {
   renderReglagesNav();
   aller('reglages');
   if (zone) setTimeout(function () { versZoneReglages(zone); }, 60);
+}
+
+/* Le logo est réduit avant d'être gardé : une photo de téléphone pèse
+   plusieurs mégaoctets, et le stockage local d'un navigateur n'est pas
+   extensible. 256 pixels suffisent largement aux deux endroits où il
+   s'affiche. */
+var LOGO_COTE = 256;
+function reduireImage(fichier, cote) {
+  return new Promise(function (resolve, reject) {
+    var lecteur = new FileReader();
+    lecteur.onerror = function () { reject(new Error('lecture impossible')); };
+    lecteur.onload = function () {
+      var img = new Image();
+      img.onerror = function () { reject(new Error('image illisible')); };
+      img.onload = function () {
+        var k = Math.min(1, cote / Math.max(img.width || 1, img.height || 1));
+        var l = Math.max(1, Math.round((img.width || 1) * k));
+        var h = Math.max(1, Math.round((img.height || 1) * k));
+        var c = document.createElement('canvas');
+        c.width = l; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, l, h);
+        /* PNG : un logo a souvent un fond transparent, que le JPEG noircirait. */
+        resolve(c.toDataURL('image/png'));
+      };
+      img.src = lecteur.result;
+    };
+    lecteur.readAsDataURL(fichier);
+  });
+}
+function renderReglagesMarque() {
+  var nom = $('#r-ent-nom'); if (!nom) return;
+  A.cfg = A.cfg || {};
+  nom.value = A.cfg.nomEntreprise || '';
+  var z = $('#r-ent-apercu'), logo = A.cfg.logoEntreprise || '';
+  z.hidden = !logo;
+  z.innerHTML = logo ? '<img alt="">' : '';
+  if (logo) z.querySelector('img').src = logo;
+  $('#r-ent-retirer').hidden = !logo;
+}
+function brancherReglagesMarque() {
+  var nom = $('#r-ent-nom'); if (!nom) return;
+  nom.addEventListener('change', function () {
+    A.cfg.nomEntreprise = this.value.trim();
+    sauverCfg().then(function () { renderAccueil(); toast('Nom enregistré.'); });
+  });
+  $('#r-ent-fichier').addEventListener('change', function () {
+    var fic = this.files && this.files[0];
+    this.value = '';
+    if (!fic) return;
+    reduireImage(fic, LOGO_COTE).then(function (url) {
+      A.cfg.logoEntreprise = url;
+      return sauverCfg();
+    }).then(function () {
+      renderReglagesMarque(); renderNotesMaj(); renderAccueil();
+      toast('Logo enregistré.');
+    })['catch'](function () { toast('Cette image n’a pas pu être lue.'); });
+  });
+  $('#r-ent-retirer').addEventListener('click', function () {
+    if (!confirm('Retirer votre logo ?')) return;
+    A.cfg.logoEntreprise = null;
+    sauverCfg().then(function () {
+      renderReglagesMarque(); renderNotesMaj(); renderAccueil(); toast('Logo retiré.');
+    });
+  });
+}
+
+/* Les cinq dernières mises à jour, en clair. Écrites à la main à chaque
+   livraison : une liste engendrée depuis les commits dirait « corrections
+   diverses », ce qui n'apprend rien. Cinq suffisent — au-delà on ne remonte
+   plus, et la liste devient un journal qu'on ne lit pas.
+   « vue » rend la ligne cliquable et mène à l'écran concerné. */
+var NOTES_MAJ = [
+  { v: '4.44', quoi: [
+    { t: 'Votre logo et le nom de votre entreprise, sur l’écran Entreprise et au démarrage', vue: 'reglages' },
+    { t: 'Cette liste, qui dit ce qui a changé aux cinq dernières mises à jour' },
+    { t: 'Plus aucune référence à l’application d’origine du cubage' }
+  ] },
+  { v: '4.43', quoi: [
+    { t: 'Un produit dosé se saisit en plants sur les sorties, plus en millilitres', vue: 'commandes' },
+    { t: 'La conversion s’écrit sous le champ pendant que vous tapez' }
+  ] },
+  { v: '4.42', quoi: [
+    { t: '« En stock » passe en première colonne de l’inventaire', vue: 'stock2' },
+    { t: 'Le taux de marge sur l’ensemble de vos ventes, avec votre objectif', vue: 'revient' },
+    { t: 'Marge brute ou nette, au choix, et vos prix face au minimum', vue: 'revient' },
+    { t: 'La dépense d’une commande se décoche après coup', vue: 'commandes' }
+  ] },
+  { v: '4.41', quoi: [
+    { t: 'L’inventaire n’additionne plus des millilitres avec des pièces', vue: 'stock2' },
+    { t: 'Le dosage par plant ne s’offre qu’aux unités qui peuvent en porter un' },
+    { t: '« Reçue » annonce la date de livraison qu’elle inscrit', vue: 'commandes' }
+  ] },
+  { v: '4.40', quoi: [
+    { t: 'Les journées passées comptent comme faites, plus comme prévues', vue: 'carnet' },
+    { t: 'L’échéance de paiement, et le délai de règlement par client', vue: 'finances' },
+    { t: 'Les fiches incomplètes se signalent dans le carnet', vue: 'carnet' },
+    { t: 'Le carnet aligné, et les réglages qui rendent la main' }
+  ] }
+];
+function renderNotesMaj() {
+  var z = $('#c-notes-maj'); if (!z) return;
+  var courante = String((window.BCP && BCP.version) || '').split('-')[0];
+  z.innerHTML = NOTES_MAJ.slice(0, 5).map(function (m, i) {
+    var ici = courante.indexOf(m.v) === 0;
+    return '<div style="padding:' + (i ? '11px' : '0') + ' 0 0' +
+      (i ? ';border-top:1px solid var(--trait);margin-top:11px' : '') + '">' +
+      '<p class="eyebrow" style="margin:0 0 6px">Version ' + esc(m.v) +
+      (ici ? ' <span class="muted" style="font-weight:400;text-transform:none;' +
+        'letter-spacing:0">— celle que vous avez</span>' : '') + '</p>' +
+      m.quoi.map(function (q) {
+        return q.vue
+          ? '<button class="note-maj" data-notevue="' + esc(q.vue) + '">' +
+            esc(q.t) + '<span aria-hidden="true"> ›</span></button>'
+          : '<p class="note-maj sans">' + esc(q.t) + '</p>';
+      }).join('') + '</div>';
+  }).join('');
 }
 
 function renderReglagesBois() {
@@ -7177,6 +7360,19 @@ function brancher() {
     allerModule('chantiers', 'carnet');
   });
   brancherReglagesAlertes();
+  brancherReglagesMarque();
+  $('#c-notes-maj').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-notevue]'); if (!b) return;
+    var v = b.dataset.notevue;
+    if (v === 'reglages') { allerReglages('general'); return; }
+    /* On passe par le module qui porte la vue, sinon la barre du bas
+       resterait sur celle d'avant. */
+    var MOD = { carnet: 'chantiers', chantier: 'chantiers', calendrier: 'calendrier',
+      rendements: 'rendements', estimer: 'rendements', finances: 'finances',
+      depenses: 'finances', charges: 'finances', analyses: 'finances',
+      stock2: 'stock', commandes: 'stock', revient: 'stock' };
+    allerModule(MOD[v] || 'chantiers', v);
+  });
 
   /* --- finances --- */
   ['#fi-type', '#fi-indice', '#fi-annee'].forEach(function (s) {
@@ -7484,6 +7680,7 @@ function init() {
       });
       majOnglets(); renderPiles(); renderStock(); renderLieux(); renderReglagesBois();
       renderCarnet(); renderReglagesCh(); renderReglagesDemarrage(); renderReglagesAlertes(); renderEstimer();
+      renderReglagesMarque(); renderNotesMaj();
       renderRendements(); renderCalendrier(); renderAlertes();
       renderFinances(); renderDepenses(); renderCharges(); renderStockFournitures();
       renderCarteChantiers(); renderAnalyses(); renderCommandes(); renderRevient();
@@ -10148,6 +10345,7 @@ function renderEntreprise() {
       : 'Protections, tuteurs, marges';
   }
 
+  renderMarqueEntreprise();
   renderEntBilan();
   renderATraiter();
 }
@@ -10155,6 +10353,19 @@ function renderEntreprise() {
 /* Six chiffres qui disent ce qu'il reste à faire, pas ce qui est déjà fait —
    les tuiles s'en chargent. Chacun mène droit à la liste qui le détaille.
    Le bilan répond à « où j'en suis » avant qu'on ait à chercher. */
+/* Le nom et le logo de l'entreprise, sur son écran. Rien de saisi : l'écran
+   garde son intitulé d'origine. */
+function renderMarqueEntreprise() {
+  var z = $('#ent-logo'), h = $('#ent-nom');
+  if (!z || !h) return;
+  var nom = ((A.cfg && A.cfg.nomEntreprise) || '').trim();
+  var logo = (A.cfg && A.cfg.logoEntreprise) || '';
+  h.textContent = nom || 'Mon entreprise';
+  z.hidden = !logo;
+  z.innerHTML = logo ? '<img alt="">' : '';
+  if (logo) z.querySelector('img').src = logo;
+}
+
 function renderEntBilan() {
   var z = $('#ent-bilan'); if (!z) return;
   if (!A.chantiers.length && !A.charges.length) { z.innerHTML = ''; return; }
@@ -14175,14 +14386,14 @@ else init();
 </script>
 <script>
 /* ==========================================================================
-   BordCub — installation, hors-ligne, stockage durable
+   Sylve — installation, hors-ligne, stockage durable
    Tout est facultatif : sur un fichier local ou un vieux navigateur,
    chaque bloc se désactive proprement.
    ========================================================================== */
 (function () {
 'use strict';
 
-var VERSION = '4.43.0-20260818-2334';
+var VERSION = '4.44.0-20260818-2357';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
