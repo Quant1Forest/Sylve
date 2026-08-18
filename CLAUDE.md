@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.39.0-20260818-1915**
+Version courante : **4.41.0-20260818-2113**
 
 ---
 
@@ -105,6 +105,12 @@ Scripts séparés si besoin : `npm run verifier`, `npm test`,
 ---
 
 ## Livrer
+
+**Une version = une mise à jour qu'il valide**, pas un lot de travail.
+Plusieurs séances de corrections peuvent s'accumuler sous le même numéro :
+il ne monte qu'au moment d'envoyer. Sinon on arrive à la 4.99 avant que
+l'application soit finie, et chaque numéro perd son sens — il doit
+correspondre à ce qu'il a réellement vu changer sur son téléphone.
 
 **La 5.0 sera la version jugée aboutie** — partie Entreprise finie, telle
 que l'utilisateur la veut sur le terrain. D'ici là on reste en 4.x : le
@@ -465,6 +471,41 @@ retour du bandeau lisait le module courant : on ressortait des réglages dans
 « Mon entreprise », jamais sur l'écran quitté. `aller()` retient donc
 `A.vueAvantReglages`, et `allerMenuParent()` y redescend d'abord — à
 condition que cette vue appartienne encore au module ouvert.
+
+## Journées faites, échéance de paiement, fiche à compléter
+
+**Une journée posée sur une date passée a eu lieu.** `journeesFaites()` et
+`journeesAVenir()` séparent le placé selon la date du jour, et la fiche
+annonce « faites · à venir · à placer ». C'est ce qui permet de saisir après
+coup un chantier déjà commencé sans que tout devienne de l'estimation.
+
+**Attention au contresens** : « faite » dit qu'on y était, pas combien
+d'heures on y a passé. Les rendements se calculent toujours sur les temps
+saisis (`temps`, alimenté par les journées), jamais sur ces journées placées.
+Ne pas les brancher l'un sur l'autre pour « simplifier ».
+
+**L'échéance prime sur le délai.** `c.echeancePaiement` est demandée au
+moment de basculer en « Facturé », avec des raccourcis +30/+45/+60 jours
+comptés depuis la date de facture — pas depuis aujourd'hui, sinon une facture
+saisie après coup recevrait une échéance fausse. `retardPaiement()` compare à
+cette date ; `joursRelanceFacture` ne sert plus que faute d'échéance saisie.
+
+**Le délai de règlement se lit par client**, dans le bilan des finances, à
+côté de ce que ce client rapporte. C'est **la médiane**, pas la moyenne : un
+seul règlement oublié six mois donnerait une réputation imméritée. Le pire
+délai s'affiche à côté quand il dépasse la médiane.
+
+**`ce-ech` est un piège de nommage.** C'était l'ancienne échéance *de
+chantier* (« à finir avant le »), retirée exprès — il raisonne en journées à
+poser, pas en date butoir — et un scénario garde sa disparition. L'échéance
+de paiement s'appelle donc `ce-echpaie`. Le test a attrapé la collision.
+
+**Une fiche incomplète se signale, elle ne bloque jamais.** `CHAMPS_FICHE`
+liste les champs clés avec l'étape à partir de laquelle chacun a un sens
+(`des`) : on ne réclame pas un numéro de facture sur un devis. Un chantier
+`sansuite` ne manque plus de rien — il ne se fera pas. La marque « à
+compléter » apparaît dans le carnet, la fiche énumère les manques, et un
+filtre les rassemble.
 
 ## Le rangement des réglages
 

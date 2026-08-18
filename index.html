@@ -86,6 +86,27 @@ body:not(.m-bois) .mod-bois,
 body:not(.m-ent) .mod-ent{display:none}
 .st{display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;white-space:nowrap;color:#fff}
 .retard{color:#B4231F;font-size:11.5px}
+/* Un rappel, pas un reproche : le ton de l'avertissement doux, jamais celui
+   de l'erreur. Une fiche incomplète n'a rien fait de mal. */
+/* L'offre d'ajout à une liste : une ligne sous le champ, qu'on tape ou qu'on
+   ignore. Une fenêtre bloquante à la validation arrivait trop tard — le nom
+   était tapé depuis longtemps — et coupait la saisie. */
+.offre-liste{margin:5px 0 0;font-size:12px;color:var(--doux);display:none}
+.offre-liste.visible{display:block}
+.offre-liste button{
+  font:inherit;font-size:12px;font-weight:600;color:var(--accent);
+  background:none;border:0;padding:0 0 0 4px;text-decoration:underline;
+  text-underline-offset:2px;cursor:pointer;
+}
+.offre-liste.faite{color:var(--vert-marque)}
+.acompleter-bloc{
+  margin:9px 0 0;padding:8px 11px;border-radius:var(--r-s);
+  background:#F5EBCB;color:#6B5200;font-size:12.5px;
+}
+.acompleter{
+  color:#8A6A00;font-size:11px;font-weight:600;background:#F5EBCB;
+  padding:1px 7px;border-radius:20px;white-space:nowrap;
+}
 .ligne-trav{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center;padding:7px 0;border-bottom:1px solid var(--trait)}
 .ligne-trav:last-child{border-bottom:none}
 .fiche-tete{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
@@ -156,6 +177,12 @@ body:not(.m-ent) .mod-ent{display:none}
 
 /* ---------------------------------------------------------- accueil --- */
 .accueil-ouvert .bandeau,.accueil-ouvert .onglets{display:none}
+/* Dans les réglages, la barre du bas proposait les écrans du module d'où l'on
+   venait : on arrivait des Finances et elle offrait Bilan, Dépenses, Charges,
+   Analyses, alors qu'aucun de ces écrans n'est affiché. Les réglages sont un
+   écran de côté ; on en sort par la flèche du bandeau, qui redescend là où on
+   était. */
+body.v-reglages .onglets{display:none}
 .accueil{max-width:640px;margin:0 auto;padding:26px 15px 40px}
 .marque{display:flex;align-items:center;gap:13px;margin:6px 0 4px}
 .marque svg{flex:none}
@@ -258,6 +285,21 @@ input.mini{padding:6px 7px;border:1px solid var(--trait);border-radius:7px;font-
 .charge-m{display:block;font-size:15px;white-space:nowrap}
 .charge-a{display:block;font-size:11px;color:var(--doux);white-space:nowrap}
 .charge-act{grid-column:2/4;display:flex;gap:6px;margin-top:8px}
+
+/* Le carnet suit la même grille que les charges : pastille, texte, montant,
+   chacun dans sa colonne. Les montants tombent donc les uns sous les autres
+   quelle que soit la longueur du nom. */
+.chantier-l{
+  display:grid;grid-template-columns:15px 1fr auto;align-items:start;column-gap:11px;
+  padding:11px;border:1px solid var(--trait);border-radius:var(--r-s);
+  background:var(--carte);margin-bottom:8px;
+}
+.chantier-l .pastille{margin-top:3px}
+.chantier-n{font-weight:600;font-size:14.5px}
+.chantier-d{display:block;font-size:12px;color:var(--doux);margin-top:2px}
+.chantier-e{display:block;font-size:12px;margin-top:4px}
+.chantier-m{display:block;font-size:15px;white-space:nowrap}
+.chantier-act{grid-column:2/4;display:flex;gap:6px;margin-top:9px}
 
 /* Le bilan de l'écran Entreprise. Trois colonnes tiennent sur 375 px sans
    couper un montant ; un seul chiffre par bulle, sinon on ne sait plus
@@ -3334,6 +3376,28 @@ function placerJour(ch, ts, part) {
   ch.jours = l.sort(function (a, b) { return a.d - b.d; });
   return totalPlace(ch);
 }
+/* Une journée posée sur une date passée n'est plus une prévision : elle a eu
+   lieu. La distinction compte quand on saisit après coup un chantier déjà
+   fait — tout y est « placé », rien n'y est à venir, et parler d'estimation
+   n'aurait aucun sens.
+   Attention : « faite » dit qu'on y était, pas combien d'heures on y a passé.
+   Les rendements continuent de se calculer sur les temps saisis, jamais sur
+   ces journées-là. */
+function journeesFaites(ch, maintenant) {
+  var jour = minuit(maintenant || Date.now());
+  return journeesPlacees(ch).filter(function (j) { return minuit(j.d) <= jour; });
+}
+function journeesAVenir(ch, maintenant) {
+  var jour = minuit(maintenant || Date.now());
+  return journeesPlacees(ch).filter(function (j) { return minuit(j.d) > jour; });
+}
+function totalFait(ch, maintenant) {
+  return arr(journeesFaites(ch, maintenant).reduce(function (s, j) { return s + nb(j.p); }, 0), 2);
+}
+function totalAVenir(ch, maintenant) {
+  return arr(journeesAVenir(ch, maintenant).reduce(function (s, j) { return s + nb(j.p); }, 0), 2);
+}
+
 /* Reste à placer par rapport à l'estimation. */
 function resteAPlacer(ch) {
   var vise = nb(ch && ch.joursEstimes) || 0;
@@ -3465,11 +3529,21 @@ function alertes(chantiers, cfg, maintenant) {
         }
       }
     }
-    if (ch.statut === 'facture' && ch.dateFacture) {
-      var j2 = Math.floor((now - ch.dateFacture) / JOUR);
-      if (j2 >= relanceFacture) {
-        out.push({ type: 'impaye', chantier: ch, gravite: 3, jours: j2,
-          texte: 'facturé il y a ' + j2 + ' jours, non réglé' });
+    /* Une facture porte sa propre échéance : c'est elle qui dit le retard, et
+       non un délai général. Le délai réglable ne sert plus que faute
+       d'échéance saisie. */
+    if (ch.statut === 'facture') {
+      var enRetardDe = retardPaiement(ch, now);
+      if (enRetardDe != null) {
+        out.push({ type: 'impaye', chantier: ch, gravite: 3, jours: enRetardDe,
+          texte: 'échéance dépassée de ' + enRetardDe + ' jour' + (enRetardDe > 1 ? 's' : '') +
+            ' — à payer avant le ' + new Date(ch.echeancePaiement).toLocaleDateString('fr-FR') });
+      } else if (!ch.echeancePaiement && ch.dateFacture) {
+        var j2 = Math.floor((now - ch.dateFacture) / JOUR);
+        if (j2 >= relanceFacture) {
+          out.push({ type: 'impaye', chantier: ch, gravite: 3, jours: j2,
+            texte: 'facturé il y a ' + j2 + ' jours, non réglé' });
+        }
       }
     }
     /* Ce qui est posé au calendrier dans les trois jours. Un chantier prévu
@@ -3687,6 +3761,7 @@ function filtre(chantiers, quoi) {
   var l = chantiers || [];
   if (!quoi || quoi === 'ouverts') return l.filter(function (c) { return statutOuvert(c.statut); });
   if (quoi === 'tous') return l.slice();
+  if (quoi === 'acompleter') return l.filter(function (c) { return !ficheComplete(c); });
   return l.filter(function (c) { return c.statut === quoi; });
 }
 /* Chercher un chantier par ce dont on se souvient : le nom, qui l'a donné,
@@ -3694,6 +3769,37 @@ function filtre(chantiers, quoi) {
    les majuscules ne comptent pas — le numéro se tape d'une main.
    Plusieurs mots doivent tous se retrouver, pas forcément dans le même
    champ : « dubois foncine » sort le chantier de Foncine passé par Dubois. */
+/* Ce qu'une fiche doit porter pour être exploitable. Rien n'est jamais
+   bloqué à la saisie — on note trois mots sur un bord de route et on complète
+   le soir — mais on doit pouvoir retrouver ce qui est resté à moitié rempli.
+   Chaque champ n'est réclamé qu'à partir de l'étape où il a un sens : demander
+   un numéro de facture sur un devis n'aurait aucun intérêt. */
+var CHAMPS_FICHE = [
+  { c: 'donneur', n: 'donneur d’ordre', des: 'devis' },
+  { c: 'commune', n: 'commune', des: 'devis' },
+  { c: 'lignes', n: 'lignes de travaux', des: 'accepte' },
+  { c: 'joursEstimes', n: 'journées estimées', des: 'accepte' },
+  { c: 'numeroDevis', n: 'numéro de devis', des: 'envoye', devisSeul: true },
+  { c: 'numeroFacture', n: 'numéro de facture', des: 'facture' },
+  { c: 'dateFacture', n: 'date de facture', des: 'facture' },
+  { c: 'echeancePaiement', n: 'échéance de paiement', des: 'facture' },
+  { c: 'datePaiement', n: 'date de paiement', des: 'paye' }
+];
+function champsManquants(ch) {
+  if (!ch) return [];
+  var rang = rangStatut(ch.statut);
+  return CHAMPS_FICHE.filter(function (x) {
+    if (x.devisSeul && !aDevis(ch)) return false;
+    /* Sans suite : on n'a plus rien à réclamer, le chantier ne se fera pas. */
+    if (ch.statut === 'sansuite') return false;
+    if (rang < rangStatut(x.des)) return false;
+    var v = ch[x.c];
+    if (x.c === 'lignes') return !(v && v.length);
+    return v == null || v === '' || v === 0;
+  }).map(function (x) { return x.n; });
+}
+function ficheComplete(ch) { return champsManquants(ch).length === 0; }
+
 function chercher(chantiers, q) {
   var mots = normalise(q).split(/\s+/).filter(Boolean);
   if (!mots.length) return (chantiers || []).slice();
@@ -3707,17 +3813,36 @@ function chercher(chantiers, q) {
 /* Totaux du carnet : ce qui est signé, ce qui reste à facturer, ce qui est
    encaissé, et ce qui n'est encore qu'une proposition. */
 /* Statistiques par donneur d'ordre : qui apporte le plus de travail. */
+/* Combien de jours ce client met à payer. On ne compte que les factures
+   réglées : une facture en cours n'a pas de délai, elle a de l'ancienneté. */
+function delaiPaiement(ch) {
+  if (!ch || !ch.dateFacture || !ch.datePaiement) return null;
+  var d = Math.round((minuit(ch.datePaiement) - minuit(ch.dateFacture)) / JOUR);
+  return d >= 0 ? d : null;
+}
+/* En retard sur son échéance, et de combien. L'échéance saisie prime sur le
+   délai général : c'est la date qu'on a écrite sur la facture. */
+function retardPaiement(ch, maintenant) {
+  if (!ch || ch.statut !== 'facture' || !ch.echeancePaiement) return null;
+  var d = Math.round((minuit(maintenant || Date.now()) - minuit(ch.echeancePaiement)) / JOUR);
+  return d > 0 ? d : null;
+}
+
 function parDonneur(chantiers, cfg) {
   var m = {};
   (chantiers || []).forEach(function (ch) {
     var d = (ch.donneur || '').trim() || '(non précisé)';
-    if (!m[d]) m[d] = { donneur: d, n: 0, signe: 0, propose: 0, facture: 0, jours: 0, gagnes: 0, perdus: 0 };
+    if (!m[d]) m[d] = { donneur: d, n: 0, signe: 0, propose: 0, facture: 0, jours: 0,
+      gagnes: 0, perdus: 0, delais: [], enRetard: 0 };
     var e = m[d], mt = montant(ch);
     e.n++;
     if (statutEngage(ch.statut)) { e.signe += mt; e.gagnes++; }
     if (ch.statut === 'devis' || ch.statut === 'envoye') e.propose += mt;
     if (ch.statut === 'sansuite') e.perdus++;
     if (['facture', 'paye'].indexOf(ch.statut) >= 0) e.facture += mt;
+    var dp = delaiPaiement(ch);
+    if (dp != null) { e.delais.push(dp); }
+    if (retardPaiement(ch)) e.enRetard++;
     e.jours += tempsMoi(ch, cfg);
   });
   return Object.keys(m).map(function (k) {
@@ -3725,12 +3850,21 @@ function parDonneur(chantiers, cfg) {
     ['signe', 'propose', 'facture', 'jours'].forEach(function (x) { e[x] = arr(e[x], 2); });
     var tranches = e.gagnes + e.perdus;
     e.taux = tranches ? Math.round(e.gagnes / tranches * 100) : null;
+    /* Le délai médian plutôt que la moyenne : un seul règlement oublié six
+       mois fausserait la moyenne et donnerait une réputation imméritée. */
+    if (e.delais.length) {
+      var tri2 = e.delais.slice().sort(function (a, b) { return a - b; });
+      var mi = Math.floor(tri2.length / 2);
+      e.delaiMedian = tri2.length % 2 ? tri2[mi] : Math.round((tri2[mi - 1] + tri2[mi]) / 2);
+      e.delaiPire = tri2[tri2.length - 1];
+    } else { e.delaiMedian = null; e.delaiPire = null; }
     return e;
   }).sort(function (a, b) { return b.signe - a.signe; });
 }
 
 function totaux(chantiers, cfg) {
-  var t = { propose: 0, signe: 0, aFacturer: 0, facture: 0, encaisse: 0, jours: 0, n: 0, ouverts: 0, retard: 0 };
+  var t = { propose: 0, signe: 0, aFacturer: 0, nAFacturer: 0, facture: 0, encaisse: 0,
+    jours: 0, n: 0, ouverts: 0, retard: 0 };
   var now = Date.now();
   (chantiers || []).forEach(function (c) {
     var m = montant(c);
@@ -3739,7 +3873,9 @@ function totaux(chantiers, cfg) {
     if (enRetard(c, now)) t.retard++;
     if (c.statut === 'devis' || c.statut === 'envoye') t.propose += m;
     if (statutEngage(c.statut)) t.signe += m;
-    if (c.statut === 'termine') t.aFacturer += m;
+    /* Un chantier terminé compte, même sans ligne chiffrée : c'est justement
+       celui-là qu'on risque d'oublier de facturer. */
+    if (c.statut === 'termine') { t.aFacturer += m; t.nAFacturer++; }
     if (c.statut === 'facture') t.facture += m;
     if (c.statut === 'paye') t.encaisse += m;
     t.jours += tempsMoi(c, cfg);
@@ -3775,6 +3911,10 @@ var M = {
   jourCle: jourCle, minuit: minuit, ajouteJours: ajouteJours, estWeekend: estWeekend,
   journeesPlacees: journeesPlacees, placerJour: placerJour, resteAPlacer: resteAPlacer,
   totalPlace: totalPlace, partDuJour: partDuJour,
+  journeesFaites: journeesFaites, journeesAVenir: journeesAVenir,
+  totalFait: totalFait, totalAVenir: totalAVenir,
+  delaiPaiement: delaiPaiement, retardPaiement: retardPaiement,
+  CHAMPS_FICHE: CHAMPS_FICHE, champsManquants: champsManquants, ficheComplete: ficheComplete,
   journeesPrevues: journeesPrevues, fermeteDe: fermeteDe, occupation: occupation,
   chargeMois: chargeMois, alertes: alertes, fmtJours: fmtJours,
   MOTIFS_REFUS: MOTIFS_REFUS, nomMotifRefus: nomMotifRefus, analyseRefus: analyseRefus,
@@ -8516,11 +8656,17 @@ function renderCarnet() {
     z.innerHTML = '<div class="kpi">' +
       '<div class="carte2"><b class="num">' + eur(t.signe) + '</b><small>signé</small></div>' +
       '<div class="carte2"><b class="num">' + eur(t.propose) + '</b><small>en attente de réponse</small></div>' +
-      '<div class="carte2"><b class="num">' + eur(t.aFacturer) + '</b><small>à facturer</small></div>' +
+      '<div class="carte2"><b class="num">' + eur(t.aFacturer) + '</b><small>à facturer' +
+      (t.nAFacturer ? ' · ' + t.nAFacturer + ' chantier' + (t.nAFacturer > 1 ? 's' : '') : '') +
+      '</small></div>' +
       '<div class="carte2"><b class="num">' + eur(t.encaisse) + '</b><small>encaissé</small></div>' +
       '</div>' +
+      /* « En cours » est le nom d'un statut : l'employer pour compter tout ce
+         qui n'est pas soldé faisait annoncer « 31 en cours » avec un seul
+         chantier à ce statut. Le mot du filtre est le bon. */
       '<p class="muted" style="font-size:12px;margin:11px 0 0">' + t.ouverts + ' chantier' +
-      (t.ouverts > 1 ? 's' : '') + ' en cours · ' + E.fmt(t.jours, 1) + ' jours-homme cumulés' +
+      (t.ouverts > 1 ? 's' : '') + ' ouvert' + (t.ouverts > 1 ? 's' : '') +
+      ' · ' + E.fmt(t.jours, 1) + ' jours-homme cumulés' +
       (t.retard ? ' · <span class="retard">' + t.retard + ' en retard</span>' : '') + '</p>';
   }
   renderFiltreChantiers();
@@ -8531,8 +8677,10 @@ function renderCarnet() {
 function renderFiltreChantiers() {
   var s = $('#c-filtre'); if (!s) return;
   var f = A.filtreCh || 'ouverts';
+  var incomplets = A.chantiers.filter(function (c) { return !C.ficheComplete(c); }).length;
   var opts = [['ouverts', 'Chantiers ouverts', C.filtre(A.chantiers, 'ouverts').length],
     ['tous', 'Tous', A.chantiers.length]];
+  if (incomplets) opts.push(['acompleter', 'À compléter', incomplets]);
   C.STATUTS.forEach(function (st) {
     var n = C.filtre(A.chantiers, st.c).length;
     if (n) opts.push([st.c, st.n, n]);
@@ -8558,24 +8706,33 @@ function renderListeChantiers() {
   var now = Date.now();
   z.innerHTML = l.map(function (c) {
     var m = C.montant(c), retard = C.enRetard(c, now);
+    var manque = C.champsManquants(c);
     var trav = (c.lignes || []).map(function (x) { return C.nomTravail(x.travail); });
     var uniq = trav.filter(function (v, i) { return trav.indexOf(v) === i; });
-    return '<div class="liste-item pile-c">' +
-      '<div class="li-h"><span class="pastille" style="background:' + (COUL_STATUT[c.statut] || '#7A8471') + ';margin-top:4px"></span>' +
-      '<div class="li-c"><b>' + esc(c.nom || 'Chantier') + (m ? ' — ' + eur(m) : '') + '</b>' +
-      '<small>' + esc([c.donneur || c.client, c.proprietaire, c.foret,
+    var place = C.totalPlace(c);
+    return '<div class="chantier-l">' +
+      '<span class="pastille" style="background:' + (COUL_STATUT[c.statut] || '#7A8471') +
+      '" title="' + esc(C.nomStatut(c.statut, c)) + '"></span>' +
+      '<div><span class="chantier-n">' + esc(c.nom || 'Chantier') + '</span>' +
+      '<span class="chantier-d">' + esc([c.donneur || c.client, c.proprietaire, c.foret,
         c.parcelles ? 'p. ' + c.parcelles : ''].filter(Boolean).join(' · ') || 'sans donneur d’ordre') +
-      (uniq.length ? '<br>' + esc(uniq.slice(0, 3).join(', ')) + (uniq.length > 3 ? '…' : '') : '') +
-      (C.totalPlace(c) ? ' · ' + E.fmt(C.totalPlace(c), C.totalPlace(c) % 1 ? 1 : 0) + ' j placée' +
-        (C.totalPlace(c) > 1 ? 's' : '') : '') +
-      ((c.echeance || c.fin) ? ' · avant le ' + dateCourte(c.echeance || c.fin) : '') +
-      /* Le badge et sa date tiennent toujours sur la dernière ligne, quel que
-         soit ce qui précède : sans ça, les lignes de longueur inégale font
-         danser les badges d'un chantier à l'autre. */
-      '<br>' + badgeStatut(c) +
+      '</span>' +
+      (uniq.length ? '<span class="chantier-d">' + esc(uniq.slice(0, 3).join(', ')) +
+        (uniq.length > 3 ? '…' : '') +
+        (place ? ' · ' + E.fmt(place, place % 1 ? 1 : 0) + ' j placée' + (place > 1 ? 's' : '') : '') +
+        ((c.echeance || c.fin) ? ' · avant le ' + dateCourte(c.echeance || c.fin) : '') + '</span>' : '') +
+      /* Le badge et sa date tiennent toujours sur leur propre ligne, quel que
+         soit ce qui précède : sinon les lignes de longueur inégale font danser
+         les badges d'un chantier à l'autre. */
+      '<span class="chantier-e">' + badgeStatut(c) +
       (dateStatut(c) ? ' <span class="muted">' + esc(dateStatut(c)) + '</span>' : '') +
-      (retard ? ' <span class="retard">en retard</span>' : '') + '</small></div></div>' +
-      '<div class="li-actions">' +
+      (retard ? ' <span class="retard">en retard</span>' : '') +
+      /* Une fiche à moitié remplie se perd dans le carnet : elle se signale,
+         sans jamais empêcher de l'enregistrer telle quelle. */
+      (manque.length ? ' <span class="acompleter">à compléter</span>' : '') +
+      '</span></div>' +
+      '<span class="chantier-m num">' + (m ? eur(m) : '') + '</span>' +
+      '<div class="chantier-act">' +
       '<button class="btn-min" data-chouvrir="' + c.id + '">Ouvrir</button>' +
       '<button class="btn-min" data-chtemps="' + c.id + '">Temps</button>' +
       '<button class="btn-min" data-chstatut="' + c.id + '">Statut</button></div></div>';
@@ -8747,6 +8904,11 @@ function renderFiche() {
       return jalons.length ? '<p class="muted" style="font-size:12px;margin:9px 0 0">' +
         esc(jalons.join(' · ')) + '</p>' : '';
     })() +
+    (function () {
+      var manque = C.champsManquants(c);
+      if (!manque.length) return '';
+      return '<p class="acompleter-bloc">Il manque : ' + esc(manque.join(', ')) + '.</p>';
+    })() +
     '<div class="btn-rang" style="margin-top:11px">' +
     '<button class="btn btn-min" data-chretour="1">← Carnet</button>' +
     '<button class="btn btn-min" id="f-entete">Modifier l’en-tête</button>' +
@@ -8781,11 +8943,25 @@ function renderFiche() {
             : 'Aucune journée estimée ni placée.') + '</p>';
       }
       var reste = C.resteAPlacer(c);
-      return '<p class="muted" style="font-size:12.5px;margin:0 0 7px">' +
-        E.fmt(tot, tot % 1 ? 1 : 0) + (est ? ' / ' + E.fmt(est, est % 1 ? 1 : 0) : '') + ' journée' +
-        (tot > 1 ? 's' : '') + ' placée' + (tot > 1 ? 's' : '') +
-        (reste > 0 ? ' — encore ' + E.fmt(reste, reste % 1 ? 1 : 0) + ' à poser' :
-          (reste < 0 ? ' — ' + E.fmt(-reste, 1) + ' de trop' : '')) + '</p>' +
+      var fait = C.totalFait(c), venir = C.totalAVenir(c);
+      var jf = function (v) { return E.fmt(v, v % 1 ? 1 : 0); };
+      /* Trois nombres, et le premier est celui qui a eu lieu : un chantier
+         saisi après coup n'a que des journées faites, et parler d'estimation
+         sur lui n'aurait aucun sens. */
+      return '<div class="kpi" style="margin:0 0 9px">' +
+        '<div class="carte2"><b class="num">' + jf(fait) + '</b><small>faites</small></div>' +
+        '<div class="carte2"><b class="num">' + jf(venir) + '</b><small>à venir</small></div>' +
+        (reste != null && reste > 0
+          ? '<div class="carte2"><b class="num">' + jf(reste) + '</b><small>à placer</small></div>'
+          : (reste != null && reste < 0
+            ? '<div class="carte2"><b class="num">' + jf(-reste) + '</b><small>de trop</small></div>'
+            : '')) +
+        '</div>' +
+        '<p class="muted" style="font-size:12px;margin:0 0 7px">' +
+        jf(tot) + (est ? ' sur ' + jf(est) + ' estimée' + (est > 1 ? 's' : '') : '') +
+        ' placée' + (tot > 1 ? 's' : '') +
+        '. Une journée passée compte comme faite ; le temps réellement passé, ' +
+        'lui, se saisit à part.</p>' +
         '<div class="chips">' + pl.map(function (j) {
           var dd = new Date(j.d);
           return '<span class="chip" style="cursor:default">' + dd.getDate() + ' ' +
@@ -8940,14 +9116,16 @@ function formEnteteCh(c) {
     '<button type="button" class="mini-plus" data-ajlist="clients" data-ajchamp="ce-donneur" ' +
     'title="Ajouter à la liste">+ liste</button></label>' +
     '<input type="text" id="ce-donneur" autocomplete="off" list="liste-clients" placeholder="expert, gestionnaire…" value="' +
-    esc(c.donneur || c.client || '') + '"></div>' +
+    esc(c.donneur || c.client || '') + '">' +
+    '<p class="offre-liste" id="ce-donneur-offre"></p></div>' +
     /* « Propriétaire facturé » laissait croire que la facture part chez lui.
        Elle part chez le donneur d'ordre, qui la transmet ; le propriétaire
        est celui qui règle. */
     '<div class="champ"><label class="eyebrow" for="ce-proprio">Propriétaire' +
     '<button type="button" class="mini-plus" data-ajlist="proprios" data-ajchamp="ce-proprio" ' +
     'title="Ajouter à la liste">+ liste</button></label>' +
-    '<input type="text" id="ce-proprio" autocomplete="off" list="liste-proprios" value="' + esc(c.proprietaire || '') + '"></div>' +
+    '<input type="text" id="ce-proprio" autocomplete="off" list="liste-proprios" value="' + esc(c.proprietaire || '') + '">' +
+    '<p class="offre-liste" id="ce-proprio-offre"></p></div>' +
     '<div class="champ"><label class="eyebrow" for="ce-foret">Forêt</label>' +
     '<input type="text" id="ce-foret" autocomplete="off" value="' + esc(c.foret || '') + '"></div>' +
     '<div class="champ"><label class="eyebrow" for="ce-parc">Parcelle(s)</label>' +
@@ -8963,6 +9141,8 @@ function formEnteteCh(c) {
        les relances, ni pour reprendre un historique. */
     '<div class="champ"><label class="eyebrow" for="ce-datefact">Facturé le</label>' +
     '<input type="date" id="ce-datefact" value="' + versChamp(c.dateFacture) + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="ce-echpaie">À payer avant le</label>' +
+    '<input type="date" id="ce-echpaie" value="' + versChamp(c.echeancePaiement) + '"></div>' +
     '<div class="champ"><label class="eyebrow" for="ce-datepaie">Payé le</label>' +
     '<input type="date" id="ce-datepaie" value="' + versChamp(c.datePaiement) + '"></div>' +
     '<div class="champ"><label class="eyebrow" for="ce-jest">Journées estimées</label>' +
@@ -9112,6 +9292,8 @@ function ouvrirEnteteCh(id) {
   renderCeDevis(c);
   brancherEssenceCh('ce-ess', (c.criteres || {}).essence || '');
   $('#ce-adevis').addEventListener('change', function () { renderCeDevis(c); });
+  brancherOffreListe('ce-donneur', 'clients');
+  brancherOffreListe('ce-proprio', 'proprios');
   ['#ce-datedevis', '#ce-validite'].forEach(function (s) {
     $(s).addEventListener('change', majFinValidite);
   });
@@ -9183,6 +9365,7 @@ function ouvrirEnteteCh(id) {
       siren: $('#ce-siren').checked,
       numeroFacture: $('#ce-numfact').value.trim(),
       dateFacture: versDate($('#ce-datefact').value),
+      echeancePaiement: versDate($('#ce-echpaie').value),
       datePaiement: versDate($('#ce-datepaie').value),
       /* Décocher, c'est dire qu'il n'y a pas de devis : garder un numéro et
          une date derrière ferait ressortir un devis fantôme plus tard. */
@@ -9200,12 +9383,49 @@ function ouvrirEnteteCh(id) {
       A.chantiers.push(maj); c = maj;
     }
     horodaterStatut(c);
-    noterClient(maj.donneur);
-    noterProprio(maj.proprietaire);
+    /* L'ajout aux listes se propose désormais sous le champ, à la sortie de
+       celui-ci. Ne rien redemander ici : une confirmation à la validation
+       arrivait trop tard et coupait l'enregistrement. */
     sauverChantiers().then(function () {
       fermerModale(); renderCarnet(); renderAccueil(); renderRendements(); renderCalendrier();
       if (id) renderFiche(); else ouvrirChantier(c.id);
       toast(id ? 'Chantier modifié.' : 'Chantier créé.');
+    });
+  });
+}
+
+/* Proposer d'enrichir la liste dès qu'on quitte le champ, plutôt qu'au moment
+   de valider le chantier : à la validation, le nom est tapé depuis longtemps,
+   la fenêtre bloquante tombe de nulle part et coupe la saisie. Ici c'est une
+   ligne sous le champ, qu'on tape ou qu'on ignore. */
+function brancherOffreListe(champId, cle) {
+  var champ = $('#' + champId), offre = $('#' + champId + '-offre');
+  if (!champ || !offre) return;
+  var montrer = function () {
+    var nom = champ.value.trim();
+    var connu = nom && listeDe(cle).some(function (x) {
+      return String(x).toLowerCase() === nom.toLowerCase();
+    });
+    if (!nom || connu) { offre.className = 'offre-liste'; offre.innerHTML = ''; return; }
+    offre.className = 'offre-liste visible';
+    offre.innerHTML = '« ' + esc(nom) + ' » n’est pas dans vos ' +
+      esc(LISTES[cle].nom.toLowerCase()) +
+      '.<button type="button" data-offre="' + esc(champId) + '">Ajouter</button>';
+  };
+  champ.addEventListener('blur', montrer);
+  champ.addEventListener('input', function () {
+    /* Tant qu'il tape, on se tait : l'offre reviendra quand il aura fini. */
+    if (offre.classList.contains('visible')) { offre.className = 'offre-liste'; offre.innerHTML = ''; }
+  });
+  offre.addEventListener('click', function (e) {
+    if (!e.target.closest('[data-offre]')) return;
+    var nom = champ.value.trim();
+    if (!nom) return;
+    listeDe(cle).push(nom);
+    sauverListe(cle).then(function () {
+      majDatalistClients(); majDatalistLieux(); renderListesReglages();
+      offre.className = 'offre-liste visible faite';
+      offre.textContent = '« ' + nom +' » ajouté à vos ' + LISTES[cle].nom.toLowerCase() + '.';
     });
   });
 }
@@ -10302,11 +10522,20 @@ function renderFinances() {
         }).join('') : '<p class="muted" style="font-size:12.5px">Aucune facture sur la période.</p>') +
         '<p class="eyebrow" style="margin:14px 0 6px">Tous chantiers confondus</p>' +
         pg.slice(0, 6).map(function (x) {
+          /* Le délai de règlement se lit ici, à côté de ce que le client
+             apporte : c'est le même jugement — celui qui paie vite et celui
+             qui fait attendre ne se valent pas à chiffre égal. La médiane,
+             pas la moyenne : un seul règlement oublié six mois donnerait une
+             réputation imméritée. */
           return '<div style="display:flex;justify-content:space-between;align-items:baseline;padding:4px 0">' +
-            '<span style="font-size:13px">' + esc(x.donneur) + '</span>' +
+            '<span style="font-size:13px">' + esc(x.donneur) +
+            (x.enRetard ? ' <span class="retard">' + x.enRetard + ' en retard</span>' : '') + '</span>' +
             '<span class="muted" style="font-size:12px">' + eur(x.signe) + ' signés' +
             (x.propose ? ' · ' + eur(x.propose) + ' proposés' : '') +
-            (x.taux != null ? ' · ' + x.taux + ' % acceptés' : '') + '</span></div>';
+            (x.taux != null ? ' · ' + x.taux + ' % acceptés' : '') +
+            (x.delaiMedian != null ? ' · payé en ' + x.delaiMedian + ' j' +
+              (x.delaiPire > x.delaiMedian ? ' (jusqu’à ' + x.delaiPire + ')' : '') : '') +
+            '</span></div>';
         }).join('') + '</div>';
     })() +
     (tr.proposes ? '<div class="carte"><h2>Devis</h2><div class="kpi">' +
@@ -12454,7 +12683,15 @@ function demanderNumeroFacture(c) {
     '<input type="text" id="nf-num" class="gros" autocomplete="off" ' +
     'placeholder="celui de votre logiciel" value="' + esc(c.numeroFacture || '') + '"></div>' +
     '<div class="champ"><label class="eyebrow" for="nf-date">Facturé le</label>' +
-    '<input type="date" id="nf-date" value="' + versChamp(c.dateFacture) + '"></div></div>' +
+    '<input type="date" id="nf-date" value="' + versChamp(c.dateFacture) + '"></div>' +
+    /* L'échéance écrite sur la facture vaut mieux qu'un délai général : c'est
+       elle qui dit si le client est en retard, et de combien. */
+    '<div class="champ"><label class="eyebrow" for="nf-ech">À payer avant le</label>' +
+    '<input type="date" id="nf-ech" value="' + versChamp(c.echeancePaiement) + '"></div></div>' +
+    '<div class="btn-rang" style="margin-top:4px">' +
+    '<button class="btn-min" data-nfech="30">+ 30 jours</button>' +
+    '<button class="btn-min" data-nfech="45">+ 45 jours</button>' +
+    '<button class="btn-min" data-nfech="60">+ 60 jours</button></div>' +
     '<p class="muted" style="font-size:12px;margin:9px 0 0">C’est par ce numéro que vous ' +
     'retrouverez le chantier depuis la recherche du carnet.</p>' +
     '<div class="btn-rang" style="margin-top:11px">' +
@@ -12465,6 +12702,7 @@ function demanderNumeroFacture(c) {
       c.numeroFacture = $('#nf-num').value.trim();
       var d = versDate($('#nf-date').value);
       if (d) c.dateFacture = d;
+      c.echeancePaiement = versDate($('#nf-ech').value);
     }
     sauverChantiers().then(function () {
       fermerModale(); renderCarnet(); renderFiche(); renderFinances(); renderAccueil();
@@ -12472,6 +12710,14 @@ function demanderNumeroFacture(c) {
     });
   };
   $('#modale-corps').addEventListener('click', function (e) {
+    /* Les délais usuels d'un coup : on part de la date de facture, pas
+       d'aujourd'hui — une facture antérieure garde son vrai délai. */
+    var raccourci = e.target.closest('[data-nfech]');
+    if (raccourci) {
+      var base = versDate($('#nf-date').value) || C.minuit(Date.now());
+      $('#nf-ech').value = versChamp(base + Number(raccourci.dataset.nfech) * C.JOUR);
+      return;
+    }
     if (e.target.closest('#nf-ok')) finir(true);
     else if (e.target.closest('#nf-passer')) finir(false);
   });
@@ -13659,7 +13905,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.39.0-20260818-1915';
+var VERSION = '4.40.0-20260818-2113';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
