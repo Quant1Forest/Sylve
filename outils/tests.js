@@ -2543,6 +2543,85 @@ scenario('Commande : on achète des bidons, jamais des plants', async () => {
 });
 
 /* --------------------------------------------------------------------- */
+scenario('L’application ne porte plus le nom de celle dont elle est partie', async () => {
+  /* Elle s'en est inspirée puis complètement écartée : plus aucune trace à
+     l'écran. Les clés de stockage, elles, gardent leur nom — les renommer
+     ferait chercher les données dans un tiroir vide. */
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'cubage' }));
+  t.clic('#b-reglages'); await t.pause(350);
+  t.clic('[data-regl="cubage"]'); await t.pause(250);
+  const texte = t.$('#regl-corps').textContent;
+  verifierVrai('le mode ne cite plus l’application d’origine', !/Bord.?Cub/i.test(texte));
+  verifierVrai('il s’appelle « Historique »', /Historique/.test(texte));
+  t.clic('[data-mode="corrige"]'); await t.pause(250);
+  verifierVrai('l’explication non plus', !/Bord.?Cub/i.test(t.$('#regl-corps').textContent));
+  /* Nulle part ailleurs à l'écran. On écarte le source des <script> : il
+     contient les clés de stockage, que personne ne voit jamais. */
+  const copie = t.d.body.cloneNode(true);
+  [...copie.querySelectorAll('script, style')].forEach(e => e.remove());
+  verifierVrai('ni ailleurs à l’écran', !/Bord.?Cub/i.test(copie.textContent));
+  /* Mais le tiroir garde son nom, sinon les données seraient perdues. */
+  verifierVrai('les données restent rangées où elles étaient',
+    t.w.localStorage.getItem('bordcub.cfg') !== null);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Marque : le logo et le nom de l’entreprise, là où ils servent', async () => {
+  /* Une image minuscule, en PNG, qui tient dans une chaîne. */
+  const LOGO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'entreprise',
+    cfg: { nomEntreprise: 'ETF du Val Vert', logoEntreprise: LOGO }
+  }));
+  await t.pause(300);
+  verifier('le nom remplace « Mon entreprise »', 'ETF du Val Vert', t.texte('#ent-nom'));
+  verifierVrai('le logo est affiché', !t.$('#ent-logo').hidden);
+  verifierVrai('et c’est bien l’image déposée',
+    t.$('#ent-logo img').getAttribute('src') === LOGO);
+  /* Au démarrage, la signature sous la phrase de l'outil. */
+  verifierVrai('la signature est posée au démarrage', !t.$('#dem-ent').hidden);
+  verifierVrai('elle porte le nom', /ETF du Val Vert/.test(t.$('#dem-ent').textContent));
+
+  /* Rien de saisi : l'écran garde son intitulé, et rien ne signe. */
+  const vide = await ouvrir(Object.assign({}, VIDE, { module: 'entreprise' }));
+  await vide.pause(250);
+  verifier('sans nom, l’intitulé d’origine', 'Mon entreprise', vide.texte('#ent-nom'));
+  verifierVrai('sans logo, rien ne s’affiche', vide.$('#ent-logo').hidden);
+  verifierVrai('et rien ne signe le démarrage', vide.$('#dem-ent').hidden);
+
+  /* Le nom se règle, et l'écran suit. */
+  vide.clic('#b-reglages'); await vide.pause(350);
+  verifierVrai('le champ est dans les réglages', vide.$('#r-ent-nom'));
+  vide.choisir('#r-ent-nom', 'Forêts du Levant'); await vide.pause(350);
+  verifier('le nom est enregistré', 'Forêts du Levant', (vide.stock('cfg') || {}).nomEntreprise);
+  verifier('et l’écran d’entreprise a suivi', 'Forêts du Levant', vide.texte('#ent-nom'));
+  verifier('aucune erreur', [], t.erreurs.concat(vide.erreurs));
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Notes de mise à jour : les cinq dernières, et où regarder', async () => {
+  /* Cinq suffisent : au-delà on ne remonte plus, et la liste devient un
+     journal qu'on ne lit pas. */
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'chantiers' }));
+  t.clic('#b-reglages'); await t.pause(350);
+  t.clic('[data-regl="general"]'); await t.pause(250);
+  const z = t.$('#c-notes-maj');
+  verifierVrai('la liste est là', z && z.textContent.trim());
+  const versions = [...z.querySelectorAll('.eyebrow')].map(e => e.textContent);
+  verifier('cinq versions, pas plus', 5, versions.length);
+  verifierVrai('la version installée est repérée',
+    /celle que vous avez/.test(z.textContent));
+
+  /* Une note qui mène quelque part y mène vraiment. */
+  const lien = z.querySelector('[data-notevue="stock2"]');
+  verifierVrai('une note mène à l’inventaire', lien);
+  lien.click(); await t.pause(400);
+  verifierVrai('et l’inventaire s’ouvre', t.$('#vue-stock2').classList.contains('actif'));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
 /* Un troisième argument ne joue que les scénarios dont le nom le contient.
    Sert à éprouver un contrôle en le cassant exprès : rejouer les quarante
    autres pour vérifier qu'un seul crie coûte deux minutes pour rien.
