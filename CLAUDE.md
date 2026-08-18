@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.41.0-20260818-2113**
+Version courante : **4.42.0-20260818-2300**
 
 ---
 
@@ -560,6 +560,49 @@ vérifiable.
     une attente lue par cette porte s'écrit avec une espace ordinaire, alors
     qu'une attente lue sur `textContent` brut garde l'insécable. Deux heures
     perdues sur un « attendu 1 000 € / obtenu 1 000 € » qui se lisaient pareil.
+
+## Le stock : ce qui se totalise et ce qui ne se totalise pas
+
+**On n'additionne pas des millilitres avec des pièces.** La ligne de total de
+l'inventaire annonçait « 55 800 achetés » en cumulant du répulsif au
+millilitre et des tuteurs à la pièce. Les colonnes de quantité n'ont de total
+que si tout le catalogue parle la même unité ; sinon elles disent « unités
+différentes ». **La valeur en euros, elle, se cumule toujours** — c'est la
+seule échelle commune, et c'est pour ça que « Où dort votre argent » est un
+graphique de valeurs et jamais de quantités.
+
+**« En stock » est la première colonne**, avant « acheté » et « sorti » :
+c'est la seule qu'on vient vraiment lire, et elle était au bout d'un
+défilement horizontal. Un test lit désormais le tableau **par le nom de la
+colonne**, jamais par sa position — l'ordre a déjà changé une fois.
+
+**Le débours quitte bien le stock.** `quantite()` retranche toutes les
+sorties sans regarder leur nature ; seule `ventes()` écarte débours et pertes,
+pour le chiffre d'affaires et la marge. Vérifié par un scénario : 500
+achetés, 100 vendus, 50 en débours, 350 restants.
+
+**Le dosage par plant ne concerne que les unités dosables** —
+`UNITE_DOSABLE()` : millilitre, litre, mètre linéaire, kilo. « 6 ml par
+plant » sur des tuteurs comptés à la pièce n'a aucun sens. Attention :
+**`plant` n'est pas une unité d'article**, s'y fier mène à une garde qui ne
+se déclenche jamais.
+
+**La dépense d'une commande se corrige après coup.** Elle porte
+`commande: <id>`, et `depenseDeCommande()` la retrouve. Décocher la case la
+retire, changer la TVA la corrige — les deux préviennent au moment du geste,
+pas à l'enregistrement. Piège rencontré : en modification, l'objet `maj` n'a
+pas d'identifiant, c'est celui de la commande ouverte qu'il faut.
+
+**Le simulateur peut changer le dosage** sans toucher la fiche du produit :
+`A.revient.dose` prime dans `echelle()`, et la mention « simulé » le dit. De
+gros Douglas prennent plus de répulsif que six millilitres.
+
+**L'objectif de 30 % de marge n'est pas décoratif.** Avec l'abattement
+forfaitaire de 71 % sur les ventes, en dessous de ce taux il cotise sur une
+marge qu'il n'a pas faite. D'où le taux d'ensemble en tête de Performance —
+un produit vendu trop bas peut être rattrapé par un autre, c'est le total qui
+décide — et le graphique « vos prix face au minimum », qui rapporte chaque
+prix pratiqué au minimum du produit plutôt qu'à des euros incomparables.
 
 ## Le millilitre n’est pas le mètre linéaire
 

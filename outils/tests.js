@@ -2314,16 +2314,159 @@ scenario('Stock : un débours sort bien du stock', async () => {
     ]
   }));
   await t.pause(350);
+  /* On lit par le nom de la colonne, pas par sa position : l'ordre a déjà
+     changé une fois, et un test qui compte les cases casse pour rien. */
+  const entetes = t.$$('#stock-table thead th').map(e => e.textContent.trim());
   const cellules = t.$$('#stock-table tbody tr')[0].children;
-  const lu = i => cellules[i].textContent.trim();
-  verifier('500 achetés', '500', lu(1));
-  verifier('150 sortis, débours compris', '150', lu(2));
-  verifier('il reste 350 en stock', '350', lu(3));
+  const col = nom => {
+    const i = entetes.indexOf(nom);
+    return i < 0 ? null : cellules[i].textContent.trim();
+  };
+  verifier('500 achetés', '500', col('Acheté'));
+  verifier('150 sortis, débours compris', '150', col('Sorti'));
+  verifier('il reste 350 en stock', '350', col('En stock'));
   /* Et le débours ne se compte pas comme une vente : la sortie le dit. */
   t.clic('[data-vue="commandes"]'); await t.pause(300);
   t.clic('[data-mvt="sorties"]'); await t.pause(250);
   verifierVrai('la sortie en débours est étiquetée comme telle',
     /débours/.test(t.$('#liste-commandes').textContent));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+  const STOCK = () => Object.assign({}, VIDE, {
+    module: 'stock',
+    articles: [
+      { id: 'a1', nom: 'Bambou', unite: 'unite' },
+      { id: 'a2', nom: 'Gaine', unite: 'unite' }
+    ],
+    commandes: [{ id: 'k1', num: 'C-1', statut: 'recu', dateCmd: Date.now(), dateLiv: Date.now(),
+      lignes: [{ article: 'a1', qte: 1000, prix: 1 }, { article: 'a2', qte: 1000, prix: 2 }] }],
+    sorties: [{ id: 's1', statut: 'fini', date: Date.now(), debours: false, perte: false,
+      lignes: [{ article: 'a1', qte: 100, prix: 2 }, { article: 'a2', qte: 100, prix: 2.2 }] }]
+  });
+
+scenario('Inventaire : ce qu’il reste se lit sans faire défiler', async () => {
+  /* « En stock » était au bout d'un défilement horizontal, alors que c'est la
+     seule colonne qu'on vient vraiment lire. */
+  const t = await ouvrir(STOCK());
+  await t.pause(350);
+  const entetes = t.$$('#stock-table thead th').map(e => e.textContent.trim());
+  verifier('le produit d’abord', 'Produit', entetes[0]);
+  verifier('puis ce qu’il reste', 'En stock', entetes[1]);
+  verifierVrai('l’acheté vient après', entetes.indexOf('Acheté') > 1);
+  /* Et la valeur reste la colonne qui a du sens à totaliser. */
+  const cellules = t.$$('#stock-table tbody tr')[0].children;
+  verifier('la première valeur lue est le stock', '900', cellules[1].textContent.trim());
+
+  /* Où dort l'argent, là où il fait son état des lieux. */
+  const resume = t.$('#stock-resume').textContent;
+  verifierVrai('la valeur par produit est montrée', /Où dort votre argent/.test(resume));
+  verifierVrai('la gaine passe devant le bambou', /Gaine[\s\S]*Bambou/.test(resume));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Commande : la dépense se décoche après coup, et prévient', async () => {
+  /* Deux achats chez le même fournisseur réglés par une seule facture : il
+     faut pouvoir retirer la dépense d'une des deux commandes. */
+  const t = await ouvrir(STOCK());
+  t.clic('[data-vue="commandes"]'); await t.pause(300);
+  t.clic('[data-cmdmod="k1"]'); await t.pause(350);
+  verifierVrai('la case est proposée en modification', t.$('#cm-dep'));
+  verifierVrai('décochée : cette commande n’a pas de dépense', !t.$('#cm-dep').checked);
+
+  /* On la coche : la dépense se crée. */
+  t.$('#cm-dep').checked = true;
+  t.$('#cm-dep').dispatchEvent(new t.w.Event('change', { bubbles: true }));
+  t.choisir('#cm-tva', '20');
+  t.clic('#cm-ok'); await t.pause(450);
+  const dep = (t.stock('depenses') || []).filter(d => d.commande === 'k1');
+  verifier('une dépense est née de la commande', 1, dep.length);
+  verifier('elle porte la TVA choisie', 20, dep[0].lignes[0].taux);
+
+  /* On la décoche : on est prévenu, et refuser ne change rien. */
+  t.clic('[data-cmdmod="k1"]'); await t.pause(350);
+  verifierVrai('la case est cochée cette fois', t.$('#cm-dep').checked);
+  let alerte = '';
+  t.w.confirm = m => { alerte = m; return false; };
+  t.$('#cm-dep').checked = false;
+  t.$('#cm-dep').dispatchEvent(new t.w.Event('change', { bubbles: true }));
+  await t.pause(150);
+  verifierVrai('on est prévenu du retrait', /retirera la dépense/.test(alerte));
+  verifierVrai('refuser recoche la case', t.$('#cm-dep').checked);
+
+  /* Accepter, cette fois. */
+  t.w.confirm = () => true;
+  t.$('#cm-dep').checked = false;
+  t.$('#cm-dep').dispatchEvent(new t.w.Event('change', { bubbles: true }));
+  t.clic('#cm-ok'); await t.pause(450);
+  verifier('la dépense a disparu', 0,
+    (t.stock('depenses') || []).filter(d => d.commande === 'k1').length);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Performance : le taux d’ensemble, et la bascule brute / nette', async () => {
+  /* Un produit vendu sous l'objectif peut être rattrapé par un autre : c'est
+     le total qui dit si les charges sont couvertes. */
+  const t = await ouvrir(STOCK());
+  t.clic('[data-vue="revient"]'); await t.pause(300);
+  t.clic('[data-rev="perf"]'); await t.pause(350);
+  const corps = t.$('#rev-resultat').textContent;
+  verifierVrai('le taux d’ensemble est annoncé', /Sur l’ensemble de vos ventes/.test(corps));
+  verifierVrai('l’objectif est rappelé', /objectif/.test(corps));
+  verifierVrai('et le net après charges aussi', /après charges/.test(corps));
+
+  /* La bascule change le graphique sans changer le tableau. */
+  verifierVrai('la bascule existe', t.$('[data-marge="nette"]'));
+  verifier('on part de la brute', 'true',
+    t.$('[data-marge="brute"]').getAttribute('aria-pressed'));
+  t.clic('[data-marge="nette"]'); await t.pause(300);
+  verifier('la nette prend la main', 'true',
+    t.$('[data-marge="nette"]').getAttribute('aria-pressed'));
+  verifierVrai('et le texte explique ce qu’elle retire',
+    /de charges sur le prix de vente/.test(t.$('#rev-resultat').textContent));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Coûts : les prix pratiqués se comparent au minimum', async () => {
+  /* Le bambou acheté 1 € et vendu 2 € passe largement ; la gaine achetée 2 €
+     et vendue 2,20 € reste sous le minimum. */
+  const t = await ouvrir(STOCK());
+  t.clic('[data-vue="revient"]'); await t.pause(300);
+  t.clic('[data-rev="couts"]'); await t.pause(350);
+  const corps = t.$('#rev-resultat');
+  verifierVrai('le graphique est là', /Vos prix face au minimum/.test(corps.textContent));
+  verifierVrai('il nomme les deux produits',
+    /Bambou/.test(corps.textContent) && /Gaine/.test(corps.textContent));
+  verifierVrai('il donne le prix pratiqué et le minimum',
+    /vendu/.test(corps.textContent) && /minimum/.test(corps.textContent));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Simulateur : le dosage se change sans toucher au produit', async () => {
+  /* De gros Douglas prennent plus de répulsif que six millilitres : on doit
+     pouvoir le chiffrer sans corriger la fiche du produit. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'stock',
+    articles: [{ id: 'a1', nom: 'Trico', unite: 'millilitre', dosage: 6 }],
+    commandes: [{ id: 'k1', statut: 'recu', dateCmd: Date.now(), dateLiv: Date.now(),
+      lignes: [{ article: 'a1', qte: 10000, prix: 0.02 }] }]
+  }));
+  t.clic('[data-vue="revient"]'); await t.pause(350);
+  verifierVrai('le champ de dosage est proposé', t.$('#rev-dose'));
+  verifier('il part du dosage du produit', '6', t.$('#rev-dose').value);
+  const coutA = t.$('#rev-form').textContent;
+
+  t.choisir('#rev-dose', '12'); await t.pause(350);
+  verifier('le dosage saisi est retenu', '12', t.$('#rev-dose').value);
+  verifierVrai('le coût par plant a changé', t.$('#rev-form').textContent !== coutA);
+  verifierVrai('et le simulé est signalé', /simulé/.test(t.$('#rev-form').textContent));
+  /* La fiche du produit, elle, n'a pas bougé. */
+  verifier('le produit garde son dosage', 6, (t.stock('articles') || [])[0].dosage);
   verifier('aucune erreur', [], t.erreurs);
 });
 
