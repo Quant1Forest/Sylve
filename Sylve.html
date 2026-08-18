@@ -154,7 +154,6 @@ body:not(.m-ent) .mod-ent{display:none}
 
 /* ---------------------------------------------------------- accueil --- */
 .accueil-ouvert .bandeau,.accueil-ouvert .onglets{display:none}
-.sans-onglets .onglets{display:none}
 .accueil{max-width:640px;margin:0 auto;padding:26px 15px 40px}
 .marque{display:flex;align-items:center;gap:13px;margin:6px 0 4px}
 .marque svg{flex:none}
@@ -1144,17 +1143,11 @@ if (froid && s > 0) montrer(s);
           <button class="tuile" data-module="rendements"><span class="ic rond"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><path d="M4.6 19.6h14.8"/><path d="M7.7 19.6v-5.2M12 19.6v-8.8M16.3 19.6v-12.4"/></svg></span>
             <span><b>Rendements</b><small id="e-rd-s">Temps passé par type de travaux</small></span>
             <span class="chiffre"><b id="e-rd-n">—</b><span>références</span></span></button>
-          <button class="tuile" data-module="devis"><span class="ic rond"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><path d="M13.9 3.7H7.5a1.9 1.9 0 0 0-1.9 1.9v12.8a1.9 1.9 0 0 0 1.9 1.9h9a1.9 1.9 0 0 0 1.9-1.9V8.1Z"/><path d="M13.9 3.7v4.4h4.5"/><path d="M8.7 13.2h6.6M8.7 16.5h4.4"/></svg></span>
-            <span><b>Devis et estimatif</b><small id="e-dv-s">Chiffrer d'après vos chantiers passés</small></span>
-            <span class="chiffre"><b id="e-dv-n">—</b><span>en attente</span></span></button>
-          <button class="tuile" data-module="analyses"><span class="ic rond"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><circle cx="12" cy="12" r="7.9"/><path d="M12 4.1v7.9h7.9"/></svg></span>
-            <span><b>Analyses</b><small id="e-an-s">Ce qui rapporte, où part l'argent</small></span>
-            <span class="chiffre"><b id="e-an-n">—</b><span id="e-an-p">facturé</span></span></button>
           <button class="tuile" data-module="stock"><span class="ic rond"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><path d="M4.7 8.5 12 4.8l7.3 3.7v7L12 19.2l-7.3-3.7Z"/><path d="M4.7 8.5 12 12.2l7.3-3.7M12 12.2v7"/></svg></span>
             <span><b>Stock et fournitures</b><small id="e-st-s">Protections, tuteurs, marges</small></span>
             <span class="chiffre"><b id="e-st-n">—</b><span>en stock</span></span></button>
           <button class="tuile" data-module="finances"><span class="ic rond"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><path d="M16.4 7.6a5.7 5.7 0 0 0-8.5 4.5 5.7 5.7 0 0 0 8.5 4.5"/><path d="M6.3 10.6h6.8M6.3 13.6h6.8"/></svg></span>
-            <span><b>Finances</b><small id="e-fi-s">Chiffre d'affaires, TVA, dépenses</small></span>
+            <span><b>Finances</b><small id="e-fi-s">Bilan, recettes, dépenses, analyses</small></span>
             <span class="chiffre"><b id="e-fi-n">—</b><span>facturé</span></span></button>
                 </div>
       </div>
@@ -6183,7 +6176,7 @@ function allerReglages(sec) {
   if (r) { sec = r[0]; zone = r[1]; }
   A.secReglages = sec || 'general';
   document.body.classList.remove('accueil-ouvert');
-  if (!MODULES[A.module]) A.module = 'cubage';
+  A.module = moduleValide(A.module);
   majOnglets();
   renderReglagesNav();
   aller('reglages');
@@ -6425,6 +6418,12 @@ function fermerModale() { $('#modale').hidden = true; $('#modale-corps').innerHT
 
 /* ============================================================ NAVIGATION */
 function aller(v) {
+  /* Les réglages sont une vue, pas un étage de la navigation : on retient
+     l'écran quitté pour pouvoir y redescendre. Sans cette mémoire, le retour
+     du bandeau lisait le module courant et remontait au menu du groupe —
+     on ressortait des réglages dans « Mon entreprise », jamais là où on
+     était. */
+  if (v === 'reglages' && A.vue && A.vue !== 'reglages') A.vueAvantReglages = A.vue;
   A.vue = v;
   $$('.onglets button').forEach(function (b) { b.setAttribute('aria-selected', String(b.dataset.vue === v)); });
   $$('main > .vue').forEach(function (s) { s.classList.toggle('actif', s.id === 'vue-' + v); });
@@ -6481,7 +6480,6 @@ function brancher() {
   $('#b-ctx').addEventListener('click', function (e) {
     var b = e.target.closest('button'); if (!b) return;
     if (b.id === 'b-entete2') ouvrirEntete();
-    else if (b.id === 'b-estimer') { renderEstimer(); aller('estimer'); }
     else if (b.id === 'b-aujourdhui') { A.calMois = null; A.calJour = Date.now(); renderCalendrier(); aller('calendrier'); }
   });
   document.addEventListener('click', function (e) {
@@ -6736,7 +6734,7 @@ function brancher() {
     else if (s4) {
       A.estim = { travail: s4.dataset.restim, quantite: '', rendement: null, repere: null };
       renderEstimer(); renderEstimResultat();
-      allerModule('devis', 'estimer');
+      allerModule('rendements', 'estimer');
     }
   });
 
@@ -7078,7 +7076,7 @@ function brancher() {
   $('#a-sauvegarde').addEventListener('click', function (e) {
     if (!e.target.closest('#a-sauver')) return;
     document.body.classList.remove('accueil-ouvert');
-    if (!MODULES[A.module]) A.module = 'cubage';
+    A.module = moduleValide(A.module);
     majOnglets(); aller('fichiers');
     var c = $('#c-sauvegarde');
     if (c) c.scrollIntoView({ block: 'center' });
@@ -7256,7 +7254,10 @@ function init() {
     .then(function (res) {
       A.export = res[3] || 0;
       A.piles = res[4] || [];
-      A.module = MODULES[res[5]] ? res[5] : 'cubage';
+      /* Le module en mémoire peut viser un module retiré : on le corrige et
+         on réécrit la valeur, pour que le téléphone cesse de la porter. */
+      A.module = moduleValide(res[5]);
+      if (A.module !== res[5]) ecrire('bordcub.module', A.module);
       A.chantiers = res[6] || [];
       A.clients = res[7] || [];
       A.depenses = res[8] || [];
@@ -7305,8 +7306,8 @@ function init() {
       if (vd) {
         var MOD_DE_VUE = { stock: 'bois', bois: 'bois', lieux: 'bois',
           carnet: 'chantiers', chantier: 'chantiers', calendrier: 'calendrier',
-          rendements: 'rendements', estimer: 'devis', finances: 'finances', depenses: 'finances',
-          charges: 'finances', stock2: 'stock', commandes: 'stock', revient: 'stock', carte: 'calendrier', analyses: 'analyses' };
+          rendements: 'rendements', estimer: 'rendements', finances: 'finances', depenses: 'finances',
+          charges: 'finances', stock2: 'stock', commandes: 'stock', revient: 'stock', carte: 'calendrier', analyses: 'finances' };
         var mod = MOD_DE_VUE[vd] || 'cubage';
         renderReglages();
         if (actif && A.index.some(function (x) { return x.id === actif; })) {
@@ -7405,17 +7406,16 @@ var MODULES = {
     nom: 'Rendements', defaut: 'rendements', groupe: 'entreprise',
     vues: [['rendements', 'Rendements'], ['estimer', 'Estimer']]
   },
-  devis: {
-    nom: 'Devis et estimatif', defaut: 'estimer', groupe: 'entreprise',
-    vues: [['estimer', 'Estimer'], ['carnet', 'Devis']]
-  },
+  /* « Devis et estimatif » n'avait aucun écran à lui : son onglet Estimer
+     appartenait aux Rendements, son onglet Devis était le carnet des
+     Chantiers. C'était une entrée de menu déguisée en module — et depuis que
+     le devis vit sur la fiche du chantier, elle n'avait plus d'objet.
+     « Analyses » lisait les mêmes données que Finances, sur la même période,
+     avec un second jeu de sélecteurs : elle y est devenue un onglet. */
   finances: {
     nom: 'Finances', defaut: 'finances', groupe: 'entreprise',
-    vues: [['finances', 'Bilan'], ['depenses', 'Dépenses'], ['charges', 'Charges fixes']]
-  },
-  analyses: {
-    nom: 'Analyses', defaut: 'analyses', groupe: 'entreprise',
-    vues: [['analyses', 'Analyses']]
+    vues: [['finances', 'Bilan'], ['depenses', 'Dépenses'],
+    ['charges', 'Charges fixes'], ['analyses', 'Analyses']]
   },
   stock: {
     nom: 'Stock et fournitures', defaut: 'stock2', groupe: 'entreprise',
@@ -7435,7 +7435,29 @@ var NOMS_GROUPE = { entreprise: 'Mon entreprise' };
 
 /* Remonter d'un cran : le menu de la partie si le module en a une,
    l'accueil sinon. */
+/* Les modules retirés en 4.38 restent en mémoire sur les téléphones déjà
+   installés : « devis » menait à l'estimation, désormais dans Rendements,
+   et « analyses » est devenue un onglet de Finances. Sans cette
+   redirection, l'application se rouvrait dans le cubage. */
+var MODULES_RETIRES = { devis: 'rendements', analyses: 'finances' };
+function moduleValide(m) {
+  if (MODULES[m]) return m;
+  if (MODULES_RETIRES[m]) return MODULES_RETIRES[m];
+  return 'cubage';
+}
 function allerMenuParent() {
+  /* Depuis les réglages, on redescend d'abord là où on était. On ne le fait
+     que si cette vue appartient encore au module ouvert : sinon on afficherait
+     un écran dont l'onglet n'est plus dans la barre. */
+  if (A.vue === 'reglages' && A.vueAvantReglages) {
+    var precedente = A.vueAvantReglages;
+    A.vueAvantReglages = null;
+    var m = MODULES[A.module];
+    if (m && m.vues.some(function (v) { return v[0] === precedente; })) {
+      aller(precedente);
+      return;
+    }
+  }
   var g = (MODULES[A.module] || {}).groupe;
   if (!g) { allerAccueil(); return; }
   document.body.classList.add('accueil-ouvert');
@@ -7448,7 +7470,6 @@ function allerMenuParent() {
    encore d'équivalent ailleurs. */
 var ACTIONS_MODULE = {
   cubage: [['b-entete2', 'En-tête']],
-  devis: [['b-estimer', 'Estimer']],
   calendrier: [['b-aujourdhui', 'Aujourd’hui']]
 };
 function majBandeauModule() {
@@ -7483,10 +7504,6 @@ function majOnglets() {
   document.body.classList.add('m-' + A.module);
   if (m.groupe === 'entreprise') document.body.classList.add('m-ent');
   majBandeauModule();
-  /* Un module qui n'a qu'une vue n'a pas besoin d'onglet : un seul onglet
-     étiré sur toute la largeur ne propose rien et mange une bande d'écran.
-     Analyses est dans ce cas. */
-  document.body.classList.toggle('sans-onglets', m.vues.length < 2);
   $('#onglets').innerHTML = m.vues.map(function (v) {
     return '<button role="tab" data-vue="' + v[0] + '" aria-selected="false">' +
       '<span class="ic"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true">' +
@@ -9844,15 +9861,6 @@ function renderEntreprise() {
       : 'Saisissez temps et quantités pour en obtenir';
   }
 
-  var enAttente = A.chantiers.filter(function (c) { return ['devis', 'envoye'].indexOf(c.statut) >= 0; });
-  if ($('#e-dv-n')) $('#e-dv-n').textContent = enAttente.length || '—';
-  if ($('#e-dv-s')) {
-    var tr = FIN.tauxReussite(A.chantiers, C.aDevis);
-    $('#e-dv-s').textContent = enAttente.length
-      ? eur(t.propose) + ' en attente de réponse'
-      : (tr.taux != null ? tr.taux + ' % de devis acceptés' : 'Chiffrer d’après vos chantiers passés');
-  }
-
   var b = periodeCourante();
   var ca = FIN.chiffreAffaires(A.chantiers, b);
   var bal = FIN.balanceTva(A.chantiers, A.depenses, b);
@@ -9861,21 +9869,9 @@ function renderEntreprise() {
     $('#e-fi-s').textContent = ca.total || bal.montant
       ? libellePeriode() + ' · TVA ' + eur(bal.montant) + ' ' +
         (bal.sens === 'a_payer' ? 'à reverser' : (bal.sens === 'a_recuperer' ? 'à récupérer' : ''))
-      : 'Chiffre d’affaires, TVA, dépenses';
+      : 'Bilan, recettes, dépenses, analyses';
   }
 
-  var resAn = FIN.resultat(A.chantiers, A.depenses, periodeCourante());
-  /* La tuile annonçait « marge » une différence entre recettes et achats qui
-     ignore cotisations, impôt et amortissement — ce n'est pas une marge. Elle
-     porte le chiffre d'affaires, qui est ce qu'on vient y chercher, et la
-     période, faute de quoi on ne sait pas si c'est l'année ou le total. */
-  if ($('#e-an-n')) $('#e-an-n').textContent = (resAn.recettes || resAn.achats) ? eur(resAn.recettes) : '—';
-  if ($('#e-an-p')) $('#e-an-p').textContent = 'facturé ' + libellePeriode();
-  if ($('#e-an-s')) {
-    $('#e-an-s').textContent = (resAn.recettes || resAn.achats)
-      ? eur(resAn.recettes) + ' facturés · ' + eur(resAn.achats) + ' achetés'
-      : 'Ce qui rapporte, où part l’argent';
-  }
   var vs = ST.valeurTotale(A.articles), bas = ST.articlesSousSeuil(A.articles);
   if ($('#e-st-n')) $('#e-st-n').textContent = vs ? eur(vs) : '—';
   if ($('#e-st-s')) {
@@ -13640,7 +13636,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.37.0-20260817-2118';
+var VERSION = '4.38.0-20260818-1856';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

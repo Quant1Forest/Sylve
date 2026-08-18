@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.37.0-20260817-2118**
+Version courante : **4.38.0-20260818-1856**
 
 ---
 
@@ -424,6 +424,47 @@ scénario de navigation l'a rattrapée.
 
 **Un module qui n'a qu'une vue n'affiche pas d'onglet** (`sans-onglets`) : un
 onglet unique étiré sur la largeur ne propose rien. Analyses est le seul cas.
+
+## Cinq modules, plus sept
+
+Deux des sept « modules » de la partie Entreprise n'en étaient pas. Le test
+qui les a désignés est simple et se rejoue : **un module dont toutes les vues
+appartiennent à d'autres modules est une entrée de menu déguisée.**
+
+- **« Devis et estimatif » a été supprimé** en 4.38. Son onglet *Estimer*
+  était celui des Rendements, son onglet *Devis* le carnet des Chantiers. Le
+  devis vit désormais sur la fiche du chantier, ce qui achevait de le vider
+  de son objet. Rien n'a été perdu : `estimer` est le second onglet des
+  Rendements.
+- **« Analyses » est devenue le quatrième onglet de Finances.** Les deux
+  écrans lisaient les mêmes données — chantiers et dépenses — sur la même
+  période. Ils portaient même deux jeux de sélecteurs distincts (`fi-*` et
+  `an-*`) qui écrivaient déjà tous les deux dans `A.periode` : la fusion n'a
+  donc rien eu à réconcilier.
+- **« Recettes » existait déjà**, en pastille dans Analyses à côté de « Vue
+  d'ensemble » et « Dépenses ». Ne pas en créer un second : le manque
+  ressenti était un problème de visibilité, pas d'absence.
+
+**Deux nettoyages en ont découlé, et c'est le signe que la fusion était
+juste :**
+
+- L'action *Estimer* du bandeau n'avait plus lieu d'être — elle était là
+  parce que c'était « le seul accès à l'écran d'estimation ». Ce n'est plus
+  vrai. Il ne reste que *Aujourd'hui* et *En-tête*.
+- La garde `sans-onglets` de la 4.37 a été **retirée** : Analyses était son
+  seul cas. Un scénario vérifie maintenant qu'aucun module ne se réduit à un
+  onglet solitaire — il criera le jour où l'un réapparaîtra.
+
+**Un téléphone déjà installé garde en mémoire le module ouvert.**
+`MODULES_RETIRES` redirige `devis` vers Rendements et `analyses` vers
+Finances, et réécrit la valeur au démarrage. Sans ça, l'application se
+rouvrait dans le cubage, à l'autre bout.
+
+**Les réglages ne sont pas un étage de la navigation.** C'est une vue, et le
+retour du bandeau lisait le module courant : on ressortait des réglages dans
+« Mon entreprise », jamais sur l'écran quitté. `aller()` retient donc
+`A.vueAvantReglages`, et `allerMenuParent()` y redescend d'abord — à
+condition que cette vue appartienne encore au module ouvert.
 
 ## Deux détails de typographie qui comptent
 
