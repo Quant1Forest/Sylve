@@ -120,9 +120,29 @@ Le dépôt est publié par GitHub Pages : ce qui est poussé sur `main` devient
 l'application, et le téléphone propose la mise à jour à la prochaine ouverture
 avec du réseau.
 
-Donc : **on ne pousse jamais sans un « envoie » explicite.** Modifier les
-fichiers, faire vérifier le résultat, attendre le feu vert, pousser ensuite.
-Un `git push` est une publication, pas une sauvegarde.
+**Un correctif part seul. Une modification se demande.** Règle posée le
+18 août 2026, après une trentaine de lots où il répondait « oui » à chaque
+fois : ce qu'il valide, il ne peut de toute façon le juger qu'une fois
+l'application entre ses mains. Lui faire relire un correctif d'alignement ne
+lui apprend rien.
+
+**Part sans rien demander** — un correctif : réparer un comportement décrit
+comme cassé, sans changer ce que l'application propose. Un libellé faux, un
+alignement, un calcul erroné, une garde manquante, un bouton qui ne répond
+pas. Condition ferme : le contrôle au vert **et** le scénario qui couvre la
+correction écrit.
+
+**Attend son feu vert** — une modification : tout ce qui ajoute, retire ou
+déplace quelque chose. Un écran, un module, un onglet, un champ, une règle
+métier, une couleur qu'il n'a pas demandée. Et **tout ce qui touche à ses
+données existantes** : migration, création en masse, suppression.
+
+**Dans le doute, c'est une modification.** Se tromper en demandant coûte un
+message ; se tromper en publiant met sur son téléphone quelque chose qu'il
+n'a pas voulu.
+
+Un `git push` reste une publication, pas une sauvegarde : ce qui part sur
+`main` est en ligne à la prochaine ouverture avec du réseau.
 
 Livrer suppose aussi d'avoir monté la `VERSION` dans `index.html` **et** dans
 `sw.js` — sans quoi les téléphones déjà installés continuent de servir
