@@ -6992,13 +6992,25 @@ function brancher() {
   });
 
   /* --- prix de revient --- */
+  $('#rev-resultat').addEventListener('click', function (e) {
+    var m = e.target.closest('[data-marge]');
+    if (m) { A.revient.marge = m.dataset.marge; renderRevient(); }
+  });
   $('#rev-nav').addEventListener('click', function (e) {
     var b = e.target.closest('[data-rev]');
     if (b) { A.revient.onglet = b.dataset.rev; renderRevient(); }
   });
   $('#rev-hyp').addEventListener('click', ouvrirHypotheses);
   $('#rev-form').addEventListener('change', function (e) {
-    if (e.target.closest('#rev-art')) { A.revient.article = $('#rev-art').value; A.revient.prix = ''; renderRevient(); }
+    if (e.target.closest('#rev-art')) {
+      /* Changer de produit repart de son dosage à lui, pas de celui d'avant. */
+      A.revient.article = $('#rev-art').value; A.revient.prix = ''; A.revient.dose = null;
+      renderRevient();
+    }
+    else if (e.target.closest('#rev-dose')) {
+      A.revient.dose = ST.nb($('#rev-dose').value) || null;
+      renderRevient();
+    }
     else if (e.target.closest('#rev-base')) { A.revient.base = $('#rev-base').value; renderRevient(); }
     else if (e.target.closest('#rev-mode')) { A.revient.mode = $('#rev-mode').value; renderRevient(); }
     else if (e.target.closest('#rev-par')) { A.revient.par = $('#rev-par').value; A.revient.prix = ''; renderRevient(); }
@@ -10387,6 +10399,12 @@ function horodaterStatut(c) {
 var FIN = window.BCF;
 
 function depense(id) { return A.depenses.filter(function (d) { return d.id === id; })[0] || null; }
+/* La dépense née d'une commande porte son identifiant : c'est ce qui permet
+   de la retrouver pour la corriger ou la retirer. */
+function depenseDeCommande(idCmd) {
+  if (!idCmd) return null;
+  return A.depenses.filter(function (d) { return d.commande === idCmd; })[0] || null;
+}
 function sauverDepenses() { return ecrire('bordcub.depenses', A.depenses); }
 function periodeCourante() {
   var p = A.periode || (A.periode = { type: 'annee', annee: new Date().getFullYear(), indice: 0 });
@@ -11785,6 +11803,25 @@ function majStock() {
 }
 
 /* ------------------------------------------------------------ inventaire */
+/* Où l'argent dort. Les quantités ne se comparent pas d'un produit à l'autre
+   — mille bambous et mille gaines n'ont rien de commun — mais leur valeur en
+   euros, si. C'est la seule échelle partagée par tout le catalogue. */
+function ouDortLArgent(articles) {
+  var l = (articles || []).map(function (a) {
+    return { nom: a.nom || 'Produit', valeur: ST.valeurStock(a),
+      detail: E.fmt(ST.quantite(a), 0) + ' ' + ST.courtUniteArt(a.unite) };
+  }).filter(function (x) { return x.valeur > 0; })
+    .sort(function (x, y) { return y.valeur - x.valeur; });
+  if (l.length < 2) return '';
+  var tot = l.reduce(function (s2, x) { return s2 + x.valeur; }, 0);
+  l.forEach(function (x) { x.part = Math.round(x.valeur / tot * 100); });
+  return '<div class="carte2" style="margin-top:11px;padding:11px">' +
+    '<p class="eyebrow" style="margin:0 0 9px">Où dort votre argent</p>' +
+    barres(l, '#5B3A1E') +
+    '<p class="muted" style="font-size:12px;margin:2px 0 0">La valeur est la seule échelle ' +
+    'commune : mille bambous et mille gaines ne se comparent pas au nombre.</p></div>';
+}
+
 function renderStockFournitures() {
   var z = $('#stock-resume'); if (!z) return;
   var t = $('#stock-table');
@@ -11814,7 +11851,7 @@ function renderStockFournitures() {
       ruptures.length + '</b><small>en rupture</small></div>' : '') +
     (bas.length ? '<div class="carte2" style="border-color:#B98A00"><b class="num">' + bas.length +
       '</b><small>à recommander</small></div>' : '') +
-    '</div>';
+    '</div>' + ouDortLArgent(A.articles);
 
   var l = A.articles.slice().sort(function (a, b) {
     return (a.nom || '').localeCompare(b.nom || '', 'fr');
@@ -11830,7 +11867,10 @@ function renderStockFournitures() {
 
   t.innerHTML = '<div class="tab-boite"><table><thead><tr>' +
     '<th style="text-align:left">Produit</th>' +
-    '<th class="num">Acheté</th><th class="num">Sorti</th><th class="num">En stock</th>' +
+    /* Ce qu'il reste d'abord : c'est la seule colonne qu'on vient vraiment
+       lire, et elle était au bout d'un défilement horizontal. */
+    '<th class="num">En stock</th>' +
+    '<th class="num">Acheté</th><th class="num">Sorti</th>' +
     (engage ? '<th class="num">Futur</th>' : '') +
     (prevu ? '<th class="num">À prévoir</th>' : '') +
     '<th class="num">Coût unit. réel</th><th class="num">Valeur</th>' +
@@ -11851,9 +11891,9 @@ function renderStockFournitures() {
         '<td style="text-align:left"><i class="pt" style="background:' + coul + '"></i>' +
         esc(a.nom || 'Produit') +
         '<small class="muted"> ' + esc(u) + (att ? ' · +' + ech1(att) + ' attendus' : '') + '</small></td>' +
+        '<td class="num"><b>' + ech1(q) + '</b></td>' +
         '<td class="num">' + ech1(ST.quantiteAchetee(a)) + '</td>' +
         '<td class="num">' + ech1(ST.quantiteSortie(a)) + '</td>' +
-        '<td class="num"><b>' + ech1(q) + '</b></td>' +
         (engage ? '<td class="num muted">' + ech1(ST.stockFutur(a)) + '</td>' : '') +
         (prevu ? '<td class="num muted">' + ech1(ST.stockPrevu(a)) + '</td>' : '') +
         '<td class="num">' + E.fmt(ST.pmp(a), 4) + '</td>' +
@@ -11865,9 +11905,9 @@ function renderStockFournitures() {
        veut rien dire. Seule la valeur, en euros, se cumule toujours. */
     '<tr class="tot"><td style="text-align:left">Total</td>' +
     (uniteUnique
-      ? '<td class="num">' + E.fmt(tot.achat, 0) + '</td>' +
-        '<td class="num">' + E.fmt(tot.vendu, 0) + '</td>' +
-        '<td class="num">' + E.fmt(tot.stock, 0) + '</td>'
+      ? '<td class="num">' + E.fmt(tot.stock, 0) + '</td>' +
+        '<td class="num">' + E.fmt(tot.achat, 0) + '</td>' +
+        '<td class="num">' + E.fmt(tot.vendu, 0) + '</td>'
       : '<td class="num muted" colspan="3" style="text-align:center;font-style:italic">' +
         'unités différentes</td>') +
     (engage ? '<td></td>' : '') + (prevu ? '<td></td>' : '') +
@@ -13193,14 +13233,21 @@ function ouvrirCommande(id, artPref) {
     '<div class="champ" style="margin-top:11px"><label class="eyebrow" for="cm-livr">Frais de livraison (€ HT)</label>' +
     '<input type="text" id="cm-livr" inputmode="decimal" placeholder="0" value="' + (c && ST.nb(c.livraison) ? c.livraison : '') + '"></div>' +
     '<div class="carte2" id="cm-apercu" style="margin:11px 0"></div>' +
-    (id ? '' :
-      '<label class="ligne-check" style="display:flex;align-items:center;gap:8px;font-size:13.5px">' +
-      '<input type="checkbox" id="cm-dep" checked> Créer aussi la dépense correspondante</label>' +
-      '<div class="grille g2" style="margin-top:8px"><div class="champ">' +
-      '<label class="eyebrow" for="cm-tva">TVA</label>' +
-      '<select id="cm-tva">' + FIN.TAUX_TVA.map(function (t) {
-        return '<option value="' + t + '"' + (t === 20 ? ' selected' : '') + '>' + (t ? t + ' %' : 'sans TVA') + '</option>';
-      }).join('') + '</select></div></div>') +
+    (function () {
+      var dep = id ? depenseDeCommande(id) : null;
+      var taux = dep ? FIN.nb((dep.lignes || [{}])[0].taux) : 20;
+      return '<label class="ligne-check" style="display:flex;align-items:center;gap:8px;font-size:13.5px">' +
+        '<input type="checkbox" id="cm-dep"' + (!id || dep ? ' checked' : '') + '> ' +
+        (id ? 'Cette commande figure dans les dépenses' : 'Créer aussi la dépense correspondante') +
+        '</label>' +
+        '<div class="grille g2" style="margin-top:8px"><div class="champ">' +
+        '<label class="eyebrow" for="cm-tva">TVA</label>' +
+        '<select id="cm-tva">' + FIN.TAUX_TVA.map(function (t) {
+          return '<option value="' + t + '"' + (t === taux ? ' selected' : '') + '>' +
+            (t ? t + ' %' : 'sans TVA') + '</option>';
+        }).join('') + '</select></div></div>' +
+        '<p class="muted" style="font-size:11.5px;margin:5px 0 0" id="cm-dep-aide"></p>';
+    })() +
     '<div class="btn-rang" style="margin-top:11px">' +
     '<button class="btn primaire" id="cm-ok">Enregistrer</button>' +
     (id ? '<button class="btn danger btn-min" id="cm-sup">Supprimer</button>' : '') + '</div>');
@@ -13231,6 +13278,38 @@ function ouvrirCommande(id, artPref) {
   $('#cm-livr').addEventListener('input', apercu);
   $('#cm-four-plus').addEventListener('click', function () { fermerModale(); ouvrirFournisseur(null); });
 
+  /* Prévenir au moment du geste, pas à l'enregistrement : décocher retire une
+     dépense réelle, et changer la TVA change ce qu'on récupère. */
+  var majAideDep = function () {
+    var z = $('#cm-dep-aide'); if (!z) return;
+    var coche = $('#cm-dep').checked;
+    z.textContent = coche
+      ? 'La dépense suivra cette commande : montant, TVA et date.'
+      : 'Cette commande restera hors des dépenses, donc hors du calcul de TVA.';
+  };
+  if ($('#cm-dep')) {
+    $('#cm-dep').addEventListener('change', function () {
+      var dep = id ? depenseDeCommande(id) : null;
+      if (!this.checked && dep) {
+        if (!confirm('Décocher retirera la dépense de ' + eur(FIN.ttcDe(dep)) +
+          ' liée à cette commande.\n\nSa TVA ne sera plus récupérée. Confirmer ?')) {
+          this.checked = true;
+        }
+      }
+      majAideDep();
+    });
+    majAideDep();
+  }
+  if ($('#cm-tva')) {
+    var tvaAvant = $('#cm-tva').value;
+    $('#cm-tva').addEventListener('change', function () {
+      if (!id || !depenseDeCommande(id) || this.value === tvaAvant) { tvaAvant = this.value; return; }
+      var mot = function (v) { return ST.nb(v) ? String(v).replace('.', ',') + ' %' : 'sans TVA'; };
+      if (!confirm('La TVA de la dépense passera de ' + mot(tvaAvant) + ' à ' + mot(this.value) +
+        '.\n\nConfirmer ?')) { this.value = tvaAvant; return; }
+      tvaAvant = this.value;
+    });
+  }
   $('#cm-ok').addEventListener('click', function () {
     lireLignes();
     var lignes = lignesValides();
@@ -13245,17 +13324,33 @@ function ouvrirCommande(id, artPref) {
     A.commandes = A.commandes || [];
     if (c) Object.keys(maj).forEach(function (k) { c[k] = maj[k]; });
     else { maj.id = uid(); A.commandes.push(maj); }
+    /* En modification, « maj » n'a pas d'identifiant : c'est celui de la
+       commande ouverte qui rattache la dépense. */
+    var idCmd = id || maj.id;
     var suite = sauverCommandes();
-    if (!id && $('#cm-dep') && $('#cm-dep').checked) {
+    /* La dépense découle de la commande : on la crée, on la met à jour ou on
+       la retire selon la case, plutôt que de la figer à la création. */
+    var veut = $('#cm-dep') && $('#cm-dep').checked;
+    var dep = depenseDeCommande(idCmd);
+    if (veut) {
       var taux = ST.nb($('#cm-tva').value);
       var march = lignes.reduce(function (s, l) { return s + l.qte * l.prix; }, 0);
       var dl = [{ libelle: 'Fournitures' + (maj.num ? ' ' + maj.num : ''), categorie: 'FOURN',
         ttc: FIN.arr(march * (1 + taux / 100), 2), taux: taux }];
       if (maj.livraison) dl.push({ libelle: 'Livraison', categorie: 'FOURN',
         ttc: FIN.arr(maj.livraison * (1 + taux / 100), 2), taux: taux });
-      A.depenses.push({ id: uid(), date: maj.dateLiv || maj.dateCmd,
-        fournisseur: nomFournisseur(maj.fournisseur), numero: maj.num,
-        commande: maj.id, maj: Date.now(), lignes: dl });
+      if (!dep) {
+        dep = { id: uid(), commande: idCmd };
+        A.depenses.push(dep);
+      }
+      dep.date = maj.dateLiv || maj.dateCmd;
+      dep.fournisseur = nomFournisseur(maj.fournisseur);
+      dep.numero = maj.num;
+      dep.lignes = dl;
+      dep.maj = Date.now();
+      suite = suite.then(sauverDepenses);
+    } else if (dep) {
+      A.depenses = A.depenses.filter(function (x) { return x !== dep; });
       suite = suite.then(sauverDepenses);
     }
     suite.then(function () {
@@ -13476,7 +13571,8 @@ function barresObjectif(lignes, objectif, o) {
       var atteint = l.valeur >= objectif;
       return '<div style="margin-bottom:9px">' +
         '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px">' +
-        '<span>' + esc(l.nom) + '</span>' +
+        '<span>' + esc(l.nom) + (l.detail ? ' <span class="muted" style="font-size:11.5px">' +
+          esc(l.detail) + '</span>' : '') + '</span>' +
         '<span class="num"' + (atteint ? '' : ' style="color:#B4231F"') + '>' +
         esc(l.texte || E.fmt(l.valeur, 1)) + '</span></div>' +
         '<div style="height:9px;background:var(--trait);border-radius:5px;overflow:hidden">' +
@@ -13560,7 +13656,11 @@ function renderRevient() {
         '<select id="rev-par">' +
         '<option value="plant"' + (r.par !== 'unite' ? ' selected' : '') + '>par plant</option>' +
         '<option value="unite"' + (r.par === 'unite' ? ' selected' : '') + '>par ' +
-        esc(ST.courtUniteArt(art.unite)) + '</option></select></div>' : '') +
+        esc(ST.courtUniteArt(art.unite)) + '</option></select></div>' +
+        '<div class="champ"><label class="eyebrow" for="rev-dose">Dosage (' +
+        esc(ST.courtUniteArt(art.unite)) + ' / plant)</label>' +
+        '<input type="text" id="rev-dose" inputmode="decimal" value="' +
+        esc(String(e.dose).replace('.', ',')) + '"></div>' : '') +
     '<div class="champ"><label class="eyebrow" for="rev-mode">Prix de vente</label>' +
     '<select id="rev-mode">' +
     '<option value="saisi"' + (r.mode !== 'moyen' ? ' selected' : '') + '>prix saisi</option>' +
@@ -13576,8 +13676,11 @@ function renderRevient() {
     '<div style="display:flex;justify-content:space-between;font-size:13.5px">' +
     '<span>Coût réel par ' + esc(e.nom) + '</span><b class="num">' + E.fmt(cout, 4) + ' €</b></div>' +
     (e.dose ? '<div style="display:flex;justify-content:space-between;font-size:13.5px;margin-top:3px">' +
-      '<span class="muted">dosage retenu</span><b class="num muted">' + E.fmt(e.dose, 1) + ' ' +
-      esc(ST.courtUniteArt(art.unite)) + ' par plant</b></div>' : '') +
+      '<span class="muted">dosage retenu</span><b class="num muted">' + E.fmt(e.dose, 2) + ' ' +
+      esc(ST.courtUniteArt(art.unite)) + ' par plant' +
+      (ST.nb(r.dose) && ST.nb(r.dose) !== ST.nb(art.dosage)
+        ? ' <i style="font-style:normal;color:#B98A00">simulé</i>' : '') +
+      '</b></div>' : '') +
     '<div class="muted" style="font-size:11.5px;margin-top:5px">Livraison comprise. ' +
     (r.base === 'dernier' ? 'Dernière commande — le prix auquel vous rachèterez.'
       : 'Moyenne pondérée de toutes les commandes reçues.') + '</div></div>';
@@ -13588,7 +13691,9 @@ function renderRevient() {
    bascule dans l'unité choisie, coût compris. Les rapports ne changent pas,
    seuls les euros suivent l'échelle. */
 function echelle(art) {
-  var d = ST.nb(art && art.dosage);
+  /* Le dosage simulé prime sur celui de la fiche : on chiffre un chantier de
+     grosses tiges sans corriger le produit, qui lui ne change pas. */
+  var d = ST.nb((A.revient && A.revient.dose) || (art && art.dosage));
   var parPlant = d > 0 && (!A.revient || A.revient.par !== 'unite');
   return { dose: d > 0 ? d : 0, k: parPlant ? d : 1,
     nom: parPlant ? 'plant' : ST.courtUniteArt(art && art.unite) };
@@ -13702,7 +13807,30 @@ function tableauCouts() {
         detail: E.fmt(ST.quantite(a), 0) + ' ' + ST.courtUniteArt(a.unite) };
     });
 
-  return '<div class="carte"><h2>Coût réel par commande</h2>' +
+  /* Rapporté au minimum plutôt qu'en euros : les produits n'ont pas le même
+     prix, mais « à 100 % du minimum » se compare d'une ligne à l'autre. En
+     dessous de la barre, la vente ne couvre pas l'objectif. */
+  var cible = cibleMarge();
+  var gSeuil = A.articles.filter(function (a) {
+    return ST.quantiteVendue(a) > 0 && ST.pmp(a) > 0;
+  }).map(function (a) {
+    var cu = ST.pmp(a), pv = ST.prixVenteMoyen(a);
+    var mini = cible < 100 ? cu / (1 - cible / 100) : cu;
+    return { nom: a.nom || '', valeur: mini > 0 ? pv / mini * 100 : 0,
+      texte: E.fmt(mini > 0 ? pv / mini * 100 : 0, 0) + ' %',
+      detail: 'vendu ' + E.fmt(pv, 3) + ' € · minimum ' + E.fmt(mini, 3) + ' €' };
+  }).sort(function (a, b) { return b.valeur - a.valeur; });
+
+  return (gSeuil.length
+    ? '<div class="carte"><h2>Vos prix face au minimum ' +
+      '<span class="muted" style="font-weight:400;font-size:13px">— ' + E.fmt(cible, 0) +
+      ' % de marge</span></h2>' +
+      barresObjectif(gSeuil, 100, { libObjectif: 'minimum' }) +
+      '<p class="muted" style="font-size:12px;margin:9px 0 0">Chaque barre est le prix pratiqué ' +
+      'rapporté au prix minimum du produit. Sous la barre, la vente ne couvre pas votre ' +
+      'objectif.</p></div>'
+    : '') +
+    '<div class="carte"><h2>Coût réel par commande</h2>' +
     '<div class="tab-boite"><table><thead><tr>' +
     '<th style="text-align:left">Commande</th><th style="text-align:left">Produit</th>' +
     '<th class="num">Qté</th><th class="num">Achat</th><th class="num">Quote-part livr.</th>' +
@@ -13767,9 +13895,12 @@ function tableauPerformance() {
   }).join('');
   var pvm = tot.q > 0 ? tot.ca / tot.q : 0, cum = tot.q > 0 ? tot.cout / tot.q : 0;
 
+  /* Brute ou nette : la nette retire les charges, celles qui décident si l'on
+     paie des cotisations sur de l'argent qu'on n'a pas gagné. */
+  var nette = (A.revient || {}).marge === 'nette';
   var gMarge = l.map(function (a) {
     var pv = ST.prixVenteMoyen(a), cu = ST.pmp(a);
-    var t = pv > 0 ? (pv - cu) / pv * 100 : 0;
+    var t = pv > 0 ? (pv - cu - (nette ? pv * tc : 0)) / pv * 100 : 0;
     return { nom: a.nom || '', valeur: t, texte: E.fmt(t, 1) + ' %' };
   }).sort(function (a, b) { return b.valeur - a.valeur; });
   var gCa = l.map(function (a) {
@@ -13777,7 +13908,30 @@ function tableauPerformance() {
       detail: E.fmt(ST.quantiteVendue(a), 0) + ' ' + ST.courtUniteArt(a.unite) };
   }).sort(function (a, b) { return b.valeur - a.valeur; });
 
-  return '<div class="carte"><h2>Ce que chaque produit rapporte</h2>' +
+  /* Le taux d'ensemble, avant le détail par produit : un produit vendu sous
+     l'objectif peut être rattrapé par un autre, et c'est le total qui décide
+     si les charges sont couvertes. */
+  var brutTot = tot.ca > 0 ? (tot.ca - tot.cout) / tot.ca * 100 : 0;
+  var netTot = tot.ca > 0 ? (tot.ca - tot.cout - tot.ca * tc) / tot.ca * 100 : 0;
+  var caCible = cm < 100 ? tot.cout / (1 - cm / 100) : 0;
+  var manque = caCible - tot.ca;
+
+  return '<div class="carte"><h2>Sur l’ensemble de vos ventes</h2>' +
+    '<div class="kpi">' +
+    '<div class="carte2"><b class="num" style="font-size:23px' +
+    (brutTot < cm ? ';color:#B4231F' : '') + '">' + E.fmt(brutTot, 1) + ' %</b>' +
+    '<small>marge brute</small></div>' +
+    '<div class="carte2"><b class="num">' + E.fmt(cm, 0) + ' %</b><small>votre objectif</small></div>' +
+    '<div class="carte2"><b class="num">' + E.fmt(netTot, 1) + ' %</b><small>net, après charges</small></div>' +
+    '</div>' +
+    '<p class="muted" style="font-size:12.5px;margin:10px 0 0">' +
+    (tot.ca <= 0 ? 'Aucune vente à mesurer.'
+      : brutTot >= cm
+        ? 'Vous êtes au-dessus de votre objectif : l’abattement forfaitaire couvre vos charges.'
+        : 'Il vous manque ' + eur(FIN.arr(manque, 2)) + ' de chiffre d’affaires, à coût de ' +
+          'revient inchangé, pour atteindre ' + E.fmt(cm, 0) + ' %. En dessous, vous cotisez sur ' +
+          'une marge que vous n’avez pas faite.') + '</p></div>' +
+    '<div class="carte"><h2>Ce que chaque produit rapporte</h2>' +
     '<div class="tab-boite"><table><thead><tr>' +
     '<th style="text-align:left">Produit</th><th class="num">Vendu</th><th class="num">CA</th>' +
     '<th class="num">Prix moyen</th><th class="num">Coût réel</th><th class="num">Marge / u.</th>' +
@@ -13797,8 +13951,16 @@ function tableauPerformance() {
     '<p class="muted" style="font-size:11.5px;margin:9px 0 0">Bénéfice net : après cotisations et ' +
     'impôt calculés sur le chiffre d’affaires après abattement, aux taux de vos hypothèses.' +
     (deb ? ' Les ' + eur(deb) + ' refacturés en débours sont exclus.' : '') + '</p></div>' +
-    '<div class="carte"><h2>Taux de marge brute par produit</h2>' +
+    '<div class="carte"><div class="carte-titre"><h2>Taux de marge par produit</h2></div>' +
+    '<div class="chips" id="perf-marge">' +
+    '<button class="chip" data-marge="brute" aria-pressed="' + (!nette) + '">Marge brute</button>' +
+    '<button class="chip" data-marge="nette" aria-pressed="' + nette + '">Marge nette</button>' +
+    '</div><div style="margin-top:10px">' +
     barresObjectif(gMarge, cm, { libObjectif: E.fmt(cm, 0) + ' %' }) + '</div>' +
+    '<p class="muted" style="font-size:11.5px;margin:8px 0 0">' +
+    (nette ? 'Nette : après les ' + E.fmt(tc * 100, 1) + ' % de charges sur le prix de vente. ' +
+      'C’est ce taux-là qui dit si la vente vous laisse quelque chose.'
+      : 'Brute : prix de vente moins coût réel, avant charges.') + '</p></div>' +
     '<div class="carte"><h2>Qui fait le chiffre</h2>' + barres(gCa, '#2E4A3C') + '</div>';
 }
 
@@ -13941,7 +14103,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.41.0-20260818-2233';
+var VERSION = '4.42.0-20260818-2300';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
