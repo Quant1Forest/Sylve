@@ -353,13 +353,14 @@ scenario('Accueil : des pictogrammes dessinés, plus des caractères de rempliss
       tuile && !/[▤▥▦▧▨▩]/.test(tuile.querySelector('.ic').textContent));
   });
   verifier('le bouton accueil n’affiche plus de losange', '', t.texte('#b-accueil'));
-  /* Second niveau : les sept tuiles de l'entreprise, cerclées. */
-  const sous = ['chantiers', 'calendrier', 'rendements', 'devis', 'analyses', 'stock', 'finances'];
+  /* Second niveau : les cinq tuiles de l'entreprise, cerclées. Devis n'avait
+     aucun écran à lui, et Analyses est devenue un onglet de Finances. */
+  const sous = ['chantiers', 'calendrier', 'rendements', 'stock', 'finances'];
   const cercles = sous.filter(m => {
     const b = t.$('#vue-entreprise [data-module="' + m + '"]');
     return b && b.querySelector('.ic.rond svg.pic');
   });
-  verifier('les sept tuiles de l’entreprise sont cerclées', sous, cercles);
+  verifier('les cinq tuiles de l’entreprise sont cerclées', sous, cercles);
   verifierVrai('aucun caractère de remplissage ne subsiste dans les tuiles',
     t.$$('.tuile .ic').every(e => !/[▤▥▦▧▨▩⏱≈◫]/.test(e.textContent)));
   /* Le logo ne doit exister qu'une fois dans le fichier : l'accueil et le
@@ -386,9 +387,12 @@ scenario('Bandeau : rien qui fasse doublon avec la page', async () => {
     verifierVrai(mod + ' : le bouton est dans la page', t.$(enPage));
     verifier(mod + ' : aucune erreur', [], t.erreurs);
   }
-  /* Ceux qui n'ont pas d'équivalent restent, sinon on serait bloqué dehors. */
-  const t2 = await ouvrir(Object.assign({}, VIDE, { module: 'devis' }));
-  verifierVrai('devis : « Estimer » reste, c’est le seul accès', t2.$('#b-estimer'));
+  /* « Estimer » a quitté le bandeau : depuis que le module Devis a disparu,
+     l'écran est le second onglet des Rendements. Il n'y a donc plus d'action
+     sans équivalent dans sa page. */
+  const t2 = await ouvrir(Object.assign({}, VIDE, { module: 'rendements' }));
+  verifier('rendements : le bandeau n’a plus d’action', '', t2.texte('#b-ctx'));
+  verifierVrai('l’estimation est devenue un onglet', t2.$('[data-vue="estimer"]'));
   /* Le filet du bandeau est brun, plus bleu : c'était le reproche principal. */
   const css = t2.d.documentElement.outerHTML;
   verifierVrai('le filet du bandeau est brun',
@@ -404,8 +408,8 @@ scenario('Onglets : un dessin partout, le même d’un module à l’autre', asy
      différente selon le module — on s'y perdait, et ils mangeaient un
      onglet là où il n'y en a que deux ou trois. */
   const attendu = {
-    cubage: 4, chantiers: 2, calendrier: 3, rendements: 2, devis: 2,
-    finances: 3, analyses: 1, stock: 3, bois: 4
+    cubage: 4, chantiers: 2, calendrier: 3, rendements: 2,
+    finances: 4, stock: 3, bois: 4
   };
   for (const mod of Object.keys(attendu)) {
     const t = await ouvrir(Object.assign({}, VIDE, { module: mod }));
@@ -900,11 +904,11 @@ scenario('Réglages : une longue liste se replie', async () => {
 });
 
 /* --------------------------------------------------------------------- */
-scenario('Analyses : la tuile ne parle plus de marge', async () => {
+scenario('Tuiles : aucune ne parle de marge, et Finances porte le chiffre d’affaires', async () => {
   /* « Marge » désignait recettes moins achats, qui ignore les cotisations,
-     l'impôt et l'amortissement. Ce n'est pas une marge, et la tuile ne
-     disait pas non plus sur quelle période elle comptait. */
-  const an = new Date().getFullYear();
+     l'impôt et l'amortissement. Ce n'est pas une marge. La tuile Analyses a
+     disparu avec son module ; c'est Finances qui porte le chiffre d'affaires,
+     et elle doit dire sur quelle période elle compte. */
   const t = await ouvrir(Object.assign({}, VIDE, {
     module: 'entreprise',
     chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'paye', temps: [], maj: Date.now(),
@@ -913,12 +917,15 @@ scenario('Analyses : la tuile ne parle plus de marge', async () => {
     depenses: [{ id: 'd1', date: Date.now(),
       lignes: [{ libelle: 'Gasoil', categorie: 'CONSO', ttc: 120, taux: 20 }] }]
   }));
-  const lib = t.texte('#e-an-p');
-  verifierVrai('le mot « marge » a disparu de la tuile', !/marge/i.test(lib || ''));
-  verifier('elle annonce ce qu’elle compte et quand', 'facturé ' + an, lib);
-  /* 4 ha × 250 € = 1000 € facturés, et non 1000 − 100 d'achats. */
-  /* t.texte() replie les blancs : l'insécable y ressort en espace ordinaire. */
-  verifier('et c’est bien le chiffre d’affaires', '1 000 €', t.texte('#e-an-n'));
+  /* La tuile Stock parle bien de marges, et c'est juste : ce sont celles des
+     fournitures revendues. Celle qui mentait était la tuile du résultat. */
+  const fin = t.$('#vue-entreprise [data-module="finances"]');
+  verifierVrai('la tuile Finances ne parle pas de marge', !/marge/i.test(fin.textContent));
+  /* 4 ha × 250 € = 1000 € facturés, et non 1000 − 120 d'achats.
+     t.texte() replie les blancs : l'insécable y ressort en espace ordinaire. */
+  verifier('Finances porte le chiffre d’affaires', '1 000 €', t.texte('#e-fi-n'));
+  verifierVrai('et elle dit sur quelle période',
+    new RegExp(String(new Date().getFullYear())).test(t.texte('#e-fi-s')));
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -1737,21 +1744,24 @@ scenario('À traiter : des notes à soi-même, qui restent tant qu’on ne les e
 });
 
 /* --------------------------------------------------------------------- */
-scenario('Onglets : un module qui n’a qu’une vue n’affiche pas de barre', async () => {
-  /* Analyses n'a qu'une vue : un onglet unique étiré sur toute la largeur ne
-     propose rien et mange une bande d'écran. */
-  const t = await ouvrir(Object.assign({}, VIDE, { module: 'analyses' }));
-  await t.pause(250);
-  verifierVrai('la barre est masquée sur Analyses',
-    t.d.body.classList.contains('sans-onglets'));
-  verifier('un seul onglet était prévu', 1, t.$$('#onglets button').length);
-
-  t.clic('[data-module="finances"]'); await t.pause(300);
-  verifierVrai('elle revient sur un module à plusieurs vues',
-    !t.d.body.classList.contains('sans-onglets'));
-  verifierVrai('et l’onglet des charges s’appelle « Charges fixes »',
-    /Charges fixes/.test(t.$('#onglets').textContent));
-  verifier('aucune erreur', [], t.erreurs);
+scenario('Onglets : plus aucun module ne se réduit à un onglet solitaire', async () => {
+  /* Analyses était le seul cas, et un onglet unique étiré sur la largeur ne
+     propose rien. Elle est devenue un onglet de Finances : la règle se vérifie
+     donc sur tous les modules à la fois. Ce contrôle criera le jour où un
+     module à vue unique réapparaîtra. */
+  const modules = ['cubage', 'chantiers', 'calendrier', 'rendements',
+    'finances', 'stock', 'bois'];
+  for (const mod of modules) {
+    const t = await ouvrir(Object.assign({}, VIDE, { module: mod }));
+    const n = t.$$('#onglets button').length;
+    verifierVrai(mod + ' : ' + n + ' onglets, jamais un seul', n >= 2);
+    verifier(mod + ' : aucune erreur', [], t.erreurs);
+  }
+  const t2 = await ouvrir(Object.assign({}, VIDE, { module: 'finances' }));
+  verifierVrai('l’onglet des charges s’appelle « Charges fixes »',
+    /Charges fixes/.test(t2.$('#onglets').textContent));
+  verifierVrai('et Analyses y a trouvé sa place',
+    /Analyses/.test(t2.$('#onglets').textContent));
 });
 
 /* --------------------------------------------------------------------- */
@@ -1782,6 +1792,81 @@ scenario('Milliers : séparés à l’écran, jamais dans un fichier', async () 
   verifier('même avec une espace ordinaire', 25000, C.nb('25 000'));
   verifier('les finances aussi', 1800.5, FIN.nb('1' + NBSP + '800,5'));
   verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Réglages : le retour redescend là où on était, pas au menu', async () => {
+  /* Les réglages sont une vue, pas un étage : le retour du bandeau lisait le
+     module courant et remontait au menu du groupe. On sortait des réglages
+     dans « Mon entreprise », jamais sur l'écran quitté. */
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'finances' }));
+  t.clic('[data-vue="charges"]'); await t.pause(250);
+  verifierVrai('on part des charges fixes', t.$('#vue-charges').classList.contains('actif'));
+
+  t.clic('#b-reglages'); await t.pause(300);
+  verifierVrai('les réglages sont ouverts', t.$('#vue-reglages').classList.contains('actif'));
+
+  t.clic('#b-retour'); await t.pause(300);
+  verifierVrai('on revient sur les charges fixes', t.$('#vue-charges').classList.contains('actif'));
+  verifierVrai('et pas sur le menu de l’entreprise',
+    !t.$('#vue-entreprise').classList.contains('actif'));
+  verifierVrai('le masque des menus n’est pas posé',
+    !t.d.body.classList.contains('accueil-ouvert'));
+
+  /* Deuxième appui : là, on remonte bien au menu du groupe. */
+  t.clic('#b-retour'); await t.pause(300);
+  verifierVrai('un second retour mène au menu de la partie',
+    t.$('#vue-entreprise').classList.contains('actif'));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Modules : Devis disparaît, Analyses devient un onglet de Finances', async () => {
+  /* « Devis et estimatif » n'avait aucun écran à lui, et Analyses lisait les
+     mêmes données que Finances sur la même période. Sept tuiles passent à
+     cinq sans qu'un seul écran soit perdu. */
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'entreprise' }));
+  const tuiles = t.$$('#vue-entreprise .tuiles .tuile')
+    .map(b => b.dataset.module);
+  verifier('cinq tuiles restent', 5, tuiles.length);
+  verifierVrai('plus de tuile Devis', tuiles.indexOf('devis') < 0);
+  verifierVrai('plus de tuile Analyses', tuiles.indexOf('analyses') < 0);
+  verifierVrai('Chantiers, Calendrier, Rendements, Stock et Finances sont là',
+    ['chantiers', 'calendrier', 'rendements', 'stock', 'finances']
+      .every(m => tuiles.indexOf(m) >= 0));
+
+  /* Les deux écrans restent joignables, ailleurs. */
+  t.clic('[data-module="finances"]'); await t.pause(300);
+  const onglets = t.$$('#onglets button').map(b => b.dataset.vue);
+  verifier('Finances porte quatre onglets', 4, onglets.length);
+  verifierVrai('dont Analyses', onglets.indexOf('analyses') >= 0);
+  t.clic('[data-vue="analyses"]'); await t.pause(350);
+  verifierVrai('l’écran d’analyses s’affiche', t.$('#vue-analyses').classList.contains('actif'));
+  /* « Recettes » existait déjà, en pastille : la fusion ne l'a pas perdue. */
+  verifierVrai('et sa pastille Recettes est là', t.$('[data-ana="recettes"]'));
+
+  t.clic('[data-module="entreprise"]'); await t.pause(300);
+  t.clic('[data-module="rendements"]'); await t.pause(300);
+  const ongRd = t.$$('#onglets button').map(b => b.dataset.vue);
+  verifierVrai('Estimer a suivi les Rendements', ongRd.indexOf('estimer') >= 0);
+  t.clic('[data-vue="estimer"]'); await t.pause(300);
+  verifierVrai('l’estimation s’ouvre toujours', t.$('#vue-estimer').classList.contains('actif'));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Mise à jour : un téléphone resté sur un module retiré ne tombe pas dans le cubage', async () => {
+  /* Le module ouvert est gardé en mémoire. « devis » et « analyses »
+     n'existent plus : sans redirection, l'application se rouvrait à l'autre
+     bout, dans le cubage. */
+  const surDevis = await ouvrir(Object.assign({}, VIDE, { module: 'devis' }));
+  verifier('« devis » mène aux rendements', 'rendements', surDevis.stock('module'));
+  const surAnalyses = await ouvrir(Object.assign({}, VIDE, { module: 'analyses' }));
+  verifier('« analyses » mène aux finances', 'finances', surAnalyses.stock('module'));
+  const inconnu = await ouvrir(Object.assign({}, VIDE, { module: 'chose' }));
+  verifier('un module inconnu retombe sur le cubage', 'cubage', inconnu.stock('module'));
+  verifier('aucune erreur', [],
+    surDevis.erreurs.concat(surAnalyses.erreurs, inconnu.erreurs));
 });
 
 /* --------------------------------------------------------------------- */
