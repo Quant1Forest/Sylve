@@ -1235,7 +1235,6 @@ if (froid && s > 0) montrer(s);
         <div class="carte-titre"><h2>Inventaire</h2>
           <div class="btn-rang" style="margin:0">
             <button class="btn btn-min" id="art-importer">Importer</button>
-            <button class="btn primaire btn-min" id="art-reception">+ Commande</button>
           </div></div>
         <div id="stock-resume"></div>
       </div>
@@ -4518,6 +4517,11 @@ function nomUniteArt(c) {
   for (var i = 0; i < UNITES_ART.length; i++) if (UNITES_ART[i].c === c) return UNITES_ART[i].n;
   return c || '';
 }
+/* Ce qui peut porter un dosage par plant : ce qui s'achète en volume, en
+   longueur ou en poids, puis se facture au plant. Un tuteur compté à la pièce
+   n'a pas de « 6 ml par plant ». */
+var UNITES_DOSABLES = ['millilitre', 'litre', 'ml', 'kg'];
+function UNITE_DOSABLE(u) { return UNITES_DOSABLES.indexOf(u) >= 0; }
 function courtUniteArt(c) {
   for (var i = 0; i < UNITES_ART.length; i++) if (UNITES_ART[i].c === c) return UNITES_ART[i].court;
   return c || '';
@@ -4765,7 +4769,7 @@ function decomposer(prixVente, cout, cfg) {
 }
 
 var M = {
-  UNITES_ART: UNITES_ART, nomUniteArt: nomUniteArt, courtUniteArt: courtUniteArt,
+  UNITES_ART: UNITES_ART, UNITE_DOSABLE: UNITE_DOSABLE, nomUniteArt: nomUniteArt, courtUniteArt: courtUniteArt,
   echelleArt: echelleArt,
   TYPES_ART: TYPES_ART, nomTypeArt: nomTypeArt,
   STATUTS_ACHAT: STATUTS_ACHAT, nomStatutAchat: nomStatutAchat,
@@ -6926,7 +6930,6 @@ function brancher() {
   $('#vue-stock2').addEventListener('click', function (e) {
     var f = e.target.closest('[data-artfiche]');
     if (f) { ouvrirFicheArticle(f.dataset.artfiche); return; }
-    if (e.target.closest('#art-reception')) ouvrirCommande(null);
     else if (e.target.closest('#art-importer') || e.target.closest('#stock-imp-vide')) ouvrirImportStock();
   });
 
@@ -6945,8 +6948,17 @@ function brancher() {
     else if (r) {
       var c = commande(r.dataset.cmdrecu); if (!c) return;
       c.statut = 'recu'; c.maj = Date.now();
-      if (!c.dateLiv) c.dateLiv = Date.now();
-      sauverCommandes().then(function () { majStock(); toast('Commande reçue.'); });
+      /* Sans date de livraison saisie, c'est aujourd'hui : on ne coche pas
+         « reçue » pour une commande qu'on n'a pas dans les mains. On le dit,
+         sinon la date s'inscrit sans qu'il le sache. */
+      var datee = !c.dateLiv;
+      if (!c.dateLiv) c.dateLiv = C.minuit(Date.now());
+      sauverCommandes().then(function () {
+        majStock();
+        toast(datee
+          ? 'Commande reçue, livraison datée du ' + dateCourte(c.dateLiv) + '.'
+          : 'Commande reçue — livrée le ' + dateCourte(c.dateLiv) + '.');
+      });
     }
   });
 
@@ -11810,6 +11822,11 @@ function renderStockFournitures() {
   var engage = l.some(function (a) { return ST.stockFutur(a) !== ST.quantite(a); });
   var prevu = l.some(function (a) { return ST.stockPrevu(a) !== ST.stockFutur(a); });
   var tot = { achat: 0, vendu: 0, stock: 0, valeur: 0 };
+  /* Les quantités ne se cumulent que si tout le catalogue parle la même
+     unité — sinon on additionnerait des millilitres et des pièces. */
+  var unites = {};
+  l.forEach(function (a) { unites[a.unite || 'unite'] = 1; });
+  var uniteUnique = Object.keys(unites).length === 1;
 
   t.innerHTML = '<div class="tab-boite"><table><thead><tr>' +
     '<th style="text-align:left">Produit</th>' +
@@ -11842,10 +11859,17 @@ function renderStockFournitures() {
         '<td class="num">' + E.fmt(ST.pmp(a), 4) + '</td>' +
         '<td class="num">' + E.fmt(ST.valeurStock(a), 2) + '</td></tr>';
     }).join('') +
+    /* On n'additionne pas des litres avec des unités. Tant que le catalogue
+       mêle les unités, les colonnes de quantité n'ont pas de total : « 55 800
+       achetés » sur du répulsif au millilitre et des tuteurs à la pièce ne
+       veut rien dire. Seule la valeur, en euros, se cumule toujours. */
     '<tr class="tot"><td style="text-align:left">Total</td>' +
-    '<td class="num">' + E.fmt(tot.achat, 0) + '</td>' +
-    '<td class="num">' + E.fmt(tot.vendu, 0) + '</td>' +
-    '<td class="num">' + E.fmt(tot.stock, 0) + '</td>' +
+    (uniteUnique
+      ? '<td class="num">' + E.fmt(tot.achat, 0) + '</td>' +
+        '<td class="num">' + E.fmt(tot.vendu, 0) + '</td>' +
+        '<td class="num">' + E.fmt(tot.stock, 0) + '</td>'
+      : '<td class="num muted" colspan="3" style="text-align:center;font-style:italic">' +
+        'unités différentes</td>') +
     (engage ? '<td></td>' : '') + (prevu ? '<td></td>' : '') +
     '<td></td><td class="num">' + E.fmt(tot.valeur, 2) + '</td></tr>' +
     '</tbody></table></div>' +
@@ -12151,21 +12175,33 @@ function ouvrirArticle(id) {
     '<input type="text" id="ar-ref" autocomplete="off" value="' + esc(a.reference || '') + '"></div>' +
     '<div class="champ"><label class="eyebrow" for="ar-seuil">Seuil d’alerte</label>' +
     '<input type="text" id="ar-seuil" inputmode="decimal" placeholder="facultatif" value="' + (a.seuil || '') + '"></div>' +
-    '<div class="champ"><label class="eyebrow" for="ar-dosage">Dosage par plant</label>' +
+    '<div class="champ" id="ar-dosage-champ"><label class="eyebrow" for="ar-dosage">Dosage par plant</label>' +
     '<input type="text" id="ar-dosage" inputmode="decimal" placeholder="ex. 6 ml" value="' + (a.dosage || '') + '"></div>' +
     '</div>' +
-    '<p class="muted" style="font-size:11.5px;margin:6px 0 0">Le dosage sert aux produits achetés ' +
+    '<p class="muted" style="font-size:11.5px;margin:6px 0 0" id="ar-dosage-aide">Le dosage sert aux produits achetés ' +
     'au litre ou au mètre et facturés au plant : le stock se lit alors aussi en nombre de plants.</p>' +
     '<div class="btn-rang" style="margin-top:11px">' +
     '<button class="btn primaire" id="ar-ok">Valider</button>' +
     (id ? '<button class="btn danger btn-min" id="ar-sup">Supprimer</button>' : '') + '</div>');
+  /* Un produit compté au plant n'a pas de dosage par plant : le champ n'a
+     alors aucun sens et se retire. */
+  var majDosage = function () {
+    var dosable = ST.UNITE_DOSABLE($('#ar-unite').value);
+    $('#ar-dosage-champ').style.display = dosable ? '' : 'none';
+    $('#ar-dosage-aide').style.display = dosable ? '' : 'none';
+  };
+  $('#ar-unite').addEventListener('change', majDosage);
+  majDosage();
   $('#ar-ok').addEventListener('click', function () {
     var nom = $('#ar-nom').value.trim();
     if (!nom) { toast('Donnez un nom.'); return; }
     var maj = { nom: nom, designation: $('#ar-des').value.trim(), type: $('#ar-type').value,
       unite: $('#ar-unite').value, seuil: ST.nb($('#ar-seuil').value) || null,
       fournisseur: $('#ar-four').value || null, reference: $('#ar-ref').value.trim(),
-      dosage: ST.nb($('#ar-dosage').value) || null, maj: Date.now() };
+      /* Un produit déjà compté au plant n'a pas de dosage par plant : le champ
+         est masqué, et sa valeur ne doit pas survivre à un changement d'unité. */
+      dosage: (ST.UNITE_DOSABLE($('#ar-unite').value) ? ST.nb($('#ar-dosage').value) || null : null),
+      maj: Date.now() };
     if (id) Object.keys(maj).forEach(function (k) { a[k] = maj[k]; });
     else { maj.id = uid(); maj.mouvements = []; A.articles.push(maj); }
     sauverArticles().then(function () {
@@ -13905,7 +13941,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.40.0-20260818-2113';
+var VERSION = '4.41.0-20260818-2233';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

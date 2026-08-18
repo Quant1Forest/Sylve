@@ -382,7 +382,9 @@ scenario('Bandeau : rien qui fasse doublon avec la page', async () => {
      il y passe, jamais par le haut. Le bandeau redevient de la navigation. */
   const doublons = [
     ['bois', '#p-nouvelle'], ['chantiers', '#c-nouveau'],
-    ['finances', '#dep-nouvelle'], ['stock', '#art-reception']
+    /* Le stock crée ses commandes aux Entrées et sorties : « + Commande » a
+       quitté l'inventaire, qui n'est qu'un état des lieux. */
+    ['finances', '#dep-nouvelle'], ['stock', '#cmd-nouvelle']
   ];
   for (const [mod, enPage] of doublons) {
     const t = await ouvrir(Object.assign({}, VIDE, { module: mod }));
@@ -2190,6 +2192,138 @@ scenario('Listes : le nom se propose en quittant le champ, pas à la validation'
   t.clic('#ce-ok'); await t.pause(450);
   verifier('la validation ne demande plus rien', null, demande);
   verifier('et le chantier est enregistré', 1, (t.stock('chantiers') || []).length);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Inventaire : on n’additionne pas des millilitres avec des pièces', async () => {
+  /* « 55 800 achetés » sur du répulsif au millilitre et des tuteurs à la pièce
+     ne veut rien dire. Même règle que les journées et les plants. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'stock',
+    articles: [
+      { id: 'a1', nom: 'Trico', unite: 'millilitre', dosage: 6 },
+      { id: 'a2', nom: 'Tuteur', unite: 'unite' }
+    ],
+    commandes: [{ id: 'k1', statut: 'recu', date: Date.now(), dateLiv: Date.now(),
+      lignes: [{ article: 'a1', qte: 34000, prix: 0.01 }, { article: 'a2', qte: 500, prix: 1.2 }] }]
+  }));
+  await t.pause(300);
+  const tot = t.$('#stock-table .tot');
+  verifierVrai('la ligne de total existe', tot);
+  verifierVrai('elle renonce aux quantités', /unités différentes/.test(tot.textContent));
+  verifierVrai('mais garde la valeur en euros', /\u20AC|\d/.test(tot.textContent));
+
+  /* Un catalogue d'une seule unité, lui, se totalise sans mentir. */
+  const u = await ouvrir(Object.assign({}, VIDE, {
+    module: 'stock',
+    articles: [{ id: 'a1', nom: 'Tuteur', unite: 'unite' },
+      { id: 'a2', nom: 'Gaine', unite: 'unite' }],
+    commandes: [{ id: 'k1', statut: 'recu', date: Date.now(), dateLiv: Date.now(),
+      lignes: [{ article: 'a1', qte: 500, prix: 1 }, { article: 'a2', qte: 300, prix: 1 }] }]
+  }));
+  await u.pause(300);
+  verifierVrai('unités identiques : le total revient',
+    /800/.test(u.$('#stock-table .tot').textContent));
+  verifier('aucune erreur', [], t.erreurs.concat(u.erreurs));
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Stock : la commande se saisit aux entrées, pas depuis l’inventaire', async () => {
+  /* L'inventaire est un état des lieux : on n'y crée rien. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'stock', articles: [{ id: 'a1', nom: 'Tuteur', unite: 'unite' }]
+  }));
+  await t.pause(250);
+  verifier('plus de « + Commande » sur l’inventaire', null, t.$('#art-reception'));
+  verifierVrai('l’import reste', t.$('#art-importer'));
+  t.clic('[data-vue="commandes"]'); await t.pause(300);
+  verifierVrai('la commande se crée aux entrées et sorties', t.$('#cmd-nouvelle'));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Commande reçue : la livraison se date, et on le dit', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'stock',
+    articles: [{ id: 'a1', nom: 'Tuteur', unite: 'unite' }],
+    commandes: [{ id: 'k1', statut: 'commande', date: Date.now() - 5 * 86400000,
+      lignes: [{ article: 'a1', qte: 100, prix: 1 }] }]
+  }));
+  t.clic('[data-vue="commandes"]'); await t.pause(300);
+  verifierVrai('la commande attend sa réception', t.$('[data-cmdrecu="k1"]'));
+  t.clic('[data-cmdrecu="k1"]'); await t.pause(400);
+  const k = (t.stock('commandes') || [])[0];
+  verifier('elle est reçue', 'recu', k.statut);
+  verifierVrai('et la livraison est datée d’aujourd’hui',
+    jourISO(k.dateLiv) === jourISO(Date.now()));
+  verifierVrai('le message le dit', /livraison datée/.test(t.$('#toast').textContent));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Produit : le dosage par plant ne s’offre qu’aux unités dosables', async () => {
+  /* « 6 ml par plant » sur des tuteurs comptés à la pièce ne veut rien dire.
+     Le dosage sert à ce qui s'achète en volume, longueur ou poids et se
+     facture au plant. */
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'stock' }));
+  const ST = t.w.BCS2;
+  verifierVrai('le millilitre est dosable', ST.UNITE_DOSABLE('millilitre'));
+  verifierVrai('le litre aussi', ST.UNITE_DOSABLE('litre'));
+  verifierVrai('le mètre linéaire aussi', ST.UNITE_DOSABLE('ml'));
+  verifierVrai('l’unité, non', !ST.UNITE_DOSABLE('unite'));
+  verifierVrai('le rouleau non plus', !ST.UNITE_DOSABLE('rouleau'));
+
+  t.clic('#b-reglages'); await t.pause(350);
+  t.clic('#rp-add'); await t.pause(350);
+  /* Le formulaire s'ouvre sur l'unité par défaut : à la pièce, pas de dosage. */
+  t.choisir('#ar-unite', 'unite'); await t.pause(200);
+  verifier('à la pièce, le dosage disparaît', 'none', t.$('#ar-dosage-champ').style.display);
+  verifier('son explication aussi', 'none', t.$('#ar-dosage-aide').style.display);
+  t.choisir('#ar-unite', 'millilitre'); await t.pause(200);
+  verifierVrai('au millilitre, il revient',
+    t.$('#ar-dosage-champ').style.display !== 'none');
+
+  /* Une valeur saisie ne survit pas au passage à une unité non dosable. */
+  t.saisir('#ar-nom', 'Tuteur');
+  t.saisir('#ar-dosage', '6');
+  t.choisir('#ar-unite', 'unite'); await t.pause(200);
+  t.clic('#ar-ok'); await t.pause(400);
+  const a = (t.stock('articles') || [])[0];
+  verifier('le produit est enregistré', 'Tuteur', a && a.nom);
+  verifier('sans dosage', null, a && a.dosage);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Stock : un débours sort bien du stock', async () => {
+  /* Un débours n'est pas une vente — il ne compte ni dans le chiffre
+     d'affaires ni dans la marge — mais la marchandise, elle, est partie.
+     On le lit sur le tableau, là où il le lit : l'index des mouvements vit en
+     mémoire et n'est pas dans le stockage. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'stock',
+    articles: [{ id: 'a1', nom: 'Tuteur', unite: 'unite' }],
+    commandes: [{ id: 'k1', statut: 'recu', dateCmd: Date.now(), dateLiv: Date.now(),
+      lignes: [{ article: 'a1', qte: 500, prix: 1 }] }],
+    sorties: [
+      { id: 's1', statut: 'fini', date: Date.now(), debours: false, perte: false,
+        lignes: [{ article: 'a1', qte: 100, prix: 2 }] },
+      { id: 's2', statut: 'fini', date: Date.now(), debours: true, perte: false,
+        lignes: [{ article: 'a1', qte: 50, prix: 1 }] }
+    ]
+  }));
+  await t.pause(350);
+  const cellules = t.$$('#stock-table tbody tr')[0].children;
+  const lu = i => cellules[i].textContent.trim();
+  verifier('500 achetés', '500', lu(1));
+  verifier('150 sortis, débours compris', '150', lu(2));
+  verifier('il reste 350 en stock', '350', lu(3));
+  /* Et le débours ne se compte pas comme une vente : la sortie le dit. */
+  t.clic('[data-vue="commandes"]'); await t.pause(300);
+  t.clic('[data-mvt="sorties"]'); await t.pause(250);
+  verifierVrai('la sortie en débours est étiquetée comme telle',
+    /débours/.test(t.$('#liste-commandes').textContent));
   verifier('aucune erreur', [], t.erreurs);
 });
 
