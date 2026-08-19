@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.47.0-20260819-1958**
+Version courante : **4.48.0-20260819-2020**
 
 ---
 

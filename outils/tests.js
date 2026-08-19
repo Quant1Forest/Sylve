@@ -2828,6 +2828,119 @@ scenario('Rentabilité : les ventes année par année, et quand elles tombent', 
 });
 
 /* --------------------------------------------------------------------- */
+scenario('Rentabilité : un produit dosé se lit au plant, jamais au millilitre', async () => {
+  /* 0,05 € le millilitre ne dit rien ; 0,30 € le plant se compare à ce qu'on
+     facture. La règle valait déjà partout ailleurs. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'stock',
+    articles: [{ id: 'a1', nom: 'Trico', unite: 'millilitre', dosage: 6 }],
+    commandes: [{ id: 'k1', statut: 'recu', dateCmd: Date.now(), dateLiv: Date.now(),
+      lignes: [{ article: 'a1', qte: 12000, prix: 0.02 }] }],
+    sorties: [{ id: 's1', statut: 'fini', date: Date.now(), debours: false, perte: false,
+      lignes: [{ article: 'a1', qte: 6000, prix: 0.05 }] }]
+  }));
+  t.clic('[data-vue="revient"]'); await t.pause(300);
+  t.clic('[data-rev="couts"]'); await t.pause(400);
+  const z = t.$('#rev-resultat').textContent;
+  verifierVrai('le graphique raisonne au plant', /par plant/.test(z));
+  /* 0,02 €/ml × 6 = 0,12 € le plant ; vendu 0,05 × 6 = 0,30 €. */
+  verifierVrai('le coût est celui d’un plant', /0,120|0,12/.test(z));
+  verifierVrai('et le prix pratiqué aussi', /0,300|0,30/.test(z));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Rentabilité : le titre suit le nom de l’onglet, et l’année se choisit', async () => {
+  const j = (an, m) => new Date(an, m, 12, 12).getTime();
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'stock',
+    articles: [{ id: 'a1', nom: 'Gaine', unite: 'unite' }],
+    commandes: [{ id: 'k1', statut: 'recu', dateCmd: j(2025, 0), dateLiv: j(2025, 0),
+      lignes: [{ article: 'a1', qte: 4000, prix: 1 }] }],
+    sorties: [
+      { id: 's1', statut: 'fini', date: j(2025, 3), debours: false, perte: false,
+        lignes: [{ article: 'a1', qte: 500, prix: 2 }] },
+      { id: 's2', statut: 'fini', date: j(2026, 2), debours: false, perte: false,
+        lignes: [{ article: 'a1', qte: 750, prix: 2 }] }
+    ]
+  }));
+  t.clic('[data-vue="revient"]'); await t.pause(350);
+  verifier('le titre de l’écran dit Rentabilité', 'Rentabilité',
+    t.$('#vue-revient .carte-titre h2').textContent);
+
+  /* Un clic sur le sélecteur ouvrait la liste ET redessinait l’écran : elle se
+     refermait avant qu’on ait pu choisir. */
+  t.clic('[data-rev="annee"]'); await t.pause(400);
+  verifier('l’année la plus récente d’abord', '2026', t.$('#an-rev').value);
+  t.$('#an-rev').dispatchEvent(new t.w.MouseEvent('click', { bubbles: true }));
+  await t.pause(250);
+  verifier('un clic ne remet pas l’année à zéro', '2026', t.$('#an-rev').value);
+  t.choisir('#an-rev', '2025'); await t.pause(400);
+  verifier('et le choix est retenu', '2025', t.$('#an-rev').value);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Carnet : le numéro de facture se lit, et le tri se retourne', async () => {
+  const j = (an, m) => new Date(an, m, 12, 12).getTime();
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [
+      { id: 'c1', nom: 'Ancien', statut: 'paye', lignes: [], temps: [],
+        numeroFacture: 'F-2024-003', dateFacture: j(2024, 5), datePaiement: j(2024, 6),
+        donneur: 'Dubois', maj: j(2024, 6) },
+      { id: 'c2', nom: 'Récent', statut: 'paye', lignes: [], temps: [],
+        numeroFacture: 'F-2026-011', dateFacture: j(2026, 1), datePaiement: j(2026, 2),
+        donneur: 'Dubois', maj: j(2026, 2) }
+    ]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.choisir('#c-filtre', 'tous'); await t.pause(300);
+  const liste = t.$('#liste-chantiers');
+  verifierVrai('le numéro de facture est dans la ligne',
+    /F-2026-011/.test(liste.textContent));
+
+  const noms = () => t.$$('#liste-chantiers .chantier-n').map(e => e.textContent);
+  verifier('le plus récent d’abord par défaut', 'Récent', noms()[0]);
+  verifierVrai('le bouton annonce le sens', /plus récent/.test(t.texte('#c-sens')));
+  t.clic('#c-sens'); await t.pause(300);
+  verifier('retourné, le plus ancien vient en tête', 'Ancien', noms()[0]);
+  verifierVrai('et le bouton le dit', /plus ancien/.test(t.texte('#c-sens')));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('À compléter : on ne réclame pas d’estimation sur un chantier payé', async () => {
+  /* Un chantier de 2024, fait et réglé, ressortait « à compléter » parce
+     qu'il n'avait ni journées estimées ni échéance de paiement. On n'estime
+     pas le passé. */
+  const j = (an, m) => new Date(an, m, 12, 12).getTime();
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [{ id: 'c1', nom: 'Repris', statut: 'paye', temps: [], aDevis: false,
+      donneur: 'Dubois', numeroFacture: 'F-2024-003',
+      dateFacture: j(2024, 5), datePaiement: j(2024, 6), maj: j(2024, 6),
+      lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 2, prix: 900, nature: 'prestation' }] }]
+  }));
+  const C = t.w.BCC;
+  const c = (t.stock('chantiers') || [])[0];
+  const manque = C.champsManquants(c);
+  verifierVrai('plus de journées estimées réclamées',
+    manque.indexOf('journées estimées') < 0);
+  verifierVrai('plus d’échéance de paiement non plus',
+    manque.indexOf('échéance de paiement') < 0);
+  verifierVrai('ni la commune', manque.indexOf('commune') < 0);
+  verifier('la fiche est complète', [], manque);
+
+  /* Mais un chantier accepté, lui, doit encore être estimé. */
+  const enCours = { statut: 'accepte', donneur: 'X', commune: 'Y',
+    lignes: [{ travail: 'DEGAG' }] };
+  verifierVrai('un chantier à planifier réclame son estimation',
+    C.champsManquants(enCours).indexOf('journées estimées') >= 0);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
 /* Un troisième argument ne joue que les scénarios dont le nom le contient.
    Sert à éprouver un contrôle en le cassant exprès : rejouer les quarante
    autres pour vérifier qu'un seul crie coûte deux minutes pour rien.

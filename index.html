@@ -111,6 +111,12 @@ body:not(.m-ent) .mod-ent{display:none}
   margin:9px 0 0;padding:8px 11px;border-radius:var(--r-s);
   background:#F5EBCB;color:#6B5200;font-size:12.5px;
 }
+/* Le numéro de facture, discret mais lisible : c'est une référence, pas un
+   titre. */
+.num-fact{
+  font-family:var(--mono);font-size:11px;color:var(--doux);
+  background:var(--carte2);border-radius:4px;padding:1px 5px;white-space:nowrap;
+}
 .acompleter{
   color:#8A6A00;font-size:11px;font-weight:600;background:#F5EBCB;
   padding:1px 7px;border-radius:20px;white-space:nowrap;
@@ -1287,8 +1293,11 @@ if (froid && s > 0) montrer(s);
           <input type="search" id="c-rech" autocomplete="off"
                  placeholder="Rechercher : nom, donneur, commune, n° de facture…">
         </div>
-        <div class="champ" style="max-width:230px;margin-bottom:11px">
-          <select id="c-filtre"></select>
+        <div style="display:flex;gap:7px;margin-bottom:11px;flex-wrap:wrap">
+          <div class="champ" style="flex:1;min-width:150px;max-width:230px;margin:0">
+            <select id="c-filtre"></select>
+          </div>
+          <button class="btn-min" id="c-sens" style="flex:none"></button>
         </div>
         <div id="liste-chantiers"></div>
       </div>
@@ -1312,7 +1321,7 @@ if (froid && s > 0) montrer(s);
 
     <section class="vue" id="vue-revient" role="tabpanel">
       <div class="carte">
-        <div class="carte-titre"><h2>Prix de revient</h2>
+        <div class="carte-titre"><h2>Rentabilité</h2>
           <button class="lien-regl" id="rev-hyp">Hypothèses</button></div>
         <p class="muted" style="font-size:12.5px;margin:0 0 11px">
           Ce qu'un produit coûte vraiment, ce que l'État prendra, ce qu'il vous reste.
@@ -3814,10 +3823,13 @@ function dernierEvenement(c) {
    si bien qu'un chantier accepté ce matin passait derrière tous les devis :
    on ne retrouvait pas ce qu'on venait d'ouvrir. Le statut ne sert plus qu'à
    départager deux chantiers du même jour. */
-function tri(chantiers) {
+/* Du plus récent au plus ancien par défaut : c'est ce qu'on vient de toucher
+   qu'on cherche. Mais reprendre un historique se fait dans l'autre sens, en
+   remontant le temps — d'où le bouton. */
+function tri(chantiers, ancienDabord) {
   return (chantiers || []).slice().sort(function (a, b) {
     var da = dernierEvenement(a), db = dernierEvenement(b);
-    if (da !== db) return db - da;
+    if (da !== db) return ancienDabord ? da - db : db - da;
     return rangStatut(a.statut) - rangStatut(b.statut);
   });
 }
@@ -3838,15 +3850,23 @@ function filtre(chantiers, quoi) {
    le soir — mais on doit pouvoir retrouver ce qui est resté à moitié rempli.
    Chaque champ n'est réclamé qu'à partir de l'étape où il a un sens : demander
    un numéro de facture sur un devis n'aurait aucun intérêt. */
+/* Chaque champ n'est réclamé que sur la tranche d'étapes où il sert encore.
+   « des » dit à partir de quand, « jusqua » jusqu'à quand — car un champ peut
+   perdre son sens en avançant : réclamer des journées estimées sur un chantier
+   payé il y a deux ans n'a aucun intérêt, il est fait et réglé. On n'estime
+   pas le passé.
+   Un chantier repris d'un ancien carnet arrive directement à « payé » : il ne
+   doit donc rien manquer d'autre que ce qui sert encore à le retrouver et à le
+   comptabiliser. */
 var CHAMPS_FICHE = [
   { c: 'donneur', n: 'donneur d’ordre', des: 'devis' },
-  { c: 'commune', n: 'commune', des: 'devis' },
+  { c: 'commune', n: 'commune', des: 'devis', jusqua: 'termine' },
   { c: 'lignes', n: 'lignes de travaux', des: 'accepte' },
-  { c: 'joursEstimes', n: 'journées estimées', des: 'accepte' },
-  { c: 'numeroDevis', n: 'numéro de devis', des: 'envoye', devisSeul: true },
+  { c: 'joursEstimes', n: 'journées estimées', des: 'accepte', jusqua: 'encours' },
+  { c: 'numeroDevis', n: 'numéro de devis', des: 'envoye', devisSeul: true, jusqua: 'accepte' },
   { c: 'numeroFacture', n: 'numéro de facture', des: 'facture' },
   { c: 'dateFacture', n: 'date de facture', des: 'facture' },
-  { c: 'echeancePaiement', n: 'échéance de paiement', des: 'facture' },
+  { c: 'echeancePaiement', n: 'échéance de paiement', des: 'facture', jusqua: 'facture' },
   { c: 'datePaiement', n: 'date de paiement', des: 'paye' }
 ];
 function champsManquants(ch) {
@@ -3857,6 +3877,9 @@ function champsManquants(ch) {
     /* Sans suite : on n'a plus rien à réclamer, le chantier ne se fera pas. */
     if (ch.statut === 'sansuite') return false;
     if (rang < rangStatut(x.des)) return false;
+    /* Passé son étape, le champ ne se réclame plus : il ne servirait qu'à
+       marquer « incomplet » un chantier que plus rien n'attend. */
+    if (x.jusqua && rang > rangStatut(x.jusqua)) return false;
     var v = ch[x.c];
     if (x.c === 'lignes') return !(v && v.length);
     return v == null || v === '' || v === 0;
@@ -5252,7 +5275,7 @@ function ecrire(k, o) { return Store.set(k, JSON.stringify(o)); }
 /* ---------------------------------------------------------------- état */
 var A = {
   cfg: null, index: [], bord: null, piles: [], chantiers: [], module: 'cubage', ici: null,
-  vuePiles: 'stock', filtreCh: 'ouverts', rechCh: '', chOuvert: null, clients: [], proprios: [], estim: null, imp: null, articles: [], charges: [], fournisseurs: [], commandes: [], sorties: [], mvt: 'achats', journees: [], lieuxRegles: [], listeReglee: 'clients', revient: null, calMois: null, calJour: null, nbAlertes: 0, planifie: null,
+  vuePiles: 'stock', filtreCh: 'ouverts', rechCh: '', triAncien: false, chOuvert: null, clients: [], proprios: [], estim: null, imp: null, articles: [], charges: [], fournisseurs: [], commandes: [], sorties: [], mvt: 'achats', journees: [], lieuxRegles: [], listeReglee: 'clients', revient: null, calMois: null, calJour: null, nbAlertes: 0, planifie: null,
   depenses: [], periode: null, filtreDep: 'tous', vueAna: 'ensemble', secReglages: 'general',
   vue: 'saisie', sousVue: 'synthese', edition: null,
   memeGrume: false, classementRegl: 'Class. Comt', filtre: ''
@@ -6544,6 +6567,11 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.48', quoi: [
+    { t: 'Un produit dosé se lit au plant partout, y compris dans les coûts', vue: 'revient' },
+    { t: 'Le carnet montre le numéro de facture, et le tri se retourne', vue: 'carnet' },
+    { t: 'Plus d’estimation réclamée sur un chantier déjà payé', vue: 'carnet' }
+  ] },
   { v: '4.47', quoi: [
     { t: '« Prix de revient » devient « Rentabilité », et gagne une vue par année', vue: 'revient' },
     { t: 'Vos ventes de fournitures année par année, mois par mois, et l’évolution', vue: 'revient' },
@@ -6562,10 +6590,6 @@ var NOTES_MAJ = [
     { t: 'Votre logo et le nom de votre entreprise, sur l’écran Entreprise et au démarrage', vue: 'reglages' },
     { t: 'Cette liste, qui dit ce qui a changé aux cinq dernières mises à jour' },
     { t: 'Plus aucune référence à l’application d’origine du cubage' }
-  ] },
-  { v: '4.43', quoi: [
-    { t: 'Un produit dosé se saisit en plants sur les sorties, plus en millilitres', vue: 'commandes' },
-    { t: 'La conversion s’écrit sous le champ pendant que vous tapez' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -7049,6 +7073,9 @@ function brancher() {
   $('#c-nouveau').addEventListener('click', function () { ouvrirEnteteCh(null); });
   $('#c-filtre').addEventListener('change', function () { A.filtreCh = this.value; renderListeChantiers(); });
   $('#c-rech').addEventListener('input', function () { A.rechCh = this.value; renderListeChantiers(); });
+  $('#c-sens').addEventListener('click', function () {
+    A.triAncien = !A.triAncien; renderListeChantiers();
+  });
   $('#liste-chantiers').addEventListener('click', function (e) {
     var o = e.target.closest('[data-chouvrir]'), t = e.target.closest('[data-chtemps]'),
       s = e.target.closest('[data-chstatut]');
@@ -7251,10 +7278,10 @@ function brancher() {
     var m = e.target.closest('[data-marge]');
     if (m) { A.revient.marge = m.dataset.marge; renderRevient(); return; }
     var fo = e.target.closest('[data-anforme]');
-    if (fo) { A.revient.forme = fo.dataset.anforme; renderRevient(); return; }
-    if (e.target.closest('#an-rev')) {
-      A.revient.annee = Number($('#an-rev').value); renderRevient();
-    }
+    if (fo) { A.revient.forme = fo.dataset.anforme; renderRevient(); }
+    /* Pas de branche pour le sélecteur d'année ici : un clic dessus, c'est
+       l'ouverture de la liste, pas un choix. Redessiner à ce moment-là
+       refermait la liste avant qu'il ait pu choisir. Seul « change » compte. */
   });
   $('#rev-nav').addEventListener('click', function (e) {
     var b = e.target.closest('[data-rev]');
@@ -8977,8 +9004,10 @@ function renderCarnet() {
       'puis suit le chantier jusqu’au paiement.</p></div>';
   } else {
     z.innerHTML = '<div class="kpi">' +
-      '<div class="carte2"><b class="num">' + eur(t.signe) + '</b><small>signé</small></div>' +
-      '<div class="carte2"><b class="num">' + eur(t.propose) + '</b><small>en attente de réponse</small></div>' +
+      /* « Signé » comptait tout ce qui est engagé, du chantier accepté à la
+         facture payée : le mot laissait croire à des devis signés en attente. */
+      '<div class="carte2"><b class="num">' + eur(t.signe) + '</b><small>engagé, tous statuts</small></div>' +
+      '<div class="carte2"><b class="num">' + eur(t.propose) + '</b><small>devis sans réponse</small></div>' +
       '<div class="carte2"><b class="num">' + eur(t.aFacturer) + '</b><small>à facturer' +
       (t.nAFacturer ? ' · ' + t.nAFacturer + ' chantier' + (t.nAFacturer > 1 ? 's' : '') : '') +
       '</small></div>' +
@@ -9018,8 +9047,11 @@ function renderListeChantiers() {
   /* Une recherche passe outre le filtre : un numéro de facture appartient
      presque toujours à un chantier payé, donc rangé hors des « ouverts ».
      Taper le bon numéro et ne rien voir sortir serait le pire des deux. */
-  var l = q ? C.tri(C.chercher(A.chantiers, q))
-    : C.tri(C.filtre(A.chantiers, A.filtreCh || 'ouverts'));
+  var vieux = !!A.triAncien;
+  var l = q ? C.tri(C.chercher(A.chantiers, q), vieux)
+    : C.tri(C.filtre(A.chantiers, A.filtreCh || 'ouverts'), vieux);
+  var bs = $('#c-sens');
+  if (bs) bs.textContent = vieux ? '↑ plus ancien d’abord' : '↓ plus récent d’abord';
   if (!l.length) {
     z.innerHTML = '<div class="vide"><p>' + (q
       ? 'Rien qui corresponde à « ' + esc(q) +' ».'
@@ -9047,7 +9079,11 @@ function renderListeChantiers() {
       /* Le badge et sa date tiennent toujours sur leur propre ligne, quel que
          soit ce qui précède : sinon les lignes de longueur inégale font danser
          les badges d'un chantier à l'autre. */
-      '<span class="chantier-e">' + badgeStatut(c) +
+      '<span class="chantier-e">' +
+      /* Le numéro de facture est ce par quoi il retrouve un chantier réglé :
+         il doit se lire dans la liste, pas seulement sur la fiche. */
+      (c.numeroFacture ? '<span class="num-fact">n° ' + esc(c.numeroFacture) + '</span> ' : '') +
+      badgeStatut(c) +
       (dateStatut(c) ? ' <span class="muted">' + esc(dateStatut(c)) + '</span>' : '') +
       (retard ? ' <span class="retard">en retard</span>' : '') +
       /* Une fiche à moitié remplie se perd dans le carnet : elle se signale,
@@ -10629,7 +10665,14 @@ function effacerNote(id) {
 
 function renderAlertes() {
   var z = $('#bandeau-alertes'); if (!z) return;
-  var al = C.alertes(A.chantiers, A.cfg, Date.now());
+  /* Le même « À traiter » que sur l'écran Entreprise : deux listes portant
+     le même titre et ne disant pas la même chose, c'est ce qui l'a perdu.
+     Les journées à placer et le travail qui approche vivent dans les bulles
+     et sur le calendrier ; ici on ne garde que ce qui porte un nom de
+     chantier et attend une action. */
+  var al = C.alertes(A.chantiers, A.cfg, Date.now()).filter(function (a2) {
+    return ['retard', 'afacturer', 'impaye'].indexOf(a2.type) >= 0;
+  });
   A.nbAlertes = al.length;
   if (!al.length) { z.innerHTML = ''; majPastilleEntreprise(); return; }
   z.innerHTML = '<div class="carte"><div class="carte-titre"><h2>À traiter (' + al.length + ')</h2></div>' +
@@ -13962,7 +14005,7 @@ function anneau(parts, options) {
       return '<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:13px">' +
         '<span><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:' +
         p.couleur + ';margin-right:7px"></i>' + esc(p.nom) + '</span>' +
-        '<span><b class="num">' + esc(p.texte || E.fmt(p.valeur, 4)) + '</b>' +
+        '<span style="white-space:nowrap"><b class="num">' + esc(p.texte || E.fmt(p.valeur, 4)) + '</b>' +
         '<span class="muted" style="font-size:11.5px"> · ' + E.fmt(p.valeur / tot * 100, 1) + ' %</span></span></div>';
     }).join('') + '</div></div>';
 }
@@ -14046,7 +14089,9 @@ function batonsPrix(lignes, cible) {
     var sousLaBarre = l.vendu < l.mini;
     return '<div style="margin-bottom:13px">' +
       '<div style="display:flex;justify-content:space-between;align-items:baseline;' +
-      'font-size:13px;margin-bottom:5px"><b>' + esc(l.nom) + '</b>' +
+      'font-size:13px;margin-bottom:5px"><b>' + esc(l.nom) +
+      (l.unite ? ' <span class="muted" style="font-weight:400;font-size:11.5px">par ' +
+        esc(l.unite) + '</span>' : '') + '</b>' +
       '<span class="num"' + (sousLaBarre ? ' style="color:#B4231F"' : '') + '>' +
       (sousLaBarre ? 'il manque ' + eur(ST.arr(l.mini - l.vendu, 3))
         : '+ ' + eur(ST.arr(l.vendu - l.mini, 3))) + '</span></div>' +
@@ -14317,9 +14362,12 @@ function tableauCouts() {
   var gPrix = A.articles.filter(function (a) {
     return ST.quantiteVendue(a) > 0 && ST.pmp(a) > 0;
   }).map(function (a) {
-    var cu = ST.pmp(a), pv = ST.prixVenteMoyen(a);
-    return { nom: a.nom || '', cout: cu,
-      mini: cible < 100 ? cu / (1 - cible / 100) : cu, vendu: pv };
+    /* Un produit dosé se raisonne au plant : 0,05 € le millilitre ne dit rien,
+       0,30 € le plant se compare à ce qu'on facture. */
+    var d = ST.nb(a.dosage), k = d > 0 ? d : 1;
+    var cu = ST.pmp(a) * k, pv = ST.prixVenteMoyen(a) * k;
+    return { nom: a.nom || '', unite: d > 0 ? 'plant' : ST.courtUniteArt(a.unite),
+      cout: cu, mini: cible < 100 ? cu / (1 - cible / 100) : cu, vendu: pv };
   }).sort(function (a, b) { return b.vendu - a.vendu; });
 
   return (gPrix.length ? '<div class="carte"><h2>Ce qu’ils coûtent, ce qu’ils valent, ' +
@@ -14335,7 +14383,8 @@ function tableauCouts() {
     lignes.map(function (x) {
       return '<tr' + (x.recu ? '' : ' class="epuise"') + '>' +
         '<td style="text-align:left">' + esc(x.cmd) + (x.recu ? '' : ' <small class="muted">attendue</small>') + '</td>' +
-        '<td style="text-align:left">' + esc(x.art.nom || '') + '</td>' +
+        '<td style="text-align:left">' + esc(x.art.nom || '') +
+        '<small class="muted"> ' + esc(ST.courtUniteArt(x.art.unite)) + '</small></td>' +
         '<td class="num">' + E.fmt(x.qte, 0) + '</td>' +
         '<td class="num">' + E.fmt(x.achat, 2) + '</td>' +
         '<td class="num">' + E.fmt(x.quotePart, 2) + '</td>' +
@@ -14689,7 +14738,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.47.0-20260819-1958';
+var VERSION = '4.48.0-20260819-2020';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
