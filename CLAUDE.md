@@ -513,26 +513,30 @@ place selon l'étape** : seul son contenu change, pour qu'on retrouve toujours
 la facture au même endroit.
 
 **Un bloc dont l'étape n'est pas atteinte reste visible, en pointillé**
-() : on voit le chemin qui reste sans en être encombré.
+(classe `carte avenir`) : on voit le chemin qui reste sans en être encombré.
 
-**Chaque bloc a son crayon**, qui n'ouvre que ses champs — ,
-, , , ,
-, . Tous passent par , qui
+**Chaque bloc a son crayon**, qui n'ouvre que ses champs — `ouvrirIdentiteCh`,
+`ouvrirEstimationCh`, `ouvrirDevisCh`, `ouvrirFactureCh`, `ouvrirJourneesCh`,
+`ouvrirPeuplementCh`, `ouvrirNoteCh`. Tous passent par `majChantier()`, qui
 enregistre et redessine : c'est ce qui garantit qu'aucun n'oublie de
 rafraîchir le carnet ou l'accueil.
 
-** change de mots avec l'étape** : « ce que ça vaut » et
+**`blocValeur()` change de mots avec l'étape** : « ce que ça vaut » et
 « proposé » avant, « ce que ça a rapporté » et « facturé » après. L'estimation
 reste lisible tout du long — c'est elle qui dit si la journée a tenu ce
 qu'elle promettait.
 
-** survit pour la création d'un chantier** seulement. Le jour
-où on la simplifiera, penser à ce que la création reste courte : le reste se
-remplit bloc par bloc ensuite.
+**`ouvrirEnteteCh` survit pour la création d'un chantier** seulement, et
+`brancherCeJours()` sert aux deux formulaires qui manipulent les dates posées.
+Le jour où on simplifiera la création, veiller à ce qu'elle reste courte : le
+reste se remplit bloc par bloc ensuite.
 
-**Piège rencontré** :  avait été inséré dans le bloc
+**Piège rencontré** : `blocFacture()` avait été inséré dans le bloc
 conditionnel des fournitures. La facture disparaissait donc sur un chantier
 qui n'en consomme pas. Un scénario l'a attrapé.
+
+**Et un rappel de méthode** : écrire ces notes par `node -e` dans le shell
+mange les accents graves du Markdown. Passer par un fichier.
 
 ## Journées faites, échéance de paiement, fiche à compléter
 
