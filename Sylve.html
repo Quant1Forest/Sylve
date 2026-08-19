@@ -6377,6 +6377,7 @@ var SEC_DE_MODULE = {
   finances: 'fin', stock: 'stock'
 };
 var RACCOURCIS_REGLAGES = {
+  maj: ['general', 'maj'],
   stock: ['ent', 'stock'], listes: ['ent', 'listes'], fin: ['ent', 'fin'],
   journee: ['ent', 'journee'], vehicule: ['ent', 'vehicule'],
   alertes: ['ent', 'alertes']
@@ -6485,6 +6486,10 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.45', quoi: [
+    { t: 'Cette liste ne déplie que la version installée ; les autres sont derrière un bouton' },
+    { t: 'Après une mise à jour, l’application ouvre directement ce qui a changé' }
+  ] },
   { v: '4.44', quoi: [
     { t: 'Votre logo et le nom de votre entreprise, sur l’écran Entreprise et au démarrage', vue: 'reglages' },
     { t: 'Cette liste, qui dit ce qui a changé aux cinq dernières mises à jour' },
@@ -6504,31 +6509,38 @@ var NOTES_MAJ = [
     { t: 'L’inventaire n’additionne plus des millilitres avec des pièces', vue: 'stock2' },
     { t: 'Le dosage par plant ne s’offre qu’aux unités qui peuvent en porter un' },
     { t: '« Reçue » annonce la date de livraison qu’elle inscrit', vue: 'commandes' }
-  ] },
-  { v: '4.40', quoi: [
-    { t: 'Les journées passées comptent comme faites, plus comme prévues', vue: 'carnet' },
-    { t: 'L’échéance de paiement, et le délai de règlement par client', vue: 'finances' },
-    { t: 'Les fiches incomplètes se signalent dans le carnet', vue: 'carnet' },
-    { t: 'Le carnet aligné, et les réglages qui rendent la main' }
   ] }
 ];
+/* Seule la version installée est dépliée : les quatre précédentes tiennent
+   derrière un bouton. Cinq notes ouvertes faisaient un long défilement pour
+   une information qu'on ne relit presque jamais. */
+var notesDepliees = false;
+function blocNoteMaj(m, i, courante) {
+  var ici = courante.indexOf(m.v) === 0;
+  return '<div style="padding:' + (i ? '11px' : '0') + ' 0 0' +
+    (i ? ';border-top:1px solid var(--trait);margin-top:11px' : '') + '">' +
+    '<p class="eyebrow" style="margin:0 0 6px">Version ' + esc(m.v) +
+    (ici ? ' <span class="muted" style="font-weight:400;text-transform:none;' +
+      'letter-spacing:0">— celle que vous avez</span>' : '') + '</p>' +
+    m.quoi.map(function (q) {
+      return q.vue
+        ? '<button class="note-maj" data-notevue="' + esc(q.vue) + '">' +
+          esc(q.t) + '<span aria-hidden="true"> ›</span></button>'
+        : '<p class="note-maj sans">' + esc(q.t) + '</p>';
+    }).join('') + '</div>';
+}
 function renderNotesMaj() {
   var z = $('#c-notes-maj'); if (!z) return;
   var courante = String((window.BCP && BCP.version) || '').split('-')[0];
-  z.innerHTML = NOTES_MAJ.slice(0, 5).map(function (m, i) {
-    var ici = courante.indexOf(m.v) === 0;
-    return '<div style="padding:' + (i ? '11px' : '0') + ' 0 0' +
-      (i ? ';border-top:1px solid var(--trait);margin-top:11px' : '') + '">' +
-      '<p class="eyebrow" style="margin:0 0 6px">Version ' + esc(m.v) +
-      (ici ? ' <span class="muted" style="font-weight:400;text-transform:none;' +
-        'letter-spacing:0">— celle que vous avez</span>' : '') + '</p>' +
-      m.quoi.map(function (q) {
-        return q.vue
-          ? '<button class="note-maj" data-notevue="' + esc(q.vue) + '">' +
-            esc(q.t) + '<span aria-hidden="true"> ›</span></button>'
-          : '<p class="note-maj sans">' + esc(q.t) + '</p>';
-      }).join('') + '</div>';
-  }).join('');
+  var l = NOTES_MAJ.slice(0, 5);
+  var vues = notesDepliees ? l : l.slice(0, 1);
+  var reste = l.length - vues.length;
+  z.innerHTML = vues.map(function (m, i) { return blocNoteMaj(m, i, courante); }).join('') +
+    (reste > 0 || notesDepliees
+      ? '<button class="btn-min" id="notes-plus" style="margin-top:11px">' +
+        (notesDepliees ? 'Masquer les versions précédentes'
+          : 'Voir les ' + reste + ' versions précédentes') + '</button>'
+      : '');
 }
 
 function renderReglagesBois() {
@@ -7360,6 +7372,11 @@ function brancher() {
   brancherReglagesAlertes();
   brancherReglagesMarque();
   $('#c-notes-maj').addEventListener('click', function (e) {
+    if (e.target.closest('#notes-plus')) {
+      notesDepliees = !notesDepliees;
+      renderNotesMaj();
+      return;
+    }
     var b = e.target.closest('[data-notevue]'); if (!b) return;
     var v = b.dataset.notevue;
     if (v === 'reglages') { allerReglages('general'); return; }
@@ -7683,6 +7700,23 @@ function init() {
       renderFinances(); renderDepenses(); renderCharges(); renderStockFournitures();
       renderCarteChantiers(); renderAnalyses(); renderCommandes(); renderRevient();
       renderReglagesStock(); renderAccueil();
+      /* Au premier lancement qui suit une mise à jour, on ouvre directement
+         ce qui a changé : il vient d'appuyer sur « installer », c'est ce
+         qu'il attend. Jamais à la toute première installation — on ne
+         dépose pas quelqu'un dans les réglages pour son premier contact. */
+      var versionVue = A.cfg.versionVue || null;
+      var versionIci = String((window.BCP && BCP.version) || '');
+      var vientDeChanger = !!(versionVue && versionIci && versionVue !== versionIci);
+      if (versionIci && versionVue !== versionIci) {
+        A.cfg.versionVue = versionIci;
+        sauverCfg();
+      }
+      if (vientDeChanger) {
+        renderReglages(); renderNotesMaj();
+        allerReglages('maj');
+        toast('Mise à jour installée.');
+        return;
+      }
       var vd = vueDemandee(null);
       if (vd === 'accueil') { majBandeau(); renderFichiers(); renderReglages(); allerAccueil(); return; }
       if (vd) {
@@ -14391,7 +14425,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.44.0-20260818-2357';
+var VERSION = '4.45.0-20260819-1848';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

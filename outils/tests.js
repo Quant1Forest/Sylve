@@ -2600,25 +2600,63 @@ scenario('Marque : le logo et le nom de l’entreprise, là où ils servent', as
 });
 
 /* --------------------------------------------------------------------- */
-scenario('Notes de mise à jour : les cinq dernières, et où regarder', async () => {
-  /* Cinq suffisent : au-delà on ne remonte plus, et la liste devient un
-     journal qu'on ne lit pas. */
+scenario('Notes de mise à jour : la version installée d’abord, les autres derrière', async () => {
+  /* Cinq notes dépliées faisaient un long défilement pour une information
+     qu'on ne relit presque jamais. */
   const t = await ouvrir(Object.assign({}, VIDE, { module: 'chantiers' }));
   t.clic('#b-reglages'); await t.pause(350);
   t.clic('[data-regl="general"]'); await t.pause(250);
   const z = t.$('#c-notes-maj');
   verifierVrai('la liste est là', z && z.textContent.trim());
-  const versions = [...z.querySelectorAll('.eyebrow')].map(e => e.textContent);
-  verifier('cinq versions, pas plus', 5, versions.length);
-  verifierVrai('la version installée est repérée',
-    /celle que vous avez/.test(z.textContent));
+  verifier('une seule version dépliée', 1, z.querySelectorAll('.eyebrow').length);
+  verifierVrai('et c’est celle qu’on a', /celle que vous avez/.test(z.textContent));
+  verifierVrai('un bouton annonce les autres',
+    /Voir les 4 versions précédentes/.test(z.textContent));
 
-  /* Une note qui mène quelque part y mène vraiment. */
+  t.clic('#notes-plus'); await t.pause(250);
+  verifier('dépliées, cinq versions', 5, z.querySelectorAll('.eyebrow').length);
+  verifierVrai('et le bouton se retourne', /Masquer/.test(z.textContent));
+  t.clic('#notes-plus'); await t.pause(250);
+  verifier('repliées, une seule', 1, z.querySelectorAll('.eyebrow').length);
+
+  /* Une note qui mène quelque part y mène toujours. */
+  t.clic('#notes-plus'); await t.pause(250);
   const lien = z.querySelector('[data-notevue="stock2"]');
   verifierVrai('une note mène à l’inventaire', lien);
   lien.click(); await t.pause(400);
   verifierVrai('et l’inventaire s’ouvre', t.$('#vue-stock2').classList.contains('actif'));
   verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Mise à jour : au premier lancement, on arrive sur ce qui a changé', async () => {
+  /* Il vient d'appuyer sur « installer » : la note est ce qu'il attend. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers', cfg: { versionVue: '4.00.0-vieille' }
+  }));
+  await t.pause(400);
+  verifierVrai('les réglages sont ouverts', t.$('#vue-reglages').classList.contains('actif'));
+  verifierVrai('sur l’onglet général',
+    t.$('[data-regl="general"]').getAttribute('aria-pressed') === 'true');
+  verifierVrai('et la version vue est mise à jour',
+    (t.stock('cfg') || {}).versionVue !== '4.00.0-vieille');
+
+  /* Au lancement suivant, plus rien : on repart où l'on était. */
+  const apres = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers', cfg: { versionVue: (t.stock('cfg') || {}).versionVue }
+  }));
+  await apres.pause(350);
+  verifierVrai('le lancement suivant n’ouvre plus les réglages',
+    !apres.$('#vue-reglages').classList.contains('actif'));
+
+  /* Première installation : on ne dépose personne dans les réglages. */
+  const neuve = await ouvrir(Object.assign({}, VIDE, { module: 'chantiers' }));
+  await neuve.pause(350);
+  verifierVrai('une installation neuve n’y va pas non plus',
+    !neuve.$('#vue-reglages').classList.contains('actif'));
+  verifierVrai('mais elle retient la version',
+    !!(neuve.stock('cfg') || {}).versionVue);
+  verifier('aucune erreur', [], t.erreurs.concat(apres.erreurs, neuve.erreurs));
 });
 
 /* --------------------------------------------------------------------- */
