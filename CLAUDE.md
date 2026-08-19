@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.48.0-20260819-2020**
+Version courante : **4.49.0-20260819-2122**
 
 ---
 
@@ -498,6 +498,41 @@ retour du bandeau lisait le module courant : on ressortait des réglages dans
 « Mon entreprise », jamais sur l'écran quitté. `aller()` retient donc
 `A.vueAvantReglages`, et `allerMenuParent()` y redescend d'abord — à
 condition que cette vue appartienne encore au module ouvert.
+
+## La fiche suit la vie du chantier
+
+**« En-tête » nommait un formulaire de vingt-trois champs** qui contenait le
+devis, la facture, les journées, le peuplement, le statut et la note — dont
+deux en double avec la fiche. C'est ce qui le perdait, et il le disait :
+« je me perds un peu entre l'en-tête et la fiche ».
+
+La fiche se lit désormais **dans l'ordre de la vie du chantier** : Le chantier
+· Ce que ça vaut · Le devis · Les travaux · Les journées · Le temps passé · La
+facture · Les fournitures · Le peuplement · Note. **Aucun bloc ne change de
+place selon l'étape** : seul son contenu change, pour qu'on retrouve toujours
+la facture au même endroit.
+
+**Un bloc dont l'étape n'est pas atteinte reste visible, en pointillé**
+() : on voit le chemin qui reste sans en être encombré.
+
+**Chaque bloc a son crayon**, qui n'ouvre que ses champs — ,
+, , , ,
+, . Tous passent par , qui
+enregistre et redessine : c'est ce qui garantit qu'aucun n'oublie de
+rafraîchir le carnet ou l'accueil.
+
+** change de mots avec l'étape** : « ce que ça vaut » et
+« proposé » avant, « ce que ça a rapporté » et « facturé » après. L'estimation
+reste lisible tout du long — c'est elle qui dit si la journée a tenu ce
+qu'elle promettait.
+
+** survit pour la création d'un chantier** seulement. Le jour
+où on la simplifiera, penser à ce que la création reste courte : le reste se
+remplit bloc par bloc ensuite.
+
+**Piège rencontré** :  avait été inséré dans le bloc
+conditionnel des fournitures. La facture disparaissait donc sur un chantier
+qui n'en consomme pas. Un scénario l'a attrapé.
 
 ## Journées faites, échéance de paiement, fiche à compléter
 
