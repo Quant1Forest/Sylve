@@ -105,6 +105,19 @@ body:not(.m-ent) .mod-ent{display:none}
 }
 .note-maj[data-notevue]{color:var(--accent);cursor:pointer}
 .note-maj.sans{color:var(--doux)}
+.paire-fiche{display:flex;justify-content:space-between;font-size:13.5px;padding:4px 0}
+/* Un bloc dont l'étape n'est pas atteinte : présent, mais en retrait. */
+.carte.avenir{background:transparent;box-shadow:none;border-style:dashed;opacity:.62}
+.carte.avenir .modif-bloc{color:var(--gris-clair)}
+.tete-bloc{display:flex;align-items:baseline;justify-content:space-between;gap:9px;margin-bottom:8px}
+.etape-bloc{
+  font-size:10.5px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;
+  color:var(--gris);
+}
+.modif-bloc{
+  font:inherit;font-size:12.5px;color:var(--accent);font-weight:600;white-space:nowrap;
+  background:none;border:0;padding:0;cursor:pointer;
+}
 .acompleter-bloc{
   margin:9px 0 0;padding:8px 11px;border-radius:var(--r-s);
   background:#F5EBCB;color:#6B5200;font-size:12.5px;
@@ -6565,6 +6578,11 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.49', quoi: [
+    { t: 'La fiche du chantier se lit dans l’ordre de sa vie, bloc par bloc', vue: 'carnet' },
+    { t: 'Chaque bloc a son crayon : le devis, la facture, les journées, chacun à part' },
+    { t: 'Fini l’en-tête unique de vingt-trois champs' }
+  ] },
   { v: '4.48', quoi: [
     { t: 'Un produit dosé se lit au plant partout, y compris dans les coûts', vue: 'revient' },
     { t: 'Le carnet montre le numéro de facture, et le tri se retourne', vue: 'carnet' },
@@ -6583,11 +6601,6 @@ var NOTES_MAJ = [
   { v: '4.45', quoi: [
     { t: 'Cette liste ne déplie que la version installée ; les autres sont derrière un bouton' },
     { t: 'Après une mise à jour, l’application ouvre directement ce qui a changé' }
-  ] },
-  { v: '4.44', quoi: [
-    { t: 'Votre logo et le nom de votre entreprise, sur l’écran Entreprise et au démarrage', vue: 'reglages' },
-    { t: 'Cette liste, qui dit ce qui a changé aux cinq dernières mises à jour' },
-    { t: 'Plus aucune référence à l’application d’origine du cubage' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -7088,7 +7101,15 @@ function brancher() {
     var id = A.chOuvert, c = chantier(id);
     if (e.target.closest('[data-chretour]')) { aller('carnet'); return; }
     if (!c) return;
-    if (e.target.closest('#f-entete')) { ouvrirEnteteCh(id); return; }
+    /* Chaque bloc de la fiche ouvre son propre formulaire : on ne cherche
+       plus le numéro de devis au milieu des essences. */
+    if (e.target.closest('#f-identite')) { ouvrirIdentiteCh(id); return; }
+    if (e.target.closest('#f-estim')) { ouvrirEstimationCh(id); return; }
+    if (e.target.closest('#f-devis')) { ouvrirDevisCh(id); return; }
+    if (e.target.closest('#f-facture')) { ouvrirFactureCh(id); return; }
+    if (e.target.closest('#f-peuplement')) { ouvrirPeuplementCh(id); return; }
+    if (e.target.closest('#f-note')) { ouvrirNoteCh(id); return; }
+    if (e.target.closest('#f-jours')) { ouvrirJourneesCh(id); return; }
     if (e.target.closest('#f-statut')) { ouvrirStatut(id); return; }
     if (e.target.closest('#f-ligne')) { ouvrirLigne(id, null); return; }
     if (e.target.closest('#f-temps')) { ouvrirTemps(id); return; }
@@ -9186,6 +9207,93 @@ function optionsChantiers(sel) {
     (clos.length ? '<optgroup label="Clos">' + clos.join('') + '</optgroup>' : '');
 }
 
+/* L'en-tête d'un bloc : son étape, et le crayon qui n'ouvre que ses champs.
+   Un bloc dont l'étape n'est pas atteinte reste visible mais en retrait — on
+   voit le chemin qui reste sans être encombré. */
+function teteBloc(titre, idBouton, mot) {
+  return '<div class="tete-bloc"><span class="etape-bloc">' + esc(titre) + '</span>' +
+    (idBouton ? '<button class="modif-bloc" id="' + idBouton + '">' +
+      esc(mot || 'modifier') + ' ✎</button>' : '') + '</div>';
+}
+function paireFiche(nom, valeur) {
+  return '<div class="paire-fiche"><span>' + esc(nom) + '</span><span class="num">' +
+    esc(String(valeur)) + '</span></div>';
+}
+/* Ce que le chantier vaut, puis ce qu'il a rapporté : le même bloc, dont les
+   mots changent avec l'étape. Avant, c'est une intention ; après, un constat.
+   L'estimation reste donc lisible tout du long — c'est elle qui dit si la
+   journée a tenu ce qu'elle promettait. */
+function blocValeur(c, m, pj, vise) {
+  var fait = C.totalFait(c), est = C.nb(c.joursEstimes);
+  var solde = ['termine', 'facture', 'paye'].indexOf(c.statut) >= 0;
+  var jours = solde ? fait : est;
+  var parJour = jours > 0 ? m / jours : 0;
+  return '<div class="carte">' +
+    teteBloc(solde ? 'Ce que ça a rapporté' : 'Ce que ça vaut', 'f-estim', 'estimer') +
+    '<div class="kpi">' +
+    '<div class="carte2"><b class="num">' + (m ? eur(m) : '—') + '</b><small>' +
+    (solde ? (c.statut === 'paye' ? 'encaissé' : 'facturé') : 'proposé') + '</small></div>' +
+    '<div class="carte2"><b class="num">' + (jours ? E.fmt(jours, jours % 1 ? 1 : 0) : '—') +
+    '</b><small>' + (solde ? 'journées faites' : 'journées estimées') + '</small></div>' +
+    '<div class="carte2"><b class="num"' +
+    (parJour && vise && parJour < vise ? ' style="color:#B4231F"' : '') + '>' +
+    (parJour ? eur(C.arr(parJour, 0)) : '—') + '</b><small>par journée</small></div>' +
+    '</div>' +
+    (vise && parJour
+      ? '<p class="muted" style="font-size:12px;margin:9px 0 0">Votre objectif est de ' +
+        eur(vise) + (parJour >= vise ? ' : ce chantier passe au-dessus.'
+          : ' : ce chantier reste en dessous.') + '</p>'
+      : '') +
+    (!solde && !est
+      ? '<p class="muted" style="font-size:12px;margin:6px 0 0">Aucune journée estimée : ' +
+        'sans elle, rien ne dit ce que la journée doit rapporter.</p>'
+      : '') + '</div>';
+}
+/* Le devis, quand il y en a un. Sinon le bloc reste, en retrait, pour dire
+   qu'on peut en attacher un. */
+function blocDevis(c) {
+  if (!C.aDevis(c)) {
+    return '<div class="carte avenir">' + teteBloc('Le devis', 'f-devis', 'attacher') +
+      '<p class="muted" style="font-size:13px;margin:0">Ce chantier n’a pas de devis. ' +
+      'Les étapes de devis ne figurent donc pas dans son statut.</p></div>';
+  }
+  var fin = C.finValiditeDevis(c);
+  var vide = !c.numeroDevis && !c.dateDevis;
+  return '<div class="carte' + (vide ? ' avenir' : '') + '">' +
+    teteBloc('Le devis', 'f-devis', 'modifier') +
+    (vide
+      ? '<p class="muted" style="font-size:13px;margin:0">Devis annoncé, rien de saisi ' +
+        'encore : numéro, date et validité restent à mettre.</p>'
+      : paireFiche('Numéro', c.numeroDevis || '—') +
+        paireFiche('Édité le', c.dateDevis ? dateCourte(c.dateDevis) : '—') +
+        (c.validiteDevis ? paireFiche('Valable', c.validiteDevis + ' mois' +
+          (fin ? ' — jusqu’au ' + dateCourte(fin) : '')) : '') +
+        (c.dateEnvoi ? paireFiche('Envoyé le', dateCourte(c.dateEnvoi)) : '')) +
+    '</div>';
+}
+/* La facture ferme le chantier : c'est elle qui fait foi de ce qui a été
+   fait. Tant qu'elle n'existe pas, le bloc annonce l'étape à venir. */
+function blocFacture(c) {
+  var attendue = C.rangStatut(c.statut) < C.rangStatut('facture');
+  if (attendue && !c.numeroFacture && !c.dateFacture) {
+    return '<div class="carte avenir">' + teteBloc('La facture', 'f-facture', 'saisir') +
+      '<p class="muted" style="font-size:13px;margin:0">Pas encore facturé.</p></div>';
+  }
+  var retard = C.retardPaiement(c, Date.now()), delai = C.delaiPaiement(c);
+  return '<div class="carte">' + teteBloc('La facture', 'f-facture', 'modifier') +
+    paireFiche('Numéro', c.numeroFacture || '—') +
+    paireFiche('Facturé le', c.dateFacture ? dateCourte(c.dateFacture) : '—') +
+    (c.echeancePaiement ? paireFiche('À payer avant le', dateCourte(c.echeancePaiement)) : '') +
+    (c.datePaiement ? paireFiche('Payé le', dateCourte(c.datePaiement)) : '') +
+    (delai != null
+      ? '<p class="muted" style="font-size:12px;margin:8px 0 0">Réglé en ' + delai +
+        ' jour' + (delai > 1 ? 's' : '') + '.</p>'
+      : retard
+        ? '<p class="retard" style="margin:8px 0 0">Échéance dépassée de ' + retard +
+          ' jour' + (retard > 1 ? 's' : '') + '.</p>'
+        : '') + '</div>';
+}
+
 function renderFiche() {
   var z = $('#fiche-chantier'); if (!z) return;
   var c = chantier(A.chOuvert);
@@ -9238,29 +9346,17 @@ function renderFiche() {
     '<label class="eyebrow" for="f-choix">Chantier affiché</label>' +
     '<select id="f-choix" style="margin-top:5px">' + optionsChantiers(c.id) + '</select>' +
     '</div>' +
+    /* Le chantier : qui, où, et où il en est. */
     '<div class="carte">' +
-    '<div class="fiche-tete"><div><h2 style="margin:0">' + esc(c.nom || 'Chantier') + '</h2>' +
+    teteBloc('Le chantier', 'f-identite', 'modifier') +
+    '<h2 style="margin:0">' + esc(c.nom || 'Chantier') + '</h2>' +
     '<p class="muted" style="font-size:12.5px;margin:3px 0 0">' +
     esc([c.donneur || c.client ? 'via ' + (c.donneur || c.client) : '',
       c.proprietaire ? c.proprietaire + (c.siren ? ' (SIREN)' : '') : '',
-      c.foret, c.parcelles ? 'parc. ' + c.parcelles : '', c.commune].filter(Boolean).join(' · ') || 'sans donneur d’ordre') + '</p></div>' +
-    '<div style="text-align:right">' + badgeStatut(c) +
-    (C.enRetard(c, Date.now()) ? '<div class="retard">en retard</div>' : '') + '</div></div>' +
-    (function () {
-      var fin = C.finValiditeDevis(c);
-      var jalons = [
-        c.numeroDevis ? 'devis n° ' + c.numeroDevis : '',
-        c.dateDevis ? 'devis du ' + dateCourte(c.dateDevis) : '',
-        c.dateEnvoi ? 'envoyé le ' + dateCourte(c.dateEnvoi) : '',
-        fin ? 'valable jusqu’au ' + dateCourte(fin) : '',
-        c.numeroFacture ? 'facture n° ' + c.numeroFacture : '',
-        c.dateFin ? 'terminé le ' + dateCourte(c.dateFin) : '',
-        c.dateFacture ? 'facturé le ' + dateCourte(c.dateFacture) : '',
-        c.datePaiement ? 'payé le ' + dateCourte(c.datePaiement) : ''
-      ].filter(Boolean);
-      return jalons.length ? '<p class="muted" style="font-size:12px;margin:9px 0 0">' +
-        esc(jalons.join(' · ')) + '</p>' : '';
-    })() +
+      c.foret, c.parcelles ? 'parc. ' + c.parcelles : '', c.commune].filter(Boolean).join(' · ') || 'sans donneur d’ordre') + '</p>' +
+    '<div style="margin-top:9px">' + badgeStatut(c) +
+    (dateStatut(c) ? ' <span class="muted" style="font-size:12px">' + esc(dateStatut(c)) + '</span>' : '') +
+    (C.enRetard(c, Date.now()) ? ' <span class="retard">en retard</span>' : '') + '</div>' +
     (function () {
       var manque = C.champsManquants(c);
       if (!manque.length) return '';
@@ -9268,9 +9364,11 @@ function renderFiche() {
     })() +
     '<div class="btn-rang" style="margin-top:11px">' +
     '<button class="btn btn-min" data-chretour="1">← Carnet</button>' +
-    '<button class="btn btn-min" id="f-entete">Modifier l’en-tête</button>' +
     '<button class="btn btn-min" id="f-statut">Changer le statut</button></div>' +
     '</div>' +
+
+    blocValeur(c, m, pj, vise) +
+    blocDevis(c) +
 
     '<div class="carte"><div class="carte-titre"><h2>Travaux</h2>' +
     '<button class="btn primaire btn-min" id="f-ligne">+ Ligne</button></div>' +
@@ -9285,7 +9383,8 @@ function renderFiche() {
       '</span></div>' : '') +
     '</div>' +
 
-    '<div class="carte"><div class="carte-titre"><h2>Journées</h2>' +
+    '<div class="carte">' + teteBloc('Les journées', 'f-jours', 'modifier') +
+    '<div class="carte-titre" style="margin:0 0 4px">' +
     '<button class="btn primaire btn-min" id="f-planifier">' +
     (C.journeesPlacees(c).length ? 'Modifier les journées' : 'Placer sur l’agenda') +
     '</button></div>' +
@@ -9363,6 +9462,8 @@ function renderFiche() {
         'précisez l’activité dans chaque saisie de temps pour obtenir les rendements.</p>' : '') : '') +
     '</div>' +
 
+    blocFacture(c) +
+
     (function () {
       var conso = ST.consommationChantier(A.articles, c.id);
       if (!conso.length) return '';
@@ -9381,12 +9482,23 @@ function renderFiche() {
           '<b class="num">' + eur(mg.marge) + '</b><small>marge' + (mg.taux != null ? ' · ' + mg.taux + ' %' : '') + '</small></div></div>' : '') +
         '</div>';
     })() +
+    (function () {
+      var cr = c.criteres || {};
+      var dit = critLibelle(cr);
+      return '<div class="carte' + (dit ? '' : ' avenir') + '">' +
+        teteBloc('Le peuplement', 'f-peuplement', dit ? 'modifier' : 'renseigner') +
+        '<p style="font-size:13.5px;margin:0"' + (dit ? '' : ' class="muted"') + '>' +
+        esc(dit || 'Essence et densité, pour vos statistiques.') + '</p></div>';
+    })() +
     (C.kmChantier(c) ? '<div class="carte"><h2>Déplacements</h2>' +
       '<div class="kpi"><div class="carte2"><b class="num">' + E.fmt(C.kmChantier(c), 0) + '</b><small>km</small></div>' +
       '<div class="carte2"><b class="num">' + eur(C.coutCarburant(C.kmChantier(c), A.cfg)) + '</b><small>carburant estimé</small></div></div></div>' : '') +
     (c.motifRefus ? '<div class="carte"><h2>Sans suite</h2><p style="font-size:14px;margin:0">' +
       esc(C.nomMotifRefus(c.motifRefus)) + (c.noteRefus ? ' — ' + esc(c.noteRefus) : '') + '</p></div>' : '') +
-    (c.notes ? '<div class="carte"><h2>Note</h2><p style="font-size:14px;margin:0">' + esc(c.notes) + '</p></div>' : '') +
+    '<div class="carte' + (c.notes ? '' : ' avenir') + '">' +
+    teteBloc('Note', 'f-note', c.notes ? 'modifier' : 'écrire') +
+    '<p style="font-size:14px;margin:0"' + (c.notes ? '' : ' class="muted"') + '>' +
+    esc(c.notes || 'Ce que vous voudrez relire dans deux ans.') + '</p></div>' +
     '<div class="carte"><div class="btn-rang">' +
     '<button class="btn danger btn-min" id="f-sup">Supprimer ce chantier</button></div></div>';
 }
@@ -9636,25 +9748,9 @@ function lireCeJours() {
     if (p > 0) ceJours[Number(s.dataset.cepart)].p = p;
   });
 }
-function ouvrirEnteteCh(id) {
-  var c = id ? chantier(id) : { statut: 'devis', lignes: [], temps: [] };
-  if (!c) return;
-  var gps = c.gps || null;
-  ceJours = C.journeesPlacees(c).map(function (x) { return { d: x.d, p: x.p }; });
-  ceChantierId = id || null;
-
-  majDatalistClients();
-  modale(id ? 'En-tête du chantier' : 'Nouveau chantier', formEnteteCh(c));
-  renderCeJours();
-  renderCeDevis(c);
-  brancherEssenceCh('ce-ess', (c.criteres || {}).essence || '');
-  $('#ce-adevis').addEventListener('change', function () { renderCeDevis(c); });
-  brancherOffreListe('ce-donneur', 'clients');
-  brancherOffreListe('ce-proprio', 'proprios');
-  ['#ce-datedevis', '#ce-validite'].forEach(function (s) {
-    $(s).addEventListener('change', majFinValidite);
-  });
-  $('#ce-jest').addEventListener('input', renderCeJours);
+/* Ajouter, retirer, corriger une date posée. Partagé par le formulaire de
+   création et celui des journées : deux copies auraient fini par diverger. */
+function brancherCeJours() {
   $('#ce-jours').addEventListener('click', function (e) {
     var plus = e.target.closest('#ce-plusjour'), del = e.target.closest('[data-cedel]');
     if (plus) {
@@ -9679,6 +9775,71 @@ function ouvrirEnteteCh(id) {
     }
   });
   $('#ce-jours').addEventListener('change', function () { lireCeJours(); renderCeJours(); });
+}
+
+/* Les dates posées se modifiaient dans l'en-tête, au milieu de vingt-deux
+   autres champs. Elles ont leur formulaire, comme chaque bloc de la fiche.
+   Le calendrier reste la façon naturelle d'en poser une ; ceci sert à
+   corriger une date ou une demi-journée sans y aller. */
+function ouvrirJourneesCh(id) {
+  var c = chantier(id); if (!c) return;
+  ceJours = C.journeesPlacees(c).map(function (x) { return { d: x.d, p: x.p }; });
+  ceChantierId = id;
+  modale('Les journées',
+    '<div class="champ"><label class="eyebrow" for="ce-jest">Journées estimées</label>' +
+    '<input type="text" id="ce-jest" inputmode="decimal" autocomplete="off" value="' +
+    (c.joursEstimes != null ? esc(String(c.joursEstimes).replace('.', ',')) : '') + '"></div>' +
+    '<p class="eyebrow" style="margin:14px 0 6px">Les dates posées</p>' +
+    '<div id="ce-jours"></div>' +
+    '<p class="muted" style="font-size:12px;margin:9px 0 0">Total placé : ' +
+    '<b id="ce-total-jours" class="num">—</b>. Pour poser une date en voyant le mois, ' +
+    'passez par l’agenda.</p>' +
+    '<div class="btn-rang" style="margin-top:11px">' +
+    '<button class="btn primaire" id="cj-ok">Valider</button></div>');
+  renderCeJours();
+  $('#ce-jest').addEventListener('input', renderCeJours);
+  brancherCeJours();
+  $('#cj-ok').addEventListener('click', function () {
+    lireCeJours();
+    var jest = C.nb($('#ce-jest').value);
+    var pose = ceJours.reduce(function (s2, j) { return s2 + C.nb(j.p); }, 0);
+    if (jest > 0 && pose > jest) {
+      var tropDe = C.arr(pose - jest, 2);
+      if (!confirm('Vous placez ' + E.fmt(pose, pose % 1 ? 1 : 0) + ' journées pour ' +
+        E.fmt(jest, jest % 1 ? 1 : 0) + ' estimées, soit ' +
+        String(tropDe).replace('.', ',') + ' de trop.\n\nEnregistrer quand même ?')) return;
+    }
+    var vus = {};
+    majChantier(c, {
+      joursEstimes: jest > 0 ? jest : null,
+      jours: ceJours.filter(function (j) {
+        if (!j.d || vus[j.d]) return false;
+        vus[j.d] = 1; return true;
+      }).sort(function (x, y) { return x.d - y.d; })
+    }, 'Journées enregistrées.');
+  });
+}
+
+function ouvrirEnteteCh(id) {
+  var c = id ? chantier(id) : { statut: 'devis', lignes: [], temps: [] };
+  if (!c) return;
+  var gps = c.gps || null;
+  ceJours = C.journeesPlacees(c).map(function (x) { return { d: x.d, p: x.p }; });
+  ceChantierId = id || null;
+
+  majDatalistClients();
+  modale(id ? 'En-tête du chantier' : 'Nouveau chantier', formEnteteCh(c));
+  renderCeJours();
+  renderCeDevis(c);
+  brancherEssenceCh('ce-ess', (c.criteres || {}).essence || '');
+  $('#ce-adevis').addEventListener('change', function () { renderCeDevis(c); });
+  brancherOffreListe('ce-donneur', 'clients');
+  brancherOffreListe('ce-proprio', 'proprios');
+  ['#ce-datedevis', '#ce-validite'].forEach(function (s) {
+    $(s).addEventListener('change', majFinValidite);
+  });
+  $('#ce-jest').addEventListener('input', renderCeJours);
+  brancherCeJours();
   $('#ce-gps').addEventListener('click', function () {
     var b = this;
     releverPosition(b, function (pt) { gps = pt; b.textContent = 'Position enregistrée ✓'; toast('Position relevée.'); });
@@ -9784,6 +9945,205 @@ function brancherOffreListe(champId, cle) {
       offre.className = 'offre-liste visible faite';
       offre.textContent = '« ' + nom +' » ajouté à vos ' + LISTES[cle].nom.toLowerCase() + '.';
     });
+  });
+}
+
+
+/* Enregistre quelques champs d'un chantier et redessine ce qu'il faut. Tous
+   les petits formulaires passent par là : c'est ce qui garantit qu'aucun
+   n'oublie de rafraîchir le carnet ou l'accueil. */
+function majChantier(c, champs, message) {
+  Object.keys(champs).forEach(function (k) { c[k] = champs[k]; });
+  c.maj = Date.now();
+  horodaterStatut(c);
+  return sauverChantiers().then(function () {
+    fermerModale(); renderFiche(); renderCarnet(); renderCalendrier();
+    renderRendements(); renderFinances(); renderAccueil();
+    if (message) toast(message);
+  });
+}
+
+/* --- l'identité : qui, où, pour qui --- */
+function ouvrirIdentiteCh(id) {
+  var c = chantier(id); if (!c) return;
+  var gps = c.gps || null;
+  majDatalistClients();
+  modale('Le chantier',
+    '<div class="champ"><label class="eyebrow" for="ic-nom">Nom du chantier</label>' +
+    '<input type="text" id="ic-nom" class="gros" autocomplete="off" value="' + esc(c.nom || '') + '"></div>' +
+    '<div class="grille g2">' +
+    '<div class="champ"><label class="eyebrow" for="ic-donneur">Donneur d’ordre' +
+    '<button type="button" class="mini-plus" data-ajlist="clients" data-ajchamp="ic-donneur" ' +
+    'title="Ajouter à la liste">+ liste</button></label>' +
+    '<input type="text" id="ic-donneur" autocomplete="off" list="liste-clients" ' +
+    'placeholder="expert, gestionnaire…" value="' + esc(c.donneur || c.client || '') + '">' +
+    '<p class="offre-liste" id="ic-donneur-offre"></p></div>' +
+    '<div class="champ"><label class="eyebrow" for="ic-proprio">Propriétaire' +
+    '<button type="button" class="mini-plus" data-ajlist="proprios" data-ajchamp="ic-proprio" ' +
+    'title="Ajouter à la liste">+ liste</button></label>' +
+    '<input type="text" id="ic-proprio" autocomplete="off" list="liste-proprios" value="' +
+    esc(c.proprietaire || '') + '"><p class="offre-liste" id="ic-proprio-offre"></p></div>' +
+    '<div class="champ"><label class="eyebrow" for="ic-foret">Forêt</label>' +
+    '<input type="text" id="ic-foret" autocomplete="off" value="' + esc(c.foret || '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="ic-parc">Parcelle(s)</label>' +
+    '<input type="text" id="ic-parc" autocomplete="off" value="' + esc(c.parcelles || '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="ic-com">Commune</label>' +
+    '<input type="text" id="ic-com" autocomplete="off" value="' + esc(c.commune || '') + '"></div>' +
+    '</div>' +
+    '<label class="ligne-check" style="display:flex;align-items:flex-start;gap:8px;font-size:13.5px;margin:10px 0 0">' +
+    '<input type="checkbox" id="ic-siren"' + (c.siren ? ' checked' : '') + ' style="margin-top:2px">' +
+    '<span>Propriétaire identifié producteur agricole (n° SIREN)' +
+    '<span class="muted" style="display:block;font-size:11.5px">Ouvre le taux réduit sur les ' +
+    'travaux qui y donnent droit.</span></span></label>' +
+    '<div class="btn-rang" style="margin-top:11px">' +
+    '<button class="btn" id="ic-gps">' +
+    (c.gps && c.gps.lat != null ? 'Position enregistrée ✓' : 'Enregistrer la position') + '</button>' +
+    '<button class="btn primaire" id="ic-ok">Valider</button></div>');
+  brancherOffreListe('ic-donneur', 'clients');
+  brancherOffreListe('ic-proprio', 'proprios');
+  $('#ic-gps').addEventListener('click', function () {
+    var b = this;
+    releverPosition(b, function (pt) { gps = pt; b.textContent = 'Position enregistrée ✓'; });
+  });
+  $('#ic-ok').addEventListener('click', function () {
+    var nom = $('#ic-nom').value.trim();
+    if (!nom) { toast('Donnez un nom au chantier.'); return; }
+    majChantier(c, { nom: nom, donneur: $('#ic-donneur').value.trim(),
+      proprietaire: $('#ic-proprio').value.trim(), foret: $('#ic-foret').value.trim(),
+      parcelles: $('#ic-parc').value.trim(), commune: $('#ic-com').value.trim(),
+      siren: $('#ic-siren').checked, gps: gps }, 'Chantier modifié.');
+  });
+}
+
+/* --- l'estimation : ce qu'on pense y passer, et ce qu'on vise --- */
+function ouvrirEstimationCh(id) {
+  var c = chantier(id); if (!c) return;
+  modale('L’estimation',
+    '<div class="grille g2">' +
+    '<div class="champ"><label class="eyebrow" for="es-jest">Journées estimées</label>' +
+    '<input type="text" id="es-jest" class="gros" inputmode="decimal" autocomplete="off" value="' +
+    (c.joursEstimes != null ? esc(String(c.joursEstimes).replace('.', ',')) : '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="es-pj">Prix de journée visé (€)</label>' +
+    '<input type="text" id="es-pj" class="gros" inputmode="decimal" placeholder="' +
+    (C.nb(A.cfg && A.cfg.prixJourVise) || 'défaut') + '" value="' +
+    (c.prixJour != null ? esc(String(c.prixJour).replace('.', ',')) : '') + '"></div></div>' +
+    '<p class="muted" style="font-size:12px;margin:9px 0 0">Ce que vous pensez y passer, ' +
+    'et ce que la journée doit rapporter. Ça reste votre repère tout le long : on le ' +
+    'compare ensuite aux journées réellement faites.</p>' +
+    '<div class="btn-rang" style="margin-top:11px">' +
+    '<button class="btn primaire" id="es-ok">Valider</button></div>');
+  $('#es-ok').addEventListener('click', function () {
+    var jest = C.nb($('#es-jest').value);
+    majChantier(c, { joursEstimes: jest > 0 ? jest : null,
+      prixJour: C.nb($('#es-pj').value) || null }, 'Estimation enregistrée.');
+  });
+}
+
+/* --- le devis, quand il y en a un --- */
+function ouvrirDevisCh(id) {
+  var c = chantier(id); if (!c) return;
+  modale('Le devis',
+    '<label class="ligne-check" style="display:flex;align-items:flex-start;gap:8px;font-size:13.5px;margin:0">' +
+    '<input type="checkbox" id="dv-a"' + (C.aDevis(c) ? ' checked' : '') + ' style="margin-top:2px">' +
+    '<span>J’ai fait un devis pour ce chantier' +
+    '<span class="muted" style="display:block;font-size:11.5px">Décoché, les étapes de devis ' +
+    'disparaissent du statut et rien d’autre n’est à remplir ici.</span></span></label>' +
+    '<div id="dv-bloc">' + champsDevisCh(c) + '</div>' +
+    '<div class="btn-rang" style="margin-top:11px">' +
+    '<button class="btn primaire" id="dv-ok">Valider</button></div>');
+  var maj = function () {
+    var coche = $('#dv-a').checked;
+    $('#dv-bloc').style.display = coche ? '' : 'none';
+    majFinValidite();
+  };
+  $('#dv-a').addEventListener('change', maj);
+  ['#ce-datedevis', '#ce-validite'].forEach(function (x) {
+    if ($(x)) $(x).addEventListener('change', majFinValidite);
+  });
+  maj();
+  $('#dv-ok').addEventListener('click', function () {
+    var coche = $('#dv-a').checked;
+    var champs = { aDevis: coche,
+      numeroDevis: coche ? $('#ce-numdevis').value.trim() : '',
+      dateDevis: coche ? versDate($('#ce-datedevis').value) : null,
+      validiteDevis: coche ? (C.nb($('#ce-validite').value) || null) : null };
+    /* Sans devis, les deux premières étapes n'existent plus : on avance le
+       chantier à celle où il en est réellement. */
+    if (!coche && (c.statut === 'devis' || c.statut === 'envoye')) champs.statut = 'accepte';
+    majChantier(c, champs, 'Devis enregistré.');
+  });
+}
+
+/* --- la facture et son règlement --- */
+function ouvrirFactureCh(id) {
+  var c = chantier(id); if (!c) return;
+  modale('La facture',
+    '<div class="grille g2">' +
+    '<div class="champ"><label class="eyebrow" for="fc-num">N° de facture</label>' +
+    '<input type="text" id="fc-num" class="gros" autocomplete="off" ' +
+    'placeholder="celui de votre logiciel" value="' + esc(c.numeroFacture || '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="fc-date">Facturé le</label>' +
+    '<input type="date" id="fc-date" value="' + versChamp(c.dateFacture) + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="fc-ech">À payer avant le</label>' +
+    '<input type="date" id="fc-ech" value="' + versChamp(c.echeancePaiement) + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="fc-paie">Payé le</label>' +
+    '<input type="date" id="fc-paie" value="' + versChamp(c.datePaiement) + '"></div></div>' +
+    '<div class="btn-rang" style="margin-top:4px">' +
+    '<button class="btn-min" data-fcech="30">+ 30 jours</button>' +
+    '<button class="btn-min" data-fcech="45">+ 45 jours</button>' +
+    '<button class="btn-min" data-fcech="60">+ 60 jours</button></div>' +
+    '<p class="muted" style="font-size:12px;margin:9px 0 0">Les délais se comptent depuis ' +
+    'la date de facture, pas depuis aujourd’hui : une facture saisie après coup garde ' +
+    'sa vraie échéance.</p>' +
+    '<div class="btn-rang" style="margin-top:11px">' +
+    '<button class="btn primaire" id="fc-ok">Valider</button></div>');
+  $('#modale-corps').addEventListener('click', function (e) {
+    var r = e.target.closest('[data-fcech]'); if (!r) return;
+    var base = versDate($('#fc-date').value) || C.minuit(Date.now());
+    $('#fc-ech').value = versChamp(base + Number(r.dataset.fcech) * C.JOUR);
+  });
+  $('#fc-ok').addEventListener('click', function () {
+    majChantier(c, { numeroFacture: $('#fc-num').value.trim(),
+      dateFacture: versDate($('#fc-date').value),
+      echeancePaiement: versDate($('#fc-ech').value),
+      datePaiement: versDate($('#fc-paie').value) }, 'Facture enregistrée.');
+  });
+}
+
+/* --- le peuplement : essence et densité --- */
+function ouvrirPeuplementCh(id) {
+  var c = chantier(id); if (!c) return;
+  var cr = c.criteres || {};
+  modale('Le peuplement',
+    '<div class="grille g2">' +
+    '<div class="champ"><label class="eyebrow" for="ce-ess">Essence</label>' +
+    '<select id="ce-ess">' + optionsEssenceCh(cr.essence) + '</select></div>' +
+    '<div class="champ"><label class="eyebrow" for="ce-dens">Densité (tiges ou plants/ha)</label>' +
+    '<input type="text" id="ce-dens" inputmode="numeric" autocomplete="off" value="' +
+    (cr.densite || '') + '"></div></div>' +
+    '<p class="muted" style="font-size:12px;margin:7px 0 0">L’essence pour vos statistiques, ' +
+    'la densité parce que multipliée par la surface elle vous donne le nombre de plants.</p>' +
+    '<div class="btn-rang" style="margin-top:11px">' +
+    '<button class="btn primaire" id="pe-ok">Valider</button></div>');
+  brancherEssenceCh('ce-ess', cr.essence || '');
+  $('#pe-ok').addEventListener('click', function () {
+    var essv = $('#ce-ess').value;
+    if (essv === '__ajouter') essv = '';
+    majChantier(c, { criteres: Object.assign({}, c.criteres || {}, {
+      essence: essv || null, densite: C.nb($('#ce-dens').value) || null
+    }) }, 'Peuplement enregistré.');
+  });
+}
+
+/* --- la note --- */
+function ouvrirNoteCh(id) {
+  var c = chantier(id); if (!c) return;
+  modale('Note',
+    '<div class="champ"><label class="eyebrow" for="nc-txt">Ce que vous voulez relire</label>' +
+    '<input type="text" id="nc-txt" class="gros" autocomplete="off" value="' + esc(c.notes || '') + '"></div>' +
+    '<div class="btn-rang"><button class="btn primaire" id="nc-ok">Valider</button></div>');
+  $('#nc-ok').addEventListener('click', function () {
+    majChantier(c, { notes: $('#nc-txt').value.trim() }, 'Note enregistrée.');
   });
 }
 
@@ -14736,7 +15096,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.48.0-20260819-2020';
+var VERSION = '4.49.0-20260819-2122';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

@@ -544,7 +544,7 @@ scenario('Journées : on pose des heures, pas seulement des demi-journées', asy
   }));
   t.clic('[data-vue="carnet"]'); await t.pause(250);
   t.clic('[data-chouvrir="c1"]'); await t.pause(300);
-  t.clic('#f-entete'); await t.pause(350);
+  t.clic('#f-jours'); await t.pause(350);
   t.clic('#ce-plusjour'); await t.pause(200);
 
   const sel = t.$('[data-cepart="0"]');
@@ -558,7 +558,7 @@ scenario('Journées : on pose des heures, pas seulement des demi-journées', asy
   verifier('3 h valent la bonne part de journée', 0.375, Number(troisH.value));
 
   t.choisir('[data-cepart="0"]', '0.375'); await t.pause(200);
-  t.clic('#ce-ok'); await t.pause(400);
+  t.clic('#cj-ok'); await t.pause(400);
   const c = (t.stock('chantiers') || [])[0];
   verifier('la part saisie est retenue', 0.375, C0(c).p);
   verifier('aucune erreur', [], t.erreurs);
@@ -575,20 +575,20 @@ scenario('Journées : dépasser l’estimation demande confirmation', async () =
   }));
   t.clic('[data-vue="carnet"]'); await t.pause(250);
   t.clic('[data-chouvrir="c1"]'); await t.pause(300);
-  t.clic('#f-entete'); await t.pause(350);
+  t.clic('#f-jours'); await t.pause(350);
   t.clic('#ce-plusjour'); await t.pause(150);
   t.clic('#ce-plusjour'); await t.pause(150);
 
   /* Refusé : rien ne doit être enregistré. */
   let demande = '';
   t.w.confirm = m => { demande = m; return false; };
-  t.clic('#ce-ok'); await t.pause(300);
+  t.clic('#cj-ok'); await t.pause(300);
   verifierVrai('l’écart est annoncé en clair', /2 journées pour 1 estimée|de trop/.test(demande));
   verifier('refuser n’enregistre rien', 0, ((t.stock('chantiers') || [])[0].jours || []).length);
 
   /* Accepté : un chantier a le droit de déborder. */
   t.w.confirm = () => true;
-  t.clic('#ce-ok'); await t.pause(400);
+  t.clic('#cj-ok'); await t.pause(400);
   verifier('accepter enregistre les deux journées', 2,
     ((t.stock('chantiers') || [])[0].jours || []).length);
   verifier('aucune erreur', [], t.erreurs);
@@ -607,7 +607,7 @@ scenario('Journées : la croix retire bien la journée de trop', async () => {
   }));
   t.clic('[data-vue="carnet"]'); await t.pause(250);
   t.clic('[data-chouvrir="c1"]'); await t.pause(300);
-  t.clic('#f-entete'); await t.pause(350);
+  t.clic('#f-jours'); await t.pause(350);
   t.clic('#ce-plusjour'); await t.pause(150);
   t.clic('#ce-plusjour'); await t.pause(150);
   verifier('deux journées posées', 2, t.$$('#ce-jours [data-cej]').length);
@@ -618,7 +618,7 @@ scenario('Journées : la croix retire bien la journée de trop', async () => {
   verifier('c’est bien la première qui est partie', second, t.$('[data-cej="0"]').value);
   verifier('aucune erreur', [], t.erreurs);
 
-  t.clic('#ce-ok'); await t.pause(400);
+  t.clic('#cj-ok'); await t.pause(400);
   verifier('une seule journée enregistrée', 1,
     ((t.stock('chantiers') || [])[0].jours || []).length);
 });
@@ -1037,12 +1037,12 @@ scenario('Chantier : les dates de facture et de paiement se corrigent', async ()
   }));
   t.clic('[data-vue="carnet"]'); await t.pause(250);
   t.clic('[data-chouvrir="c1"]'); await t.pause(350);
-  t.clic('#f-entete'); await t.pause(350);
-  verifierVrai('le champ « Facturé le » existe', t.$('#ce-datefact'));
-  verifierVrai('le champ « Payé le » aussi', t.$('#ce-datepaie'));
-  verifier('la date en base est bien affichée', '2026-03-10', t.$('#ce-datefact').value);
-  t.choisir('#ce-datepaie', '2026-04-02');
-  t.clic('#ce-ok'); await t.pause(400);
+  t.clic('#f-facture'); await t.pause(350);
+  verifierVrai('le champ « Facturé le » existe', t.$('#fc-date'));
+  verifierVrai('le champ « Payé le » aussi', t.$('#fc-paie'));
+  verifier('la date en base est bien affichée', '2026-03-10', t.$('#fc-date').value);
+  t.choisir('#fc-paie', '2026-04-02');
+  t.clic('#fc-ok'); await t.pause(400);
   const c = (t.stock('chantiers') || [])[0];
   verifierVrai('la date de paiement saisie est retenue',
     c && new Date(c.datePaiement).getMonth() === 3 && new Date(c.datePaiement).getDate() === 2);
@@ -1375,12 +1375,12 @@ scenario('Devis : numéro, date d’édition et validité tiennent sur la fiche'
   verifierVrai('la fiche affiche le numéro du devis',
     /D-2026-014/.test(t.$('#vue-chantier').textContent));
   verifierVrai('et jusqu’à quand il vaut',
-    /valable jusqu’au 28\/02\/2026/.test(t.$('#vue-chantier').textContent));
+    /jusqu’au 28\/02\/2026/.test(t.$('#vue-chantier').textContent));
 
   /* Décoché, plus de devis : garder un numéro ferait ressortir un fantôme. */
-  t.clic('#f-entete'); await t.pause(350);
-  cocher(t, '#ce-adevis', false); await t.pause(200);
-  t.clic('#ce-ok'); await t.pause(450);
+  t.clic('#f-devis'); await t.pause(350);
+  cocher(t, '#dv-a', false); await t.pause(200);
+  t.clic('#dv-ok'); await t.pause(450);
   const c2 = (t.stock('chantiers') || [])[0];
   verifier('décocher efface le numéro', '', c2.numeroDevis);
   verifier('et la date', null, c2.dateDevis);
@@ -2937,6 +2937,99 @@ scenario('À compléter : on ne réclame pas d’estimation sur un chantier pay�
     lignes: [{ travail: 'DEGAG' }] };
   verifierVrai('un chantier à planifier réclame son estimation',
     C.champsManquants(enCours).indexOf('journées estimées') >= 0);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Fiche : des blocs dans l’ordre de la vie du chantier', async () => {
+  /* Un seul formulaire de vingt-trois champs s'appelait « en-tête » et
+     contenait le devis, la facture, les journées et le peuplement. Chaque
+     bloc ouvre désormais le sien. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [{ id: 'c1', nom: 'Coupe des Places', statut: 'envoye', temps: [],
+      aDevis: true, donneur: 'Cabinet Dubois', commune: 'Foncine',
+      numeroDevis: 'D-2026-014', dateDevis: Date.now() - 12 * 86400000,
+      validiteDevis: 3, dateEnvoi: Date.now() - 12 * 86400000,
+      joursEstimes: 4, prixJour: 800, maj: Date.now(),
+      lignes: [{ travail: 'PLANT', unite: 'plant', quantite: 1200, prix: 2.1,
+        nature: 'prestation' }] }]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+
+  /* Les blocs, dans l'ordre. */
+  const etapes = t.$$('#vue-chantier .etape-bloc').map(e => e.textContent);
+  verifier('le chantier d’abord', 'Le chantier', etapes[0]);
+  verifier('puis ce que ça vaut', 'Ce que ça vaut', etapes[1]);
+  verifier('puis le devis', 'Le devis', etapes[2]);
+  verifierVrai('la facture est plus bas', etapes.indexOf('La facture') > 2);
+
+  /* Ce qui n'est pas encore atteint reste visible, en retrait. */
+  const fact = t.$$('#vue-chantier .carte.avenir')
+    .filter(e => /La facture/.test(e.textContent))[0];
+  verifierVrai('la facture s’annonce comme une étape à venir', fact);
+  verifierVrai('et le dit en clair', /Pas encore facturé/.test(fact.textContent));
+
+  /* Le bloc d'argent parle au futur tant que rien n'est facturé. */
+  const val = t.$$('#vue-chantier .carte')
+    .filter(e => /Ce que ça vaut/.test(e.textContent))[0];
+  verifierVrai('il annonce le montant proposé', /proposé/.test(val.textContent));
+  verifierVrai('et les journées estimées', /journées estimées/.test(val.textContent));
+  /* 1 200 plants × 2,10 € = 2 520 € sur 4 journées : 630 € la journée. */
+  verifierVrai('avec le prix de journée qui en découle', /630/.test(val.textContent));
+  verifierVrai('comparé à l’objectif', /objectif/.test(val.textContent));
+
+  /* Chaque crayon ouvre son seul sujet. */
+  verifier('plus de bouton « en-tête »', null, t.$('#f-entete'));
+  t.clic('#f-facture'); await t.pause(350);
+  const corps = t.$('#modale-corps');
+  verifierVrai('le formulaire de facture s’ouvre', t.$('#fc-num'));
+  verifier('quatre champs, pas vingt-trois', 4, corps.querySelectorAll('input').length);
+  verifierVrai('et rien du devis dedans', !/numéro de devis/i.test(corps.textContent));
+  t.saisir('#fc-num', 'F-2026-031');
+  t.choisir('#fc-date', '2026-10-03');
+  t.clic('#fc-ok'); await t.pause(450);
+  verifier('la facture est enregistrée', 'F-2026-031',
+    (t.stock('chantiers') || [])[0].numeroFacture);
+  verifierVrai('et le bloc n’est plus en attente',
+    !t.$$('#vue-chantier .carte.avenir').some(e => /La facture/.test(e.textContent)));
+
+  /* L'estimation garde sa place, même une fois le chantier avancé. */
+  t.clic('#f-estim'); await t.pause(350);
+  verifierVrai('l’estimation s’ouvre seule', t.$('#es-jest'));
+  verifier('avec les journées déjà estimées', '4', t.$('#es-jest').value);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Fiche : sans devis, le bloc le dit au lieu de mentir', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [{ id: 'c1', nom: 'Dépannage', statut: 'encours', temps: [],
+      aDevis: false, donneur: 'Dubois', commune: 'Foncine', joursEstimes: 2,
+      maj: Date.now(), lignes: [] }]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+  const dev = t.$$('#vue-chantier .carte')
+    .filter(e => /Le devis/.test(e.textContent))[0];
+  verifierVrai('le bloc devis est là quand même', dev);
+  verifierVrai('mais en retrait', dev.classList.contains('avenir'));
+  verifierVrai('et il dit pourquoi', /n’a pas de devis/.test(dev.textContent));
+
+  /* On peut en attacher un depuis là. */
+  t.clic('#f-devis'); await t.pause(350);
+  verifierVrai('le formulaire s’ouvre sur la case', t.$('#dv-a'));
+  verifierVrai('décochée', !t.$('#dv-a').checked);
+  t.$('#dv-a').checked = true;
+  t.$('#dv-a').dispatchEvent(new t.w.Event('change', { bubbles: true }));
+  await t.pause(200);
+  t.saisir('#ce-numdevis', 'D-2026-020');
+  t.clic('#dv-ok'); await t.pause(450);
+  const c = (t.stock('chantiers') || [])[0];
+  verifier('le devis est attaché', true, c.aDevis);
+  verifier('avec son numéro', 'D-2026-020', c.numeroDevis);
   verifier('aucune erreur', [], t.erreurs);
 });
 
