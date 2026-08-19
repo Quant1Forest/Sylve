@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.45.0-20260819-1848**
+Version courante : **4.46.0-20260819-1927**
 
 ---
 
@@ -707,6 +707,26 @@ un produit vendu trop bas peut être rattrapé par un autre, c'est le total qui
 décide — et le graphique « vos prix face au minimum », qui rapporte chaque
 prix pratiqué au minimum du produit plutôt qu'à des euros incomparables.
 
+## Lire un graphique sans devoir l'expliquer
+
+**« 131 % du minimum » ne veut rien dire pour personne.** Le graphique des
+prix rapportait chaque prix pratiqué au minimum du produit, en pourcentage :
+comparable d'une ligne à l'autre, mais illisible. Il est remplacé par
+`batonsPrix()` — trois bâtons par produit sur une échelle en euros : le coût
+réel, le prix qu'il faudrait pour tenir l'objectif, le prix pratiqué. Et
+l'écart écrit en euros : « il manque 0,23 € ».
+
+**L'objectif de marge ne vaut que pour la marge brute.** C'est sur elle que
+l'abattement forfaitaire se compare. Le trait pointillé a donc disparu de la
+vue nette, où il faisait croire à un seuil qui n'existe pas. La nette vaut la
+brute moins le taux de charges appliqué au prix de vente — un produit à
+faible marge y perd proportionnellement bien plus qu'un autre.
+
+**Un graphique ne se répète pas.** « Où dort votre argent » vivait à la fois
+sur l'inventaire et dans les coûts. Il reste sur l'inventaire, là où se fait
+l'état des lieux ; les coûts n'en gardent qu'une ligne, la valeur
+immobilisée.
+
 ## Le millilitre n’est pas le mètre linéaire
 
 Dans `UNITES_ART`, **`ml` désigne le mètre linéaire** — celui du grillage.
@@ -733,6 +753,11 @@ découle de la facture et se refait à chaque modification. Elle est marquée
 - **La facture compte ce que lit le client, le stock ce qui est consommé.**
   332 plants restent 332 plants sur la ligne ; c'est la sortie qui convertit
   en 1 992 ml, via le `dosage` de l'article.
+- **Mais la sortie n'est plus un miroir : c'est un point de départ.** Depuis la
+  4.46, la modifier la détache (`auto` passe à `false`) et elle cesse de suivre
+  la facture. Il consomme parfois moins de répulsif que prévu, et c'est le
+  stock qui doit dire vrai, pas ce qui a été facturé. La facture, elle, ne
+  bouge pas. `sortieManuelleDe()` empêche alors d'en recréer une seconde.
 - **L'état suit le chantier** par `VENTE_DE_CHANTIER` : rien ne quitte le
   stock avant que le chantier soit fait.
 - **Corriger la facture corrige la sortie** ; retirer la ligne la supprime.

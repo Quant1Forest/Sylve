@@ -2426,25 +2426,10 @@ scenario('Performance : le taux d’ensemble, et la bascule brute / nette', asyn
   verifier('la nette prend la main', 'true',
     t.$('[data-marge="nette"]').getAttribute('aria-pressed'));
   verifierVrai('et le texte explique ce qu’elle retire',
-    /de charges sur le prix de vente/.test(t.$('#rev-resultat').textContent));
+    /de charges, prélevés sur le prix de vente/.test(t.$('#rev-resultat').textContent));
   verifier('aucune erreur', [], t.erreurs);
 });
 
-/* --------------------------------------------------------------------- */
-scenario('Coûts : les prix pratiqués se comparent au minimum', async () => {
-  /* Le bambou acheté 1 € et vendu 2 € passe largement ; la gaine achetée 2 €
-     et vendue 2,20 € reste sous le minimum. */
-  const t = await ouvrir(STOCK());
-  t.clic('[data-vue="revient"]'); await t.pause(300);
-  t.clic('[data-rev="couts"]'); await t.pause(350);
-  const corps = t.$('#rev-resultat');
-  verifierVrai('le graphique est là', /Vos prix face au minimum/.test(corps.textContent));
-  verifierVrai('il nomme les deux produits',
-    /Bambou/.test(corps.textContent) && /Gaine/.test(corps.textContent));
-  verifierVrai('il donne le prix pratiqué et le minimum',
-    /vendu/.test(corps.textContent) && /minimum/.test(corps.textContent));
-  verifier('aucune erreur', [], t.erreurs);
-});
 
 /* --------------------------------------------------------------------- */
 scenario('Simulateur : le dosage se change sans toucher au produit', async () => {
@@ -2657,6 +2642,116 @@ scenario('Mise à jour : au premier lancement, on arrive sur ce qui a changé', 
   verifierVrai('mais elle retient la version',
     !!(neuve.stock('cfg') || {}).versionVue);
   verifier('aucune erreur', [], t.erreurs.concat(apres.erreurs, neuve.erreurs));
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Sortie : la corriger la détache de la facture, sans y toucher', async () => {
+  /* Il consomme parfois moins de répulsif que prévu. La sortie née de la
+     facture se refaisait à chaque modification du chantier : la corriger
+     n'avait aucun effet durable. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'stock',
+    articles: [{ id: 'a1', nom: 'Trico', unite: 'millilitre', dosage: 6 }],
+    commandes: [{ id: 'k1', statut: 'recu', dateCmd: Date.now(), dateLiv: Date.now(),
+      lignes: [{ article: 'a1', qte: 34000, prix: 0.02 }] }],
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'termine', temps: [], maj: Date.now(),
+      dateFin: Date.now(),
+      lignes: [{ travail: 'PROTEC', unite: 'plant', quantite: 332, prix: 0.3,
+        nature: 'vente', article: 'a1' }] }],
+    /* Telle que la facture l'a créée : 332 plants à 6 ml. */
+    sorties: [{ id: 's1', auto: true, chantier: 'c1', statut: 'fini', date: Date.now(),
+      perte: false, debours: false, num: '',
+      lignes: [{ article: 'a1', qte: 1992, prix: 0.05 }] }]
+  }));
+  t.clic('[data-vue="commandes"]'); await t.pause(300);
+  t.clic('[data-mvt="sorties"]'); await t.pause(250);
+  verifierVrai('la liste dit qu’elle suit la facture',
+    /suit la facture/.test(t.$('#liste-commandes').textContent));
+
+  /* Il en a consommé 4 ml par plant, pas 6. */
+  t.clic('[data-srtmod="s1"]'); await t.pause(400);
+  verifierVrai('le formulaire prévient qu’elle suit la facture',
+    /cessera de la suivre/.test(t.$('#modale-corps').textContent));
+  verifier('elle s’ouvre en plants', '332', t.$('[data-lgqte="0"]').value);
+  /* 332 plants à 4 ml au lieu de 6 : il pose le compte réel en millilitres. */
+  t.choisir('[data-lgpar="0"]', ''); await t.pause(250);
+  t.saisir('[data-lgqte="0"]', '1328');
+  t.clic('#so-ok'); await t.pause(450);
+
+  let so = (t.stock('sorties') || [])[0];
+  verifier('la quantité corrigée est retenue', 1328, so.lignes[0].qte);
+  verifierVrai('et la sortie ne suit plus la facture', !so.auto);
+  /* La facture, elle, n'a pas bougé. */
+  verifier('la ligne de facture est intacte', 332,
+    (t.stock('chantiers') || [])[0].lignes[0].quantite);
+
+  /* Modifier le chantier relance la synchronisation : elle doit respecter la
+     correction au lieu d'en recréer une seconde. */
+  t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(350);
+  t.clic('[data-lmod="0"]'); await t.pause(400);
+  t.saisir('#cl-qte', '340');
+  t.clic('#cl-ok'); await t.pause(500);
+  verifier('aucune seconde sortie n’apparaît', 1, (t.stock('sorties') || []).length);
+  verifier('et la correction tient', 1328, (t.stock('sorties') || [])[0].lignes[0].qte);
+  verifier('la facture, elle, a bien suivi', 340,
+    (t.stock('chantiers') || [])[0].lignes[0].quantite);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Coûts : les trois prix en euros, et plus de graphique en double', async () => {
+  /* « 131 % du minimum » ne veut rien dire pour personne. Trois bâtons en
+     euros : ce que le produit coûte, ce qu'il devrait valoir, ce qu'on le
+     vend. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'stock',
+    articles: [{ id: 'a1', nom: 'Tuteur', unite: 'unite' }],
+    commandes: [{ id: 'k1', statut: 'recu', dateCmd: Date.now(), dateLiv: Date.now(),
+      lignes: [{ article: 'a1', qte: 1000, prix: 1 }] }],
+    sorties: [{ id: 's1', statut: 'fini', date: Date.now(), debours: false, perte: false,
+      lignes: [{ article: 'a1', qte: 100, prix: 1.2 }] }]
+  }));
+  t.clic('[data-vue="revient"]'); await t.pause(300);
+  t.clic('[data-rev="couts"]'); await t.pause(400);
+  const z = t.$('#rev-resultat').textContent;
+  verifierVrai('les trois repères sont nommés',
+    /coût réel/.test(z) && /minimum à/.test(z) && /prix pratiqué/.test(z));
+  /* Vendu 1,20 € pour un coût de 1 € : le minimum à 30 % est 1,43 €. */
+  verifierVrai('l’écart au minimum est dit en euros', /il manque/.test(z));
+  verifierVrai('plus aucun pourcentage d’un pourcentage', !/131|% du minimum/.test(z));
+  /* Le graphique de l'inventaire ne se répète plus ici. */
+  verifierVrai('« Où dort votre argent » n’est plus en double',
+    !/Où dort votre argent/.test(z));
+  verifierVrai('mais la valeur immobilisée reste dite', /immobilisés en stock/.test(z));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Performance : l’objectif ne vaut que pour la marge brute', async () => {
+  /* Le seuil de 30 % se compare à la marge brute — c'est sur elle que
+     l'abattement forfaitaire joue. Garder le trait sur la vue nette ferait
+     croire à un objectif qui n'existe pas. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'stock',
+    articles: [{ id: 'a1', nom: 'Tuteur', unite: 'unite' }],
+    commandes: [{ id: 'k1', statut: 'recu', dateCmd: Date.now(), dateLiv: Date.now(),
+      lignes: [{ article: 'a1', qte: 1000, prix: 1 }] }],
+    sorties: [{ id: 's1', statut: 'fini', date: Date.now(), debours: false, perte: false,
+      lignes: [{ article: 'a1', qte: 100, prix: 2 }] }]
+  }));
+  t.clic('[data-vue="revient"]'); await t.pause(300);
+  t.clic('[data-rev="perf"]'); await t.pause(400);
+  verifierVrai('en brute, l’objectif est tracé',
+    /votre objectif de/.test(t.$('#rev-resultat').textContent));
+  t.clic('[data-marge="nette"]'); await t.pause(350);
+  const z = t.$('#rev-resultat').textContent;
+  verifierVrai('en nette, plus de trait d’objectif', !/Trait pointillé/.test(z));
+  verifierVrai('et on dit pourquoi',
+    /porte sur la marge brute/.test(z));
+  verifierVrai('on explique aussi ce que la nette retire',
+    /de charges, prélevés sur le/.test(z));
+  verifier('aucune erreur', [], t.erreurs);
 });
 
 /* --------------------------------------------------------------------- */

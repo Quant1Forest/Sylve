@@ -6486,6 +6486,11 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.46', quoi: [
+    { t: 'Une sortie née d’une facture se corrige : elle cesse alors de la suivre', vue: 'commandes' },
+    { t: 'Trois prix par produit, en euros : coût, minimum, prix pratiqué', vue: 'revient' },
+    { t: 'L’objectif de marge ne s’affiche plus sur la marge nette', vue: 'revient' }
+  ] },
   { v: '4.45', quoi: [
     { t: 'Cette liste ne déplie que la version installée ; les autres sont derrière un bouton' },
     { t: 'Après une mise à jour, l’application ouvre directement ce qui a changé' }
@@ -6504,11 +6509,6 @@ var NOTES_MAJ = [
     { t: 'Le taux de marge sur l’ensemble de vos ventes, avec votre objectif', vue: 'revient' },
     { t: 'Marge brute ou nette, au choix, et vos prix face au minimum', vue: 'revient' },
     { t: 'La dépense d’une commande se décoche après coup', vue: 'commandes' }
-  ] },
-  { v: '4.41', quoi: [
-    { t: 'L’inventaire n’additionne plus des millilitres avec des pièces', vue: 'stock2' },
-    { t: 'Le dosage par plant ne s’offre qu’aux unités qui peuvent en porter un' },
-    { t: '« Reçue » annonce la date de livraison qu’elle inscrit', vue: 'commandes' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -12339,7 +12339,8 @@ function listeSorties(pertes) {
       '<span class="pastille" style="background:' + coul + ';align-self:flex-start;margin-top:3px"></span>' +
       '<div class="li-c"><b>' + esc(titre) +
       (s.perte ? '' : ' — ' + eur(ST.arr(ca, 2))) +
-      (s.debours ? ' <i class="etiq" style="background:#5C6BA8">débours</i>' : '') + '</b>' +
+      (s.debours ? ' <i class="etiq" style="background:#5C6BA8">débours</i>' : '') +
+      (s.auto ? ' <i class="etiq" style="background:#7A8471">suit la facture</i>' : '') + '</b>' +
       '<small>' + sous.join(' · ') + '<br>' +
       (s.lignes || []).map(function (x) {
         var a = article(x.article);
@@ -13733,6 +13734,11 @@ function ouvrirSortieStock(id, perte, artPref) {
         return '<option value="' + x.c + '"' + ((s ? s.statut : 'fini') === x.c ? ' selected' : '') + '>' + x.n + '</option>';
       }).join('') + '</select></div></div>' +
       '<p class="muted" style="font-size:11.5px;margin:-4px 0 8px" id="so-note-ch"></p>') +
+    (s && s.auto
+      ? '<p class="acompleter-bloc" style="margin:0 0 9px">Cette sortie a été créée ' +
+        'depuis la facture du chantier. Si vous la modifiez, elle cessera de la suivre ' +
+        'et gardera vos chiffres — la facture, elle, ne changera pas.</p>'
+      : '') +
     '<label class="eyebrow" style="margin-top:6px;display:block">Produits sortis</label>' +
     '<div id="lg-lignes"></div>' +
     (perte ? '' :
@@ -13812,11 +13818,23 @@ function ouvrirSortieStock(id, perte, artPref) {
       lignes: lignes, maj: Date.now()
     };
     A.sorties = A.sorties || [];
-    if (s) Object.keys(maj).forEach(function (k) { s[k] = maj[k]; });
+    /* Une sortie née d'une facture se refaisait à chaque modification du
+       chantier : la corriger n'avait donc aucun effet durable. Dès qu'on y
+       touche, elle cesse de suivre la facture et devient la sienne — c'est
+       la consommation réelle qui compte pour le stock, pas ce qui a été
+       facturé. La facture, elle, ne bouge pas. */
+    var detachee = !!(s && s.auto);
+    if (s) {
+      Object.keys(maj).forEach(function (k) { s[k] = maj[k]; });
+      if (detachee) s.auto = false;
+    }
     else { maj.id = uid(); A.sorties.push(maj); }
     sauverSorties().then(function () {
       fermerModale(); majStock(); renderFiche(); renderFinances(); renderAnalyses();
       toast(perte ? 'Perte enregistrée.' : id ? 'Sortie modifiée.' : 'Sortie enregistrée.');
+      if (detachee) {
+        toast('Elle ne suivra plus la facture : c’est votre chiffre qui compte.');
+      }
     });
   });
   if (id) $('#so-sup').addEventListener('click', function () {
@@ -13881,6 +13899,44 @@ function anneau(parts, options) {
 
 /* Barres horizontales avec un repère d'objectif : on voit d'un coup qui
    passe la barre et qui reste dessous. */
+/* Trois bâtons par produit, sur une même échelle en euros : le coût réel, le
+   prix qu'il faudrait pour tenir l'objectif, et le prix réellement pratiqué.
+   On voit d'un coup lequel passe la barre — et de combien, en euros, pas en
+   pourcentage d'un pourcentage. */
+function batonsPrix(lignes, cible) {
+  if (!lignes.length) return '<p class="muted" style="font-size:12.5px">Aucune vente.</p>';
+  var max = Math.max.apply(null, lignes.map(function (l) {
+    return Math.max(l.cout, l.mini, l.vendu);
+  }).concat([0]));
+  if (!(max > 0)) return '<p class="muted" style="font-size:12.5px">Aucune vente.</p>';
+  var COUL = [['cout', '#8A5A2B', 'coût réel'],
+    ['mini', '#B98A00', 'minimum à ' + E.fmt(cible, 0) + ' %'],
+    ['vendu', '#2E7D46', 'prix pratiqué']];
+  var corps = lignes.map(function (l) {
+    var sousLaBarre = l.vendu < l.mini;
+    return '<div style="margin-bottom:13px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;' +
+      'font-size:13px;margin-bottom:5px"><b>' + esc(l.nom) + '</b>' +
+      '<span class="num"' + (sousLaBarre ? ' style="color:#B4231F"' : '') + '>' +
+      (sousLaBarre ? 'il manque ' + eur(ST.arr(l.mini - l.vendu, 3))
+        : '+ ' + eur(ST.arr(l.vendu - l.mini, 3))) + '</span></div>' +
+      COUL.map(function (c) {
+        var v = l[c[0]], pc = Math.max(1, v / max * 100);
+        return '<div style="display:flex;align-items:center;gap:7px;margin-bottom:3px">' +
+          '<span style="flex:none;width:8.5em;font-size:11px;color:var(--doux)">' + c[2] + '</span>' +
+          '<span style="flex:1;height:11px;background:var(--carte2);border-radius:6px;overflow:hidden">' +
+          '<i style="display:block;height:100%;width:' + pc.toFixed(1) + '%;background:' +
+          c[1] + '"></i></span>' +
+          '<span class="num" style="flex:none;font-size:11.5px;width:5.2em;text-align:right">' +
+          E.fmt(v, v < 10 ? 3 : 2) + ' €</span></div>';
+      }).join('') + '</div>';
+  }).join('');
+  return corps +
+    '<p class="muted" style="font-size:12px;margin:2px 0 0">Le prix pratiqué doit dépasser ' +
+    'le minimum : en dessous, la vente ne couvre pas l’objectif de ' + E.fmt(cible, 0) +
+    ' % et vous cotisez sur une marge que vous n’avez pas faite.</p>';
+}
+
 function barresObjectif(lignes, objectif, o) {
   o = o || {};
   if (!lignes.length) return '<p class="muted" style="font-size:12.5px">Rien à afficher.</p>';
@@ -14122,36 +14178,21 @@ function tableauCouts() {
     t.achat += x.achat; t.qp += x.quotePart; t.reel += x.coutTotal; return t;
   }, { achat: 0, qp: 0, reel: 0 });
 
-  var stock = A.articles.filter(function (a) { return ST.valeurStock(a) > 0; })
-    .sort(function (a, b) { return ST.valeurStock(b) - ST.valeurStock(a); })
-    .map(function (a) {
-      return { nom: a.nom || '', valeur: ST.valeurStock(a),
-        detail: E.fmt(ST.quantite(a), 0) + ' ' + ST.courtUniteArt(a.unite) };
-    });
-
-  /* Rapporté au minimum plutôt qu'en euros : les produits n'ont pas le même
-     prix, mais « à 100 % du minimum » se compare d'une ligne à l'autre. En
-     dessous de la barre, la vente ne couvre pas l'objectif. */
+  /* Trois prix côte à côte, en euros : ce que le produit coûte, ce qu'il
+     devrait valoir pour tenir l'objectif, et ce qu'on le vend. Un pourcentage
+     rapporté à un minimum se comparait bien d'un produit à l'autre, mais
+     personne ne sait ce que « 131 % » veut dire. */
   var cible = cibleMarge();
-  var gSeuil = A.articles.filter(function (a) {
+  var gPrix = A.articles.filter(function (a) {
     return ST.quantiteVendue(a) > 0 && ST.pmp(a) > 0;
   }).map(function (a) {
     var cu = ST.pmp(a), pv = ST.prixVenteMoyen(a);
-    var mini = cible < 100 ? cu / (1 - cible / 100) : cu;
-    return { nom: a.nom || '', valeur: mini > 0 ? pv / mini * 100 : 0,
-      texte: E.fmt(mini > 0 ? pv / mini * 100 : 0, 0) + ' %',
-      detail: 'vendu ' + E.fmt(pv, 3) + ' € · minimum ' + E.fmt(mini, 3) + ' €' };
-  }).sort(function (a, b) { return b.valeur - a.valeur; });
+    return { nom: a.nom || '', cout: cu,
+      mini: cible < 100 ? cu / (1 - cible / 100) : cu, vendu: pv };
+  }).sort(function (a, b) { return b.vendu - a.vendu; });
 
-  return (gSeuil.length
-    ? '<div class="carte"><h2>Vos prix face au minimum ' +
-      '<span class="muted" style="font-weight:400;font-size:13px">— ' + E.fmt(cible, 0) +
-      ' % de marge</span></h2>' +
-      barresObjectif(gSeuil, 100, { libObjectif: 'minimum' }) +
-      '<p class="muted" style="font-size:12px;margin:9px 0 0">Chaque barre est le prix pratiqué ' +
-      'rapporté au prix minimum du produit. Sous la barre, la vente ne couvre pas votre ' +
-      'objectif.</p></div>'
-    : '') +
+  return (gPrix.length ? '<div class="carte"><h2>Ce qu’ils coûtent, ce qu’ils valent, ' +
+    'ce qu’ils se vendent</h2>' + batonsPrix(gPrix, cible) + '</div>' : '') +
     '<div class="carte"><h2>Coût réel par commande</h2>' +
     '<div class="tab-boite"><table><thead><tr>' +
     '<th style="text-align:left">Commande</th><th style="text-align:left">Produit</th>' +
@@ -14182,10 +14223,13 @@ function tableauCouts() {
     '</tbody></table></div>' +
     '<p class="muted" style="font-size:11.5px;margin:9px 0 0">La quote-part de livraison est ' +
     'répartie au prorata des quantités de la commande, ou des montants si les unités diffèrent.</p></div>' +
-    (stock.length ? '<div class="carte"><h2>Où dort votre argent</h2>' +
-      barres(stock, '#5B3A1E') +
-      '<p class="muted" style="font-size:11.5px;margin:7px 0 0">Valeur du stock au coût réel : ' +
-      eur(ST.valeurTotale(A.articles)) + ' immobilisés.</p></div>' : '');
+    /* « Où dort votre argent » vit sur l'inventaire : le répéter ici le
+       montrait deux fois. Seule la valeur immobilisée reste, en une ligne. */
+    (ST.valeurTotale(A.articles) > 0
+      ? '<p class="muted" style="font-size:12px;margin:11px 0 0">' +
+        eur(ST.valeurTotale(A.articles)) + ' immobilisés en stock, au coût réel. ' +
+        'Le détail par produit se lit sur l’inventaire.</p>'
+      : '');
 }
 
 /* Ce que chaque produit a réellement rapporté, et qui tient l'objectif. */
@@ -14278,11 +14322,17 @@ function tableauPerformance() {
     '<button class="chip" data-marge="brute" aria-pressed="' + (!nette) + '">Marge brute</button>' +
     '<button class="chip" data-marge="nette" aria-pressed="' + nette + '">Marge nette</button>' +
     '</div><div style="margin-top:10px">' +
-    barresObjectif(gMarge, cm, { libObjectif: E.fmt(cm, 0) + ' %' }) + '</div>' +
+    /* L'objectif de marge est un objectif de marge BRUTE : c'est sur elle que
+       l'abattement forfaitaire se compare. Garder le trait sur la vue nette
+       ferait croire à un objectif qui n'existe pas. */
+    (nette ? barres(gMarge, '#2E7D46')
+      : barresObjectif(gMarge, cm, { libObjectif: E.fmt(cm, 0) + ' %' })) + '</div>' +
     '<p class="muted" style="font-size:11.5px;margin:8px 0 0">' +
-    (nette ? 'Nette : après les ' + E.fmt(tc * 100, 1) + ' % de charges sur le prix de vente. ' +
-      'C’est ce taux-là qui dit si la vente vous laisse quelque chose.'
-      : 'Brute : prix de vente moins coût réel, avant charges.') + '</p></div>' +
+    (nette ? 'Nette : la brute moins ' + E.fmt(tc * 100, 1) + ' % de charges, prélevés sur le ' +
+      'prix de vente. Un produit à faible marge y perd proportionnellement bien plus qu’un ' +
+      'autre. Pas d’objectif ici : le seuil de ' + E.fmt(cm, 0) + ' % porte sur la marge brute.'
+      : 'Brute : prix de vente moins coût réel, avant charges. C’est elle que compare ' +
+      'l’objectif de ' + E.fmt(cm, 0) + ' %.') + '</p></div>' +
     '<div class="carte"><h2>Qui fait le chiffre</h2>' + barres(gCa, '#2E4A3C') + '</div>';
 }
 
@@ -14425,7 +14475,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.45.0-20260819-1848';
+var VERSION = '4.46.0-20260819-1927';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
