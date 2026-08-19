@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.46.0-20260819-1927**
+Version courante : **4.47.0-20260819-1958**
 
 ---
 
@@ -706,6 +706,35 @@ marge qu'il n'a pas faite. D'où le taux d'ensemble en tête de Performance —
 un produit vendu trop bas peut être rattrapé par un autre, c'est le total qui
 décide — et le graphique « vos prix face au minimum », qui rapporte chaque
 prix pratiqué au minimum du produit plutôt qu'à des euros incomparables.
+
+## Rentabilité, et les ventes par année
+
+**« Prix de revient » nommait mal l'écran** : il porte un simulateur, des
+coûts, les performances de vente et désormais l'analyse annuelle. Il
+s'appelle **Rentabilité**, et sa quatrième pastille est *Par année*.
+
+Elle répond à trois questions que le cumul de toujours ne posait pas : est-ce
+que je progresse, quand est-ce que je vends, et qu'est-ce qui rapporte cette
+année-là. Le « quand » décide des achats — la fourniture se commande avant la
+saison, pas pendant.
+
+`ST.caAnnee`, `margeAnnee`, `caParMois` et `caParArticle` s'appuient tous sur
+`ventes()`, qui écarte déjà pertes et débours. Un débours n'est pas une vente.
+
+**L'anneau existait déjà** — le simulateur décompose un prix avec. Ne pas en
+écrire un second : c'est le vérificateur qui a attrapé le doublon. Il prend
+des parts `{nom, valeur, couleur, texte}` et un `{centre, sous}` ;
+`partsProduits()` ajoute la palette et regroupe la queue sous « autres »
+au-delà de six parts, faute de quoi il devient illisible.
+
+**Un contrôle qui vérifie qu'un graphique existe ne prouve rien.** Mélanger
+les années laissait la courbe intacte et le scénario au vert. Il lit
+maintenant les valeurs mois par mois, dans les `<title>` des points. Et
+attention aux comparaisons partielles : chercher « 0 € » dans « 1 000 € »
+réussit par accident — comparer la phrase entière.
+
+**Un scénario ne doit pas dépendre des notes de mise à jour**, qui tournent à
+chaque livraison : viser un écran nommé le casse à la rotation suivante.
 
 ## Lire un graphique sans devoir l'expliquer
 

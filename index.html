@@ -1321,6 +1321,7 @@ if (froid && s > 0) montrer(s);
           <button class="chip" data-rev="simul" aria-pressed="true">Simulateur</button>
           <button class="chip" data-rev="couts" aria-pressed="false">Coûts</button>
           <button class="chip" data-rev="perf" aria-pressed="false">Performance</button>
+          <button class="chip" data-rev="annee" aria-pressed="false">Par année</button>
         </div>
         <div id="rev-form" style="margin-top:12px"></div>
       </div>
@@ -4648,6 +4649,59 @@ function quantiteVendue(art) { return arr(sommeQte(ventes(art)), 3); }
 function quantitePerdue(art) { return arr(sommeQte(pertes(art)), 3); }
 function quantiteDebours(art) { return arr(sommeQte(debours(art)), 3); }
 function quantiteAchetee(art) { return arr(sommeQte(entrees(art)), 3); }
+/* Les ventes datées : ce qui est réellement sorti, hors pertes et hors
+   débours — un débours n'est pas une vente, il est refacturé à l'euro près.
+   Tout ce qui suit s'appuie là-dessus. */
+function anneesDeVente(articles) {
+  var a = {};
+  (articles || []).forEach(function (art) {
+    ventes(art).forEach(function (m) { if (m.date) a[new Date(m.date).getFullYear()] = 1; });
+  });
+  return Object.keys(a).map(Number).sort(function (x, y) { return y - x; });
+}
+function caAnnee(articles, an) {
+  return arr((articles || []).reduce(function (s2, art) {
+    return s2 + ventes(art).filter(function (m) {
+      return m.date && new Date(m.date).getFullYear() === an;
+    }).reduce(function (t, m) { return t + nb(m.qte) * nb(m.prix); }, 0);
+  }, 0), 2);
+}
+/* Marge de l'année : le prix de vente moins le coût réel du moment, produit
+   par produit. Le coût moyen pondéré sert de référence — il n'existe pas de
+   coût « au jour de la vente » dans les données. */
+function margeAnnee(articles, an) {
+  return arr((articles || []).reduce(function (s2, art) {
+    var cu = pmp(art);
+    return s2 + ventes(art).filter(function (m) {
+      return m.date && new Date(m.date).getFullYear() === an;
+    }).reduce(function (t, m) { return t + nb(m.qte) * (nb(m.prix) - cu); }, 0);
+  }, 0), 2);
+}
+function caParMois(articles, an) {
+  var mois = [];
+  for (var i = 0; i < 12; i++) mois.push(0);
+  (articles || []).forEach(function (art) {
+    ventes(art).forEach(function (m) {
+      if (!m.date) return;
+      var d = new Date(m.date);
+      if (d.getFullYear() !== an) return;
+      mois[d.getMonth()] += nb(m.qte) * nb(m.prix);
+    });
+  });
+  return mois.map(function (v) { return arr(v, 2); });
+}
+function caParArticle(articles, an) {
+  return (articles || []).map(function (art) {
+    var v = ventes(art).filter(function (m) {
+      return m.date && new Date(m.date).getFullYear() === an;
+    });
+    return { article: art, nom: art.nom || '',
+      ca: arr(v.reduce(function (t, m) { return t + nb(m.qte) * nb(m.prix); }, 0), 2),
+      qte: arr(v.reduce(function (t, m) { return t + nb(m.qte); }, 0), 3) };
+  }).filter(function (x) { return x.ca > 0; })
+    .sort(function (a, b) { return b.ca - a.ca; });
+}
+
 function caVendu(art) {
   return arr(ventes(art).reduce(function (s, m) { return s + nb(m.qte) * nb(m.prix); }, 0), 2);
 }
@@ -4842,6 +4896,8 @@ var M = {
   VENTE_DE_CHANTIER: VENTE_DE_CHANTIER,
   attendues: attendues, engagees: engagees, prevues: prevues,
   ventes: ventes, debours: debours, pertes: pertes,
+  anneesDeVente: anneesDeVente, caAnnee: caAnnee, margeAnnee: margeAnnee,
+  caParMois: caParMois, caParArticle: caParArticle,
   quantiteAttendue: quantiteAttendue, stockFutur: stockFutur, stockPrevu: stockPrevu,
   quantiteVendue: quantiteVendue, quantitePerdue: quantitePerdue,
   quantiteDebours: quantiteDebours, quantiteAchetee: quantiteAchetee,
@@ -6488,6 +6544,11 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.47', quoi: [
+    { t: '« Prix de revient » devient « Rentabilité », et gagne une vue par année', vue: 'revient' },
+    { t: 'Vos ventes de fournitures année par année, mois par mois, et l’évolution', vue: 'revient' },
+    { t: 'Ce qui rapporte se lit en anneau ou en barres, au choix', vue: 'revient' }
+  ] },
   { v: '4.46', quoi: [
     { t: 'Une sortie née d’une facture se corrige : elle cesse alors de la suivre', vue: 'commandes' },
     { t: 'Trois prix par produit, en euros : coût, minimum, prix pratiqué', vue: 'revient' },
@@ -6505,12 +6566,6 @@ var NOTES_MAJ = [
   { v: '4.43', quoi: [
     { t: 'Un produit dosé se saisit en plants sur les sorties, plus en millilitres', vue: 'commandes' },
     { t: 'La conversion s’écrit sous le champ pendant que vous tapez' }
-  ] },
-  { v: '4.42', quoi: [
-    { t: '« En stock » passe en première colonne de l’inventaire', vue: 'stock2' },
-    { t: 'Le taux de marge sur l’ensemble de vos ventes, avec votre objectif', vue: 'revient' },
-    { t: 'Marge brute ou nette, au choix, et vos prix face au minimum', vue: 'revient' },
-    { t: 'La dépense d’une commande se décoche après coup', vue: 'commandes' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -7187,9 +7242,19 @@ function brancher() {
   });
 
   /* --- prix de revient --- */
+  $('#rev-resultat').addEventListener('change', function (e) {
+    if (e.target.closest('#an-rev')) {
+      A.revient.annee = Number($('#an-rev').value); renderRevient();
+    }
+  });
   $('#rev-resultat').addEventListener('click', function (e) {
     var m = e.target.closest('[data-marge]');
-    if (m) { A.revient.marge = m.dataset.marge; renderRevient(); }
+    if (m) { A.revient.marge = m.dataset.marge; renderRevient(); return; }
+    var fo = e.target.closest('[data-anforme]');
+    if (fo) { A.revient.forme = fo.dataset.anforme; renderRevient(); return; }
+    if (e.target.closest('#an-rev')) {
+      A.revient.annee = Number($('#an-rev').value); renderRevient();
+    }
   });
   $('#rev-nav').addEventListener('click', function (e) {
     var b = e.target.closest('[data-rev]');
@@ -7837,8 +7902,11 @@ var MODULES = {
   },
   stock: {
     nom: 'Stock et fournitures', defaut: 'stock2', groupe: 'entreprise',
+    /* « Prix de revient » nommait mal un écran qui porte aussi un simulateur
+       et les performances de vente. La question qu'il pose vraiment est celle
+       de la rentabilité. */
     vues: [['stock2', 'Inventaire'], ['commandes', 'Entrées / sorties'],
-    ['revient', 'Prix de revient']]
+    ['revient', 'Rentabilité']]
   },
   bois: {
     nom: 'Bois de chauffage', defaut: 'stock',
@@ -13905,6 +13973,66 @@ function anneau(parts, options) {
    prix qu'il faudrait pour tenir l'objectif, et le prix réellement pratiqué.
    On voit d'un coup lequel passe la barre — et de combien, en euros, pas en
    pourcentage d'un pourcentage. */
+/* Une couleur par part, et une queue regroupée : au-delà de six parts un
+   anneau devient illisible, et les miettes ne se lisent plus. */
+var COUL_PART = ['#2E4A3C', '#8A5A2B', '#B98A00', '#1D6FB8', '#7A8471', '#5B3A1E'];
+function partsProduits(l) {
+  var t = l.filter(function (x) { return x.valeur > 0; })
+    .sort(function (a, b) { return b.valeur - a.valeur; });
+  if (t.length > 6) {
+    var queue = t.slice(5);
+    t = t.slice(0, 5).concat([{ nom: 'autres',
+      valeur: ST.arr(queue.reduce(function (s2, x) { return s2 + x.valeur; }, 0), 2) }]);
+  }
+  return t.map(function (x, i) {
+    return { nom: x.nom, valeur: x.valeur, couleur: COUL_PART[i % COUL_PART.length],
+      texte: eur(x.valeur) };
+  });
+}
+
+/* Une courbe par année : on voit quand on vend, donc quand acheter. */
+function courbeMois(series, o) {
+  o = o || {};
+  var toutes = series.reduce(function (a, x) { return a.concat(x.valeurs); }, []);
+  var max = Math.max.apply(null, toutes.concat([0]));
+  if (!(max > 0)) return '<p class="muted" style="font-size:12.5px">Aucune vente sur ces années.</p>';
+  var haut = paliersJoli(max);
+  var W = 360, H = 170, padL = 36, padB = 20, padT = 10;
+  var hU = H - padB - padT, lU = W - padL - 6;
+  var x = function (i) { return padL + i * (lU / 11); };
+  var y = function (v) { return H - padB - (v / haut) * hU; };
+  var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="max-width:460px">';
+  [0, haut / 2, haut].forEach(function (v) {
+    svg += '<line x1="' + padL + '" y1="' + y(v).toFixed(1) + '" x2="' + W + '" y2="' + y(v).toFixed(1) +
+      '" stroke="var(--trait)" stroke-width="1"' + (v > 0 ? ' stroke-dasharray="2 3"' : '') + '/>' +
+      '<text x="' + (padL - 4) + '" y="' + (y(v) + 3).toFixed(1) +
+      '" font-size="8.5" text-anchor="end" fill="var(--doux)">' + xmlEsc(eurCourt(v)) + '</text>';
+  });
+  series.forEach(function (se) {
+    var d = se.valeurs.map(function (v, i) {
+      return (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1);
+    }).join(' ');
+    svg += '<path d="' + d + '" fill="none" stroke="' + se.couleur + '" stroke-width="' +
+      (se.fort ? 2.4 : 1.8) + '" stroke-linejoin="round" stroke-linecap="round"/>';
+    if (se.fort) {
+      se.valeurs.forEach(function (v, i) {
+        svg += '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(v).toFixed(1) +
+          '" r="2.6" fill="' + se.couleur + '"><title>' +
+          xmlEsc(MOIS_NOMS[i] + ' : ' + eur(v)) + '</title></circle>';
+      });
+    }
+  });
+  for (var m = 0; m < 12; m++) {
+    svg += '<text x="' + x(m).toFixed(1) + '" y="' + (H - 6) +
+      '" font-size="8" text-anchor="middle" fill="var(--doux)">' + MOIS_ABBR[m].charAt(0).toUpperCase() +
+      '</text>';
+  }
+  svg += '</svg>';
+  return svg + '<div class="legende" style="margin-top:5px">' + series.map(function (se) {
+    return '<span><i style="background:' + se.couleur + '"></i>' + esc(se.nom) + '</span>';
+  }).join('') + '</div>';
+}
+
 function batonsPrix(lignes, cible) {
   if (!lignes.length) return '<p class="muted" style="font-size:12.5px">Aucune vente.</p>';
   var max = Math.max.apply(null, lignes.map(function (l) {
@@ -14083,6 +14211,7 @@ function renderRevientResultat() {
   var z = $('#rev-resultat'); if (!z) return;
   var r = A.revient, art = article(r && r.article);
   if (!art) { z.innerHTML = ''; return; }
+  if (r.onglet === 'annee') { z.innerHTML = tableauAnnee(); return; }
   if (r.onglet === 'couts') { z.innerHTML = tableauCouts(); return; }
   if (r.onglet === 'perf') { z.innerHTML = tableauPerformance(); return; }
 
@@ -14235,6 +14364,89 @@ function tableauCouts() {
 }
 
 /* Ce que chaque produit a réellement rapporté, et qui tient l'objectif. */
+/* Ce que les fournitures ont rapporté, année par année. Le cumul de toujours
+   ne dit pas si l'on progresse, ni quand on vend — deux questions qui
+   décident des achats. */
+function tableauAnnee() {
+  var ans = ST.anneesDeVente(A.articles);
+  if (!ans.length) {
+    return '<div class="carte"><div class="vide"><p>Aucune vente enregistrée. ' +
+      'Les sorties de stock alimenteront cet écran.</p></div></div>';
+  }
+  var r = A.revient || (A.revient = {});
+  var an = ans.indexOf(r.annee) >= 0 ? r.annee : ans[0];
+  r.annee = an;
+  var ca = ST.caAnnee(A.articles, an), caAvant = ST.caAnnee(A.articles, an - 1);
+  var marge = ST.margeAnnee(A.articles, an);
+  var evo = caAvant > 0 ? (ca - caAvant) / caAvant * 100 : null;
+  var parArt = ST.caParArticle(A.articles, an);
+
+  /* Cinq ans d'historique, sans remonter avant la première vente. */
+  var histo = [];
+  for (var i = 4; i >= 0; i--) {
+    var a2 = an - i;
+    if (a2 < ans[ans.length - 1]) continue;
+    histo.push({ an: a2, ca: ST.caAnnee(A.articles, a2) });
+  }
+  var maxH = Math.max.apply(null, histo.map(function (h) { return h.ca; }).concat([0]));
+
+  return '<div class="carte">' +
+    '<div class="carte-titre"><h2>Ventes de fournitures</h2>' +
+    '<select id="an-rev" style="width:auto">' + ans.map(function (a2) {
+      return '<option value="' + a2 + '"' + (a2 === an ? ' selected' : '') + '>' + a2 + '</option>';
+    }).join('') + '</select></div>' +
+    '<div class="kpi">' +
+    '<div class="carte2"><b class="num">' + eur(ca) + '</b><small>vendu en ' + an + '</small></div>' +
+    '<div class="carte2"><b class="num">' + eur(marge) + '</b><small>de marge brute</small></div>' +
+    (evo != null
+      ? '<div class="carte2"><b class="num" style="color:' + (evo >= 0 ? '#2E7D46' : '#B4231F') +
+        '">' + (evo >= 0 ? '+' : '') + E.fmt(evo, 0) + ' %</b><small>sur ' + (an - 1) + '</small></div>'
+      : '') +
+    '</div>' +
+    (evo != null
+      ? '<p class="muted" style="font-size:12px;margin:10px 0 0">' + eur(caAvant) +
+        ' en ' + (an - 1) + ', soit ' + eur(ST.arr(ca - caAvant, 2)) + ' d’écart.</p>'
+      : '<p class="muted" style="font-size:12px;margin:10px 0 0">Première année de vente : ' +
+        'rien à quoi comparer.</p>') +
+    '</div>' +
+
+    '<div class="carte"><h2>Quand vous vendez</h2>' +
+    '<p class="muted" style="font-size:12px;margin:3px 0 0">Les creux disent quand acheter : ' +
+    'la fourniture se commande avant la saison, pas pendant.</p>' +
+    courbeMois([
+      { nom: String(an - 1), valeurs: ST.caParMois(A.articles, an - 1), couleur: '#B8AB95' },
+      { nom: String(an), valeurs: ST.caParMois(A.articles, an), couleur: '#2E7D46', fort: true }
+    ]) + '</div>' +
+
+    '<div class="carte"><div class="carte-titre"><h2>Ce qui a rapporté en ' + an + '</h2>' +
+    '<div class="chips" id="an-forme">' +
+    '<button class="chip" data-anforme="anneau" aria-pressed="' + (r.forme !== 'barres') + '">Anneau</button>' +
+    '<button class="chip" data-anforme="barres" aria-pressed="' + (r.forme === 'barres') + '">Barres</button>' +
+    '</div></div>' +
+    (r.forme === 'barres'
+      ? barres(parArt.map(function (x) {
+        return { nom: x.nom, valeur: x.ca,
+          detail: E.fmt(x.qte, 0) + ' ' + ST.courtUniteArt(x.article.unite) };
+      }), '#2E4A3C')
+      : anneau(partsProduits(parArt.map(function (x) {
+        return { nom: x.nom, valeur: x.ca };
+      })), { centre: eurCourt(ca), sous: 'vendu en ' + an })) + '</div>' +
+
+    (histo.length > 1
+      ? '<div class="carte"><h2>Les ' + histo.length + ' dernières années</h2>' +
+        histo.map(function (h) {
+          var pc = maxH > 0 ? h.ca / maxH * 100 : 0;
+          return '<div style="margin-bottom:8px">' +
+            '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px">' +
+            '<span' + (h.an === an ? ' style="font-weight:600"' : '') + '>' + h.an + '</span>' +
+            '<span class="num">' + eur(h.ca) + '</span></div>' +
+            '<div style="height:9px;background:var(--carte2);border-radius:5px;overflow:hidden">' +
+            '<i style="display:block;height:100%;width:' + pc.toFixed(1) + '%;background:' +
+            (h.an === an ? '#2E7D46' : '#B8AB95') + '"></i></div></div>';
+        }).join('') + '</div>'
+      : '');
+}
+
 function tableauPerformance() {
   var f = fiscStock(), tc = ST.tauxCharges(f), cm = cibleMarge();
   var deb = ST.arr(A.articles.reduce(function (s, a) { return s + ST.caDebours(a); }, 0), 2);
@@ -14477,7 +14689,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.46.0-20260819-1927';
+var VERSION = '4.47.0-20260819-1958';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

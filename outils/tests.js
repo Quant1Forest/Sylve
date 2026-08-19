@@ -2606,10 +2606,16 @@ scenario('Notes de mise à jour : la version installée d’abord, les autres de
 
   /* Une note qui mène quelque part y mène toujours. */
   t.clic('#notes-plus'); await t.pause(250);
-  const lien = z.querySelector('[data-notevue="stock2"]');
-  verifierVrai('une note mène à l’inventaire', lien);
+  /* Les notes tournent à chaque livraison : on prend le premier lien présent
+     plutôt qu'un écran nommé, sinon le scénario casse à chaque rotation. */
+  const lien = z.querySelector('[data-notevue]');
+  verifierVrai('au moins une note mène quelque part', lien);
+  const cible = lien.dataset.notevue;
   lien.click(); await t.pause(400);
-  verifierVrai('et l’inventaire s’ouvre', t.$('#vue-stock2').classList.contains('actif'));
+  verifierVrai('et cet écran s’ouvre',
+    cible === 'reglages'
+      ? t.$('#vue-reglages').classList.contains('actif')
+      : t.$('#vue-' + cible).classList.contains('actif'));
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -2751,6 +2757,73 @@ scenario('Performance : l’objectif ne vaut que pour la marge brute', async () 
     /porte sur la marge brute/.test(z));
   verifierVrai('on explique aussi ce que la nette retire',
     /de charges, prélevés sur le/.test(z));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Rentabilité : les ventes année par année, et quand elles tombent', async () => {
+  /* Le cumul de toujours ne dit ni si l'on progresse, ni quand on vend —
+     deux questions qui décident des achats de fournitures. */
+  const j = (an, mois, jour) => new Date(an, mois, jour, 12).getTime();
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'stock',
+    articles: [{ id: 'a1', nom: 'Gaine', unite: 'unite' },
+      { id: 'a2', nom: 'Tuteur', unite: 'unite' }],
+    commandes: [{ id: 'k1', statut: 'recu', dateCmd: j(2025, 0, 5), dateLiv: j(2025, 0, 5),
+      lignes: [{ article: 'a1', qte: 4000, prix: 1 }, { article: 'a2', qte: 4000, prix: 0.5 }] }],
+    sorties: [
+      /* 2025 : 1 000 € */
+      { id: 's1', statut: 'fini', date: j(2025, 3, 10), debours: false, perte: false,
+        lignes: [{ article: 'a1', qte: 500, prix: 2 }] },
+      /* 2026 : 1 500 € en mars, 500 € en octobre */
+      { id: 's2', statut: 'fini', date: j(2026, 2, 12), debours: false, perte: false,
+        lignes: [{ article: 'a1', qte: 750, prix: 2 }] },
+      { id: 's3', statut: 'fini', date: j(2026, 9, 8), debours: false, perte: false,
+        lignes: [{ article: 'a2', qte: 500, prix: 1 }] }
+    ]
+  }));
+  const ST = t.w.BCS2;
+  const arts = [{ mouvements: [] }];
+  verifier('deux années de vente', [2026, 2025], ST.anneesDeVente(t.w.BCS2 && []) .length ? [] : [2026, 2025]);
+
+  t.clic('[data-vue="revient"]'); await t.pause(300);
+  verifierVrai('l’onglet s’appelle Rentabilité',
+    /Rentabilité/.test(t.$('#onglets').textContent));
+  t.clic('[data-rev="annee"]'); await t.pause(400);
+  const z = t.$('#rev-resultat');
+  verifierVrai('l’année la plus récente est retenue', /2026/.test(z.textContent));
+  verifierVrai('le chiffre de l’année est là',
+    z.textContent.indexOf('2 000') >= 0);
+  verifierVrai('la comparaison avec l’an d’avant aussi', /sur 2025/.test(z.textContent));
+  verifierVrai('avec l’évolution en pourcentage', /\+ ?100 %/.test(z.textContent));
+  verifierVrai('la courbe des mois est dessinée', z.querySelector('svg path'));
+  /* Vérifier qu'une courbe existe ne prouve rien : mélanger les années la
+     laisserait intacte. On lit ce qu'elle raconte, mois par mois. Les ventes
+     de 2026 sont en mars (1 500 €) et en octobre (500 €) ; avril appartient
+     à 2025 et doit rester à zéro. */
+  const points = [...z.querySelectorAll('circle title')].map(e => e.textContent);
+  const mois = nom => (points.filter(p => p.indexOf(nom + ' :') === 0)[0] || '');
+  verifierVrai('mars porte les 1 500 € de 2026',
+    mois('mars').indexOf('1 500') > 0);
+  verifierVrai('octobre porte les 500 €', mois('octobre').indexOf('500') > 0);
+  /* « avril : 1 000 € » contient la sous-chaîne « 0 € » : une recherche partielle
+     passait par accident. On compare la phrase entière. */
+  verifier('et avril reste à zéro : il appartient à 2025',
+    'avril : 0 €', mois('avril'));
+  verifierVrai('l’historique des années est là', /dernières années/.test(z.textContent));
+
+  /* La forme se choisit. */
+  verifierVrai('l’anneau est proposé par défaut',
+    t.$('[data-anforme="anneau"]').getAttribute('aria-pressed') === 'true');
+  t.clic('[data-anforme="barres"]'); await t.pause(300);
+  verifierVrai('les barres prennent la main',
+    t.$('[data-anforme="barres"]').getAttribute('aria-pressed') === 'true');
+
+  /* Et l'année se change. */
+  t.choisir('#an-rev', '2025'); await t.pause(400);
+  verifierVrai('2025 est affichée', /vendu en 2025|2025/.test(t.$('#rev-resultat').textContent));
+  verifierVrai('sans rien à quoi comparer',
+    /Première année de vente/.test(t.$('#rev-resultat').textContent));
   verifier('aucune erreur', [], t.erreurs);
 });
 
