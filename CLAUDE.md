@@ -51,7 +51,7 @@ npm run controle   # vérificateur + service worker + tests + reconstruction + c
 ```
 
 Doit afficher **« Bon pour livraison »**, puis **« le service worker tient »**
-(24 vérifications), puis la suite au vert — 316 à ce jour — puis
+(24 vérifications), puis la suite au vert — 777 à ce jour — puis
 **« Sylve.html est conforme »**.
 
 Compter **moins de deux minutes**. Ça a été dix, et deux choses l'expliquaient :
@@ -154,7 +154,7 @@ l'ancien code. Le vérificateur refuse de passer si les deux divergent.
 
 | Fichier | Rôle |
 |---|---|
-| `index.html` | **Toute l'application.** ~11 600 lignes : HTML, CSS et JS dans un seul fichier. |
+| `index.html` | **Toute l'application.** ~14 900 lignes : HTML, CSS et JS dans un seul fichier. |
 | `Sylve.html` | Version autonome, fabriquée par `outils/construire.js`. Ne jamais l'éditer à la main. |
 | `sw.js` | Service worker. Sa constante `VERSION` doit être identique à celle de `index.html`. |
 | `manifest.webmanifest` | Nom, couleurs, icônes de la PWA. |
@@ -955,40 +955,83 @@ pas sa propre facture.
   de passer en dessous de cent identifiants — un contrôle qui n'inspecte plus
   rien doit crier, pas rassurer.
 
-## Où en est le chantier — 16 août 2026
+## Où en est le chantier — 19 août 2026
 
-L'historique est repris : 32 chantiers, 124 dépenses, 6 charges fixes, 6
-produits, 3 fournisseurs, 3 commandes, 9 sorties. Il vit sur le téléphone.
-Le fichier se refabrique avec `outils/importer-carnet.js` à partir des deux
-classeurs, qui restent chez l'utilisateur.
+**Version en ligne : 4.49.0.** Le contrôle passe à 777 vérifications.
 
-Une longue tournée de retours a été traitée d'un bloc : le bandeau qui
-disparaissait, les pastilles illisibles, la fausse « marge », le carnet sans
-ordre ni dates, les listes interverties, les libellés de facture perdus, les
-dates non modifiables, « 1 709 jours », « 2 280 € tous les mois », les
-listes à rallonge, les réglages qui égaraient, les graphiques sans échelle,
-« À traiter » qui ne montrait que les ennuis, les heures sur une journée, le
-dépassement d'estimation, la TVA des achats, l'avis de mise à jour.
+L'historique est repris et vit sur le téléphone : 32 chantiers, 124 dépenses,
+6 charges fixes, 6 produits, 3 fournisseurs, 3 commandes, 9 sorties. Le fichier
+se refabrique avec `outils/importer-carnet.js` à partir des deux classeurs, qui
+restent chez l'utilisateur.
+
+**Ce qui a été fait entre le 17 et le 19 août** — quinze livraisons, toutes
+nées de ses tournées dans l'application :
+
+- le devis complet (case « j'ai fait un devis », numéro, date, validité,
+  relance sur la validité, statuts qui s'adaptent) ;
+- les charges fixes qui deviennent des dépenses toutes seules, avec la TVA
+  obligatoire et deux graphiques ;
+- l'écran Entreprise avec ses six bulles et ses notes personnelles ;
+- deux modules supprimés parce qu'ils n'en étaient pas (Devis, Analyses) ;
+- les réglages rangés en zones titrées, et le bouton qui vise la bonne ;
+- le stock : totaux honnêtes, saisie au plant, sortie détachable, rentabilité
+  par année, graphiques lisibles ;
+- son logo et le nom de son entreprise ;
+- les notes de mise à jour, et l'ouverture dessus après chaque mise à jour ;
+- la fiche chantier restructurée en blocs, dans l'ordre de la vie du chantier.
 
 **La façon de travailler qui marche** : l'utilisateur parcourt l'application
 en dictant ce qui coince, et ses retours trouvent plus de vrais défauts que
-la lecture du code. Trois exemples : la sauvegarde qui ne restaurait plus les
-dépenses, le bandeau bloqué, les quantités d'unités mêlées. À chaque fois le
-symptôme était juste, l'explication qu'il en donnait rarement — creuser le
-symptôme, pas l'explication.
+la lecture du code. Le symptôme qu'il décrit est toujours juste, l'explication
+qu'il en donne rarement — creuser le symptôme, pas l'explication.
 
-## Ce qui n'a jamais été bouclé
+**Et lire le message entier avant d'agir.** L'erreur commise : il signale que
+la bulle et l'alerte d'impayé font doublon, on retire l'alerte — et deux
+phrases plus loin il demandait *plus* de détail sur cet impayé. Les deux
+étaient dans le même paragraphe. C'est un scénario qui l'a rattrapé.
 
-- **La boucle estimation → chantier → agenda.** Touche Devis et estimatif,
-  Rendements et Calendrier à la fois. Jamais fermée.
-- **Le rangement des réglages.** Les onglets sont sortis du bas, mais le
-  contenu reste à ranger : « j'ai du mal à savoir où va quoi ».
-- **La revue de la partie Entreprise** : Chantiers, Finances et Analyses ont
-  été parcourus. Calendrier, Rendements et Devis attendent.
-- **Une barre de téléchargement.** Elle n'aurait de sens que pendant le
-  téléchargement de fond du service worker, avant que l'avis n'apparaisse —
-  à ce moment-là tout est déjà arrivé. Proposé, pas demandé.
+## Ce qui attend, par ordre de maturité
+
+**Décidé, prêt à faire :**
+
+- **Les catégories.** Ses grandes catégories : travaux de plantation, travaux
+  d'amélioration sylvicole, fournitures, journées de gestion, travaux
+  d'exploitation, débours protection gibier. Ses sous-catégories : dégagement
+  de plantations, détourage, dépressage, élagage, fourniture de gaine,
+  inventaire en plein… **Ce que Sylve appelle `TRAVAUX` correspond à ses
+  sous-catégories** : il manque le niveau du dessus. Ajouter un champ de
+  catégorie sur chaque entrée de `TRAVAUX` sans toucher aux codes, qui portent
+  l'historique.
+- **Le nom automatique du chantier.** Il dit que le nom « ne veut rien dire ».
+  Validé sur le principe : sous-catégorie + propriétaire + lieu, puis le n° de
+  devis et enfin celui de facture prennent le relais comme référence.
+- **Le formulaire de création d'un chantier** est encore l'ancien en-tête de
+  vingt-trois champs (`ouvrirEnteteCh`). À raccourcir aux essentiels : le reste
+  se remplit bloc par bloc sur la fiche.
+
+**Proposé, en attente de sa réponse :**
+
+- **Le statut qui suit la saisie.** Il a demandé si remplir la facture devait
+  faire passer le chantier en « Facturé ». Question posée, pas tranchée.
+
+**Garé, à ne pas rouvrir sans lui :**
+
+- **La fiche annuelle récapitulative en PDF** — chiffre d'affaires, bénéfices,
+  fiscalité, top clients et produits, comparaison sur cinq ans. Il l'a décrite
+  puis mise de côté. L'analyse annuelle du stock en porte déjà la moitié des
+  chiffres.
+- **Le chantier des rendements** (voir plus haut). Toujours garé.
+
+**Jamais bouclé :**
+
+- **La boucle estimation → chantier → agenda.** Touche Rendements et Calendrier.
+  Il a dit vouloir garder l'estimation « pour la toute fin ».
+- **La revue de Calendrier et Rendements** : jamais parcourus avec lui.
+  Chantiers, Finances, Stock et Réglages l'ont été.
 - **Les lignes de chantier reprises du carnet ne désignent aucun article.**
   Ne pas les rattacher : leur sortie de stock existe déjà, importée du
   classeur. Une garde empêche la double déduction, mais la tentation
   reviendra.
+- **Une barre de téléchargement.** Proposée, jamais demandée : elle n'aurait
+  de sens que pendant le téléchargement de fond du service worker, quand tout
+  est déjà arrivé.
