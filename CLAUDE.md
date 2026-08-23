@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.56.0-20260823-1730**
+Version courante : **4.59.0-20260823-2013**
 
 ---
 
@@ -979,6 +979,74 @@ pas sa propre facture.
   de passer en dessous de cent identifiants — un contrôle qui n'inspecte plus
   rien doit crier, pas rassurer.
 
+## Les déclarations : rassembler, pas recalculer
+
+Il demandait « un endroit impôt, cotisation, taxes ». Le constat en ouvrant le
+code : **presque tout existait déjà**. `simulation()` estimait cotisations et
+impôt avec ses propres taux, `tvaCollectee()` donnait la TVA par taux,
+`balanceTva()` le solde. Éparpillés sur trois écrans, si bien que le jour de
+la déclaration il les recopiait de tête. **Problème de rassemblement, pas de
+calcul** — la même leçon que « Recettes ».
+
+D'où une **quatrième pastille dans Analyses**, et non un module.
+
+- **La base est le CA FACTURÉ**, à sa demande expresse du 23 août. Le micro-BIC
+  se déclare normalement sur l'**encaissé** ; il le sait, c'est son choix, et
+  c'est écrit à l'écran. Ne pas le « corriger » en silence.
+- **`impotEstime()` suit sa règle** : son autre emploi consomme la tranche à
+  0 %, donc la base entre directement dans celle à 11 %, dont il reste une
+  capacité (`impotCapacite`, 17 978 € par défaut), puis bascule à 30 %. Les
+  trois nombres sont réglables — les tranches changent chaque année.
+- **Le remboursement vit sur le versement d'origine**, pas sur une ligne à
+  part : sa première année de cotisations lui a été remboursée deux fois, et le
+  net doit se lire sans perdre l'histoire.
+- **`A.decl` n'est pas `A.periode`.** Le sélecteur des déclarations est
+  propre à cet écran : il raisonne en mois ou trimestre, pendant que le reste
+  des Analyses garde la période générale. Changer de rythme replie l'indice —
+  le T3 n'est pas le mois de mars.
+
+**Piège attrapé au passage, et il valait cher.** `lignesFacturees()`
+recalculait le taux de TVA dans son coin et retombait sur **20 %** dès qu'aucun
+taux n'était forcé à la main — alors que la fiche appliquait le vrai, 10 % sur
+des travaux forestiers avec SIREN. Deux TVA pour le même chantier, et c'est
+celle des Finances qu'on déclare. `tauxLigne` y est désormais **injecté**,
+comme `parFamille()` et `tauxReussite()` reçoivent déjà les fonctions du
+module des chantiers. Le scénario éprouve les deux sens : sans le taux injecté
+il retrouve les 200 € d'avant, avec lui les 100 € justes — **il se sabote
+lui-même**.
+
+## Le carnet du véhicule
+
+Un module à part dans Entreprise, deux vues : le carnet et les échéances.
+
+- **Rien d'identifiant n'est livré.** L'identité du véhicule se saisit sur
+  place et vit dans `A.vehicule.infos` — le dépôt est public, et le PDF
+  d'origine portait plaque et VIN.
+- **Le compteur ne recule pas** : `kmVehicule()` retient le plus grand
+  kilométrage jamais noté, relevé ou intervention.
+- **Une intervention coche les postes qu'elle couvre**, qui repartent alors de
+  son kilométrage. Un poste jamais fait compte depuis zéro : une courroie
+  d'origine à 176 000 km est bien en retard sur ses 160 000.
+- **Les périodicités semées sont des ordres de grandeur**, tirés de son propre
+  document de suivi et dits comme tels à l'écran. Sur une courroie de
+  distribution, un chiffre approximatif coûte un moteur : la fiche du
+  constructeur fait foi, et chaque périodicité se corrige sur place. **Ne pas
+  inventer de préconisations constructeur.**
+- **Le carnet semé s'enregistre à la première ouverture.** Sans ça, chaque
+  lancement refaisait les postes avec de nouveaux identifiants et les
+  interventions qui les désignent pointaient dans le vide. C'est un test qui
+  l'a trouvé. Une fois écrit, un carnet vidé volontairement de ses postes le
+  reste.
+- **Le va-et-vient avec les dépenses est lâche** : l'intervention peut créer sa
+  dépense (catégorie `ENTRETIEN`, TVA 20 %, à corriger), et une dépense de
+  réparation suggère d'aller noter l'intervention — **jamais celle que le
+  carnet vient de créer**, qui porte le lien `d.vehicule`.
+
+**`bordcub.versements` et `bordcub.vehicule` partent dans les sauvegardes**
+(format version 8). Le carnet est un objet unique : la restauration **fusionne**
+ses listes, et dédoublonne les postes **par le nom** — leurs identifiants
+diffèrent d'un téléphone à l'autre puisqu'ils sont semés localement.
+
 ## La création d'un chantier, et son nom
 
 Le formulaire de création portait encore les vingt-trois champs de l'ancien
@@ -1219,7 +1287,7 @@ cubage, `carnet` aux chantiers.
 
 ## Où en est le chantier — 23 août 2026
 
-**Version en ligne : 4.56.0.** Le contrôle passe à 1010 vérifications.
+**Version en ligne : 4.59.0.** Le contrôle passe à 1078 vérifications.
 
 **La 4.51, née d'une seule tournée dictée.** Il a parcouru la 4.50 et signalé
 six choses en un message : le retour des réglages, l'absence de flèche hors
@@ -1275,6 +1343,14 @@ phrases plus loin il demandait *plus* de détail sur cet impayé. Les deux
 étaient dans le même paragraphe. C'est un scénario qui l'a rattrapé.
 
 ## Ce qui attend, par ordre de maturité
+
+**Fait le 23 août, à revoir à l'usage :**
+
+- **La CFE** n'est pas calculée : il a dit ne pas savoir la calculer lui-même.
+  Elle existe comme type de versement, rien de plus.
+- **Le taux de cotisation est unique**, alors que le micro-BIC en distingue
+  deux — prestation et vente. Il a parlé de « 25 % » en bloc ; à scinder le
+  jour où l'écart le gêne.
 
 **Décidé, prêt à faire :**
 
