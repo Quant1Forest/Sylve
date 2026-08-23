@@ -4497,6 +4497,80 @@ scenario('Déclarations : la base des cotisations est dite, et se change', async
 });
 
 /* --------------------------------------------------------------------- */
+scenario('Fusionner : le carnet arrive, et rien d’autre ne bouge', async () => {
+  /* « T'es sûr que ça ne me supprimera rien d'autre ? » La bonne question, et
+     elle a trouvé un défaut : la fenêtre qui annonce le contenu du fichier ne
+     comptait ni les versements ni le carnet, si bien qu'un fichier n'en
+     portant que le carnet s'annonçait « rien de reconnaissable » en face de
+     trente-deux chantiers. Devant ça, personne n'ose appuyer. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [
+      { id: 'c1', nom: 'Coupe des Places', statut: 'paye', aDevis: false, temps: [],
+        numeroFacture: 'F-2026-0042', dateFacture: Date.now(), maj: Date.now(),
+        lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 2, prix: 500, nature: 'prestation' }] },
+      { id: 'c2', nom: 'Plantation du haut', statut: 'encours', aDevis: true,
+        temps: [], lignes: [], maj: Date.now() }
+    ],
+    depenses: [{ id: 'd1', date: Date.now(),
+      lignes: [{ libelle: 'Gasoil', categorie: 'CARB', ttc: 90, taux: 20 }] }],
+    articles: [{ id: 'a1', nom: 'Gaine de protection', unite: 'unite' }]
+  }));
+  const etat = () => JSON.stringify({
+    ch: (t.stock('chantiers') || []).map(c => c.nom + '/' + (c.numeroFacture || '')),
+    dep: (t.stock('depenses') || []).length,
+    art: (t.stock('articles') || []).length
+  });
+  const avant = etat();
+
+  const fichier = {
+    format: 'bordcub-sauvegarde-1', version: 8,
+    vehicule: {
+      infos: { nom: 'Peugeot Expert Dangel 4x4' }, releves: [],
+      interventions: [
+        { id: 'vi1', quoi: 'Révision', date: new Date(2026, 3, 3, 12).getTime(), km: 171000,
+          montant: 328.78, garantie: false, postes: [] },
+        { id: 'vi2', quoi: 'Freinage', date: new Date(2024, 11, 18, 12).getTime(), km: 122273,
+          montant: 934.57, garantie: false, postes: [] }
+      ],
+      postes: [{ id: 'vp1', nom: 'Révision (vidange + filtres)', pkm: 30000,
+        dernierKm: 171000, dernierDate: new Date(2026, 3, 3, 12).getTime() }]
+    }
+  };
+  let champ = null;
+  const vrai = t.d.createElement.bind(t.d);
+  t.d.createElement = function (tag) {
+    const el = vrai(tag);
+    if (String(tag).toLowerCase() === 'input') champ = el;
+    return el;
+  };
+  t.clic('#s-restaurer');
+  t.d.createElement = vrai;
+  t.w.FileReader = function () {
+    this.readAsText = () => { this.result = JSON.stringify(fichier); this.onload && this.onload(); };
+  };
+  Object.defineProperty(champ, 'files', { value: [{ name: 'carnet.json' }], configurable: true });
+  champ.dispatchEvent(new t.w.Event('change', { bubbles: true }));
+  await t.pause(500);
+
+  /* La fenêtre doit nommer ce qui arrive, sinon on n'ose pas appuyer. */
+  const dit = t.texte('#modale-corps') || '';
+  verifierVrai('la fenêtre annonce ce que le fichier contient',
+    /2 interventions du véhicule/.test(dit));
+  verifierVrai('elle n’annonce plus « rien de reconnaissable »',
+    !/rien de reconnaissable/.test(dit));
+  verifierVrai('et elle rappelle ce qui est déjà là', /2 chantiers/.test(dit));
+
+  t.clic('#re-fus'); await t.pause(900);
+  verifier('rien d’autre n’a bougé', avant, etat());
+  const v = t.stock('vehicule');
+  verifier('le carnet est arrivé entier', 2, (v.interventions || []).length);
+  verifier('et le poste semé a repris sa date', 171000,
+    (v.postes || []).filter(p => p.nom === 'Révision (vidange + filtres)')[0].dernierKm);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
 /* Un troisième argument ne joue que les scénarios dont le nom le contient.
    Sert à éprouver un contrôle en le cassant exprès : rejouer les quarante
    autres pour vérifier qu'un seul crie coûte deux minutes pour rien.

@@ -7217,6 +7217,10 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.62', quoi: [
+    { t: 'Restaurer un fichier annonce vraiment ce qu’il contient' },
+    { t: 'Fusionner ajoute sans toucher au reste — c’est vérifié', vue: 'carnetv' }
+  ] },
   { v: '4.61', quoi: [
     { t: 'Le carnet du véhicule s’importe depuis une sauvegarde', vue: 'carnetv' },
     { t: 'Le pont arrière Dangel est suivi comme les autres postes', vue: 'echeancesv' },
@@ -7237,11 +7241,6 @@ var NOTES_MAJ = [
   { v: '4.58', quoi: [
     { t: 'La TVA se force aussi à 0 %, ce qu’un débours demande', vue: 'carnet' },
     { t: 'Le produit du stock est fermé quand une sortie existe déjà à part', vue: 'carnet' }
-  ] },
-  { v: '4.57', quoi: [
-    { t: 'Le débours se pose sur une ligne de fourniture', vue: 'carnet' },
-    { t: 'Il se voit sur la fiche, et ne gonfle plus ce que le chantier rapporte', vue: 'carnet' },
-    { t: 'Le prix par journée ne compte plus le débours', vue: 'carnet' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -7386,7 +7385,14 @@ function demanderRestauration(objet, nom) {
     { n: (s.commandes || []).length, u: 'commande', p: 'commandes' },
     { n: (s.sorties || []).length, u: 'mouvement', p: 'mouvements' },
     { n: (s.journees || []).length, u: 'journée', p: 'journées' },
-    { n: (s.articles || []).length, u: 'produit', p: 'produits' }
+    { n: (s.articles || []).length, u: 'produit', p: 'produits' },
+    /* Même oubli que dans contenuSauvegarde(), mais du côté de ce qui arrive :
+       un fichier ne portant que le carnet du véhicule s'annonçait « rien de
+       reconnaissable » en face de trente-deux chantiers. Devant ça, personne
+       n'ose appuyer — et il aurait eu raison. */
+    { n: (s.versements || []).length, u: 'versement', p: 'versements' },
+    { n: ((s.vehicule || {}).interventions || []).length,
+      u: 'intervention du véhicule', p: 'interventions du véhicule' }
   ].filter(function (x) { return x.n > 0; });
   var ici = contenuSauvegarde();
   if (!ici.length) { integrer(objet, nom); return; }
@@ -16557,7 +16563,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.61.0-20260823-2127';
+var VERSION = '4.62.0-20260823-2202';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
