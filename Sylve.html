@@ -3361,6 +3361,29 @@ function tempsTotal(ch, cfg) {
 function tempsMoi(ch, cfg) {
   return arr(((ch && ch.temps) || []).reduce(function (s, t) { return s + mesJours(t, cfg); }, 0), 2);
 }
+/* Ce qu'une facture porte en journées. Sur les chantiers repris du carnet,
+   c'est la seule trace du temps : rien n'a jamais été saisi dans « temps ». */
+function joursFactures(ch) {
+  return arr(((ch && ch.lignes) || []).reduce(function (s, l) {
+    return s + (l.unite === 'jour' ? nb(l.quantite) : 0);
+  }, 0), 2);
+}
+
+/* Combien de journées le chantier a réellement pris. Le temps saisi fait foi
+   — c'est déjà lui qui porte les rendements et le prix par journée. À défaut,
+   les lignes facturées en journées remplissent le vide. **Jamais l'addition
+   des deux** : un chantier à la fois saisi et facturé en journées compterait
+   double.
+   Attention à ne pas confondre avec totalFait(), qui compte les journées
+   posées à l'agenda : celles-là disent « j'y étais », pas « combien de temps
+   j'y ai passé ». La fiche affichait totalFait() sous l'intitulé « journées
+   faites » pendant que les rendements lisaient temps : deux chiffres pour la
+   même idée, sur le même écran. */
+function tempsPasse(ch, cfg) {
+  var saisi = tempsMoi(ch, cfg);
+  return saisi > 0 ? saisi : joursFactures(ch);
+}
+
 /* Kilomètres saisis à la main : le trajet varie trop (on ne part pas
    toujours de chez soi) pour être déduit d'une position. */
 function kmChantier(ch) {
@@ -4144,6 +4167,7 @@ var M = {
   references: references, estime: estime,
   distributionRendement: distributionRendement, difficulteLigne: difficulteLigne,
   noteLigne: noteLigne, dateChantier: dateChantier,
+  joursFactures: joursFactures, tempsPasse: tempsPasse,
   nomTravail: nomTravail, uniteDe: uniteDe, nomUnite: nomUnite, courtUnite: courtUnite,
   appliquerTravauxPerso: appliquerTravauxPerso, travauxActifs: travauxActifs,
   nomStatut: nomStatut, statutOuvert: statutOuvert, statutEngage: statutEngage, rangStatut: rangStatut,
@@ -6914,6 +6938,12 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.51', quoi: [
+    { t: 'Le temps que vous notez fait foi : fini les deux chiffres de journées', vue: 'carnet' },
+    { t: 'La date devient facultative quand vous notez du temps', vue: 'carnet' },
+    { t: 'Un chantier payé ne s’estime plus, il se corrige', vue: 'carnet' },
+    { t: 'Le retour arrière du téléphone remonte d’un cran au lieu de quitter' }
+  ] },
   { v: '4.50', quoi: [
     { t: 'Le cubage s’ouvre sur le choix : comtois ou classement ABCD', vue: 'fichiers' },
     { t: 'En ABCD, Sylve prévient quand la classe ne tient pas ses critères', vue: 'saisie' },
@@ -6935,11 +6965,6 @@ var NOTES_MAJ = [
     { t: '« Prix de revient » devient « Rentabilité », et gagne une vue par année', vue: 'revient' },
     { t: 'Vos ventes de fournitures année par année, mois par mois, et l’évolution', vue: 'revient' },
     { t: 'Ce qui rapporte se lit en anneau ou en barres, au choix', vue: 'revient' }
-  ] },
-  { v: '4.46', quoi: [
-    { t: 'Une sortie née d’une facture se corrige : elle cesse alors de la suivre', vue: 'commandes' },
-    { t: 'Trois prix par produit, en euros : coût, minimum, prix pratiqué', vue: 'revient' },
-    { t: 'L’objectif de marge ne s’affiche plus sur la marge nette', vue: 'revient' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -7261,6 +7286,7 @@ function brancher() {
   });
   $('#b-accueil').addEventListener('click', allerAccueil);
   $('#b-retour').addEventListener('click', allerMenuParent);
+  brancherRetourTelephone();
   /* Les réglages du module courant, depuis n'importe où : la section
      s'ouvre sur celle qui correspond à la partie où l'on se trouve. */
   $('#b-reglages').addEventListener('click', function () {
@@ -7278,6 +7304,7 @@ function brancher() {
     if (!t) return;
     if (t.dataset.module === 'accueil') allerAccueil();
     else if (t.dataset.module === 'entreprise') {
+      if (A.vue === 'accueil') empilerCran();
       document.body.classList.add('accueil-ouvert');
       aller('entreprise');
     } else allerModule(t.dataset.module);
@@ -8343,6 +8370,15 @@ function allerMenuParent() {
   if (A.vue === 'reglages' && A.vueAvantReglages) {
     var precedente = A.vueAvantReglages;
     A.vueAvantReglages = null;
+    /* L'accueil et le menu d'une partie ne sont les vues d'aucun module : la
+       vérification ci-dessous les rejetait, et on ressortait des réglages
+       dans « Mon entreprise » alors qu'on y était entré depuis l'accueil. */
+    if (precedente === 'accueil') { allerAccueil(); return; }
+    if (NOMS_GROUPE[precedente]) {
+      document.body.classList.add('accueil-ouvert');
+      aller(precedente);
+      return;
+    }
     var m = MODULES[A.module];
     if (m && m.vues.some(function (v) { return v[0] === precedente; })) {
       aller(precedente);
@@ -8412,8 +8448,39 @@ function moduleDeVue(v) {
     return MODULES[m].vues.some(function (x) { return x[0] === v; });
   })[0] || 'chantiers';
 }
+/* Un cran d'historique pour le bouton retour du téléphone. Voir
+   brancherRetourTelephone() : on n'en empile qu'en descendant. */
+function empilerCran() {
+  try { history.pushState({ sylve: 1 }, ''); } catch (e) { }
+}
+
+/* Le retour arrière du téléphone quittait Sylve d'un coup, même au fond d'un
+   module. Il remonte maintenant d'un cran, comme n'importe quelle application :
+   une fenêtre ouverte se ferme d'abord, sinon vue → module → partie → accueil.
+   Depuis l'accueil seulement, il sort.
+
+   Un cran est empilé à chaque descente et consommé par la remontée : c'est ce
+   qui donne un appui par étage, et non deux. Fermer une fenêtre en réempile un,
+   sinon on perdrait un étage au passage. Et on n'en réempile jamais après une
+   remontée, sans quoi le dernier appui ne sortirait pas de l'application. */
+function brancherRetourTelephone() {
+  window.addEventListener('popstate', function () {
+    if (!$('#modale').hidden) { fermerModale(); empilerCran(); return; }
+    if (A.vue === 'accueil') return;
+    /* Depuis le menu d'une partie, le cran au-dessus est l'accueil.
+       allerMenuParent() ne sait pas le faire : il lit le module courant, qui
+       appartient encore à cette partie, et y reviendrait en boucle. */
+    if (NOMS_GROUPE[A.vue]) { allerAccueil(); return; }
+    allerMenuParent();
+  });
+}
 function allerModule(m, vue) {
   if (!MODULES[m]) m = 'cubage';
+  /* Descendre depuis l'accueil ou depuis le menu d'une partie empile un cran ;
+     changer de module par le bandeau est un déplacement latéral, pas une
+     descente, et n'en empile pas — sinon les crans s'accumuleraient et il
+     faudrait plusieurs appuis pour sortir. */
+  if (A.vue === 'accueil' || NOMS_GROUPE[A.vue]) empilerCran();
   A.module = m;
   document.body.classList.remove('accueil-ouvert');
   majOnglets();
@@ -9594,17 +9661,27 @@ function paireFiche(nom, valeur) {
    L'estimation reste donc lisible tout du long — c'est elle qui dit si la
    journée a tenu ce qu'elle promettait. */
 function blocValeur(c, m, pj, vise) {
-  var fait = C.totalFait(c), est = C.nb(c.joursEstimes);
   var solde = ['termine', 'facture', 'paye'].indexOf(c.statut) >= 0;
+  /* Le temps saisi, pas les journées posées à l'agenda : celles-ci disent
+     qu'on y était, pas combien de temps on y a passé. Le bloc affichait les
+     secondes pendant que les rendements lisaient le premier. */
+  var saisi = C.tempsMoi(c, A.cfg);
+  var fait = C.tempsPasse(c, A.cfg), est = C.nb(c.joursEstimes);
   var jours = solde ? fait : est;
   var parJour = jours > 0 ? m / jours : 0;
+  /* Dire d'où sort le chiffre : « faites » quand il vient du temps noté,
+     « facturées » quand seule la facture en parle — c'est le cas de tous les
+     chantiers repris du carnet. */
+  var motJours = solde ? (saisi > 0 ? 'journées faites' : 'journées facturées')
+    : 'journées estimées';
   return '<div class="carte">' +
-    teteBloc(solde ? 'Ce que ça a rapporté' : 'Ce que ça vaut', 'f-estim', 'estimer') +
+    teteBloc(solde ? 'Ce que ça a rapporté' : 'Ce que ça vaut', 'f-estim',
+      solde ? 'modifier' : 'estimer') +
     '<div class="kpi">' +
     '<div class="carte2"><b class="num">' + (m ? eur(m) : '—') + '</b><small>' +
     (solde ? (c.statut === 'paye' ? 'encaissé' : 'facturé') : 'proposé') + '</small></div>' +
     '<div class="carte2"><b class="num">' + (jours ? E.fmt(jours, jours % 1 ? 1 : 0) : '—') +
-    '</b><small>' + (solde ? 'journées faites' : 'journées estimées') + '</small></div>' +
+    '</b><small>' + motJours + '</small></div>' +
     '<div class="carte2"><b class="num"' +
     (parJour && vise && parJour < vise ? ' style="color:#B4231F"' : '') + '>' +
     (parJour ? eur(C.arr(parJour, 0)) : '—') + '</b><small>par journée</small></div>' +
@@ -9614,10 +9691,13 @@ function blocValeur(c, m, pj, vise) {
         eur(vise) + (parJour >= vise ? ' : ce chantier passe au-dessus.'
           : ' : ce chantier reste en dessous.') + '</p>'
       : '') +
-    (!solde && !est
-      ? '<p class="muted" style="font-size:12px;margin:6px 0 0">Aucune journée estimée : ' +
-        'sans elle, rien ne dit ce que la journée doit rapporter.</p>'
-      : '') + '</div>';
+    (solde && !fait
+      ? '<p class="muted" style="font-size:12px;margin:6px 0 0">Aucun temps noté : ' +
+        'le bloc « Le temps passé », plus bas, dit ce que le chantier vous a pris.</p>'
+      : (!solde && !est
+        ? '<p class="muted" style="font-size:12px;margin:6px 0 0">Aucune journée estimée : ' +
+          'sans elle, rien ne dit ce que la journée doit rapporter.</p>'
+        : '')) + '</div>';
 }
 /* Le devis, quand il y en a un. Sinon le bloc reste, en retrait, pour dire
    qu'on peut en attacher un. */
@@ -9758,8 +9838,12 @@ function renderFiche() {
     '<button class="btn primaire btn-min" id="f-planifier">' +
     (C.journeesPlacees(c).length ? 'Modifier les journées' : 'Placer sur l’agenda') +
     '</button></div>' +
+    /* Ce bloc et « Le temps passé » parlaient tous les deux de journées, sans
+       que rien ne dise lequel répond à quoi. Celui-ci dit quand, l'autre dit
+       combien. */
     '<p class="sous-titre-bloc">Ce que vous avez <b>prévu</b> : les jours retenus sur l’agenda. ' +
-    'Ils y sont bloqués provisoirement tant que le chantier n’est pas signé.</p>' +
+    'Ils y sont bloqués provisoirement tant que le chantier n’est pas signé. ' +
+    'Ces jours disent <b>quand</b> vous y étiez ; le temps réellement passé se note plus bas.</p>' +
     (function () {
       var pl = C.journeesPlacees(c), est = C.nb(c.joursEstimes), tot = C.totalPlace(c);
       if (!pl.length) {
@@ -9775,7 +9859,7 @@ function renderFiche() {
          saisi après coup n'a que des journées faites, et parler d'estimation
          sur lui n'aurait aucun sens. */
       return '<div class="kpi" style="margin:0 0 9px">' +
-        '<div class="carte2"><b class="num">' + jf(fait) + '</b><small>faites</small></div>' +
+        '<div class="carte2"><b class="num">' + jf(fait) + '</b><small>posées</small></div>' +
         '<div class="carte2"><b class="num">' + jf(venir) + '</b><small>à venir</small></div>' +
         (reste != null && reste > 0
           ? '<div class="carte2"><b class="num">' + jf(reste) + '</b><small>à placer</small></div>'
@@ -10388,20 +10472,34 @@ function ouvrirIdentiteCh(id) {
 /* --- l'estimation : ce qu'on pense y passer, et ce qu'on vise --- */
 function ouvrirEstimationCh(id) {
   var c = chantier(id); if (!c) return;
-  modale('L’estimation',
+  /* Sur un chantier soldé, plus rien ne s'estime : le formulaire ne garde que
+     l'objectif, pour mémoire, et dit où se note le temps réellement passé.
+     Le crayon disait « estimer » sur un chantier payé, et ouvrait un
+     formulaire qui modifiait un chiffre que le bloc n'affiche même plus. */
+  var solde = ['termine', 'facture', 'paye'].indexOf(c.statut) >= 0;
+  modale(solde ? 'L’objectif de ce chantier' : 'L’estimation',
     '<div class="grille g2">' +
-    '<div class="champ"><label class="eyebrow" for="es-jest">Journées estimées</label>' +
+    '<div class="champ"><label class="eyebrow" for="es-jest">' +
+    (solde ? 'Journées estimées, pour mémoire' : 'Journées estimées') + '</label>' +
     '<input type="text" id="es-jest" class="gros" inputmode="decimal" autocomplete="off" value="' +
     (c.joursEstimes != null ? esc(String(c.joursEstimes).replace('.', ',')) : '') + '"></div>' +
     '<div class="champ"><label class="eyebrow" for="es-pj">Prix de journée visé (€)</label>' +
     '<input type="text" id="es-pj" class="gros" inputmode="decimal" placeholder="' +
     (C.nb(A.cfg && A.cfg.prixJourVise) || 'défaut') + '" value="' +
     (c.prixJour != null ? esc(String(c.prixJour).replace('.', ',')) : '') + '"></div></div>' +
-    '<p class="muted" style="font-size:12px;margin:9px 0 0">Ce que vous pensez y passer, ' +
-    'et ce que la journée doit rapporter. Ça reste votre repère tout le long : on le ' +
-    'compare ensuite aux journées réellement faites.</p>' +
+    '<p class="muted" style="font-size:12px;margin:9px 0 0">' +
+    (solde
+      ? 'Ce chantier est fini : les journées faites ne se saisissent pas ici. Elles ' +
+        'viennent du temps que vous notez, plus bas sur la fiche.'
+      : 'Ce que vous pensez y passer, et ce que la journée doit rapporter. Ça reste ' +
+        'votre repère tout le long : on le compare ensuite au temps réellement noté.') +
+    '</p>' +
     '<div class="btn-rang" style="margin-top:11px">' +
-    '<button class="btn primaire" id="es-ok">Valider</button></div>');
+    '<button class="btn primaire" id="es-ok">Valider</button>' +
+    (solde ? '<button class="btn" id="es-temps">Noter du temps</button>' : '') + '</div>');
+  if (solde) {
+    $('#es-temps').addEventListener('click', function () { fermerModale(); ouvrirTemps(c.id); });
+  }
   $('#es-ok').addEventListener('click', function () {
     var jest = C.nb($('#es-jest').value);
     majChantier(c, { joursEstimes: jest > 0 ? jest : null,
@@ -10727,12 +10825,24 @@ function ouvrirLigne(id, idx) {
   });
 }
 
+/* Un temps saisi sans date se rattache au chantier, jamais à aujourd'hui : un
+   chantier repris du carnet et fini l'an dernier verrait sinon son temps
+   compté dans la période courante, et fausserait le bilan de l'année. */
+function dateParDefautTemps(c) {
+  return C.nb(c.dateFin) || C.nb(c.dateFacture) || C.nb(c.debut) || Date.now();
+}
 function ouvrirTemps(id) {
   var c = chantier(id); if (!c) return;
   modale('Temps passé — ' + (c.nom || 'chantier'),
     '<div class="grille g2">' +
-    '<div class="champ"><label class="eyebrow" for="ct-date">Date</label>' +
-    '<input type="date" id="ct-date" value="' + new Date().toISOString().slice(0, 10) + '"></div>' +
+    /* La date était pré-remplie, donc elle avait l'air obligatoire : on ne
+       pouvait pas dire « j'ai fait trois journées » sans dire quand, ce qui
+       bloquait tous les chantiers repris du carnet. Elle est vide et annoncée
+       facultative. Elle l'était déjà techniquement — rien ne le disait.
+       Elle était aussi pré-remplie par toISOString(), qui répond en heure de
+       Greenwich : avant deux heures du matin, elle proposait la veille. */
+    '<div class="champ"><label class="eyebrow" for="ct-date">Date (facultative)</label>' +
+    '<input type="date" id="ct-date"></div>' +
     '<div class="champ"><label class="eyebrow" for="ct-act">Activité</label>' +
     '<select id="ct-act"><option value="">— toutes —</option>' +
     (c.lignes || []).map(function (l) { return '<option value="' + l.travail + '">' + C.nomTravail(l.travail) + '</option>'; }).join('') +
@@ -10748,6 +10858,9 @@ function ouvrirTemps(id) {
     '</div>' +
     '<label class="ligne-check" style="display:flex;align-items:center;gap:8px;font-size:13.5px;margin:4px 0 0">' +
     '<input type="checkbox" id="ct-sansmoi"> Je n’ai pas travaillé (chantier observé, pour le rendement)</label>' +
+    '<p class="muted" style="font-size:12px;margin:7px 0 0">Sans date, le temps est ' +
+    'rattaché à la période du chantier — pas à aujourd’hui, qui fausserait le bilan ' +
+    'de l’année en cours.</p>' +
     '<div class="carte2" id="ct-apercu" style="margin:11px 0"></div>' +
     '<div class="btn-rang"><button class="btn primaire" id="ct-ok">Enregistrer</button></div>');
   var apercu = function () {
@@ -10767,7 +10880,7 @@ function ouvrirTemps(id) {
     var d = C.nb($('#ct-duree').value);
     if (d <= 0) { toast('Durée attendue.'); return; }
     c.temps = c.temps || [];
-    c.temps.push({ date: versDate($('#ct-date').value) || Date.now(), duree: d,
+    c.temps.push({ date: versDate($('#ct-date').value) || dateParDefautTemps(c), duree: d,
       unite: $('#ct-unite').value, personnes: C.nb($('#ct-pers').value) || 1,
       sansMoi: $('#ct-sansmoi').checked || undefined,
       km: C.nb($('#ct-km').value) || undefined,
@@ -15466,7 +15579,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.50.0-20260823-1027';
+var VERSION = '4.51.0-20260823-1129';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

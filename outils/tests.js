@@ -2056,7 +2056,11 @@ scenario('Journées : une date passée compte comme faite, pas comme prévue', a
   t.clic('[data-vue="carnet"]'); await t.pause(250);
   t.clic('[data-chouvrir="c1"]'); await t.pause(350);
   const fiche = t.$('#vue-chantier').textContent;
-  verifierVrai('la fiche annonce les journées faites', /faites/.test(fiche));
+  /* Le bloc dit « posées » depuis que « faites » est réservé au temps
+     réellement noté : les deux blocs parlaient de journées sans que rien ne
+     dise lequel répond à quoi. Le moteur, lui, garde totalFait() — il compte
+     toujours les journées posées à une date passée. */
+  verifierVrai('la fiche annonce les journées posées', /posées/.test(fiche));
   verifierVrai('et celles à venir', /à venir/.test(fiche));
   verifierVrai('elle rappelle que le temps se saisit à part',
     /temps réellement passé/.test(fiche));
@@ -3335,6 +3339,173 @@ scenario('Charge fixe : recaler une échéance ne double pas la dépense', async
     [...new Set(dep.map(d => d.echeance))].length);
   verifierVrai('et janvier est bien au 30',
     dep.some(d => new Date(d.date).getMonth() === 0 && new Date(d.date).getDate() === 30));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Fiche : le temps passé fait foi, pas les journées posées à l’agenda', async () => {
+  /* Le bloc affichait les journées posées au calendrier sous l'intitulé
+     « journées faites », pendant que les rendements et le prix par journée
+     lisaient le temps saisi. Deux chiffres pour la même idée, sur le même
+     écran : c'est ce qui l'y perdait. */
+  const jadis = Date.now() - 40 * 86400000;
+  const base = { id: 'c1', nom: 'Coupe des Places', statut: 'paye', aDevis: false,
+    maj: Date.now(), dateFin: jadis,
+    lignes: [{ travail: 'DEG', unite: 'jour', quantite: 4, prix: 500, nature: 'prestation' }] };
+
+  /* Rien de saisi : la facture remplit le vide — le cas de tout le carnet. */
+  const repli = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [Object.assign({}, base, { temps: [], jours: [] })]
+  }));
+  repli.clic('[data-vue="carnet"]'); await repli.pause(250);
+  repli.saisir('#c-rech', 'Places'); await repli.pause(300);
+  repli.clic('[data-chouvrir="c1"]'); await repli.pause(400);
+  verifierVrai('sans temps noté, la facture donne les journées',
+    /4s*journées facturées/.test(repli.texte('#vue-chantier')));
+
+  /* Du temps saisi : il gagne, et on ne l'additionne pas aux 4 facturées. */
+  const saisi = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [Object.assign({}, base, {
+      temps: [{ date: jadis, duree: 3, unite: 'j', personnes: 1 }], jours: [] })]
+  }));
+  saisi.clic('[data-vue="carnet"]'); await saisi.pause(250);
+  saisi.saisir('#c-rech', 'Places'); await saisi.pause(300);
+  saisi.clic('[data-chouvrir="c1"]'); await saisi.pause(400);
+  const txt = saisi.texte('#vue-chantier');
+  verifierVrai('le temps noté gagne', /3s*journées faites/.test(txt));
+  verifierVrai('jamais l’addition des deux', !/7s*journées/.test(txt));
+
+  /* Les journées posées à l'agenda ne comptent pas comme du temps : elles
+     disent quand on y était, pas combien de temps on y a passé. */
+  const posees = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [Object.assign({}, base, {
+      temps: [], lignes: [],
+      jours: [{ d: jadis, p: 1 }, { d: jadis + 86400000, p: 1 }] })]
+  }));
+  posees.clic('[data-vue="carnet"]'); await posees.pause(250);
+  posees.saisir('#c-rech', 'Places'); await posees.pause(300);
+  posees.clic('[data-chouvrir="c1"]'); await posees.pause(400);
+  verifierVrai('deux journées posées ne font pas deux journées faites',
+    !/2s*journées faites/.test(posees.texte('#vue-chantier')));
+  verifierVrai('et le bloc dit où noter le temps',
+    /Le temps passé/.test(posees.texte('#vue-chantier')));
+  verifier('aucune erreur', [], repli.erreurs.concat(saisi.erreurs, posees.erreurs));
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Fiche : un chantier payé ne s’estime plus, il se corrige', async () => {
+  /* Le crayon disait « estimer » sur un chantier déjà payé, et ouvrait un
+     formulaire parlant d'estimation — qui modifiait un chiffre que le bloc
+     n'affiche même plus à ce stade. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [{ id: 'c1', nom: 'Coupe des Places', statut: 'paye', aDevis: false,
+      temps: [], jours: [], lignes: [], joursEstimes: 4, maj: Date.now() }]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.saisir('#c-rech', 'Places'); await t.pause(300);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+  verifier('le crayon ne parle plus d’estimer', 'modifier ✎', t.texte('#f-estim'));
+
+  t.clic('#f-estim'); await t.pause(300);
+  const modale = t.texte('#modale');
+  verifierVrai('le formulaire parle d’objectif', /L’objectif de ce chantier/.test(modale));
+  verifierVrai('et dit où se notent les journées faites',
+    /ne se saisissent pas ici/.test(modale));
+  verifierVrai('avec une porte vers le temps', t.$('#es-temps'));
+  t.clic('#es-temps'); await t.pause(300);
+  verifierVrai('qui ouvre bien la saisie du temps', t.$('#ct-duree'));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Temps passé : la date est facultative et suit le chantier', async () => {
+  /* On ne pouvait pas dire « j'ai fait trois journées » sans dire quand, ce
+     qui bloquait tous les chantiers repris du carnet. Et sans date, dater
+     d'aujourd'hui aurait rangé le temps d'un chantier de l'an dernier dans la
+     période courante. */
+  const jadis = new Date(2026, 2, 15, 12).getTime();
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [{ id: 'c1', nom: 'Coupe des Places', statut: 'paye', aDevis: false,
+      temps: [], jours: [], lignes: [], dateFin: jadis, maj: Date.now() }]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.saisir('#c-rech', 'Places'); await t.pause(300);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+  t.clic('#f-temps'); await t.pause(300);
+  verifierVrai('le champ de date existe', t.$('#ct-date'));
+  verifier('il est vide, donc il n’a pas l’air obligatoire', '', t.$('#ct-date').value);
+  verifierVrai('et l’intitulé le dit', /Date \(facultative\)/.test(t.texte('#modale')));
+
+  t.saisir('#ct-duree', '3');
+  t.clic('#ct-ok'); await t.pause(450);
+  const c = (t.stock('chantiers') || [])[0];
+  verifier('trois journées sont notées', 1, (c.temps || []).length);
+  verifier('sans date saisie', 3, c.temps[0].duree);
+  verifier('elles se rattachent au chantier, pas à aujourd’hui',
+    jourISO(jadis), jourISO(c.temps[0].date));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Retour arrière du téléphone : il remonte d’un cran au lieu de quitter', async () => {
+  /* Le bouton du téléphone quittait Sylve d'un coup, même au fond d'un
+     module. Un cran d'historique est empilé à chaque descente et consommé par
+     la remontée : un appui par étage. */
+  const t = await ouvrir(VIDE);
+  const retour = () => t.w.dispatchEvent(new t.w.PopStateEvent('popstate'));
+  t.clic('[data-module="entreprise"]'); await t.pause(250);
+  t.clic('[data-module="chantiers"]'); await t.pause(350);
+  verifierVrai('on est descendu dans le carnet',
+    t.$('#vue-carnet').classList.contains('actif'));
+
+  /* Une fenêtre ouverte se ferme d'abord, sans quitter l'écran. */
+  t.clic('#c-nouveau'); await t.pause(350);
+  verifierVrai('une fenêtre est ouverte', !t.$('#modale').hidden);
+  retour(); await t.pause(300);
+  verifierVrai('le retour la ferme', t.$('#modale').hidden);
+  verifierVrai('sans changer d’écran', t.$('#vue-carnet').classList.contains('actif'));
+
+  retour(); await t.pause(300);
+  verifierVrai('puis il remonte au menu de la partie',
+    t.$('#vue-entreprise').classList.contains('actif'));
+  retour(); await t.pause(300);
+  verifierVrai('puis à l’accueil', t.$('#vue-accueil').classList.contains('actif'));
+  retour(); await t.pause(300);
+  verifierVrai('depuis l’accueil, il ne va pas plus haut',
+    t.$('#vue-accueil').classList.contains('actif'));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Réglages : on ressort par où l’on est entré', async () => {
+  /* Entré depuis l'accueil, on ressortait dans « Mon entreprise ». La vue
+     d'origine était bien retenue, mais rejetée parce que l'accueil n'est la
+     vue d'aucun module. */
+  const t = await ouvrir(VIDE);
+  t.clic('[data-module="entreprise"]'); await t.pause(250);
+  t.clic('[data-module="chantiers"]'); await t.pause(350);
+  t.clic('#b-accueil'); await t.pause(300);
+  verifierVrai('on est bien sur l’accueil', t.$('#vue-accueil').classList.contains('actif'));
+
+  t.clic('#a-reglages'); await t.pause(350);
+  verifierVrai('les réglages s’ouvrent', t.$('#vue-reglages').classList.contains('actif'));
+  t.clic('#b-retour'); await t.pause(350);
+  verifierVrai('et le retour ramène à l’accueil',
+    t.$('#vue-accueil').classList.contains('actif'));
+  verifierVrai('pas dans « Mon entreprise »',
+    !t.$('#vue-entreprise').classList.contains('actif'));
+
+  /* Entré depuis un module, on y redescend — le comportement d'origine. */
+  t.clic('[data-module="chantiers"]'); await t.pause(350);
+  t.clic('#b-reglages'); await t.pause(350);
+  t.clic('#b-retour'); await t.pause(350);
+  verifierVrai('depuis un module, on revient dans ce module',
+    t.$('#vue-carnet').classList.contains('actif'));
   verifier('aucune erreur', [], t.erreurs);
 });
 
