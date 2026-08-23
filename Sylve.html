@@ -33,7 +33,17 @@
      mais c'est le classeur qui a la grume sous les yeux, pas Sylve. Le rouge
      est réservé à ce qui est faux, pas à ce qui mérite un second regard. */
   --tiede:#7A5E12; --tiede-fond:#FBF2DC; --tiede-trait:#E2CFA4;
-  --accent:#1F5FA9; --accent-doux:#E3EBF5; --accent-texte:#fff;
+  /* La couleur vive de l'application. Le bleu avait été validé le 3 août ;
+     il l'a repris le 23 pour un vert, « qui respire plus l'esprit de
+     l'application ». Le nom Sylve, lui, garde le vert de la marque
+     (--vert-marque) : c'est la signature, pas une couleur d'action. */
+  --accent:#2E7D46; --accent-doux:#E3EFE7; --accent-texte:#fff;
+  /* La couleur des plaquettes du bordereau ouvert. Elle repeignait toute
+     l'application par --accent, si bien que l'écran changeait de couleur
+     sans raison visible — selon le bordereau de cubage ouvert. Elle ne peint
+     plus que ce qui la désigne vraiment : la pastille du bordereau et les
+     plaquettes du ruban de saisie. */
+  --plaq:#2E4A3C;
   --r:10px; --r-s:7px;
   --mono:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Menlo,Consolas,monospace;
   --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
@@ -461,7 +471,7 @@ textarea{resize:vertical;min-height:56px}
 }
 .plaq{
   flex:none;min-width:56px;padding:5px 8px 6px;border-radius:4px 4px 7px 7px;
-  background:var(--accent);color:var(--accent-texte);text-align:center;
+  background:var(--plaq);color:#fff;text-align:center;
   font-family:var(--mono);font-size:12.5px;font-weight:600;line-height:1.15;
   position:relative;box-shadow:0 1px 2px rgba(23,37,31,.2);
 }
@@ -3298,11 +3308,48 @@ function montantLigne(l) {
    chantier. Un même chantier peut mêler 10 et 20 % (le répulsif, par
    exemple, n'ouvre pas droit au taux réduit même chez un propriétaire
    qui y a droit pour le reste). */
+/* Un forfait groupé : plusieurs travaux sur une même ligne. Ils *désignent* ce
+   que le forfait couvre — « détourage + élagage » — et le prix porte sur la
+   ligne entière, sans quantité. C'est ainsi qu'il facture, et la ligne reste
+   une seule ligne sur le papier du client.
+   « travail » reste le premier de la liste : c'est lui que lisent les
+   rendements, la famille et tout l'historique déjà saisi. Les suivants vivent
+   à part, dans travauxPlus, pour qu'aucune ligne ancienne ne bouge. */
+function travauxDeLigne(l) {
+  var t = [];
+  if (l && l.travail) t.push(l.travail);
+  ((l && l.travauxPlus) || []).forEach(function (x) {
+    if (x && t.indexOf(x) < 0) t.push(x);
+  });
+  return t;
+}
+function ligneGroupee(l) { return travauxDeLigne(l).length > 1; }
+function nomTravauxLigne(l) {
+  return travauxDeLigne(l).map(nomTravail).join(' + ');
+}
+/* Les taux que commandent les travaux d'une ligne, sans doublon. */
+function tauxDesTravaux(l, siren) {
+  var v = [];
+  travauxDeLigne(l).forEach(function (code) {
+    if (!trouve(TRAVAUX, code)) return;
+    var t = tauxAttendu(code, siren);
+    if (v.indexOf(t) < 0) v.push(t);
+  });
+  return v;
+}
+/* Sa règle, dictée le 23 août : même taux sur tous les travaux, on l'applique ;
+   taux différents, on l'oblige à trancher au lieu de choisir pour lui. */
+function tvaAtrancher(l, ch) {
+  if (l && l.tva != null && l.tva !== '') return false;
+  return tauxDesTravaux(l, ch && ch.siren).length > 1;
+}
 function tauxLigne(l, ch) {
   if (l && l.tva != null && l.tva !== '') return nb(l.tva);      // taux forcé sur la ligne
-  var t = trouve(TRAVAUX, l && l.travail);
-  if (t) return (ch && ch.siren) ? t.tvaAvec : t.tvaSans;
-  return nb(ch && ch.tva) || 20;
+  var taux = tauxDesTravaux(l, ch && ch.siren);
+  if (!taux.length) return nb(ch && ch.tva) || 20;
+  /* Taux mêlés sans arbitrage — une ligne restaurée d'avant la règle : on
+     retient le plus élevé. Sous-facturer la TVA coûte plus cher que l'inverse. */
+  return taux.length === 1 ? taux[0] : Math.max.apply(null, taux);
 }
 /* Le taux que la nature des travaux commande, avant toute correction. */
 function tauxAttendu(travail, siren) {
@@ -4069,10 +4116,29 @@ function rangComptable(c) {
   if (!c) return 0;
   return nb(c.dateFacture) || nb(c.dateDevis) || nb(c.cree) || nb(c.maj) || 0;
 }
+/* Le numéro de facture, rendu comparable. « F-2026-0010 » vaut l'année puis le
+   rang : deux factures du même jour se suivent alors dans l'ordre du
+   classeur, ce que la seule date ne savait pas faire. */
+function rangFacture(c) {
+  var s = String((c && c.numeroFacture) || '').trim();
+  if (!s) return 0;
+  var m = s.match(/(\d{4})\D+(\d+)\s*$/);
+  if (m) return Number(m[1]) * 1000000 + Number(m[2]);
+  var n = s.match(/(\d+)\s*$/);
+  return n ? Number(n[1]) : 0;
+}
 function tri(chantiers, ancienDabord) {
   return (chantiers || []).slice().sort(function (a, b) {
-    var da = rangComptable(a), db = rangComptable(b);
-    if (da !== db) return ancienDabord ? da - db : db - da;
+    /* Entre deux chantiers facturés, le numéro prime sur tout : c'est l'ordre
+       de ses classeurs. Dès que l'un des deux n'a pas de facture, on retombe
+       sur les dates — un chantier en cours n'a pas à être relégué. */
+    var fa = rangFacture(a), fb = rangFacture(b);
+    if (fa && fb) {
+      if (fa !== fb) return ancienDabord ? fa - fb : fb - fa;
+    } else {
+      var da = rangComptable(a), db = rangComptable(b);
+      if (da !== db) return ancienDabord ? da - db : db - da;
+    }
     return rangStatut(a.statut) - rangStatut(b.statut);
   });
 }
@@ -4216,6 +4282,9 @@ function totaux(chantiers, cfg) {
 
 var M = {
   JOUR: JOUR, TRAVAUX: TRAVAUX, UNITES: UNITES, STATUTS: STATUTS,
+  travauxDeLigne: travauxDeLigne, ligneGroupee: ligneGroupee,
+  nomTravauxLigne: nomTravauxLigne, tauxDesTravaux: tauxDesTravaux,
+  tvaAtrancher: tvaAtrancher,
   CAT_TRAVAUX: CAT_TRAVAUX, categorieTravail: categorieTravail,
   nomCatTravail: nomCatTravail, categorieLigne: categorieLigne,
   nomCategorieLigne: nomCategorieLigne,
@@ -4242,6 +4311,7 @@ var M = {
   dureePrevue: dureePrevue, enRetard: enRetard, tri: tri, filtre: filtre, chercher: chercher,
   totaux: totaux,
   dernierEvenement: dernierEvenement, rangComptable: rangComptable,
+  rangFacture: rangFacture,
   jourCle: jourCle, minuit: minuit, ajouteJours: ajouteJours, estWeekend: estWeekend,
   journeesPlacees: journeesPlacees, placerJour: placerJour, resteAPlacer: resteAPlacer,
   totalPlace: totalPlace, partDuJour: partDuJour,
@@ -5619,9 +5689,10 @@ function appliquerCouleur() {
   var c = A.bord ? String(A.bord.meta.plaqCouleur || '').toLowerCase().trim() : '';
   var k = Object.keys(COULEURS).filter(function (x) { return c.indexOf(x) === 0 || x.indexOf(c) === 0 && c; })[0];
   var col = COULEURS[k] || '#2E4A3C';
-  document.documentElement.style.setProperty('--accent', col);
-  document.documentElement.style.setProperty('--accent-doux', col + '1F');
-  document.documentElement.style.setProperty('--accent-texte', (k === 'jaune' || k === 'blanc') ? '#fff' : '#fff');
+  /* Elle ne touche plus à --accent : l'application gardait la couleur des
+     plaquettes du bordereau ouvert et changeait donc de teinte sans raison
+     visible. Elle ne peint que ce que la plaquette désigne. */
+  document.documentElement.style.setProperty('--plaq', col);
 }
 
 /* ------------------------------------------------------------- bandeau */
@@ -7019,6 +7090,12 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.53', quoi: [
+    { t: 'L’application passe au vert et ne change plus de couleur toute seule' },
+    { t: 'Le carnet suit le numéro de vos factures', vue: 'carnet' },
+    { t: 'Fiche précédente et suivante, sous le nom du chantier', vue: 'carnet' },
+    { t: 'Une ligne peut porter plusieurs travaux : le forfait groupé', vue: 'carnet' }
+  ] },
   { v: '4.52', quoi: [
     { t: 'Vos cinq grandes familles au-dessus des prestations', vue: 'analyses' },
     { t: 'Les recettes se lisent famille par famille', vue: 'analyses' },
@@ -7042,11 +7119,6 @@ var NOTES_MAJ = [
     { t: 'La fiche du chantier se lit dans l’ordre de sa vie, bloc par bloc', vue: 'carnet' },
     { t: 'Chaque bloc a son crayon : le devis, la facture, les journées, chacun à part' },
     { t: 'Fini l’en-tête unique de vingt-trois champs' }
-  ] },
-  { v: '4.48', quoi: [
-    { t: 'Un produit dosé se lit au plant partout, y compris dans les coûts', vue: 'revient' },
-    { t: 'Le carnet montre le numéro de facture, et le tri se retourne', vue: 'carnet' },
-    { t: 'Plus d’estimation réclamée sur un chantier déjà payé', vue: 'carnet' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -7568,6 +7640,8 @@ function brancher() {
   });
   $('#fiche-chantier').addEventListener('click', function (e) {
     var id = A.chOuvert, c = chantier(id);
+    var voisin = e.target.closest('[data-voisin]');
+    if (voisin) { ouvrirChantier(voisin.dataset.voisin); return; }
     if (e.target.closest('[data-chretour]')) { aller('carnet'); return; }
     if (!c) return;
     /* Chaque bloc de la fiche ouvre son propre formulaire : on ne cherche
@@ -9744,14 +9818,36 @@ function optionsTravaux(sel, opt) {
 /* Le sélecteur en haut de la fiche : passer d'un chantier à l'autre sans
    repasser par le carnet. Les chantiers ouverts d'abord, les clos ensuite —
    c'est presque toujours dans les ouverts qu'il veut aller. */
+/* L'ordre du carnet, pour le sélecteur comme pour les voisins : numéro de
+   facture d'abord, dates ensuite. Trier par « maj » remontait un chantier dès
+   qu'on l'ouvrait pour le corriger — l'ordre paraissait dû au hasard. */
+function chantiersOrdonnes() {
+  return C.tri(A.chantiers || [], !!A.triAncien);
+}
+
+/* Fiche précédente et suivante, dans ce même ordre. */
+function boutonsVoisins(id) {
+  var l = chantiersOrdonnes();
+  if (l.length < 2) return '';
+  var i = -1;
+  l.forEach(function (c, k) { if (c.id === id) i = k; });
+  if (i < 0) return '';
+  var prec = i > 0 ? l[i - 1] : null, suiv = i < l.length - 1 ? l[i + 1] : null;
+  var bouton = function (c, mot, cote) {
+    return '<button class="btn btn-min" ' + (c ? 'data-voisin="' + esc(c.id) + '"' : 'disabled') +
+      ' style="flex:1;text-align:' + cote + '" title="' + esc(c ? (c.nom || 'chantier') : '') + '">' +
+      esc(mot) + '</button>';
+  };
+  return '<div class="btn-rang" style="margin-top:9px;gap:7px">' +
+    bouton(prec, '‹ Précédente', 'left') +
+    '<span class="muted num" style="flex:none;align-self:center;font-size:11.5px">' +
+    (i + 1) + ' / ' + l.length + '</span>' +
+    bouton(suiv, 'Suivante ›', 'right') + '</div>';
+}
+
 function optionsChantiers(sel) {
   var ouv = [], clos = [];
-  /* Même ordre que le carnet : celui de la comptabilité. Trier par « maj »
-     remontait un chantier dès qu'on l'ouvrait pour le corriger — l'ordre
-     paraissait alphabétique, c'est-à-dire dû au hasard. */
-  (A.chantiers || []).slice().sort(function (a, b) {
-    return C.rangComptable(b) - C.rangComptable(a);
-  }).forEach(function (c) {
+  chantiersOrdonnes().forEach(function (c) {
     var lieu = [c.commune, c.foret].filter(Boolean).join(', ');
     var o = '<option value="' + esc(c.id) + '"' + (c.id === sel ? ' selected' : '') + '>' +
       esc(c.nom || 'sans nom') + (lieu ? ' — ' + esc(lieu) : '') +
@@ -9877,10 +9973,11 @@ function renderFiche() {
        texte qui figure sur la facture du client. Le travail reste dessous —
        il sert au taux de TVA et aux rendements — mais il ne doit plus
        masquer ce qui a réellement été vendu. */
-    var titre = l.note ? l.note : C.nomTravail(l.travail);
+    /* Un forfait groupé porte plusieurs travaux : « détourage + élagage ». */
+    var titre = l.note ? l.note : C.nomTravauxLigne(l);
     return '<div class="ligne-trav"><div><b>' + esc(titre) + '</b>' +
       '<div class="muted" style="font-size:12px">' +
-      (l.note ? esc(C.nomTravail(l.travail)) + ' · ' : '') + esc(q) +
+      (l.note ? esc(C.nomTravauxLigne(l)) + ' · ' : '') + esc(q) +
       ' · TVA ' + String(C.tauxLigne(l, c)).replace('.', ',') + ' %' +
       (l.nature === 'vente' ? ' · fourniture' : '') +
       (l.tva != null && l.tva !== '' ? ' (forcé)' : '') +
@@ -9913,6 +10010,9 @@ function renderFiche() {
     '<div class="carte" style="padding-bottom:11px">' +
     '<label class="eyebrow" for="f-choix">Chantier affiché</label>' +
     '<select id="f-choix" style="margin-top:5px">' + optionsChantiers(c.id) + '</select>' +
+    /* Passer d'une fiche à la suivante d'un doigt, dans l'ordre du carnet,
+       plutôt que de rouvrir la liste et d'y chercher le voisin. */
+    boutonsVoisins(c.id) +
     '</div>' +
     /* Le chantier : qui, où, et où il en est. */
     '<div class="carte">' +
@@ -10811,7 +10911,12 @@ function ouvrirLigne(id, idx) {
   if (!l) return;
   modale(idx != null ? 'Modifier la ligne' : 'Ajouter des travaux',
     '<div class="champ"><label class="eyebrow" for="cl-trav">Travaux</label>' +
-    '<select id="cl-trav">' + optionsTravaux(l.travail) + '</select></div>' +
+    '<select id="cl-trav">' + optionsTravaux(l.travail) + '</select>' +
+    /* Un forfait groupé : les travaux en plus désignent ce que la ligne
+       couvre. Le prix reste global, il n'y a pas de quantité par travail. */
+    '<div id="cl-plus"></div>' +
+    '<button type="button" class="chip plus" id="cl-ajout" style="margin-top:7px">' +
+    '+ travaux</button></div>' +
     '<div class="grille g3">' +
     '<div class="champ"><label class="eyebrow" for="cl-unite">Unité</label>' +
     '<select id="cl-unite">' + C.UNITES.map(function (u) {
@@ -10822,6 +10927,7 @@ function ouvrirLigne(id, idx) {
     '<div class="champ"><label class="eyebrow" for="cl-prix">Prix unitaire (€)</label>' +
     '<input type="text" id="cl-prix" class="gros" inputmode="decimal" value="' + esc(l.prix == null ? '' : String(l.prix).replace('.', ',')) + '"></div>' +
     '</div>' +
+    '<p class="muted" style="font-size:12px;margin:0 0 11px" id="cl-forfait"></p>' +
     '<div class="champ"><label class="eyebrow" for="cl-tva">TVA</label>' +
     '<select id="cl-tva"><option value="">— d’après la nature des travaux —</option>' +
     [5.5, 10, 20].map(function (t) {
@@ -10861,8 +10967,39 @@ function ouvrirLigne(id, idx) {
     '<div class="btn-rang"><button class="btn primaire" id="cl-ok">Valider</button></div>');
 
   var clDiff = l.difficulte || '';
+  /* Les travaux en plus du premier : ils désignent ce que le forfait couvre.
+     Dès qu'il y en a un, la ligne devient un forfait — un seul prix, pas de
+     quantité, parce que c'est ainsi qu'il la facture. */
+  var clPlus = (l.travauxPlus || []).slice();
+  var majForfait = function () {
+    var groupe = clPlus.length > 0;
+    var u = $('#cl-unite'), q = $('#cl-qte'), lab = document.querySelector('label[for="cl-prix"]');
+    if (groupe && u.value !== 'forfait') u.value = 'forfait';
+    u.disabled = groupe;
+    q.disabled = groupe;
+    if (groupe) q.value = '';
+    if (lab) lab.textContent = groupe ? 'Prix du forfait (€)' : 'Prix unitaire (€)';
+    var z = $('#cl-forfait');
+    if (z) {
+      z.textContent = groupe
+        ? 'Forfait groupé : ces travaux disent ce que la ligne couvre, le prix porte sur l’ensemble.'
+        : '';
+    }
+  };
+  var renderPlus = function () {
+    var z = $('#cl-plus'); if (!z) return;
+    z.innerHTML = clPlus.map(function (code, i) {
+      return '<div style="display:flex;gap:6px;align-items:center;margin-top:6px">' +
+        '<select data-clp="' + i + '" style="flex:1">' +
+        optionsTravaux(code, { sansFournitures: true }) + '</select>' +
+        '<button type="button" class="btn-min" data-clpsup="' + i + '" ' +
+        'aria-label="Retirer ces travaux">✕</button></div>';
+    }).join('');
+    majForfait();
+  };
   var lire = function () {
     return { travail: $('#cl-trav').value, unite: $('#cl-unite').value,
+      travauxPlus: clPlus.slice(),
       quantite: C.nb($('#cl-qte').value), prix: C.nb($('#cl-prix').value),
       nature: C.estFourniture($('#cl-trav').value) ? 'vente' : 'prestation',
       tva: $('#cl-tva').value === '' ? null : C.nb($('#cl-tva').value),
@@ -10899,6 +11036,15 @@ function ouvrirLigne(id, idx) {
         : (C.tauxFixe(x.travail) ? 'ces travaux restent à ' + attendu + ' % même avec un SIREN'
           : (c.siren ? 'taux réduit : client identifié (SIREN)' : 'taux normal : client sans SIREN')));
     if (C.tauxDiscute(x.travail)) expl += ' — taux discuté selon les sources, à confirmer';
+    /* Taux différents entre les travaux du forfait : on ne choisit pas pour
+       lui, on le lui dit et on attend qu'il tranche. */
+    var melange = C.tvaAtrancher(x, c);
+    if (melange) {
+      expl = 'ces travaux ne portent pas le même taux (' +
+        C.tauxDesTravaux(x, c.siren).map(function (t) {
+          return String(t).replace('.', ',') + ' %';
+        }).join(' et ') + ') — choisissez celui de la ligne';
+    }
     $('#cl-apercu').innerHTML = m
       ? '<b class="num" style="font-size:21px">' + eur(m) + '</b> HT' +
         '<div class="muted" style="font-size:12px">TVA ' + String(tx).replace('.', ',') + ' % → ' +
@@ -10918,6 +11064,23 @@ function ouvrirLigne(id, idx) {
       x.setAttribute('aria-pressed', String(x.dataset.cldiff === String(clDiff)));
     });
   });
+  $('#cl-ajout').addEventListener('click', function () {
+    var pris = C.travauxDeLigne({ travail: $('#cl-trav').value, travauxPlus: clPlus });
+    var libre = C.TRAVAUX.filter(function (t) {
+      return !t.retire && !t.fourniture && pris.indexOf(t.c) < 0;
+    })[0];
+    clPlus.push(libre ? libre.c : 'AUTRE');
+    renderPlus(); apercu();
+  });
+  $('#cl-plus').addEventListener('change', function (e) {
+    var b = e.target.closest('[data-clp]'); if (!b) return;
+    clPlus[+b.dataset.clp] = b.value; apercu();
+  });
+  $('#cl-plus').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-clpsup]'); if (!b) return;
+    clPlus.splice(+b.dataset.clpsup, 1); renderPlus(); apercu();
+  });
+  renderPlus();
   ['#cl-unite', '#cl-qte', '#cl-prix'].forEach(function (s) { $(s).addEventListener('input', apercu); });
   ['#cl-unite', '#cl-tva', '#cl-art'].forEach(function (s) {
     if ($(s)) $(s).addEventListener('change', apercu);
@@ -10926,6 +11089,11 @@ function ouvrirLigne(id, idx) {
   $('#cl-ok').addEventListener('click', function () {
     var x = lire();
     if (!C.montantLigne(x)) { toast('Quantité et prix attendus.'); return; }
+    if (C.tvaAtrancher(x, c)) {
+      $('#cl-tva').classList.add('err');
+      toast('Ces travaux n’ont pas le même taux de TVA : choisissez celui de la ligne.');
+      return;
+    }
     c.lignes = c.lignes || [];
     if (idx != null) c.lignes[idx] = x; else c.lignes.push(x);
     c.maj = Date.now();
@@ -12263,7 +12431,10 @@ function ouvrirTravailRegle(code) {
           esc(x.n) + '</option>';
       }).join('') + '</select></div>') +
     '<div class="grille g2">' +
-    '<div class="champ"><label class="eyebrow" for="tr-unite">Unité de facturation</label>' +
+    /* « Unité de facturation » se lisait comme une règle : il croyait que la
+       prestation ne pouvait se facturer qu'ainsi, alors qu'il facture la même
+       tantôt à la journée, tantôt à l'hectare. Ce n'est qu'un défaut. */
+    '<div class="champ"><label class="eyebrow" for="tr-unite">Unité proposée</label>' +
     '<select id="tr-unite">' + C.UNITES.map(function (x) {
       return '<option value="' + x.c + '"' + (t && t.u === x.c ? ' selected' : '') + '>' +
         esc(x.n) + '</option>';
@@ -12284,6 +12455,9 @@ function ouvrirTravailRegle(code) {
         'La retirer est impossible tant qu’elle sert.</p>'
       : code ? '<p class="muted" style="font-size:12px;margin:11px 0 0">Jamais utilisée : ' +
         'vous pouvez la retirer des listes.</p>' : '') +
+    '<p class="muted" style="font-size:12px;margin:11px 0 0">L’unité est ' +
+    'seulement <b>proposée</b> quand vous choisissez cette prestation sur une ' +
+    'ligne : vous la changez ensuite ligne par ligne, sans rien modifier ici.</p>' +
     (code && t.tvaAvec != null
       ? '<p class="muted" style="font-size:11.5px;margin:9px 0 0">TVA ' +
         String(t.tvaSans).replace('.', ',') + ' % sans SIREN, ' +
@@ -15711,7 +15885,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.52.0-20260823-1227';
+var VERSION = '4.53.0-20260823-1532';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
