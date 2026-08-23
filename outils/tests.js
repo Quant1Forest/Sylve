@@ -4137,6 +4137,80 @@ scenario('Débours : il se pose, il se voit, et il ne rapporte rien', async () =
 });
 
 /* --------------------------------------------------------------------- */
+scenario('Ligne : la TVA se force à zéro, sans se cocher toute seule', async () => {
+  /* Un débours refacturé à l'euro près ne porte pas de TVA à ajouter : elle
+     était déjà sur la facture du fournisseur. Piège évité : C.nb(null) vaut
+     zéro, donc tester la valeur aurait coché « forcer à 0 % » sur toute ligne
+     qui n'en force aucun. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [{ id: 'c1', nom: 'Coupe des Places', statut: 'accepte', aDevis: false,
+      temps: [], maj: Date.now(),
+      lignes: [{ travail: 'F_PROTEC', unite: 'unite', quantite: 100, prix: 3,
+        nature: 'debours' }] }]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(300);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+  t.clic('[data-lmod="0"]'); await t.pause(400);
+  verifier('quatre taux forçables, plus le défaut', 5, t.$$('#cl-tva option').length);
+  verifierVrai('le zéro est proposé',
+    t.$$('#cl-tva option').some(o => o.value === '0'));
+  verifier('aucun taux forcé sur cette ligne', '', t.$('#cl-tva').value);
+
+  t.choisir('#cl-tva', '0'); await t.pause(250);
+  t.clic('#cl-ok'); await t.pause(550);
+  const l = ((t.stock('chantiers') || [])[0].lignes || [])[0];
+  verifier('le zéro est retenu', 0, l.tva);
+  const C = t.w.BCC;
+  verifier('et c’est bien lui qui s’applique', 0, C.tauxLigne(l, {}));
+
+  /* Rouvrir la ligne doit retrouver le zéro, pas le défaut. */
+  t.clic('[data-lmod="0"]'); await t.pause(400);
+  verifier('le zéro est bien retrouvé à la réouverture', '0', t.$('#cl-tva').value);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Ligne : le produit du stock est fermé quand une sortie existe à part', async () => {
+  /* Les trente-deux chantiers repris du carnet ont leur sortie de stock
+     importée du classeur. Y désigner un produit n'ajoutait rien — la
+     synchronisation refusait de déduire deux fois — mais on ne l'apprenait
+     qu'après coup, par un message. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    articles: [{ id: 'a1', nom: 'Gaine de protection', unite: 'unite' }],
+    chantiers: [{ id: 'c1', nom: 'Coupe des Places', statut: 'accepte', aDevis: false,
+      temps: [], maj: Date.now(),
+      lignes: [{ travail: 'F_PROTEC', unite: 'unite', quantite: 100, prix: 3,
+        nature: 'vente' }] }],
+    /* La sortie du classeur : manuelle, donc sans « auto ». */
+    sorties: [{ id: 's1', chantier: 'c1', statut: 'fini', date: Date.now(),
+      lignes: [{ article: 'a1', qte: 100, prix: 3 }] }]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(300);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+  t.clic('[data-lmod="0"]'); await t.pause(450);
+  verifier('le champ est fermé', true, t.$('#cl-art').disabled);
+  verifierVrai('et il dit pourquoi',
+    /déjà une sortie de stock saisie à part/.test(t.texte('#cl-art-aide')));
+
+  /* Sur un chantier sans sortie à part, il reste ouvert. */
+  const t2 = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    articles: [{ id: 'a1', nom: 'Gaine de protection', unite: 'unite' }],
+    chantiers: [{ id: 'c1', nom: 'Neuf', statut: 'accepte', aDevis: false,
+      temps: [], maj: Date.now(),
+      lignes: [{ travail: 'F_PROTEC', unite: 'unite', quantite: 100, prix: 3,
+        nature: 'vente' }] }]
+  }));
+  t2.clic('[data-vue="carnet"]'); await t2.pause(300);
+  t2.clic('[data-chouvrir="c1"]'); await t2.pause(400);
+  t2.clic('[data-lmod="0"]'); await t2.pause(450);
+  verifier('ailleurs il reste ouvert', false, t2.$('#cl-art').disabled);
+  verifier('aucune erreur', [], t.erreurs.concat(t2.erreurs));
+});
+
+/* --------------------------------------------------------------------- */
 /* Un troisième argument ne joue que les scénarios dont le nom le contient.
    Sert à éprouver un contrôle en le cassant exprès : rejouer les quarante
    autres pour vérifier qu'un seul crie coûte deux minutes pour rien.

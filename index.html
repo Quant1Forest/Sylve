@@ -7132,6 +7132,10 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.58', quoi: [
+    { t: 'La TVA se force aussi à 0 %, ce qu’un débours demande', vue: 'carnet' },
+    { t: 'Le produit du stock est fermé quand une sortie existe déjà à part', vue: 'carnet' }
+  ] },
   { v: '4.57', quoi: [
     { t: 'Le débours se pose sur une ligne de fourniture', vue: 'carnet' },
     { t: 'Il se voit sur la fiche, et ne gonfle plus ce que le chantier rapporte', vue: 'carnet' },
@@ -7152,12 +7156,6 @@ var NOTES_MAJ = [
     { t: 'Précédente et suivante suivent l’ordre de vos factures', vue: 'carnet' },
     { t: 'Poser des journées vous ramène à la fiche du chantier', vue: 'carnet' },
     { t: 'Saisir une facture propose de passer le chantier en facturé', vue: 'carnet' }
-  ] },
-  { v: '4.53', quoi: [
-    { t: 'L’application passe au vert et ne change plus de couleur toute seule' },
-    { t: 'Le carnet suit le numéro de vos factures', vue: 'carnet' },
-    { t: 'Fiche précédente et suivante, sous le nom du chantier', vue: 'carnet' },
-    { t: 'Une ligne peut porter plusieurs travaux : le forfait groupé', vue: 'carnet' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -10933,10 +10931,16 @@ function ouvrirLigne(id, idx) {
     'avancée pour le client et refacturée à l’euro près : elle figure sur la facture, ' +
     'mais n’entre pas dans votre chiffre d’affaires.</p></div>' +
     '<div class="champ"><label class="eyebrow" for="cl-tva">TVA</label>' +
+    /* Le zéro est nécessaire au débours : refacturé à l'euro près, il ne porte
+       pas de TVA à ajouter — elle était déjà sur la facture du fournisseur.
+       La sélection se teste sur « un taux est posé », jamais sur sa valeur :
+       C.nb(null) vaut zéro, et « forcer à 0 % » se serait coché tout seul sur
+       chaque ligne qui n'en force aucun. */
     '<select id="cl-tva"><option value="">— d’après la nature des travaux —</option>' +
-    [5.5, 10, 20].map(function (t) {
-      return '<option value="' + t + '"' + (C.nb(l.tva) === t ? ' selected' : '') + '>forcer à ' +
-        String(t).replace('.', ',') + ' %</option>';
+    [0, 5.5, 10, 20].map(function (t) {
+      var pose = l.tva != null && l.tva !== '';
+      return '<option value="' + t + '"' + (pose && C.nb(l.tva) === t ? ' selected' : '') +
+        '>forcer à ' + String(t).replace('.', ',') + ' %</option>';
     }).join('') + '</select></div>' +
     '<div class="carte2" id="cl-apercu" style="margin:11px 0"></div>' +
     '<label class="eyebrow" style="display:block">Difficulté <span class="muted" ' +
@@ -11023,8 +11027,20 @@ function ouvrirLigne(id, idx) {
   };
   /* Ce que la ligne va réellement retirer du stock, dit avant de valider :
      332 plants d'un répulsif dosé à 6 ml, ce sont 1 992 ml qui sortent. */
+  /* Une sortie de stock saisie à part existe déjà pour ce chantier — c'est le
+     cas des trente-deux repris du carnet, dont la sortie vient du classeur de
+     stock. Désigner un produit n'y ajouterait rien : la synchronisation
+     refuserait de déduire une seconde fois. Autant fermer le champ et le dire
+     avant, plutôt que de le laisser remplir puis d'avertir après coup. */
+  var stockAPart = !!(sortieManuelleDe(c) && !sortieAutoDe(c));
   var aideStock = function () {
     var z = $('#cl-art-aide'); if (!z) return;
+    if (stockAPart) {
+      z.innerHTML = 'Ce chantier a déjà une sortie de stock saisie à part, dans ' +
+        '« Stock et fournitures ». Rien d’autre n’en sortira : inutile de désigner ' +
+        'un produit ici.';
+      return;
+    }
     var a = article($('#cl-art').value);
     if (!a) { z.textContent = 'Aucun mouvement de stock pour cette ligne.'; return; }
     var q = C.nb($('#cl-qte').value), d = ST.nb(a.dosage);
@@ -11067,6 +11083,7 @@ function ouvrirLigne(id, idx) {
       : '<span class="muted">Renseignez quantité et prix.</span>';
   };
   /* le choix des travaux propose l'unité habituelle */
+  if (stockAPart && $('#cl-art')) $('#cl-art').disabled = true;
   $('#cl-trav').addEventListener('change', function () {
     if (idx == null) { $('#cl-unite').value = C.uniteDe(this.value); }
     majNature(); apercu();
@@ -15908,7 +15925,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.57.0-20260823-1744';
+var VERSION = '4.58.0-20260823-1801';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
