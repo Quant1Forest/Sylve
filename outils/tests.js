@@ -4360,7 +4360,7 @@ scenario('Véhicule : le carnet note, le compteur suit, l’échéance prévient
   t.clic('[data-module="entreprise"]'); await t.pause(300);
   t.clic('[data-module="vehicule"]'); await t.pause(400);
   verifierVrai('le module ouvre sur le carnet', t.$('#vue-carnetv').classList.contains('actif'));
-  verifier('avec deux onglets', 2, t.$$('#onglets button').length);
+  verifier('avec trois onglets', 3, t.$$('#onglets button').length);
   const semes = ((t.stock('vehicule') || {}).postes || []).map(p => p.nom);
   verifier('des postes sont semés d’avance', 8, semes.length);
   /* Propre aux 4x4 Dangel, et il l'a signalé : le pont arrière se vidange
@@ -4567,6 +4567,78 @@ scenario('Fusionner : le carnet arrive, et rien d’autre ne bouge', async () =>
   verifier('le carnet est arrivé entier', 2, (v.interventions || []).length);
   verifier('et le poste semé a repris sa date', 171000,
     (v.postes || []).filter(p => p.nom === 'Révision (vidange + filtres)')[0].dernierKm);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Véhicule : le coût au kilomètre, entretien et carburant', async () => {
+  /* « Si je sais qu'un chantier me coûte tant, je réfléchis. » Le coût au
+     kilomètre est le chiffre qui dit quand un utilitaire commence à coûter
+     plus qu'il ne sert. */
+  const le = (a, m, j) => new Date(a, m, j, 12).getTime();
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'finances',
+    vehicule: {
+      infos: { nom: 'Utilitaire' }, releves: [], postes: [],
+      interventions: [
+        { id: 'i1', quoi: 'Révision', date: le(2025, 0, 10), km: 100000, montant: 400, garantie: false },
+        { id: 'i2', quoi: 'Amortisseurs', date: le(2026, 0, 10), km: 150000, montant: 1200, garantie: false },
+        /* Sous garantie : rien n'est sorti de sa poche. */
+        { id: 'i3', quoi: 'Moteur', date: le(2025, 5, 1), km: 120000, montant: 3000, garantie: true }
+      ]
+    },
+    depenses: [
+      /* Le carburant « pro » compte d'office : la catégorie est celle de
+         l'utilitaire, il n'a rien à re-marquer. */
+      { id: 'd1', date: le(2025, 6, 1), lignes: [{ libelle: 'Gasoil', categorie: 'CARB', ttc: 120, taux: 20 }] },
+      { id: 'd2', date: le(2025, 8, 1), lignes: [{ libelle: 'Gasoil', categorie: 'CARB', ttc: 120, taux: 20 }] },
+      /* La carte grise ne compte que parce qu'elle est cochée. */
+      { id: 'd3', date: le(2025, 1, 1), vehicule: true,
+        lignes: [{ libelle: 'Carte grise', categorie: 'COTIS', ttc: 500, taux: 0 }] },
+      /* Le carburant du véhicule personnel n'a rien à faire là. */
+      { id: 'd4', date: le(2025, 2, 1), lignes: [{ libelle: 'Essence perso', categorie: 'CARBPERSO', ttc: 60, taux: 20 }] }
+    ]
+  }));
+  t.clic('[data-module="entreprise"]'); await t.pause(300);
+  t.clic('[data-module="vehicule"]'); await t.pause(400);
+  t.clic('[data-vue="coutsv"]'); await t.pause(400);
+  const txt = t.texte('#veh-couts');
+
+  /* 50 000 km parcourus, de 100 000 à 150 000. */
+  /* De 100 000 à 150 000 : la dépense n'est rapportée qu'aux kilomètres
+     dont on connaît le coût, jamais au compteur entier — sinon le prix du
+     kilomètre serait sous-évalué sur un véhicule repris en cours de vie. */
+  verifierVrai('les kilomètres parcourus sont ceux qu’on connaît',
+    /Sur 50 000 km parcourus/.test(txt.replace(/\u00A0/g, ' ')));
+  verifierVrai('l’entretien exclut ce qui était sous garantie',
+    /Entretien et réparations1 600 €/.test(txt.replace(/\u00A0/g, ' ')));
+  verifierVrai('le carburant pro compte sans rien cocher',
+    /Carburant200 €/.test(txt.replace(/\u00A0/g, ' ')));
+  /* Une carte grise ne porte pas de TVA : les 500 € comptent en entier. */
+  verifierVrai('la carte grise cochée compte aussi',
+    /Autres frais500 €/.test(txt.replace(/\u00A0/g, ' ')));
+  verifierVrai('le carburant personnel n’y entre pas', !/60,00/.test(txt));
+  verifierVrai('et l’intervention la plus chère est nommée',
+    /Ce qui a coûté le plus/.test(txt) && /Amortisseurs/.test(txt));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Dépense : la case « concerne le véhicule » la rattache', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'finances' }));
+  t.clic('[data-vue="depenses"]'); await t.pause(300);
+  t.clic('#dep-nouvelle'); await t.pause(400);
+  verifierVrai('la case existe', t.$('#dp-veh'));
+  verifier('décochée par défaut', false, t.$('#dp-veh').checked);
+  t.saisir('[data-dl="0"]', 'Carte grise');
+  t.saisir('[data-dlttc="0"]', '498');
+  t.choisir('[data-dlcat="0"]', 'COTIS'); await t.pause(200);
+  cocher(t, '#dp-veh', true);
+  t.clic('#dp-ok'); await t.pause(500);
+  const d = (t.stock('depenses') || [])[0];
+  verifierVrai('la dépense est rattachée au véhicule', d.vehicule);
+  verifierVrai('et la suggestion du carnet ne se déclenche pas',
+    !/carnet du véhicule/.test(t.$('#toast').textContent));
   verifier('aucune erreur', [], t.erreurs);
 });
 
