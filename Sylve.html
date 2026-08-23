@@ -7217,6 +7217,10 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.63', quoi: [
+    { t: 'Vos donneurs d ordre ne se cassent plus en deux lignes', vue: 'finances' },
+    { t: 'Le controle technique est suivi comme les autres postes', vue: 'echeancesv' }
+  ] },
   { v: '4.62', quoi: [
     { t: 'Restaurer un fichier annonce vraiment ce qu’il contient' },
     { t: 'Fusionner ajoute sans toucher au reste — c’est vérifié', vue: 'carnetv' }
@@ -7237,10 +7241,6 @@ var NOTES_MAJ = [
     { t: 'Ce que vous avez payé se note, remboursements compris', vue: 'analyses' },
     { t: 'Un carnet d’entretien pour l’utilitaire, avec ses échéances', vue: 'carnetv' },
     { t: 'La TVA collectée applique enfin le vrai taux de vos travaux', vue: 'analyses' }
-  ] },
-  { v: '4.58', quoi: [
-    { t: 'La TVA se force aussi à 0 %, ce qu’un débours demande', vue: 'carnet' },
-    { t: 'Le produit du stock est fermé quand une sortie existe déjà à part', vue: 'carnet' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -11746,6 +11746,9 @@ function vehiculeDefaut() {
        presque, bien plus souvent que sur un utilitaire de série. */
     { id: uid() + 'd', nom: 'Vidange du pont arrière (Dangel)', pkm: 30000 },
     { id: uid() + 'l', nom: 'Liquide de frein', pmois: 24 },
+    /* Il ne figure sur aucune facture d'atelier — c'est un autre guichet — et
+       c'est justement pour ça qu'on l'oublie. */
+    { id: uid() + 't', nom: 'Contrôle technique', pmois: 24 },
     { id: uid() + 'n', nom: 'Pneus', pkm: 60000 },
     { id: uid() + 'e', nom: 'Embrayage', pkm: 200000 }
   ] };
@@ -12492,15 +12495,19 @@ function renderFinances() {
              qui fait attendre ne se valent pas à chiffre égal. La médiane,
              pas la moyenne : un seul règlement oublié six mois donnerait une
              réputation imméritée. */
-          return '<div style="display:flex;justify-content:space-between;align-items:baseline;padding:4px 0">' +
-            '<span style="font-size:13px">' + esc(x.donneur) +
-            (x.enRetard ? ' <span class="retard">' + x.enRetard + ' en retard</span>' : '') + '</span>' +
-            '<span class="muted" style="font-size:12px">' + eur(x.signe) + ' signés' +
+          /* Quatre informations et un nom sur une seule ligne : sur un
+             téléphone, la ligne se cassait en deux et l'ensemble se
+             disloquait. Le nom au-dessus, son détail en dessous — la même
+             disposition que partout ailleurs dans l'application. */
+          return '<div style="padding:6px 0;border-bottom:1px solid var(--trait)">' +
+            '<div style="font-size:13.5px">' + esc(x.donneur) +
+            (x.enRetard ? ' <span class="retard">' + x.enRetard + ' en retard</span>' : '') + '</div>' +
+            '<div class="muted" style="font-size:12px;margin-top:1px">' + eur(x.signe) + ' signés' +
             (x.propose ? ' · ' + eur(x.propose) + ' proposés' : '') +
             (x.taux != null ? ' · ' + x.taux + ' % acceptés' : '') +
             (x.delaiMedian != null ? ' · payé en ' + x.delaiMedian + ' j' +
               (x.delaiPire > x.delaiMedian ? ' (jusqu’à ' + x.delaiPire + ')' : '') : '') +
-            '</span></div>';
+            '</div></div>';
         }).join('') + '</div>';
     })() +
     (tr.proposes ? '<div class="carte"><h2>Devis</h2><div class="kpi">' +
@@ -16563,7 +16570,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.62.0-20260823-2202';
+var VERSION = '4.63.0-20260823-2232';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
