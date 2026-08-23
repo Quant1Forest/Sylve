@@ -5706,7 +5706,7 @@ var A = {
   cfg: null, index: [], bord: null, piles: [], chantiers: [], module: 'cubage', ici: null,
   vuePiles: 'stock', filtreCh: 'ouverts', rechCh: '', triAncien: false, chOuvert: null, clients: [], proprios: [], estim: null, imp: null, articles: [], charges: [], fournisseurs: [], commandes: [], sorties: [], mvt: 'achats', journees: [], lieuxRegles: [], listeReglee: 'clients', revient: null, calMois: null, calJour: null, nbAlertes: 0, planifie: null,
   depenses: [], periode: null, filtreDep: 'tous', vueAna: 'ensemble', secReglages: 'general',
-  versements: [], vehicule: null, decl: null,
+  versements: [], vehicule: null,
   vue: 'saisie', sousVue: 'synthese', edition: null,
   memeGrume: false, classementRegl: 'Class. Comt', filtre: ''
 };
@@ -7199,6 +7199,12 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.60', quoi: [
+    { t: 'Un seul choix de période dans Analyses — fini le double', vue: 'analyses' },
+    { t: 'La déclaration suit ce choix : mois, trimestre ou année', vue: 'analyses' },
+    { t: 'La TVA se reverse ou se récupère — elle ne se « paie » pas', vue: 'analyses' },
+    { t: 'Chaque mouvement dit l’année qu’il concerne', vue: 'analyses' }
+  ] },
   { v: '4.59', quoi: [
     { t: 'Déclarations : le mois, la TVA, les cotisations et l’impôt au même endroit', vue: 'analyses' },
     { t: 'Ce que vous avez payé se note, remboursements compris', vue: 'analyses' },
@@ -7218,11 +7224,6 @@ var NOTES_MAJ = [
     { t: 'Créer un chantier tient en cinq champs', vue: 'carnet' },
     { t: 'Le nom se propose : travaux, propriétaire, commune', vue: 'carnet' },
     { t: 'Le type de travaux ouvre la première ligne, à chiffrer ensuite', vue: 'carnet' }
-  ] },
-  { v: '4.55', quoi: [
-    { t: 'La facture se lit dès l’en-tête : numéro, date, paiement', vue: 'carnet' },
-    { t: 'Le moyen de paiement se note : virement, chèque, espèces', vue: 'carnet' },
-    { t: 'Le débours s’affiche à part, hors du chiffre d’affaires', vue: 'analyses' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -7868,14 +7869,6 @@ function brancher() {
     if (vm) ouvrirVersement(vm.dataset.versmod);
   });
   $('#ana-corps').addEventListener('change', function (e) {
-    if (e.target.closest('#decl-per') || e.target.closest('#decl-idx') || e.target.closest('#decl-an')) {
-      var neuf = { per: $('#decl-per').value, an: Number($('#decl-an').value),
-        idx: Number($('#decl-idx').value) || 0 };
-      /* Changer de rythme replie l'indice : le T3 n'est pas le mois de mars. */
-      if (A.decl && neuf.per !== A.decl.per) neuf.idx = 0;
-      A.decl = neuf;
-      renderAnalyses(); return;
-    }
     if (e.target.closest('#decl-cot') || e.target.closest('#decl-cap') ||
       e.target.closest('#decl-t1') || e.target.closest('#decl-t2')) {
       A.cfg.tauxCotisations = FIN.nb($('#decl-cot').value) || null;
@@ -14966,38 +14959,22 @@ function nomVersement(code) {
   return x ? x.n : (code || '');
 }
 function htmlDeclarations() {
-  if (!A.decl) {
-    var d0 = new Date();
-    A.decl = { per: 'mois', an: d0.getFullYear(), idx: d0.getMonth() };
-  }
-  var d = A.decl;
-  var bDecl = FIN.bornes(d.per === 'trimestre' ? 'trimestre' : 'mois', d.an, d.idx);
+  /* Un seul sélecteur de période, celui du haut : Analyses en portait déjà un,
+     et j'en avais ajouté un second ici. Le projet avait pourtant corrigé
+     exactement ça en fusionnant Analyses et Finances, qui écrivaient tous les
+     deux dans A.periode. Chaque bloc dit en titre la fenêtre qu'il regarde —
+     la déclaration suit la période choisie, la TVA et l'estimation raisonnent
+     sur l'année, parce que c'est ainsi qu'elles se déclarent. */
+  periodeCourante();
+  var p = A.periode;
+  var bDecl = FIN.bornes(p.type, p.annee, p.indice);
   var ca = FIN.chiffreAffaires(A.chantiers, bDecl);
-  var MOIS_N = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet',
-    'août', 'septembre', 'octobre', 'novembre', 'décembre'];
-  var anCour = new Date().getFullYear(), annees = [];
-  for (var a2 = anCour; a2 >= anCour - 4; a2--) annees.push(a2);
-  var opt = function (v, n2, sel) {
-    return '<option value="' + v + '"' + (sel ? ' selected' : '') + '>' + esc(String(n2)) + '</option>';
-  };
-  var choixIdx = d.per === 'trimestre'
-    ? [0, 1, 2, 3].map(function (i) { return opt(i, 'T' + (i + 1), d.idx === i); }).join('')
-    : MOIS_N.map(function (n2, i) { return opt(i, n2, d.idx === i); }).join('');
 
-  var h = '<div class="carte"><h2>La déclaration de chiffre d’affaires</h2>' +
+  var h = '<div class="carte"><h2>La déclaration — ' + esc(libellePeriode()) + '</h2>' +
     '<p class="muted" style="font-size:12px;margin:0 0 10px">Le chiffre d’affaires ' +
-    '<b>facturé</b> sur la période, hors débours : brut pour la déclaration, puis ' +
-    'après l’abattement forfaitaire, pour savoir sur quoi portent cotisations et impôt.</p>' +
-    '<div class="grille g3">' +
-    '<div class="champ"><label class="eyebrow" for="decl-per">Déclaration</label>' +
-    '<select id="decl-per">' + opt('mois', 'Mensuelle', d.per === 'mois') +
-    opt('trimestre', 'Trimestrielle', d.per === 'trimestre') + '</select></div>' +
-    '<div class="champ"><label class="eyebrow" for="decl-idx">' +
-    (d.per === 'trimestre' ? 'Trimestre' : 'Mois') + '</label>' +
-    '<select id="decl-idx">' + choixIdx + '</select></div>' +
-    '<div class="champ"><label class="eyebrow" for="decl-an">Année</label>' +
-    '<select id="decl-an">' + annees.map(function (a3) { return opt(a3, a3, d.an === a3); }).join('') +
-    '</select></div></div>' +
+    '<b>facturé</b> sur la période choisie en haut, hors débours : brut pour la ' +
+    'déclaration, puis après l’abattement forfaitaire, pour savoir sur quoi portent ' +
+    'cotisations et impôt.</p>' +
     '<div style="margin-top:4px">' +
     ligneCA('Prestations de services', ca.prestation, ca.prestationApres, '50 %') +
     ligneCA('Ventes de fournitures', ca.vente, ca.venteApres, '71 %') +
@@ -15007,27 +14984,32 @@ function htmlDeclarations() {
       eur(ca.debours) + ') est déjà écarté.</p>' : '') +
     '</div></div>';
 
-  var bAn = FIN.bornes('annee', d.an);
+  var an = p.annee;
+  var bAn = FIN.bornes('annee', an);
   var bal = FIN.balanceTva(A.chantiers, A.depenses, bAn, C.tauxLigne);
   var taux = Object.keys(bal.collectee.parTaux).sort(function (x, y) { return Number(x) - Number(y); });
   var ligneT = function (nom, montant) {
     return '<div style="display:flex;justify-content:space-between;font-size:13.5px;padding:3px 0">' +
       '<span>' + nom + '</span><span class="num">' + montant + '</span></div>';
   };
-  h += '<div class="carte"><h2>TVA — année ' + d.an + '</h2>' +
+  h += '<div class="carte"><h2>TVA — année ' + an + '</h2>' +
+    '<p class="muted" style="font-size:12px;margin:0 0 8px">Sur l’année entière, quelle que ' +
+    'soit la période choisie en haut : c’est ainsi qu’elle se déclare.</p>' +
     (taux.length ? taux.map(function (tx) {
       return ligneT('Collectée à ' + esc(String(tx).replace('.', ',')) + ' %', eur(bal.collectee.parTaux[tx]));
-    }).join('') : '<p class="muted" style="font-size:12.5px;margin:0 0 3px">Rien de facturé sur ' + d.an + '.</p>') +
+    }).join('') : '<p class="muted" style="font-size:12.5px;margin:0 0 3px">Rien de facturé sur ' + an + '.</p>') +
     ligneT('Déductible sur vos achats', '− ' + eur(bal.deductible.total)) +
     '<div style="display:flex;justify-content:space-between;padding-top:9px;margin-top:5px;border-top:2px solid var(--encre)">' +
     '<b>' + (bal.sens === 'a_recuperer' ? 'À récupérer' : 'À reverser') + '</b>' +
-    '<b class="num" style="font-size:18px">' + eur(bal.montant) + '</b></div></div>';
+    '<b class="num" style="font-size:18px">' + eur(bal.montant) + '</b></div>' +
+    '<p class="muted" style="font-size:11.5px;margin:9px 0 0">Vous la collectez pour l’État : ' +
+    'ce n’est pas une charge, vous la reversez ou vous la récupérez.</p></div>';
 
   var caAn = FIN.chiffreAffaires(A.chantiers, bAn);
   var tCot = FIN.nb(A.cfg.tauxCotisations);
   var imp = FIN.impotEstime(caAn.totalApres, A.cfg);
   var cot = FIN.arr(caAn.totalApres * tCot / 100, 2);
-  h += '<div class="carte"><h2>Cotisations et impôt — année ' + d.an + '</h2>' +
+  h += '<div class="carte"><h2>Cotisations et impôt — année ' + an + '</h2>' +
     '<p class="muted" style="font-size:12px;margin:0 0 10px">Une estimation avec vos taux, sur la ' +
     'base après abattement (' + eur(caAn.totalApres) + '). Votre autre emploi consommant déjà la ' +
     'tranche à 0 %, cette base entre directement dans celle à ' + esc(String(imp.t1).replace('.', ',')) +
@@ -15052,25 +15034,39 @@ function htmlDeclarations() {
       esc(String(imp.t1).replace('.', ',')) + ' % et ' + eur(imp.base2) + ' à ' +
       esc(String(imp.t2).replace('.', ',')) + ' %.</p>' : '') + '</div>';
 
+  /* Le suivi. « Payé » était faux pour la TVA : il ne la paie pas, il la
+     reverse — ou la récupère quand ses achats en portaient plus que ses
+     ventes. D'où le sens, et l'année concernée, qui n'est pas toujours celle
+     du mouvement : une régularisation de 2025 se règle en 2026. */
   var vs = (A.versements || []).slice().sort(function (x, y) { return (y.date || 0) - (x.date || 0); });
-  var netAn = 0;
+  var sorti = 0, rentre = 0;
   vs.forEach(function (v) {
-    if (new Date(v.date).getFullYear() === d.an) netAn += FIN.nb(v.montant) - FIN.nb(v.rembourse);
+    if (FIN.nb(v.annee || new Date(v.date).getFullYear()) !== an) return;
+    if (v.sens === 'entree') rentre += FIN.nb(v.montant);
+    else sorti += FIN.nb(v.montant) - FIN.nb(v.rembourse);
   });
-  h += '<div class="carte"><div class="carte-titre"><h2>Ce que vous avez payé</h2>' +
-    '<button class="btn primaire btn-min" id="decl-vers">+ Versement</button></div>' +
-    '<p class="sous-titre-bloc">Chaque versement avec sa date — et, s’il a été remboursé ' +
-    'en tout ou partie, le remboursement sur la même ligne.' +
-    (netAn ? ' Net payé en ' + d.an + ' : <b class="num">' + eur(FIN.arr(netAn, 2)) + '</b>.' : '') + '</p>' +
+  h += '<div class="carte"><div class="carte-titre"><h2>Versements et récupérations</h2>' +
+    '<button class="btn primaire btn-min" id="decl-vers">+ Mouvement</button></div>' +
+    '<p class="sous-titre-bloc">Ce qui est parti et ce qui est revenu, avec l’année que ' +
+    'ça concerne — pas toujours celle du mouvement.' +
+    ((sorti || rentre) ? ' Sur ' + an + ' : <b class="num">' + eur(FIN.arr(sorti, 2)) +
+      '</b> versés' + (rentre ? ', <b class="num">' + eur(FIN.arr(rentre, 2)) + '</b> récupérés' : '') + '.' : '') +
+    '</p>' +
     (vs.length ? vs.map(function (v) {
-      var net = FIN.arr(FIN.nb(v.montant) - FIN.nb(v.rembourse), 2);
-      return '<div class="liste-item"><div class="li-c"><b>' + esc(nomVersement(v.type)) + ' — ' + eur(net) + '</b>' +
-        '<small>' + new Date(v.date).toLocaleDateString('fr-FR') +
-        (FIN.nb(v.rembourse) ? ' · ' + eur(v.montant) + ' payés, ' + eur(v.rembourse) + ' remboursés' : '') +
+      var entree = v.sens === 'entree';
+      var net = FIN.arr(FIN.nb(v.montant) - (entree ? 0 : FIN.nb(v.rembourse)), 2);
+      var conc = FIN.nb(v.annee) || new Date(v.date).getFullYear();
+      return '<div class="liste-item"><div class="li-c"><b>' + esc(nomVersement(v.type)) + ' — ' +
+        (entree ? '+ ' : '− ') + eur(net) + '</b>' +
+        '<small>' + (entree ? 'récupéré' : 'versé') + ' le ' +
+        new Date(v.date).toLocaleDateString('fr-FR') + ' · pour ' + conc +
+        (!entree && FIN.nb(v.rembourse) ? ' · ' + eur(v.montant) + ' versés, ' +
+          eur(v.rembourse) + ' remboursés' : '') +
         (v.note ? ' · ' + esc(v.note) : '') + '</small></div>' +
         '<button class="btn-min" data-versmod="' + v.id + '">Modifier</button></div>';
-    }).join('') : '<p class="muted" style="font-size:12.5px;margin:0">Aucun versement noté. C’est ici que ' +
-      'se garde la trace de ce qui est parti : cotisations, impôt, TVA, CFE.</p>') + '</div>';
+    }).join('') : '<p class="muted" style="font-size:12.5px;margin:0">Aucun mouvement noté. C’est ici que ' +
+      'se garde la trace de ce qui est parti et de ce qui est revenu : cotisations, impôt, TVA, CFE.</p>') +
+    '</div>';
   return h;
 }
 
@@ -15083,12 +15079,28 @@ function ouvrirVersement(id) {
     '<select id="vs-type">' + TYPES_VERSEMENT.map(function (t) {
       return '<option value="' + t.c + '"' + (v && v.type === t.c ? ' selected' : '') + '>' + esc(t.n) + '</option>';
     }).join('') + '</select></div>' +
-    '<div class="champ"><label class="eyebrow" for="vs-date">Payé le</label>' +
+    '<div class="champ"><label class="eyebrow" for="vs-sens">Sens</label>' +
+    '<select id="vs-sens">' +
+    '<option value="sortie"' + (!v || v.sens !== 'entree' ? ' selected' : '') + '>Versé — sorti du compte</option>' +
+    '<option value="entree"' + (v && v.sens === 'entree' ? ' selected' : '') + '>Récupéré — rentré</option>' +
+    '</select></div>' +
+    '<div class="champ"><label class="eyebrow" for="vs-date">Le</label>' +
     '<input type="date" id="vs-date" value="' + versChamp(v ? v.date : Date.now()) + '"></div>' +
+    /* L'année concernée n'est pas toujours celle du mouvement : une
+       régularisation de 2025 se règle en 2026. */
+    '<div class="champ"><label class="eyebrow" for="vs-annee">Concerne l’année</label>' +
+    '<select id="vs-annee">' + (function () {
+      var a0 = new Date().getFullYear(), l = [], sel = FIN.nb(v && v.annee) ||
+        (v ? new Date(v.date).getFullYear() : a0);
+      for (var y = a0 + 1; y >= a0 - 5; y--) {
+        l.push('<option value="' + y + '"' + (y === sel ? ' selected' : '') + '>' + y + '</option>');
+      }
+      return l.join('');
+    })() + '</select></div>' +
     '<div class="champ"><label class="eyebrow" for="vs-mont">Montant (€)</label>' +
     '<input type="text" id="vs-mont" class="gros" inputmode="decimal" value="' +
     (v ? esc(String(v.montant).replace('.', ',')) : '') + '"></div>' +
-    '<div class="champ"><label class="eyebrow" for="vs-remb">Dont remboursé (€)</label>' +
+    '<div class="champ" id="vs-remb-champ"><label class="eyebrow" for="vs-remb">Dont remboursé (€)</label>' +
     '<input type="text" id="vs-remb" inputmode="decimal" placeholder="rien" value="' +
     (v && v.rembourse ? esc(String(v.rembourse).replace('.', ',')) : '') + '"></div></div>' +
     '<div class="champ"><label class="eyebrow" for="vs-note">Note</label>' +
@@ -15097,11 +15109,21 @@ function ouvrirVersement(id) {
     '<div class="btn-rang" style="margin-top:9px">' +
     '<button class="btn primaire" id="vs-ok">Enregistrer</button>' +
     (v ? '<button class="btn danger btn-min" id="vs-sup">Supprimer</button>' : '') + '</div>');
+  var majSens = function () {
+    var z = $('#vs-remb-champ');
+    if (z) z.style.display = $('#vs-sens').value === 'entree' ? 'none' : '';
+  };
+  $('#vs-sens').addEventListener('change', majSens);
+  majSens();
   $('#vs-ok').addEventListener('click', function () {
     var m = FIN.nb($('#vs-mont').value);
     if (!(m > 0)) { toast('Montant attendu.'); return; }
-    var maj = { type: $('#vs-type').value, date: versDate($('#vs-date').value) || Date.now(),
-      montant: m, rembourse: FIN.nb($('#vs-remb').value) || null, note: $('#vs-note').value.trim() };
+    var entree = $('#vs-sens').value === 'entree';
+    var maj = { type: $('#vs-type').value, sens: entree ? 'entree' : 'sortie',
+      date: versDate($('#vs-date').value) || Date.now(),
+      annee: FIN.nb($('#vs-annee').value) || null, montant: m,
+      rembourse: entree ? null : (FIN.nb($('#vs-remb').value) || null),
+      note: $('#vs-note').value.trim() };
     if (v) { Object.keys(maj).forEach(function (k) { v[k] = maj[k]; }); }
     else { maj.id = uid(); A.versements.push(maj); }
     sauverVersements().then(function () { fermerModale(); renderAnalyses(); toast('Versement noté.'); });
@@ -16500,7 +16522,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.59.0-20260823-2013';
+var VERSION = '4.60.0-20260823-2037';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
