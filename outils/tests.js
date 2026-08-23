@@ -3655,6 +3655,168 @@ scenario('Carnet : l’ordre est celui de la comptabilité', async () => {
 });
 
 /* --------------------------------------------------------------------- */
+scenario('Couleur : le vert est fixe, les plaquettes restent au cubage', async () => {
+  /* L'application prenait la couleur des plaquettes du bordereau ouvert :
+     elle changeait de teinte sans raison visible, bleue un jour, verte le
+     lendemain. La plaquette ne peint plus que ce qu'elle désigne. */
+  const t = await ouvrir(VIDE);
+  const src = t.d.documentElement.outerHTML;
+  verifierVrai('l’accent livré est vert', /--accent:#2E7D46/.test(src));
+  verifierVrai('le nom du démarrage garde le vert de la marque',
+    /\.dem-nom\{[^}]*color:var\(--vert-marque\)/s.test(src));
+  verifierVrai('la plaquette a sa propre variable',
+    /\.plaq\{[^}]*background:var\(--plaq\)/s.test(src));
+
+  /* Un bordereau à plaquettes rouges ne doit plus repeindre l'écran. */
+  t.clic('[data-module="cubage"]'); await t.pause(300);
+  t.clic('#cub-choix [data-nouveau="Class. Comt"]'); await t.pause(300);
+  t.choisir('#e-plaq', 'rouge');
+  t.clic('#e-ok'); await t.pause(400);
+  const racine = t.d.documentElement.style;
+  verifier('l’accent n’est pas touché', '', racine.getPropertyValue('--accent'));
+  verifierVrai('mais la plaquette prend le rouge',
+    /B4231F/i.test(racine.getPropertyValue('--plaq')));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Réglages : l’unité d’une prestation n’est qu’une proposition', async () => {
+  /* « Unité de facturation » se lisait comme une règle : il facture la même
+     prestation tantôt à la journée, tantôt à l'hectare. */
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'chantiers' }));
+  t.clic('#b-reglages'); await t.pause(350);
+  t.clic('[data-regl="ent"]'); await t.pause(300);
+  t.clic('[data-liste="travaux"]'); await t.pause(300);
+  if (t.$('#rl-plus')) { t.clic('#rl-plus'); await t.pause(300); }
+  t.clic('[data-lmodif="DETOUR"]'); await t.pause(350);
+  const m = t.texte('#modale');
+  verifierVrai('le mot dit que c’est une proposition', /Unité proposée/.test(m));
+  verifierVrai('l’ancien mot a disparu', !/Unité de facturation/.test(m));
+  verifierVrai('et la phrase l’explique', /seulement .?proposée.? quand vous choisissez/.test(m));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Carnet : le numéro de facture prime sur la date', async () => {
+  /* « Il y en a deux qui ont la même date de facture. Je veux que ce soit
+     affiché dans l'ordre de mes factures. » La date seule ne savait pas les
+     départager. La plus récente en haut. */
+  const le = (a, m, j) => new Date(a, m, j, 12).getTime();
+  const memeJour = le(2026, 3, 14);
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [
+      { id: 'f1', nom: 'Premier', statut: 'paye', aDevis: false, lignes: [], temps: [],
+        numeroFacture: 'F-2026-0001', dateFacture: memeJour, maj: Date.now() },
+      { id: 'f3', nom: 'Troisième', statut: 'paye', aDevis: false, lignes: [], temps: [],
+        numeroFacture: 'F-2026-0003', dateFacture: memeJour, maj: le(2026, 0, 1) },
+      { id: 'f2', nom: 'Deuxième', statut: 'paye', aDevis: false, lignes: [], temps: [],
+        numeroFacture: 'F-2026-0002', dateFacture: memeJour, maj: le(2026, 5, 1) }
+    ]
+  }));
+  const C = t.w.BCC;
+  verifier('le numéro devient comparable', 2026000002,
+    C.rangFacture({ numeroFacture: 'F-2026-0002' }));
+  verifier('sans facture, rien', 0, C.rangFacture({}));
+
+  t.clic('[data-vue="carnet"]'); await t.pause(300);
+  t.choisir('#c-filtre', 'tous'); await t.pause(350);
+  verifier('la plus récente en haut, malgré la même date',
+    ['f3', 'f2', 'f1'], t.$$('[data-chouvrir]').map(b => b.dataset.chouvrir));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Fiche : on passe d’un chantier au suivant sans rouvrir la liste', async () => {
+  const le = (a, m, j) => new Date(a, m, j, 12).getTime();
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [
+      { id: 'a', nom: 'Alpha', statut: 'paye', aDevis: false, lignes: [], temps: [],
+        numeroFacture: 'F-2026-0001', dateFacture: le(2026, 0, 5), maj: Date.now() },
+      { id: 'b', nom: 'Bravo', statut: 'paye', aDevis: false, lignes: [], temps: [],
+        numeroFacture: 'F-2026-0002', dateFacture: le(2026, 1, 5), maj: Date.now() }
+    ]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(300);
+  t.choisir('#c-filtre', 'tous'); await t.pause(350);
+  t.clic('[data-chouvrir="b"]'); await t.pause(400);
+  verifierVrai('les deux boutons sont sous le sélecteur', t.$('[data-voisin]'));
+  verifierVrai('et le rang est annoncé', /1 \/ 2/.test(t.texte('#fiche-chantier')));
+  t.clic('[data-voisin="a"]'); await t.pause(400);
+  verifierVrai('on est passé au suivant', /Alpha/.test(t.texte('#fiche-chantier')));
+  verifierVrai('et le rang a suivi', /2 \/ 2/.test(t.texte('#fiche-chantier')));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Ligne : un forfait groupé porte plusieurs travaux', async () => {
+  /* « Détourage + élagage » : les travaux désignent ce que la ligne couvre,
+     le prix porte sur l'ensemble, sans quantité. Et si les deux ne portent
+     pas le même taux, Sylve refuse de choisir à sa place. */
+  const t = await ouvrir(VIDE);
+  const C = t.w.BCC;
+  const groupee = { travail: 'DETOUR', travauxPlus: ['ELAG'], unite: 'forfait', prix: 900 };
+  verifier('les deux travaux sont lus', ['DETOUR', 'ELAG'], C.travauxDeLigne(groupee));
+  verifierVrai('la ligne est groupée', C.ligneGroupee(groupee));
+  verifierVrai('les deux noms s’affichent',
+    /Détourage \+ Élagage/.test(C.nomTravauxLigne(groupee)));
+  verifier('même taux : rien à trancher', false, C.tvaAtrancher(groupee, {}));
+  /* Détourage 20 % sans SIREN, fourniture de plants 5,5 % : taux mêlés. */
+  const melangee = { travail: 'DETOUR', travauxPlus: ['F_PLANTS'], unite: 'forfait', prix: 900 };
+  verifierVrai('taux différents : il faut trancher', C.tvaAtrancher(melangee, {}));
+  verifier('un taux forcé lève la question', false,
+    C.tvaAtrancher(Object.assign({}, melangee, { tva: 10 }), {}));
+  verifier('et c’est ce taux qui s’applique', 10,
+    C.tauxLigne(Object.assign({}, melangee, { tva: 10 }), {}));
+  /* Sans arbitrage, on retient le plus élevé plutôt que de sous-facturer. */
+  verifier('sans arbitrage, le plus élevé', 20, C.tauxLigne(melangee, {}));
+  verifier('une ligne simple ne change pas', 20,
+    C.tauxLigne({ travail: 'DETOUR' }, {}));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Ligne : « + travaux » bascule en forfait et bloque la TVA mêlée', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    /* Avec un SIREN, le détourage passe à 10 % tandis que le jalonnage reste
+       à 20 % : c'est là que les taux se mêlent, et c'est son cas réel. */
+    chantiers: [{ id: 'c1', nom: 'Coupe des Places', statut: 'accepte', aDevis: false,
+      siren: true, lignes: [], temps: [], maj: Date.now() }]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(300);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+  t.clic('#f-ligne'); await t.pause(400);
+  t.choisir('#cl-trav', 'DETOUR'); await t.pause(200);
+  verifierVrai('le bouton « + travaux » est là', t.$('#cl-ajout'));
+  verifier('la quantité est ouverte au départ', false, t.$('#cl-qte').disabled);
+
+  t.clic('#cl-ajout'); await t.pause(300);
+  verifierVrai('un second travail apparaît', t.$('[data-clp="0"]'));
+  verifier('la ligne passe en forfait', 'forfait', t.$('#cl-unite').value);
+  verifier('et la quantité se ferme', true, t.$('#cl-qte').disabled);
+  verifierVrai('le forfait est expliqué', /le prix porte sur l’ensemble/.test(t.texte('#cl-forfait')));
+
+  /* Deux taux différents : on refuse d'enregistrer sans arbitrage. */
+  t.choisir('[data-clp="0"]', 'JALON'); await t.pause(250);
+  t.saisir('#cl-prix', '900');
+  t.clic('#cl-ok'); await t.pause(400);
+  verifier('rien n’est enregistré tant que la TVA n’est pas tranchée', 0,
+    ((t.stock('chantiers') || [])[0].lignes || []).length);
+  verifierVrai('et le champ TVA est signalé', t.$('#cl-tva').classList.contains('err'));
+
+  t.choisir('#cl-tva', '10'); await t.pause(250);
+  t.clic('#cl-ok'); await t.pause(500);
+  const ligne = ((t.stock('chantiers') || [])[0].lignes || [])[0];
+  verifierVrai('avec le taux, la ligne passe', ligne);
+  verifier('elle porte le second travail', ['JALON'], ligne.travauxPlus);
+  verifier('en forfait', 'forfait', ligne.unite);
+  verifier('au taux choisi', 10, ligne.tva);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
 /* Un troisième argument ne joue que les scénarios dont le nom le contient.
    Sert à éprouver un contrôle en le cassant exprès : rejouer les quarante
    autres pour vérifier qu'un seul crie coûte deux minutes pour rien.
