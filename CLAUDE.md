@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.53.0-20260823-1532**
+Version courante : **4.56.0-20260823-1730**
 
 ---
 
@@ -979,6 +979,46 @@ pas sa propre facture.
   de passer en dessous de cent identifiants — un contrôle qui n'inspecte plus
   rien doit crier, pas rassurer.
 
+## La création d'un chantier, et son nom
+
+Le formulaire de création portait encore les vingt-trois champs de l'ancien
+« en-tête ». Il n'en garde que cinq : **donneur d'ordre, propriétaire, commune,
+forêt, type de travaux**. Le reste se remplit bloc par bloc sur la fiche.
+
+- **`nomAutoChantier(travail, proprietaire, commune)`** compose « Dégagement
+  manuel — Dupont, Foncine ». Il suit la saisie **tant qu'il n'a pas touché au
+  champ** ; dès qu'il écrit le sien, il se fige. Proposé, jamais imposé.
+- **Le type de travaux ouvre la première ligne** du bloc Travaux, avec son
+  unité, sans quantité ni prix. Demandé par lui : « en général à la création je
+  sais déjà le type de travaux effectués ».
+- **`formEnteteCh()` et `renderCeDevis()` ont été retirées** : elles ne
+  servaient plus qu'à ce formulaire. Les helpers partagés restent —
+  `brancherCeJours`, `brancherEssenceCh`, `brancherOffreListe`,
+  `majFinValidite` servent aux blocs de la fiche. Vérifier le compte d'usages
+  avant d'en supprimer un autre.
+- **Quatre scénarios passaient par ce formulaire** pour éprouver des propriétés
+  qui vivent ailleurs : journées posées (bloc Les journées), ajout d'essence
+  (Le peuplement), case du devis et étapes de statut (Le devis et Statut). Ils
+  visent maintenant ces écrans.
+
+## Ce qui manque encore au débours
+
+**Signalé le 23 août, pas encore fait.** La nature d'une ligne est **déduite du
+travail** : une fourniture devient `vente`, tout le reste `prestation`. Le
+**débours n'est jamais assignable** depuis l'application — ses lignes de débours
+n'existent que parce que la reprise du carnet les a posées. Et rien ne le
+distingue sur la fiche : une vente affiche « · fourniture », un débours
+n'affiche rien.
+
+Conséquence : le calcul est juste (le débours est bien hors CA), mais **il ne
+peut ni en créer un, ni en voir un, ni corriger une erreur**. Pour quelqu'un qui
+doit déduire ces montants de son chiffre d'affaires, c'est un manque réel.
+
+**Autre demande du même jour** : quand une sortie de stock manuelle existe déjà
+pour un chantier — c'est le cas des trente-deux repris du carnet — le champ
+« Produit du stock » devrait être **grisé avec son explication**, au lieu de le
+laisser saisir puis d'afficher un message après coup.
+
 ## Le vert, et la couleur qui ne bouge plus
 
 « Des fois c'est bleu, des fois c'est vert, et je ne comprends pas pourquoi. »
@@ -1179,7 +1219,7 @@ cubage, `carnet` aux chantiers.
 
 ## Où en est le chantier — 23 août 2026
 
-**Version en ligne : 4.53.0.** Le contrôle passe à 964 vérifications.
+**Version en ligne : 4.56.0.** Le contrôle passe à 1010 vérifications.
 
 **La 4.51, née d'une seule tournée dictée.** Il a parcouru la 4.50 et signalé
 six choses en un message : le retour des réglages, l'absence de flèche hors
