@@ -3384,6 +3384,21 @@ function tauxPresents(ch) {
 function montant(ch) {
   return arr(((ch && ch.lignes) || []).reduce(function (t, l) { return t + montantLigne(l); }, 0), 2);
 }
+/* Le débours traverse le compte : somme avancée pour le client et refacturée
+   à l'euro près. Il figure sur la facture — le client la paie en entier — mais
+   il ne rapporte rien et ne récompense aucune journée de travail.
+   Le total de la facture le garde donc, « ce que ça a rapporté » et le prix
+   par journée l'écartent. Sans ça, la fiche et le bilan des finances donnaient
+   deux chiffres différents pour le même chantier. */
+function montantDebours(ch) {
+  return arr(((ch && ch.lignes) || []).reduce(function (t, l) {
+    return t + (l.nature === 'debours' ? montantLigne(l) : 0);
+  }, 0), 2);
+}
+function montantHorsDebours(ch) {
+  return arr(montant(ch) - montantDebours(ch), 2);
+}
+
 /* Quantité cumulée d'une unité donnée sur le chantier (pour les rendements). */
 function quantite(ch, unite) {
   return arr(((ch && ch.lignes) || []).filter(function (l) { return l.unite === unite; })
@@ -3437,7 +3452,7 @@ function prixJourVise(ch, cfg) {
 }
 /* Ce que le devis paie en journées, face à ce qu'on y a réellement passé. */
 function bilanJournees(ch, cfg) {
-  var pj = prixJourVise(ch, cfg), m = montant(ch), faites = tempsMoi(ch, cfg);
+  var pj = prixJourVise(ch, cfg), m = montantHorsDebours(ch), faites = tempsMoi(ch, cfg);
   var prevues = pj > 0 ? arr(m / pj, 2) : null;
   return {
     prixJourVise: pj || null, prevues: prevues, faites: faites,
@@ -4305,6 +4320,7 @@ function nomAutoChantier(travail, proprietaire, commune) {
 var M = {
   JOUR: JOUR, TRAVAUX: TRAVAUX, UNITES: UNITES, STATUTS: STATUTS,
   nomAutoChantier: nomAutoChantier,
+  montantDebours: montantDebours, montantHorsDebours: montantHorsDebours,
   MOYENS_PAIEMENT: MOYENS_PAIEMENT, nomMoyenPaiement: nomMoyenPaiement,
   travauxDeLigne: travauxDeLigne, ligneGroupee: ligneGroupee,
   nomTravauxLigne: nomTravauxLigne, tauxDesTravaux: tauxDesTravaux,
@@ -7114,6 +7130,11 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.57', quoi: [
+    { t: 'Le débours se pose sur une ligne de fourniture', vue: 'carnet' },
+    { t: 'Il se voit sur la fiche, et ne gonfle plus ce que le chantier rapporte', vue: 'carnet' },
+    { t: 'Le prix par journée ne compte plus le débours', vue: 'carnet' }
+  ] },
   { v: '4.56', quoi: [
     { t: 'Créer un chantier tient en cinq champs', vue: 'carnet' },
     { t: 'Le nom se propose : travaux, propriétaire, commune', vue: 'carnet' },
@@ -7135,12 +7156,6 @@ var NOTES_MAJ = [
     { t: 'Le carnet suit le numéro de vos factures', vue: 'carnet' },
     { t: 'Fiche précédente et suivante, sous le nom du chantier', vue: 'carnet' },
     { t: 'Une ligne peut porter plusieurs travaux : le forfait groupé', vue: 'carnet' }
-  ] },
-  { v: '4.52', quoi: [
-    { t: 'Vos cinq grandes familles au-dessus des prestations', vue: 'analyses' },
-    { t: 'Les recettes se lisent famille par famille', vue: 'analyses' },
-    { t: 'Le carnet suit l’ordre de la comptabilité : facture, puis devis', vue: 'carnet' },
-    { t: 'La flèche de retour est là dans tous les modules' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -10002,7 +10017,10 @@ function renderFiche() {
   var z = $('#fiche-chantier'); if (!z) return;
   var c = chantier(A.chOuvert);
   if (!c) { z.innerHTML = '<div class="carte"><div class="vide"><p>Chantier introuvable.</p></div></div>'; return; }
-  var m = C.montant(c), j = C.tempsTotal(c, A.cfg), pj = C.prixJour(c, A.cfg);
+  /* « m » est ce que le chantier rapporte : le débours en est retiré. Le
+     total de la facture, plus bas, le garde. */
+  var m = C.montantHorsDebours(c), mFacture = C.montant(c), deb = C.montantDebours(c);
+  var j = C.tempsTotal(c, A.cfg), pj = C.prixJour(c, A.cfg);
   var vise = C.prixJourVise(c, A.cfg);
   var bil = C.bilanJournees(c, A.cfg);
   var lignes = (c.lignes || []).map(function (l, i) {
@@ -10020,6 +10038,9 @@ function renderFiche() {
       (l.note ? esc(C.nomTravauxLigne(l)) + ' · ' : '') + esc(q) +
       ' · TVA ' + String(C.tauxLigne(l, c)).replace('.', ',') + ' %' +
       (l.nature === 'vente' ? ' · fourniture' : '') +
+      /* Un débours ne se distinguait en rien d'une prestation : impossible de
+         vérifier qu'il était bien écarté du chiffre d'affaires. */
+      (l.nature === 'debours' ? ' · <b>débours</b>, hors chiffre d’affaires' : '') +
       (l.tva != null && l.tva !== '' ? ' (forcé)' : '') +
       (l.difficulte ? ' · difficulté ' + C.nb(l.difficulte) + '/5' : '') + '</div></div>' +
       '<div style="text-align:right"><b class="num">' + eur(C.montantLigne(l)) + '</b><br>' +
@@ -10099,8 +10120,14 @@ function renderFiche() {
     '<p class="sous-titre-bloc">Ce que vous facturez : une ligne par prestation, ' +
     'avec sa quantité, son prix et sa TVA. C’est la matière de votre devis.</p>' +
     (lignes || '<div class="vide"><p>Aucune ligne. Ajoutez les travaux et leur chiffrage.</p></div>') +
-    (m ? '<div style="display:flex;justify-content:space-between;margin-top:11px;padding-top:9px;border-top:2px solid var(--encre)">' +
-      '<b>Total HT</b><b class="num" style="font-size:19px">' + eur(m) + '</b></div>' +
+    /* Le total de la facture garde le débours — c'est ce que le client paie —
+       et la part qu'il représente est dite juste en dessous, pour qu'on sache
+       ce qui, là-dedans, ne rapporte rien. */
+    (mFacture ? '<div style="display:flex;justify-content:space-between;margin-top:11px;padding-top:9px;border-top:2px solid var(--encre)">' +
+      '<b>Total HT</b><b class="num" style="font-size:19px">' + eur(mFacture) + '</b></div>' +
+      (deb ? '<div style="display:flex;justify-content:space-between;font-size:13px" class="muted">' +
+        '<span>dont débours, hors chiffre d’affaires</span><span class="num">' +
+        eur(deb) + '</span></div>' : '') +
       '<div style="display:flex;justify-content:space-between;font-size:13px" class="muted">' +
       '<span>TVA ' + C.tauxPresents(c).map(function (t) { return String(t).replace('.', ','); }).join(' et ') + ' %</span><span class="num">' +
       eur((c.lignes || []).reduce(function (s, l) { return s + C.montantLigne(l) * C.tauxLigne(l, c) / 100; }, 0)) +
@@ -10893,6 +10920,16 @@ function ouvrirLigne(id, idx) {
     '<input type="text" id="cl-prix" class="gros" inputmode="decimal" value="' + esc(l.prix == null ? '' : String(l.prix).replace('.', ',')) + '"></div>' +
     '</div>' +
     '<p class="muted" style="font-size:12px;margin:0 0 11px" id="cl-forfait"></p>' +
+    /* Le débours ne se propose que sur une fourniture : c'est une somme
+       avancée pour le client et refacturée à l'euro près. */
+    '<div class="champ" id="cl-nat-champ"><label class="eyebrow" for="cl-nature">Nature</label>' +
+    '<select id="cl-nature">' +
+    '<option value="vente">Vente de fournitures</option>' +
+    '<option value="debours"' + (l.nature === 'debours' ? ' selected' : '') +
+    '>Débours client</option></select>' +
+    '<p class="muted" style="font-size:11.5px;margin:5px 0 0">Un débours est une somme ' +
+    'avancée pour le client et refacturée à l’euro près : elle figure sur la facture, ' +
+    'mais n’entre pas dans votre chiffre d’affaires.</p></div>' +
     '<div class="champ"><label class="eyebrow" for="cl-tva">TVA</label>' +
     '<select id="cl-tva"><option value="">— d’après la nature des travaux —</option>' +
     [5.5, 10, 20].map(function (t) {
@@ -10936,6 +10973,16 @@ function ouvrirLigne(id, idx) {
      Dès qu'il y en a un, la ligne devient un forfait — un seul prix, pas de
      quantité, parce que c'est ainsi qu'il la facture. */
   var clPlus = (l.travauxPlus || []).slice();
+  /* Hors fourniture, la nature reste déduite comme avant : une prestation.
+     Le champ ne s'affiche donc que là où il a un sens. */
+  var natureChoisie = function () {
+    if (!C.estFourniture($('#cl-trav').value)) return 'prestation';
+    return ($('#cl-nature') && $('#cl-nature').value) || 'vente';
+  };
+  var majNature = function () {
+    var z = $('#cl-nat-champ'); if (!z) return;
+    z.style.display = C.estFourniture($('#cl-trav').value) ? '' : 'none';
+  };
   var majForfait = function () {
     var groupe = clPlus.length > 0;
     var u = $('#cl-unite'), q = $('#cl-qte'), lab = document.querySelector('label[for="cl-prix"]');
@@ -10966,7 +11013,7 @@ function ouvrirLigne(id, idx) {
     return { travail: $('#cl-trav').value, unite: $('#cl-unite').value,
       travauxPlus: clPlus.slice(),
       quantite: C.nb($('#cl-qte').value), prix: C.nb($('#cl-prix').value),
-      nature: C.estFourniture($('#cl-trav').value) ? 'vente' : 'prestation',
+      nature: natureChoisie(),
       tva: $('#cl-tva').value === '' ? null : C.nb($('#cl-tva').value),
       difficulte: clDiff || null,
       article: $('#cl-art') ? ($('#cl-art').value || null) : (l.article || null),
@@ -11020,8 +11067,10 @@ function ouvrirLigne(id, idx) {
   /* le choix des travaux propose l'unité habituelle */
   $('#cl-trav').addEventListener('change', function () {
     if (idx == null) { $('#cl-unite').value = C.uniteDe(this.value); }
-    apercu();
+    majNature(); apercu();
   });
+  $('#cl-nature').addEventListener('change', apercu);
+  majNature();
   $('#cl-diff').addEventListener('click', function (e) {
     var b = e.target.closest('[data-cldiff]'); if (!b) return;
     clDiff = b.dataset.cldiff ? Number(b.dataset.cldiff) : '';
@@ -15857,7 +15906,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.56.0-20260823-1730';
+var VERSION = '4.57.0-20260823-1744';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
