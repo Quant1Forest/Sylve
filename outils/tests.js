@@ -4362,7 +4362,7 @@ scenario('Véhicule : le carnet note, le compteur suit, l’échéance prévient
   verifierVrai('le module ouvre sur le carnet', t.$('#vue-carnetv').classList.contains('actif'));
   verifier('avec deux onglets', 2, t.$$('#onglets button').length);
   const semes = ((t.stock('vehicule') || {}).postes || []).map(p => p.nom);
-  verifier('des postes sont semés d’avance', 7, semes.length);
+  verifier('des postes sont semés d’avance', 8, semes.length);
   /* Propre aux 4x4 Dangel, et il l'a signalé : le pont arrière se vidange
      bien plus souvent que sur un utilitaire de série. */
   verifierVrai('dont le pont arrière du Dangel',
