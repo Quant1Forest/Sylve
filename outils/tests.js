@@ -3034,6 +3034,311 @@ scenario('Fiche : sans devis, le bloc le dit au lieu de mentir', async () => {
 });
 
 /* --------------------------------------------------------------------- */
+scenario('Cubage : l’arrivée pose le choix du cubage et crée dans le bon type', async () => {
+  /* Le type de bordereau existait depuis toujours — au huitième champ de
+     l'en-tête, derrière un bouton qui fabriquait un comtois sans le dire.
+     Le manque était de visibilité, pas d'écran : le module ouvre donc sur
+     celui qui pose la question. */
+  const t = await ouvrir(VIDE);
+  t.clic('[data-module="cubage"]'); await t.pause(250);
+  verifierVrai('on arrive sur les bordereaux, pas sur la saisie',
+    t.$('#vue-fichiers').classList.contains('actif'));
+  verifierVrai('le comtois est proposé', t.$('#cub-choix [data-nouveau="Class. Comt"]'));
+  verifierVrai('l’ABCD aussi', t.$('#cub-choix [data-nouveau="Class. Qualitatif"]'));
+  const choix = t.texte('#cub-choix');
+  verifierVrai('sous leur nom en clair', /Cubage comtois/.test(choix) && /Classement ABCD/.test(choix));
+  verifierVrai('le code du tableur ne s’affiche plus', !/Class\. Comt/.test(choix));
+  verifierVrai('le bouton qui créait un comtois en silence a disparu', !t.$('#n-nouveau'));
+
+  t.clic('#cub-choix [data-nouveau="Class. Qualitatif"]'); await t.pause(250);
+  verifier('l’en-tête s’ouvre déjà réglé sur l’ABCD', 'Class. Qualitatif', t.$('#e-cl').value);
+  t.clic('#e-ok'); await t.pause(400);
+  verifierVrai('et l’on enchaîne sur la saisie', t.$('#vue-saisie').classList.contains('actif'));
+  verifier('les qualités proposées sont celles de l’ABCD',
+    ['A', 'B', 'C', 'D', 'S', 'F', 'Z', 'Z1'], t.$$('#f-qual [data-qual]').map(b => b.dataset.qual));
+  verifierVrai('« Actba » ne s’affiche plus nulle part', !/ctba/.test(t.texte('#f-qual')));
+  verifierVrai('le bandeau dit dans quel cubage on est',
+    /Classement ABCD/.test(t.texte('#b-sous')));
+
+  t.clic('[data-vue="fichiers"]'); await t.pause(250);
+  verifierVrai('le bordereau en cours se reprend d’un doigt', t.$('#cub-reprendre'));
+  verifierVrai('et annonce son type', /Classement ABCD/.test(t.texte('#cub-reprendre')));
+  t.clic('#cub-reprendre'); await t.pause(250);
+  verifierVrai('ce qui ramène à la saisie', t.$('#vue-saisie').classList.contains('actif'));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Cubage ABCD : les critères préviennent, ils n’empêchent pas d’enregistrer', async () => {
+  /* Fiche ONF : un A se compte en 4, 4,5, 5, 8 ou 9 m et demande 45 cm de
+     médian. Sylve le dit et se tait ensuite — c'est le classeur qui a la
+     grume sous les yeux. */
+  const t = await ouvrir(VIDE);
+  t.clic('[data-module="cubage"]'); await t.pause(250);
+  t.clic('#cub-choix [data-nouveau="Class. Qualitatif"]'); await t.pause(250);
+  t.clic('#e-ok'); await t.pause(400);
+
+  t.clic('#f-ess [data-ess="EPC"]');
+  t.clic('#f-qual [data-qual="A"]');
+  t.saisir('#f-lon', '6,5'); t.saisir('#f-dia', '38');
+  await t.pause(200);
+  const avis = t.texte('#a-avis');
+  verifierVrai('la longueur permise est rappelée', /se compte par 4, 4,5, 5, 8 ou 9 m/.test(avis));
+  verifierVrai('avec celle du billon', /6,50 m/.test(avis));
+  verifierVrai('le médian mini aussi', /demande 45 cm de médian sur écorce/.test(avis));
+  verifierVrai('et celui du billon', /en fait 38/.test(avis));
+  verifierVrai('l’avis n’est pas rouge : il n’accuse pas', !t.$('#a-avis .rouge'));
+  verifierVrai('il est tiède', t.$('#a-avis .tiede'));
+
+  t.clic('#f-billon'); await t.pause(400);
+  verifier('le billon s’enregistre quand même', 1, (t.stock('index')[0] || {}).nb);
+
+  /* Un billon qui tient ses critères ne dit plus rien. */
+  t.clic('#f-ess [data-ess="EPC"]');
+  t.clic('#f-qual [data-qual="A"]');
+  t.saisir('#f-lon', '4,5'); t.saisir('#f-dia', '50');
+  await t.pause(200);
+  verifierVrai('un A de 4,5 m à 50 cm ne déclenche rien', !t.$('#a-avis .tiede'));
+
+  /* Et un B se compte par 4 m, pas par 4,5. */
+  t.clic('#f-qual [data-qual="B"]'); await t.pause(200);
+  verifierVrai('un B de 4,5 m est signalé', /billon B se compte par 4 m/.test(t.texte('#a-avis')));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Cubage ABCD : la notation de purge donne la longueur de réfaction', async () => {
+  /* -2P, c'est deux mètres purgés pour pourriture. La retaper à côté était
+     une occasion de se tromper pour rien. */
+  const t = await ouvrir(VIDE);
+  t.clic('[data-module="cubage"]'); await t.pause(250);
+  t.clic('#cub-choix [data-nouveau="Class. Qualitatif"]'); await t.pause(250);
+  t.clic('#e-ok'); await t.pause(400);
+
+  t.clic('#f-motifs [data-motif="-2P"]'); await t.pause(150);
+  verifier('la notation est portée', '-2P', t.$('#f-refn').value);
+  verifier('et la réfaction s’en déduit', '2', t.$('#f-refl').value);
+  t.clic('#f-motifs [data-motif="-1D"]'); await t.pause(150);
+  verifier('deux notations se cumulent', '-2P + -1D', t.$('#f-refn').value);
+  verifier('la longueur suit', '3', t.$('#f-refl').value);
+  t.clic('#f-motifs [data-motif="-2P"]'); await t.pause(150);
+  verifier('un second appui la retire', '-1D', t.$('#f-refn').value);
+  verifier('la longueur retombe', '1', t.$('#f-refl').value);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Cubage comtois : les motifs se cumulent sans toucher à la longueur', async () => {
+  /* « D + C » est un cas du mémento : deux défauts à moins de quatre mètres
+     l'un de l'autre. Mais en comtois la purge se juge sur la grume — le code
+     ne la porte pas, Sylve n'a donc rien à en déduire. */
+  const t = await ouvrir(VIDE);
+  t.clic('[data-module="cubage"]'); await t.pause(250);
+  t.clic('#cub-choix [data-nouveau="Class. Comt"]'); await t.pause(250);
+  t.clic('#e-ok'); await t.pause(400);
+
+  verifier('les motifs sont ceux du mémento comtois',
+    ['C', 'D', 'G', 'R', 'GEL', 'EE', 'P'],
+    t.$$('#f-motifs [data-motif]').map(b => b.dataset.motif));
+  t.clic('#f-motifs [data-motif="D"]'); await t.pause(150);
+  t.clic('#f-motifs [data-motif="C"]'); await t.pause(150);
+  verifier('les deux se cumulent', 'D + C', t.$('#f-refn').value);
+  verifier('la réfaction reste à la main', '', t.$('#f-refl').value);
+  t.clic('#f-motifs [data-motif="D"]'); await t.pause(150);
+  verifier('et se retirent un à un', 'C', t.$('#f-refn').value);
+
+  /* Un code tapé à la main doit allumer sa pastille : sinon on ne sait plus
+     lequel des deux dit vrai. */
+  t.saisir('#f-refn', 'GEL + P'); await t.pause(200);
+  verifier('la saisie libre allume les pastilles', ['GEL', 'P'],
+    t.$$('#f-motifs [data-motif][aria-pressed=true]').map(b => b.dataset.motif));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Cubage : changer de type sur un bordereau rempli prévient avant', async () => {
+  /* Un V du comtois ne veut rien dire en ABCD. On le dit, on ne l'interdit
+     pas : c'est lui qui sait s'il s'est trompé de type en créant. */
+  const t = await ouvrir(VIDE);
+  t.clic('[data-module="cubage"]'); await t.pause(250);
+  t.clic('#cub-choix [data-nouveau="Class. Comt"]'); await t.pause(250);
+  t.clic('#e-ok'); await t.pause(400);
+  t.clic('#f-ess [data-ess="EPC"]');
+  t.clic('#f-qual [data-qual="V"]');
+  t.saisir('#f-lon', '12'); t.saisir('#f-dia', '40');
+  t.clic('#f-billon'); await t.pause(400);
+
+  let demande = null;
+  t.w.confirm = m => { demande = m; return false; };
+  t.clic('#b-entete'); await t.pause(250);
+  t.$('#e-cl').value = 'Class. Qualitatif';
+  t.clic('#e-ok'); await t.pause(250);
+  verifierVrai('la qualité orpheline est nommée', /La qualité V n’existe pas/.test(demande || ''));
+  verifierVrai('le nombre de billons aussi', /^1 billon est déjà saisi/.test(demande || ''));
+  verifierVrai('et les deux types en clair',
+    /« Cubage comtois »/.test(demande || '') && /« Classement ABCD »/.test(demande || ''));
+  verifier('refuser laisse le type en place', 'Class. Comt',
+    (t.stock('index')[0] || {}).meta.classement);
+
+  t.w.confirm = () => true;
+  t.$('#e-cl').value = 'Class. Qualitatif';
+  t.clic('#e-ok'); await t.pause(450);
+  verifier('accepter le change', 'Class. Qualitatif', (t.stock('index')[0] || {}).meta.classement);
+
+  /* Un bordereau vide ne demande rien : il n'y a rien à perdre. */
+  demande = null;
+  t.w.confirm = m => { demande = m; return true; };
+  t.clic('#cub-choix [data-nouveau="Class. Comt"]'); await t.pause(250);
+  t.$('#e-cl').value = 'Class. Chablis';
+  t.clic('#e-ok'); await t.pause(400);
+  verifier('aucune question sur un bordereau vide', null, demande);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Cubage : « Actba » est réécrit une fois, un libellé choisi est gardé', async () => {
+  /* Les listes de qualités partent dans les sauvegardes : changer le défaut
+     ne suffisait pas, un téléphone déjà installé garde les siennes. On ne
+     réécrit que ce qui est resté tel quel. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    cfg: {
+      qualites: {
+        'Class. Comt': [{ code: 'V', nom: 'Vert' }, { code: 'Z', nom: 'Nul - hors dimension' }],
+        'Class. Qualitatif': [
+          { code: 'A', nom: 'Actba' }, { code: 'B', nom: 'Bctba' },
+          { code: 'C', nom: 'Ma classe à moi' }, { code: 'D', nom: 'Dctba' },
+          { code: 'Z', nom: 'Nul - hors dimension' }
+        ]
+      }
+    }
+  }));
+  await t.pause(300);
+  const l = t.stock('cfg').qualites['Class. Qualitatif'];
+  const nom = c => (l.filter(q => q.code === c)[0] || {}).nom;
+  verifier('Actba devient lisible', 'Classe A', nom('A'));
+  verifier('Bctba aussi', 'Classe B', nom('B'));
+  verifier('Dctba aussi', 'Classe D', nom('D'));
+  verifier('mais son propre libellé est gardé', 'Ma classe à moi', nom('C'));
+  verifier('les codes ne bougent pas — ce sont eux qui portent les billons',
+    ['A', 'B', 'C', 'D', 'Z'], l.map(q => q.code));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Alertes : « il y a 40 jours » ne dépend pas de l’heure qu’il est', async () => {
+  /* Quatre comptes de jours se faisaient en millisecondes. Un devis envoyé il
+     y a quarante jours à 23 h 59 ressortait donc à « 39 jours » toute la
+     journée, et ne passait à 40 que dans la dernière minute. C'est le même
+     piège que toISOString() : un jour est une case du calendrier, pas
+     86 400 000 millisecondes. */
+  const ilYaA = (n, h, m) => {
+    const d = new Date(); d.setHours(h, m, 0, 0); d.setDate(d.getDate() - n); return d.getTime();
+  };
+  const devis = ts => ({ id: 'c1', nom: 'Vaux', statut: 'envoye', aDevis: true,
+    lignes: [], temps: [], dateEnvoi: ts, maj: ts });
+
+  const tot = await ouvrir(Object.assign({}, VIDE, { chantiers: [devis(ilYaA(40, 0, 1))] }));
+  const tard = await ouvrir(Object.assign({}, VIDE, { chantiers: [devis(ilYaA(40, 23, 59))] }));
+  verifierVrai('envoyé juste après minuit : 40 jours',
+    /envoyé il y a 40 jours/.test(tot.$('#a-devis').textContent));
+  verifierVrai('envoyé juste avant minuit : 40 jours aussi',
+    /envoyé il y a 40 jours/.test(tard.$('#a-devis').textContent));
+
+  /* L'indicateur de sauvegarde comptait de la même façon : une copie faite
+     hier à 23 h et relue ce matin annonçait « aujourd'hui », ce qui est
+     exactement le message à ne pas donner sur une sauvegarde. */
+  const B = tard.w.BCB, maintenant = Date.now();
+  verifier('une sauvegarde d’hier soir se dit d’hier', 'hier',
+    B.depuisQuand(ilYaA(1, 23, 30), maintenant));
+  verifier('une sauvegarde du jour reste du jour', 'aujourd’hui',
+    B.depuisQuand(ilYaA(0, 0, 5), maintenant));
+  verifier('aucune erreur', [], tot.erreurs.concat(tard.erreurs));
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Notes de mise à jour : chaque lien mène au module qui porte la vue', async () => {
+  /* Une liste tenue à la main disait quel module ouvrir pour une vue donnée.
+     Elle ignorait toutes celles du cubage : une note pointant sur le
+     bordereau ouvrait Chantiers, avec la barre du bas restée de travers.
+     Ce contrôle vise la structure et ne lit aucun texte de note — elles
+     tournent à chaque livraison. Il criera le jour où un lien visera une vue
+     qu'aucun module ne porte. */
+  const t = await ouvrir(VIDE);
+  if (t.$('#notes-plus')) { t.clic('#notes-plus'); await t.pause(250); }
+  const vues = [...new Set(t.$$('#c-notes-maj [data-notevue]').map(b => b.dataset.notevue))]
+    .filter(v => v !== 'reglages');
+  verifierVrai('les notes portent des liens', vues.length > 0);
+  for (const v of vues) {
+    t.clic('#c-notes-maj [data-notevue="' + v + '"]'); await t.pause(300);
+    const section = t.$('#vue-' + v);
+    verifierVrai(v + ' : la vue s’ouvre', section && section.classList.contains('actif'));
+    verifierVrai(v + ' : son module la porte en onglet',
+      !!t.$('#onglets button[data-vue="' + v + '"]'));
+  }
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Charge fixe : un prélèvement du 30 tombe le 30, jamais le 28', async () => {
+  /* Le jour était replié sur 28 pour éviter le « 31 février ». Deux dégâts :
+     un prélèvement du 30 était annoncé deux jours trop tôt, et sa toute
+     première échéance — tombant alors avant sa propre date de début — était
+     écartée en silence, donc jamais annoncée. */
+  const t = await ouvrir(VIDE);
+  const jours = (charge, debut, fin) =>
+    t.w.BCF.echeances(charge, { debut: debut.getTime(), fin: fin.getTime() })
+      .map(ts => { const d = new Date(ts); return (d.getMonth() + 1) + '/' + d.getDate(); });
+  const du1erJanvier = new Date(2026, 0, 1);
+  const au30Avril = new Date(2026, 3, 30, 23);
+
+  verifier('un prélèvement du 30 : février seul se replie',
+    ['1/30', '2/28', '3/30', '4/30'],
+    jours({ id: 'a', ttc: 100, periodicite: 'mensuel', jour: 30, moisReference: 0,
+      debut: new Date(2026, 0, 30, 12).getTime() }, du1erJanvier, au30Avril));
+
+  verifier('un prélèvement du 31 : février sur le 28, avril sur le 30',
+    ['1/31', '2/28', '3/31', '4/30'],
+    jours({ id: 'b', ttc: 100, periodicite: 'mensuel', jour: 31, moisReference: 0,
+      debut: new Date(2026, 0, 31, 12).getTime() }, du1erJanvier, au30Avril));
+
+  /* 2028 est bissextile : le 29 février existe. */
+  verifier('une année bissextile va jusqu’au 29',
+    ['2/29'],
+    jours({ id: 'c', ttc: 100, periodicite: 'annuel', jour: 31, moisReference: 1,
+      debut: new Date(2028, 1, 1, 12).getTime() },
+    new Date(2028, 0, 1), new Date(2028, 11, 31, 23)));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Charge fixe : recaler une échéance ne double pas la dépense', async () => {
+  /* Corollaire du repli sur le 28 : les dépenses automatiques déjà créées
+     portaient la mauvaise date. Elles sont refaites à chaque ouverture, et
+     celles qui ne correspondent plus à aucune échéance sont retirées — c'est
+     ce qui empêche la correction de laisser un doublon derrière elle. */
+  const le = (a, m, j) => new Date(a, m, j, 12).getTime();
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    charges: [{ id: 'c1', libelle: 'Assurance', ttc: 120, taux: 0, categorie: 'ASSUR',
+      periodicite: 'mensuel', jour: 30, moisReference: 0, dansDepenses: true,
+      debut: le(2026, 0, 30) }],
+    /* Une dépense automatique née de l'ancien calcul, calée sur le 28. */
+    depenses: [{ id: 'd0', auto: true, charge: 'c1', echeance: le(2026, 0, 28),
+      date: le(2026, 0, 28), fournisseur: '',
+      lignes: [{ libelle: 'Assurance', categorie: 'ASSUR', ttc: 120, taux: 0 }] }]
+  }));
+  await t.pause(500);
+  const dep = (t.stock('depenses') || []).filter(d => d.charge === 'c1');
+  verifierVrai('il reste des dépenses', dep.length > 0);
+  verifier('aucune ne reste calée sur le 28', [],
+    dep.filter(d => new Date(d.date).getDate() === 28 && new Date(d.date).getMonth() === 0));
+  verifier('aucune échéance n’est comptée deux fois', dep.length,
+    [...new Set(dep.map(d => d.echeance))].length);
+  verifierVrai('et janvier est bien au 30',
+    dep.some(d => new Date(d.date).getMonth() === 0 && new Date(d.date).getDate() === 30));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
 /* Un troisième argument ne joue que les scénarios dont le nom le contient.
    Sert à éprouver un contrôle en le cassant exprès : rejouer les quarante
    autres pour vérifier qu'un seul crie coûte deux minutes pour rien.
