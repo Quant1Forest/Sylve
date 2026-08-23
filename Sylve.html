@@ -5627,6 +5627,10 @@ function lireSauvegarde(o) {
       'versements'].forEach(function (k) {
         if (r[k].length) vide = false;
       });
+    /* Le carnet du véhicule est un objet, pas une liste : oublié de ce compte,
+       un fichier n'en portant que lui était rejeté comme illisible. */
+    if (r.vehicule && ((r.vehicule.interventions || []).length ||
+      (r.vehicule.postes || []).length || (r.vehicule.releves || []).length)) vide = false;
     return vide ? null : r;
   }
   var seul = o.bordereau || o;
@@ -6478,7 +6482,13 @@ function contenuSauvegarde() {
     { n: (A.sorties || []).length, u: 'mouvement', p: 'mouvements' },
     { n: (A.journees || []).length, u: 'journée', p: 'journées' },
     { n: A.articles.length, u: 'produit', p: 'produits' },
-    { n: A.charges.length, u: 'charge fixe', p: 'charges fixes' }
+    { n: A.charges.length, u: 'charge fixe', p: 'charges fixes' },
+    /* Oubliés de ce compte, les deux venus en 4.59 : une sauvegarde n'en
+       portant que le carnet du véhicule s'annonçait « rien restauré » alors
+       que tout était bien arrivé. Et « avez-vous des données ? » répondait
+       non à qui n'a que ça. */
+    { n: (A.versements || []).length, u: 'versement', p: 'versements' },
+    { n: ((A.vehicule || {}).interventions || []).length, u: 'intervention', p: 'interventions' }
   ].filter(function (x) { return x.n > 0; });
 }
 function listerContenu(c) {
@@ -6715,11 +6725,21 @@ function integrer(objet, source, remplace) {
           A.vehicule[k].push(x); nm++;
         });
       });
+      /* Un poste du même nom n'est pas remplacé, il est complété : ce qui
+         arrive apporte souvent le « dernier fait » que le poste semé n'a pas.
+         Sauter purement et simplement rendait tout import d'historique
+         incapable de renseigner les échéances. */
       (s.vehicule.postes || []).forEach(function (x) {
         if (!x || !x.nom) return;
         A.vehicule.postes = A.vehicule.postes || [];
-        if (A.vehicule.postes.some(function (y) { return y.nom === x.nom; })) return;
-        A.vehicule.postes.push(x); nm++;
+        var deja = A.vehicule.postes.filter(function (y) { return y.nom === x.nom; })[0];
+        if (!deja) { A.vehicule.postes.push(x); nm++; return; }
+        if (C.nb(x.dernierKm) > C.nb(deja.dernierKm)) { deja.dernierKm = x.dernierKm; nm++; }
+        if (x.dernierDate && (!deja.dernierDate || x.dernierDate > deja.dernierDate)) {
+          deja.dernierDate = x.dernierDate; nm++;
+        }
+        if (!C.nb(deja.pkm) && C.nb(x.pkm)) deja.pkm = x.pkm;
+        if (!C.nb(deja.pmois) && C.nb(x.pmois)) deja.pmois = x.pmois;
       });
       if (s.vehicule.infos && (s.vehicule.infos.nom || s.vehicule.infos.note) &&
         !((A.vehicule.infos || {}).nom)) A.vehicule.infos = s.vehicule.infos;
@@ -7197,6 +7217,11 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.61', quoi: [
+    { t: 'Le carnet du véhicule s’importe depuis une sauvegarde', vue: 'carnetv' },
+    { t: 'Le pont arrière Dangel est suivi comme les autres postes', vue: 'echeancesv' },
+    { t: 'Les cotisations disent sur quelle base elles sont calculées', vue: 'analyses' }
+  ] },
   { v: '4.60', quoi: [
     { t: 'Un seul choix de période dans Analyses — fini le double', vue: 'analyses' },
     { t: 'La déclaration suit ce choix : mois, trimestre ou année', vue: 'analyses' },
@@ -7217,11 +7242,6 @@ var NOTES_MAJ = [
     { t: 'Le débours se pose sur une ligne de fourniture', vue: 'carnet' },
     { t: 'Il se voit sur la fiche, et ne gonfle plus ce que le chantier rapporte', vue: 'carnet' },
     { t: 'Le prix par journée ne compte plus le débours', vue: 'carnet' }
-  ] },
-  { v: '4.56', quoi: [
-    { t: 'Créer un chantier tient en cinq champs', vue: 'carnet' },
-    { t: 'Le nom se propose : travaux, propriétaire, commune', vue: 'carnet' },
-    { t: 'Le type de travaux ouvre la première ligne, à chiffrer ensuite', vue: 'carnet' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -7868,8 +7888,10 @@ function brancher() {
   });
   $('#ana-corps').addEventListener('change', function (e) {
     if (e.target.closest('#decl-cot') || e.target.closest('#decl-cap') ||
-      e.target.closest('#decl-t1') || e.target.closest('#decl-t2')) {
+      e.target.closest('#decl-t1') || e.target.closest('#decl-t2') ||
+      e.target.closest('#decl-base')) {
       A.cfg.tauxCotisations = FIN.nb($('#decl-cot').value) || null;
+      A.cfg.baseCotisations = $('#decl-base').value === 'brut' ? 'brut' : 'abattu';
       A.cfg.impotCapacite = $('#decl-cap').value.trim() === '' ? null : FIN.nb($('#decl-cap').value);
       A.cfg.impotTaux1 = $('#decl-t1').value.trim() === '' ? null : FIN.nb($('#decl-t1').value);
       A.cfg.impotTaux2 = $('#decl-t2').value.trim() === '' ? null : FIN.nb($('#decl-t2').value);
@@ -11714,6 +11736,9 @@ function vehiculeDefaut() {
     { id: uid() + 'r', nom: 'Révision (vidange + filtres)', pkm: 30000, pmois: 24 },
     { id: uid() + 'c', nom: 'Courroie de distribution', pkm: 160000, pmois: 120 },
     { id: uid() + 'p', nom: 'Plaquettes de frein', pkm: 40000 },
+    /* Propre aux 4x4 Dangel : le pont arrière se vidange à chaque révision ou
+       presque, bien plus souvent que sur un utilitaire de série. */
+    { id: uid() + 'd', nom: 'Vidange du pont arrière (Dangel)', pkm: 30000 },
     { id: uid() + 'l', nom: 'Liquide de frein', pmois: 24 },
     { id: uid() + 'n', nom: 'Pneus', pkm: 60000 },
     { id: uid() + 'e', nom: 'Embrayage', pkm: 200000 }
@@ -15005,8 +15030,14 @@ function htmlDeclarations() {
 
   var caAn = FIN.chiffreAffaires(A.chantiers, bAn);
   var tCot = FIN.nb(A.cfg.tauxCotisations);
+  /* La base était figée sur l'après-abattement, alors que simulation() la
+     laisse choisir depuis toujours. Un taux de cotisation s'applique tantôt au
+     brut, tantôt à la base abattue selon le régime : cacher laquelle est
+     retenue, c'est lui faire lire un nombre dont il ignore l'assiette. */
+  var brut = A.cfg.baseCotisations === 'brut';
+  var baseCot = brut ? caAn.total : caAn.totalApres;
   var imp = FIN.impotEstime(caAn.totalApres, A.cfg);
-  var cot = FIN.arr(caAn.totalApres * tCot / 100, 2);
+  var cot = FIN.arr(baseCot * tCot / 100, 2);
   h += '<div class="carte"><h2>Cotisations et impôt — année ' + an + '</h2>' +
     '<p class="muted" style="font-size:12px;margin:0 0 10px">Une estimation avec vos taux, sur la ' +
     'base après abattement (' + eur(caAn.totalApres) + '). Votre autre emploi consommant déjà la ' +
@@ -15016,6 +15047,11 @@ function htmlDeclarations() {
     '<div class="champ"><label class="eyebrow" for="decl-cot">Cotisations (%)</label>' +
     '<input type="text" id="decl-cot" inputmode="decimal" placeholder="25" value="' +
     (tCot ? String(tCot).replace('.', ',') : '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="decl-base">Appliqué au</label>' +
+    '<select id="decl-base">' +
+    '<option value="abattu"' + (brut ? '' : ' selected') + '>montant après abattement</option>' +
+    '<option value="brut"' + (brut ? ' selected' : '') + '>chiffre d’affaires brut</option>' +
+    '</select></div>' +
     '<div class="champ"><label class="eyebrow" for="decl-cap">Reste dans la tranche (€)</label>' +
     '<input type="text" id="decl-cap" inputmode="decimal" value="' + imp.capacite + '"></div>' +
     '<div class="champ"><label class="eyebrow" for="decl-t1">Taux de la tranche (%)</label>' +
@@ -15024,7 +15060,8 @@ function htmlDeclarations() {
     '<input type="text" id="decl-t2" inputmode="decimal" value="' + String(imp.t2).replace('.', ',') + '"></div>' +
     '</div>' +
     '<div class="kpi" style="margin-top:4px">' +
-    '<div class="carte2"><b class="num">' + (tCot ? eur(cot) : '—') + '</b><small>cotisations</small></div>' +
+    '<div class="carte2"><b class="num">' + (tCot ? eur(cot) : '—') + '</b><small>cotisations sur ' +
+    eur(baseCot) + '</small></div>' +
     '<div class="carte2"><b class="num">' + eur(imp.total) + '</b><small>impôt estimé</small></div>' +
     '<div class="carte2"><b class="num">' + eur(FIN.arr((tCot ? cot : 0) + imp.total, 2)) +
     '</b><small>ensemble</small></div></div>' +
@@ -16520,7 +16557,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.60.0-20260823-2037';
+var VERSION = '4.61.0-20260823-2127';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

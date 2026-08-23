@@ -4361,7 +4361,14 @@ scenario('Véhicule : le carnet note, le compteur suit, l’échéance prévient
   t.clic('[data-module="vehicule"]'); await t.pause(400);
   verifierVrai('le module ouvre sur le carnet', t.$('#vue-carnetv').classList.contains('actif'));
   verifier('avec deux onglets', 2, t.$$('#onglets button').length);
-  verifier('des postes sont semés d’avance', 6, (t.stock('vehicule') || {}).postes.length);
+  const semes = ((t.stock('vehicule') || {}).postes || []).map(p => p.nom);
+  verifier('des postes sont semés d’avance', 7, semes.length);
+  /* Propre aux 4x4 Dangel, et il l'a signalé : le pont arrière se vidange
+     bien plus souvent que sur un utilitaire de série. */
+  verifierVrai('dont le pont arrière du Dangel',
+    semes.some(n => /pont arrière \(Dangel\)/.test(n)));
+  verifierVrai('et la courroie de distribution',
+    semes.some(n => /Courroie de distribution/.test(n)));
 
   t.clic('#vh-plus'); await t.pause(350);
   t.saisir('#vi-quoi', 'Révision et plaquettes');
@@ -4405,6 +4412,87 @@ scenario('Véhicule : une dépense d’entretien suggère le carnet, pas deux fo
   t.clic('#dp-ok'); await t.pause(500);
   verifierVrai('la suggestion est faite',
     /carnet du véhicule/.test(t.$('#toast').textContent));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Sauvegarde : un carnet de véhicule seul s’importe et complète', async () => {
+  /* Trois oublis de la 4.59, tous trouvés en préparant son import réel : le
+     contrôle « le fichier est-il vide ? » ne regardait pas le carnet, la
+     fusion des postes sautait ceux du même nom sans reprendre leur « dernier
+     fait », et le résumé annonçait « rien restauré » alors que tout arrivait. */
+  const t = await ouvrir(VIDE);
+  const fichier = {
+    format: 'bordcub-sauvegarde-1', version: 8,
+    vehicule: {
+      infos: { nom: 'Mon utilitaire', note: 'repères' },
+      releves: [],
+      interventions: [{ id: 'vi1', quoi: 'Révision', date: new Date(2026, 3, 3, 12).getTime(),
+        km: 171000, montant: 328.78, garantie: false, postes: [] }],
+      /* Un poste que l'application sème déjà, mais qui arrive daté. */
+      postes: [{ id: 'vp1', nom: 'Révision (vidange + filtres)', pkm: 30000,
+        dernierKm: 171000, dernierDate: new Date(2026, 3, 3, 12).getTime() },
+      { id: 'vp2', nom: 'Pare-brise', pkm: null, pmois: 60 }]
+    }
+  };
+  t.w.confirm = () => true;
+  /* Le champ de restauration est fabriqué à la volée : on l'attrape. */
+  let champ = null;
+  const vrai = t.d.createElement.bind(t.d);
+  t.d.createElement = function (tag) {
+    const el = vrai(tag);
+    if (String(tag).toLowerCase() === 'input') champ = el;
+    return el;
+  };
+  t.clic('#s-restaurer');
+  t.d.createElement = vrai;
+  verifierVrai('le champ de fichier est bien créé', champ);
+  t.w.FileReader = function () {
+    this.readAsText = () => { this.result = JSON.stringify(fichier); this.onload && this.onload(); };
+  };
+  Object.defineProperty(champ, 'files', { value: [{ name: 'carnet.json' }], configurable: true });
+  champ.dispatchEvent(new t.w.Event('change', { bubbles: true }));
+  await t.pause(400);
+  if (t.$('#re-fus')) { t.clic('#re-fus'); await t.pause(500); }
+  await t.pause(600);
+
+  const v = t.stock('vehicule');
+  verifierVrai('le fichier n’est pas jugé vide', v);
+  verifier('l’intervention est arrivée', 1, (v.interventions || []).length);
+  verifier('et l’identité du véhicule aussi', 'Mon utilitaire', (v.infos || {}).nom);
+  const rev = (v.postes || []).filter(p => p.nom === 'Révision (vidange + filtres)');
+  verifier('le poste du même nom n’est pas dupliqué', 1, rev.length);
+  verifier('mais il reprend le « dernier fait » qui arrive', 171000, rev[0].dernierKm);
+  verifierVrai('et un poste inconnu s’ajoute',
+    (v.postes || []).some(p => p.nom === 'Pare-brise'));
+  verifierVrai('le message ne dit plus que rien n’a été restauré',
+    /intervention/.test(t.$('#toast').textContent));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Déclarations : la base des cotisations est dite, et se change', async () => {
+  /* Le taux s'applique tantôt au brut, tantôt à la base abattue selon le
+     régime. L'écran la figeait sur l'abattue sans le dire : il lisait un
+     montant dont il ignorait l'assiette. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'finances',
+    cfg: { tauxCotisations: 25 },
+    chantiers: [{ id: 'c1', nom: 'Coupe', statut: 'facture', aDevis: false, temps: [],
+      maj: Date.now(), dateFacture: Date.now(),
+      lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 2, prix: 500, nature: 'prestation' }] }]
+  }));
+  t.clic('[data-vue="analyses"]'); await t.pause(350);
+  t.clic('[data-ana="declarations"]'); await t.pause(400);
+  verifierVrai('le champ existe', t.$('#decl-base'));
+  verifier('l’abattement est retenu par défaut', 'abattu', t.$('#decl-base').value);
+  verifierVrai('et l’assiette est dite sous le montant',
+    /cotisations sur 500/.test(t.texte('#ana-corps')));
+
+  t.choisir('#decl-base', 'brut'); await t.pause(450);
+  verifier('le choix est retenu', 'brut', (t.stock('cfg') || {}).baseCotisations);
+  verifierVrai('et le calcul suit le brut',
+    /cotisations sur 1 000/.test(t.texte('#ana-corps').replace(/\u00A0/g, ' ')));
   verifier('aucune erreur', [], t.erreurs);
 });
 
