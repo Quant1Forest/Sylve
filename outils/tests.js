@@ -4084,6 +4084,59 @@ scenario('Création : cinq champs, et le nom qui se propose', async () => {
 });
 
 /* --------------------------------------------------------------------- */
+scenario('Débours : il se pose, il se voit, et il ne rapporte rien', async () => {
+  /* « Comment je sais que ce produit-là est bien considéré comme un débours ? »
+     Il ne pouvait pas : la nature était déduite du travail, le débours n'était
+     jamais assignable, et rien ne le distinguait sur la fiche. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [{ id: 'c1', nom: 'Coupe des Places', statut: 'accepte', aDevis: false,
+      temps: [{ date: Date.now(), duree: 2, unite: 'j', personnes: 1 }], maj: Date.now(),
+      lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 2, prix: 500, nature: 'prestation' }] }]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(300);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+
+  /* Sur une prestation, la nature ne se pose pas : elle est déduite. */
+  t.clic('#f-ligne'); await t.pause(400);
+  t.choisir('#cl-trav', 'DEGAG'); await t.pause(250);
+  verifier('pas de nature à choisir sur une prestation', 'none',
+    t.$('#cl-nat-champ').style.display);
+
+  /* Sur une fourniture, le débours devient possible. */
+  t.choisir('#cl-trav', 'F_PROTEC'); await t.pause(250);
+  verifier('le champ apparaît sur une fourniture', '', t.$('#cl-nat-champ').style.display);
+  t.choisir('#cl-nature', 'debours');
+  t.saisir('#cl-qte', '100');
+  t.saisir('#cl-prix', '3');
+  t.clic('#cl-ok'); await t.pause(550);
+
+  const c = (t.stock('chantiers') || [])[0];
+  const deb = (c.lignes || []).filter(l => l.nature === 'debours')[0];
+  verifierVrai('la ligne est bien un débours', deb);
+  verifier('avec son montant', 3, deb.prix);
+
+  /* Il se voit sur la fiche, et il ne gonfle pas ce que le chantier rapporte. */
+  const f = t.texte('#fiche-chantier');
+  /* Le point médian n'appartient qu'à la ligne : « dont débours » du total
+     porte la même fin de phrase, et une regex plus large passait même après
+     avoir retiré la mention de la ligne. */
+  verifierVrai('la ligne le dit', /· débours, hors chiffre d’affaires/.test(f));
+  verifierVrai('le total de la facture le garde', /1 300/.test(f));
+  verifierVrai('et en isole la part', /dont débours/.test(f));
+  verifierVrai('« ce que ça vaut » l’écarte', /1 000/.test(f));
+
+  const C = t.w.BCC;
+  verifier('le moteur sait le retrancher', 1000, C.montantHorsDebours(c));
+  verifier('et le nommer', 300, C.montantDebours(c));
+  /* Deux journées notées : 500 € la journée, et non 650 — un débours ne
+     récompense aucune journée de travail. */
+  verifier('le prix par journée l’écarte aussi', 500,
+    C.bilanJournees(c, {}).obtenu);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
 /* Un troisième argument ne joue que les scénarios dont le nom le contient.
    Sert à éprouver un contrôle en le cassant exprès : rejouer les quarante
    autres pour vérifier qu'un seul crie coûte deux minutes pour rien.
