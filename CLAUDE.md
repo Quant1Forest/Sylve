@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.51.0-20260823-1129**
+Version courante : **4.52.0-20260823-1227**
 
 ---
 
@@ -979,6 +979,53 @@ pas sa propre facture.
   de passer en dessous de cent identifiants — un contrôle qui n'inspecte plus
   rien doit crier, pas rassurer.
 
+## Cinq familles au-dessus des prestations
+
+`TRAVAUX` correspond à ce qu'il appelle ses **sous-catégories** : quarante-cinq
+prestations à plat, sans l'étage du dessus — celui sur lequel il raisonne et
+fait ses analyses. `CAT_TRAVAUX` le pose.
+
+- **Cinq et non sept.** Il en citait sept ; « Fourniture » et « Débours client »
+  existent déjà comme **nature de ligne**, et la nature décide de l'abattement
+  fiscal. Les redire aurait fait deux champs pour la même chose.
+  `categorieLigne()` recompose ses sept à partir de cinq : la nature l'emporte
+  pour une vente ou un débours, la famille du travail parle sinon.
+- **Le rangement livré n'est qu'un défaut.** Chaque prestation porte sa famille
+  dans les réglages et elle s'y change (`travauxPerso[code].cat`) : quarante-cinq
+  affectations décidées sans lui ne pouvaient pas toutes être justes. Deux
+  hésitations signalées : le *jalonnage* rangé en gestion alors qu'il se
+  facture au mètre, et *routes / fossés / drainage / pistes* rangés en
+  exploitation alors que c'est de la desserte.
+- **Les fournitures (`F_*`) n'ont pas de famille de travaux**, ni « Autre ».
+  Elles en prennent une par la nature de la ligne.
+- **`parFamille()` reçoit les deux fonctions du module des chantiers** au lieu
+  de l'appeler : Finances ne doit pas atteindre Chantiers, sinon les deux
+  finissent par diverger. Même raison que `tauxReussite()`.
+- **Piège rencontré : deux `optionsTravaux`.** L'une pour les postes d'une
+  journée, l'autre ajoutée pour les lignes de chantier. La seconde écrasait la
+  première en silence et le sélecteur groupé ne s'affichait nulle part. Elles
+  n'en font plus qu'une, avec deux drapeaux (`vide`, `sansFournitures`). Le
+  vérificateur l'attrape et nomme les deux lignes — encore faut-il le lancer :
+  il ne sert à rien si on ne l'appelle qu'après avoir corrigé.
+
+## L'ordre de la comptabilité
+
+`rangComptable()` : **date de facture**, à défaut **date du devis**, à défaut le
+**chantier le plus récemment rentré**. Règle dictée par lui le 23 août. Le
+carnet et le sélecteur de la fiche triaient sur `maj` et `dernierEvenement()` —
+un chantier remontait dès qu'on l'ouvrait pour le corriger, et l'ordre
+paraissait alphabétique, c'est-à-dire dû au hasard.
+
+**Ne pas détourner `dernierEvenement()`** pour autant : il date les sorties de
+stock (`synchroniserStock`), et le changer aurait re-daté ses mouvements. Les
+deux notions se ressemblent et diffèrent : l'une dit la dernière étape
+franchie, l'autre le rang comptable.
+
+**La flèche de retour est dans tous les modules** depuis la 4.52. Elle était
+masquée hors d'une partie — le bouton d'accueil y faisait déjà le trajet. Il
+l'a voulue partout : « comme ça j'ai les deux possibilités. » Hors partie, elle
+vise l'accueil.
+
 ## Le temps se note à un seul endroit
 
 « Il y a trop d'endroits où je peux mettre du temps. Du coup je me perds un
@@ -1079,7 +1126,7 @@ cubage, `carnet` aux chantiers.
 
 ## Où en est le chantier — 23 août 2026
 
-**Version en ligne : 4.51.0.** Le contrôle passe à 887 vérifications.
+**Version en ligne : 4.52.0.** Le contrôle passe à 924 vérifications.
 
 **La 4.51, née d'une seule tournée dictée.** Il a parcouru la 4.50 et signalé
 six choses en un message : le retour des réglages, l'absence de flèche hors
@@ -1157,11 +1204,14 @@ phrases plus loin il demandait *plus* de détail sur cet impayé. Les deux
 
 - **Le statut qui suit la saisie.** Il a demandé si remplir la facture devait
   faire passer le chantier en « Facturé ». Question posée, pas tranchée.
-- **La flèche de retour hors de l'Entreprise.** `#b-retour` est masquée dans
-  Cubage et Bois : choix d'origine, le bouton d'accueil y fait déjà le même
-  trajet. Il l'a remarqué le 23 août, a dit « d'accord » puis « il y a un petit
-  manque là ». Question posée, pas tranchée — et depuis que le retour arrière
-  du téléphone marche, elle se pose peut-être moins.
+- **Plusieurs travaux sur une même ligne.** Il facture parfois un forfait
+  groupé — détourage *et* élagage de tiges — et ne peut rattacher qu'un seul
+  type de travaux. Il veut un « + travaux ». Sa règle de TVA est posée : même
+  taux sur les deux, on l'applique ; taux différents, **on l'oblige à
+  trancher** au lieu de choisir pour lui. **Reste à trancher : la quantité.**
+  Une seule pour la ligne, une par travail, ou aucune (forfait) ? Question
+  posée le 23 août, sans réponse. À faire **après** les familles, pas avant :
+  une ligne à deux travaux peut relever de deux familles.
 - **Le nom du classement dans les exports.** `.xlsx`, CSV et impression
   écrivent toujours « Class. Comt ». Ces fichiers partent chez le client et
   reprennent le tableur d'origine : lui demander avant d'y toucher.
