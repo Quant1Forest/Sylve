@@ -3741,11 +3741,21 @@ scenario('Fiche : on passe d’un chantier au suivant sans rouvrir la liste', as
   t.clic('[data-vue="carnet"]'); await t.pause(300);
   t.choisir('#c-filtre', 'tous'); await t.pause(350);
   t.clic('[data-chouvrir="b"]'); await t.pause(400);
-  verifierVrai('les deux boutons sont sous le sélecteur', t.$('[data-voisin]'));
-  verifierVrai('et le rang est annoncé', /1 \/ 2/.test(t.texte('#fiche-chantier')));
+  /* Le sens suit l'ordre des factures, pas la position dans la liste :
+     « précédente » est la facture d'avant, « suivante » celle d'après. Le
+     bouton qui retourne le carnet ne doit donc pas les inverser. */
+  verifierVrai('les boutons sont sous le sélecteur', t.$('[data-voisin]'));
+  verifierVrai('la facture 2 est au rang 2', /2 \/ 2/.test(t.texte('#fiche-chantier')));
+  const nomme = mot => t.$$('#fiche-chantier [data-voisin]')
+    .filter(x => new RegExp(mot).test(x.textContent))[0];
+  verifier('« précédente » mène à la facture 1', 'a', nomme('Précédente').dataset.voisin);
+  verifierVrai('« suivante » est éteinte sur la dernière',
+    t.$$('#fiche-chantier button[disabled]').some(x => /Suivante/.test(x.textContent)));
+
   t.clic('[data-voisin="a"]'); await t.pause(400);
-  verifierVrai('on est passé au suivant', /Alpha/.test(t.texte('#fiche-chantier')));
-  verifierVrai('et le rang a suivi', /2 \/ 2/.test(t.texte('#fiche-chantier')));
+  verifierVrai('on est bien sur la facture 1', /Alpha/.test(t.texte('#fiche-chantier')));
+  verifierVrai('au rang 1', /1 \/ 2/.test(t.texte('#fiche-chantier')));
+  verifier('et « suivante » y ramène à la facture 2', 'b', nomme('Suivante').dataset.voisin);
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -3813,6 +3823,100 @@ scenario('Ligne : « + travaux » bascule en forfait et bloque la TVA mêlée', 
   verifier('elle porte le second travail', ['JALON'], ligne.travauxPlus);
   verifier('en forfait', 'forfait', ligne.unite);
   verifier('au taux choisi', 10, ligne.tva);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Carnet : les filtres se rangent en cours et clos', async () => {
+  /* Trente-cinq chantiers dont trente et un payés, et des statuts à plat :
+     « je n'arrive pas à savoir dans quelle grande catégorie ils
+     appartiennent ». Les mêmes groupes que le sélecteur de la fiche. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [
+      { id: 'a', nom: 'En cours', statut: 'encours', aDevis: false, lignes: [], temps: [], maj: Date.now() },
+      { id: 'b', nom: 'Payé', statut: 'paye', aDevis: false, lignes: [], temps: [], maj: Date.now() },
+      { id: 'c', nom: 'Facturé', statut: 'facture', aDevis: false, lignes: [], temps: [], maj: Date.now() }
+    ]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(350);
+  const groupes = t.$$('#c-filtre optgroup').map(g => g.getAttribute('label'));
+  verifier('deux familles', ['En cours', 'Clos'], groupes);
+  const dans = lab => t.$$('#c-filtre optgroup')
+    .filter(g => g.getAttribute('label') === lab)[0].textContent;
+  verifierVrai('le chantier en cours est dans « En cours »', /En cours/.test(dans('En cours')));
+  verifierVrai('le payé est dans « Clos »', /Payé/.test(dans('Clos')));
+  /* Facturé mais pas encore réglé reste une affaire en cours : l'argent n'est
+     pas rentré. C'est déjà ce que dit statutOuvert(), et le regroupement s'y
+     conforme plutôt que de ranger l'impayé avec les affaires soldées. */
+  verifierVrai('le facturé reste « En cours » tant qu’il n’est pas payé',
+    /Facturé/.test(dans('En cours')));
+  /* « Tous » et « Chantiers ouverts » restent en tête, hors groupe. */
+  verifierVrai('les entrées générales restent accessibles',
+    t.$$('#c-filtre > option').length >= 2);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Facture : saisir le numéro propose de passer le chantier en facturé', async () => {
+  /* Il l'a demandé le 19 août, tranché le 23 : Sylve propose, il confirme.
+     Le statut ne doit jamais partir tout seul. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [{ id: 'c1', nom: 'Coupe des Places', statut: 'encours', aDevis: false,
+      lignes: [], temps: [], maj: Date.now() }]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(300);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+
+  let demande = null;
+  t.w.confirm = m => { demande = m; return false; };
+  t.clic('#f-facture'); await t.pause(350);
+  t.saisir('#fc-num', 'F-2026-0042');
+  t.$('#fc-date').value = jourISO(Date.now());
+  t.clic('#fc-ok'); await t.pause(450);
+  verifierVrai('la question est posée', /Le passer en/.test(demande || ''));
+  verifierVrai('elle nomme le statut visé', /Factur/.test(demande || ''));
+  verifier('refuser laisse le statut', 'encours', (t.stock('chantiers') || [])[0].statut);
+  verifier('mais la facture est bien enregistrée', 'F-2026-0042',
+    (t.stock('chantiers') || [])[0].numeroFacture);
+
+  t.w.confirm = () => true;
+  t.clic('#f-facture'); await t.pause(350);
+  t.clic('#fc-ok'); await t.pause(450);
+  verifier('accepter le fait passer', 'facture', (t.stock('chantiers') || [])[0].statut);
+
+  /* Une fois facturé, on ne repose plus la question. */
+  demande = null;
+  t.clic('#f-facture'); await t.pause(350);
+  t.clic('#fc-ok'); await t.pause(450);
+  verifier('plus de question sur un chantier déjà facturé', null, demande);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Agenda : poser des journées ramène à la fiche du chantier', async () => {
+  /* « Quand je fais terminer, je ne suis plus dans mon chantier, il faut que
+     je refasse des manips pour y retourner. » */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [{ id: 'c1', nom: 'Coupe des Places', statut: 'accepte', aDevis: false,
+      lignes: [], temps: [], joursEstimes: 3, maj: Date.now() }]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(300);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+  t.clic('#f-planifier'); await t.pause(400);
+  verifierVrai('on part bien dans l’agenda',
+    t.$('#vue-calendrier').classList.contains('actif'));
+  const jour = t.$('#cal-grille [data-jour]');
+  verifierVrai('des jours sont proposés', jour);
+  jour.click(); await t.pause(400);
+
+  t.clic('#cal-planif-fin'); await t.pause(450);
+  verifierVrai('terminer ramène sur la fiche',
+    t.$('#vue-chantier').classList.contains('actif'));
+  verifierVrai('celle du chantier qu’on planifiait',
+    /Coupe des Places/.test(t.texte('#fiche-chantier')));
   verifier('aucune erreur', [], t.erreurs);
 });
 

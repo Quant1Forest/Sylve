@@ -7090,6 +7090,12 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.54', quoi: [
+    { t: 'Les filtres du carnet se rangent en cours et clos', vue: 'carnet' },
+    { t: 'Précédente et suivante suivent l’ordre de vos factures', vue: 'carnet' },
+    { t: 'Poser des journées vous ramène à la fiche du chantier', vue: 'carnet' },
+    { t: 'Saisir une facture propose de passer le chantier en facturé', vue: 'carnet' }
+  ] },
   { v: '4.53', quoi: [
     { t: 'L’application passe au vert et ne change plus de couleur toute seule' },
     { t: 'Le carnet suit le numéro de vos factures', vue: 'carnet' },
@@ -7114,11 +7120,6 @@ var NOTES_MAJ = [
     { t: 'Les motifs de réfaction se posent d’un doigt : C, D, G, R… ou −1P, −2P', vue: 'saisie' },
     { t: 'Les qualités « Actba » et « Bctba » s’appellent enfin Classe A, Classe B' },
     { t: 'Une charge prélevée après le 28 tombe enfin le bon jour', vue: 'charges' }
-  ] },
-  { v: '4.49', quoi: [
-    { t: 'La fiche du chantier se lit dans l’ordre de sa vie, bloc par bloc', vue: 'carnet' },
-    { t: 'Chaque bloc a son crayon : le devis, la facture, les journées, chacun à part' },
-    { t: 'Fini l’en-tête unique de vingt-trois champs' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -7949,6 +7950,9 @@ function brancher() {
       var c = chantier(A.planifie);
       A.planifie = null; renderCalendrier();
       if (c) toast(E.fmt(C.totalPlace(c), 1).replace(',0', '') + ' journées placées.');
+      /* On repart de la fiche : y rester après avoir posé ses jours obligeait
+         à refaire tout le chemin pour retrouver son chantier. */
+      if (c) ouvrirChantier(c.id);
     }
   });
   $('#cal-saisir').addEventListener('click', ouvrirSaisieJour);
@@ -9645,16 +9649,25 @@ function renderFiltreChantiers() {
   var s = $('#c-filtre'); if (!s) return;
   var f = A.filtreCh || 'ouverts';
   var incomplets = A.chantiers.filter(function (c) { return !C.ficheComplete(c); }).length;
-  var opts = [['ouverts', 'Chantiers ouverts', C.filtre(A.chantiers, 'ouverts').length],
+  /* Les statuts étaient à plat : avec trente-cinq chantiers dont trente et un
+     payés, on ne savait plus à quelle famille chacun appartenait. Ils se
+     rangent sous « En cours » et « Clos », comme le sélecteur de la fiche. */
+  var opt = function (o) {
+    return '<option value="' + o[0] + '"' + (f === o[0] ? ' selected' : '') + '>' +
+      esc(o[1]) + ' (' + o[2] + ')</option>';
+  };
+  var tete = [['ouverts', 'Chantiers ouverts', C.filtre(A.chantiers, 'ouverts').length],
     ['tous', 'Tous', A.chantiers.length]];
-  if (incomplets) opts.push(['acompleter', 'À compléter', incomplets]);
+  if (incomplets) tete.push(['acompleter', 'À compléter', incomplets]);
+  var ouv = [], clos = [];
   C.STATUTS.forEach(function (st) {
     var n = C.filtre(A.chantiers, st.c).length;
-    if (n) opts.push([st.c, st.n, n]);
+    if (!n) return;
+    (C.statutOuvert(st.c) ? ouv : clos).push([st.c, st.n, n]);
   });
-  s.innerHTML = opts.map(function (o) {
-    return '<option value="' + o[0] + '"' + (f === o[0] ? ' selected' : '') + '>' + esc(o[1]) + ' (' + o[2] + ')</option>';
-  }).join('');
+  s.innerHTML = tete.map(opt).join('') +
+    (ouv.length ? '<optgroup label="En cours">' + ouv.map(opt).join('') + '</optgroup>' : '') +
+    (clos.length ? '<optgroup label="Clos">' + clos.map(opt).join('') + '</optgroup>' : '');
 }
 function renderListeChantiers() {
   var z = $('#liste-chantiers'); if (!z) return;
@@ -9827,12 +9840,18 @@ function chantiersOrdonnes() {
 
 /* Fiche précédente et suivante, dans ce même ordre. */
 function boutonsVoisins(id) {
-  var l = chantiersOrdonnes();
+  /* Toujours du plus ancien au plus récent : c'est l'ordre des factures, et il
+     ne doit pas dépendre du sens d'affichage du carnet. */
+  var l = C.tri(A.chantiers || [], true);
   if (l.length < 2) return '';
   var i = -1;
   l.forEach(function (c, k) { if (c.id === id) i = k; });
   if (i < 0) return '';
   var prec = i > 0 ? l[i - 1] : null, suiv = i < l.length - 1 ? l[i + 1] : null;
+  /* Sens rétabli le 23 août : « précédente », c'est la facture d'avant, et
+     « suivante » celle d'après. Ils suivent l'ordre des factures et non la
+     position dans la liste, sinon le bouton qui retourne le carnet
+     inverserait aussi leur sens. */
   var bouton = function (c, mot, cote) {
     return '<button class="btn btn-min" ' + (c ? 'data-voisin="' + esc(c.id) + '"' : 'disabled') +
       ' style="flex:1;text-align:' + cote + '" title="' + esc(c ? (c.nom || 'chantier') : '') + '">' +
@@ -10789,10 +10808,22 @@ function ouvrirFactureCh(id) {
     $('#fc-ech').value = versChamp(base + Number(r.dataset.fcech) * C.JOUR);
   });
   $('#fc-ok').addEventListener('click', function () {
-    majChantier(c, { numeroFacture: $('#fc-num').value.trim(),
+    var maj = { numeroFacture: $('#fc-num').value.trim(),
       dateFacture: versDate($('#fc-date').value),
       echeancePaiement: versDate($('#fc-ech').value),
-      datePaiement: versDate($('#fc-paie').value) }, 'Facture enregistrée.');
+      datePaiement: versDate($('#fc-paie').value) };
+    /* Remplir une facture sur un chantier qui n'est pas encore « Facturé »,
+       c'est presque toujours qu'il vient de l'émettre. Sylve le propose, il ne
+       le décide pas : le statut ne doit jamais partir tout seul.
+       Un paiement déjà saisi va plus loin que la facture : on propose alors
+       « Payé », sinon on reviendrait en arrière. */
+    var vise = maj.datePaiement ? 'paye' : 'facture';
+    if (maj.numeroFacture && maj.dateFacture && c.statut !== vise &&
+      ['facture', 'paye'].indexOf(c.statut) < 0) {
+      if (confirm('Ce chantier est encore « ' + C.nomStatut(c.statut, c) + ' ».\n\n' +
+        'Le passer en « ' + C.nomStatut(vise, c) + ' » ?')) maj.statut = vise;
+    }
+    majChantier(c, maj, 'Facture enregistrée.');
   });
 }
 
@@ -15885,7 +15916,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.53.0-20260823-1532';
+var VERSION = '4.54.0-20260823-1606';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
