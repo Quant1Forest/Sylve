@@ -4282,8 +4282,21 @@ function totaux(chantiers, cfg) {
   return t;
 }
 
+/* Comment le règlement est arrivé. Une liste fermée plutôt qu'un champ libre :
+   avec du texte libre, l'orthographe varie et on ne peut plus compter les
+   chèques d'un trimestre. Facultatif — beaucoup de chantiers n'en portent pas. */
+var MOYENS_PAIEMENT = [
+  { c: 'virement', n: 'Virement' }, { c: 'cheque', n: 'Chèque' },
+  { c: 'especes', n: 'Espèces' }, { c: 'autre', n: 'Autre' }
+];
+function nomMoyenPaiement(c) {
+  var x = MOYENS_PAIEMENT.filter(function (m) { return m.c === c; })[0];
+  return x ? x.n : '';
+}
+
 var M = {
   JOUR: JOUR, TRAVAUX: TRAVAUX, UNITES: UNITES, STATUTS: STATUTS,
+  MOYENS_PAIEMENT: MOYENS_PAIEMENT, nomMoyenPaiement: nomMoyenPaiement,
   travauxDeLigne: travauxDeLigne, ligneGroupee: ligneGroupee,
   nomTravauxLigne: nomTravauxLigne, tauxDesTravaux: tauxDesTravaux,
   tvaAtrancher: tvaAtrancher,
@@ -7092,6 +7105,11 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.55', quoi: [
+    { t: 'La facture se lit dès l’en-tête : numéro, date, paiement', vue: 'carnet' },
+    { t: 'Le moyen de paiement se note : virement, chèque, espèces', vue: 'carnet' },
+    { t: 'Le débours s’affiche à part, hors du chiffre d’affaires', vue: 'analyses' }
+  ] },
   { v: '4.54', quoi: [
     { t: 'Les filtres du carnet se rangent en cours et clos', vue: 'carnet' },
     { t: 'Précédente et suivante suivent l’ordre de vos factures', vue: 'carnet' },
@@ -7115,13 +7133,6 @@ var NOTES_MAJ = [
     { t: 'La date devient facultative quand vous notez du temps', vue: 'carnet' },
     { t: 'Un chantier payé ne s’estime plus, il se corrige', vue: 'carnet' },
     { t: 'Le retour arrière du téléphone remonte d’un cran au lieu de quitter' }
-  ] },
-  { v: '4.50', quoi: [
-    { t: 'Le cubage s’ouvre sur le choix : comtois ou classement ABCD', vue: 'fichiers' },
-    { t: 'En ABCD, Sylve prévient quand la classe ne tient pas ses critères', vue: 'saisie' },
-    { t: 'Les motifs de réfaction se posent d’un doigt : C, D, G, R… ou −1P, −2P', vue: 'saisie' },
-    { t: 'Les qualités « Actba » et « Bctba » s’appellent enfin Classe A, Classe B' },
-    { t: 'Une charge prélevée après le 28 tombe enfin le bon jour', vue: 'charges' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -10038,6 +10049,7 @@ function renderFiche() {
     /* Le chantier : qui, où, et où il en est. */
     '<div class="carte">' +
     teteBloc('Le chantier', 'f-identite', 'modifier') +
+    '<div id="f-bloc-chantier">' +
     '<h2 style="margin:0">' + esc(c.nom || 'Chantier') + '</h2>' +
     '<p class="muted" style="font-size:12.5px;margin:3px 0 0">' +
     esc([c.donneur || c.client ? 'via ' + (c.donneur || c.client) : '',
@@ -10046,11 +10058,26 @@ function renderFiche() {
     '<div style="margin-top:9px">' + badgeStatut(c) +
     (dateStatut(c) ? ' <span class="muted" style="font-size:12px">' + esc(dateStatut(c)) + '</span>' : '') +
     (C.enRetard(c, Date.now()) ? ' <span class="retard">en retard</span>' : '') + '</div>' +
+    /* La facture se lit dès l'en-tête : c'est sur son numéro qu'il se repère,
+       et en enchaînant les fiches par « précédente / suivante » il doit le voir
+       sans dérouler. Rien ne s'affiche tant qu'il n'y a rien à dire. */
+    (function () {
+      var l = [];
+      if (c.numeroFacture) l.push(['Facture', c.numeroFacture]);
+      if (c.dateFacture) l.push(['Facturé le', new Date(c.dateFacture).toLocaleDateString('fr-FR')]);
+      if (c.datePaiement) {
+        l.push(['Payé le', new Date(c.datePaiement).toLocaleDateString('fr-FR') +
+          (c.moyenPaiement ? ' · ' + C.nomMoyenPaiement(c.moyenPaiement) : '')]);
+      }
+      return l.length ? '<div style="margin-top:11px">' +
+        l.map(function (p) { return paireFiche(p[0], p[1]); }).join('') + '</div>' : '';
+    })() +
     (function () {
       var manque = C.champsManquants(c);
       if (!manque.length) return '';
       return '<p class="acompleter-bloc">Il manque : ' + esc(manque.join(', ')) + '.</p>';
     })() +
+    '</div>' +
     '<div class="btn-rang" style="margin-top:11px">' +
     '<button class="btn btn-min" data-chretour="1">← Carnet</button>' +
     '<button class="btn btn-min" id="f-statut">Changer le statut</button></div>' +
@@ -10794,7 +10821,15 @@ function ouvrirFactureCh(id) {
     '<div class="champ"><label class="eyebrow" for="fc-ech">À payer avant le</label>' +
     '<input type="date" id="fc-ech" value="' + versChamp(c.echeancePaiement) + '"></div>' +
     '<div class="champ"><label class="eyebrow" for="fc-paie">Payé le</label>' +
-    '<input type="date" id="fc-paie" value="' + versChamp(c.datePaiement) + '"></div></div>' +
+    '<input type="date" id="fc-paie" value="' + versChamp(c.datePaiement) + '"></div>' +
+    /* Pour savoir ce qui rentre en chèques : liste fermée, sinon on ne
+       pourrait plus les compter. */
+    '<div class="champ"><label class="eyebrow" for="fc-moyen">Réglé par</label>' +
+    '<select id="fc-moyen"><option value="">— non précisé —</option>' +
+    C.MOYENS_PAIEMENT.map(function (x) {
+      return '<option value="' + x.c + '"' + (c.moyenPaiement === x.c ? ' selected' : '') +
+        '>' + esc(x.n) + '</option>';
+    }).join('') + '</select></div></div>' +
     '<div class="btn-rang" style="margin-top:4px">' +
     '<button class="btn-min" data-fcech="30">+ 30 jours</button>' +
     '<button class="btn-min" data-fcech="45">+ 45 jours</button>' +
@@ -10813,7 +10848,8 @@ function ouvrirFactureCh(id) {
     var maj = { numeroFacture: $('#fc-num').value.trim(),
       dateFacture: versDate($('#fc-date').value),
       echeancePaiement: versDate($('#fc-ech').value),
-      datePaiement: versDate($('#fc-paie').value) };
+      datePaiement: versDate($('#fc-paie').value),
+      moyenPaiement: $('#fc-moyen').value || null };
     /* Remplir une facture sur un chantier qui n'est pas encore « Facturé »,
        c'est presque toujours qu'il vient de l'émettre. Sylve le propose, il ne
        le décide pas : le statut ne doit jamais partir tout seul.
@@ -14558,7 +14594,14 @@ function htmlRecettes(an, b) {
     ligneCA('Prestation de service', ca.prestation, ca.prestationApres, '50 %') +
     ligneCA('Vente de fournitures', ca.vente, ca.venteApres, '71 %') +
     '<div style="display:flex;justify-content:space-between;padding-top:9px;margin-top:5px;border-top:2px solid var(--encre)">' +
-    '<b>Base après abattement</b><b class="num" style="font-size:18px">' + eur(ca.totalApres) + '</b></div></div></div>' +
+    '<b>Base après abattement</b><b class="num" style="font-size:18px">' + eur(ca.totalApres) + '</b></div>' +
+    /* Le débours traverse le compte sans être une recette. Il était écarté du
+       calcul depuis le début, mais affiché nulle part : il ne pouvait pas
+       vérifier qu'il l'était bien. */
+    (ca.debours ? '<div style="display:flex;justify-content:space-between;font-size:13px;' +
+      'margin-top:9px;padding-top:9px;border-top:1px dashed var(--trait-fort)" class="muted">' +
+      '<span>Débours client — hors chiffre d’affaires</span><span class="num">' +
+      eur(ca.debours) + '</span></div>' : '') + '</div></div>' +
 
     '<div class="carte"><h2>Facturé et encaissé — ' + an + '</h2>' +
     histoMois([
@@ -15918,7 +15961,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.54.0-20260823-1606';
+var VERSION = '4.55.0-20260823-1710';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

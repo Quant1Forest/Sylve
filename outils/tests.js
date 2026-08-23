@@ -3921,6 +3921,92 @@ scenario('Agenda : poser des journées ramène à la fiche du chantier', async (
 });
 
 /* --------------------------------------------------------------------- */
+scenario('Fiche : la facture se lit dès l’en-tête du chantier', async () => {
+  /* « C'est sur le numéro de facture que je me base, donc c'est important » —
+     en enchaînant les fiches par précédente / suivante, il doit le voir sans
+     rien dérouler. */
+  const paye = new Date(2026, 4, 30, 12).getTime();
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [
+      { id: 'c1', nom: 'Coupe des Places', statut: 'paye', aDevis: false, lignes: [], temps: [],
+        numeroFacture: 'F-2026-0042', dateFacture: new Date(2026, 3, 14, 12).getTime(),
+        datePaiement: paye, moyenPaiement: 'cheque', maj: Date.now() },
+      { id: 'c2', nom: 'En cours', statut: 'encours', aDevis: false, lignes: [], temps: [],
+        maj: Date.now() }
+    ]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(300);
+  t.choisir('#c-filtre', 'tous'); await t.pause(350);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+  /* On lit le bloc « Le chantier » seul : le numéro figure aussi dans le
+     bloc facture plus bas, et lire toute la fiche ne prouverait rien. */
+  const h = t.texte('#f-bloc-chantier');
+  verifierVrai('le numéro y est', /F-2026-0042/.test(h));
+  verifierVrai('la date de facture aussi', /14\/04\/2026/.test(h));
+  verifierVrai('et le paiement, avec son moyen', /30\/05\/2026 · Chèque/.test(h));
+
+  /* Un chantier sans facture ne montre pas de lignes vides. */
+  t.clic('[data-chouvrir="c2"]'); await t.pause(400);
+  const h2 = t.texte('#f-bloc-chantier');
+  verifierVrai('rien n’est annoncé sans facture', !/Facturé le/.test(h2));
+  verifierVrai('ni de paiement', !/Payé le/.test(h2));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Facture : le moyen de paiement se choisit dans une liste', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [{ id: 'c1', nom: 'Coupe des Places', statut: 'facture', aDevis: false,
+      lignes: [], temps: [], numeroFacture: 'F-2026-0007',
+      dateFacture: Date.now(), maj: Date.now() }]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(300);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+  t.clic('#f-facture'); await t.pause(350);
+  verifierVrai('le champ existe', t.$('#fc-moyen'));
+  verifier('quatre moyens, plus « non précisé »', 5, t.$$('#fc-moyen option').length);
+  t.choisir('#fc-moyen', 'cheque');
+  t.$('#fc-paie').value = jourISO(Date.now());
+  t.w.confirm = () => true;
+  t.clic('#fc-ok'); await t.pause(450);
+  verifier('le moyen est retenu', 'cheque', (t.stock('chantiers') || [])[0].moyenPaiement);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Recettes : le débours se voit, hors du chiffre d’affaires', async () => {
+  /* Il était écarté du calcul depuis le début — mais affiché nulle part, donc
+     impossible pour lui de vérifier qu'il l'était bien. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'finances',
+    chantiers: [{ id: 'c1', nom: 'Coupe des Places', statut: 'paye', aDevis: false, temps: [],
+      dateFacture: Date.now(), datePaiement: Date.now(), maj: Date.now(),
+      lignes: [
+        { travail: 'DEGAG', unite: 'ha', quantite: 2, prix: 500, nature: 'prestation' },
+        { travail: 'F_PROTEC', unite: 'unite', quantite: 100, prix: 3, nature: 'debours' }
+      ] }]
+  }));
+  const C = t.w.BCC, FIN = t.w.BCF;
+  const ca = FIN.chiffreAffaires(t.stock('chantiers'), null);
+  verifier('le débours est suivi à part', 300, ca.debours);
+  verifier('et n’entre pas dans le total', 1000, ca.total);
+  verifier('ni dans l’encaissé', 1000, ca.encaisse);
+
+  t.clic('[data-vue="analyses"]'); await t.pause(350);
+  const rec = t.$$('#vue-analyses .chip, #vue-analyses [role=tab]')
+    .filter(b => /Recettes/.test(b.textContent))[0];
+  if (rec) { rec.click(); await t.pause(400); }
+  const txt = t.texte('#vue-analyses');
+  /* « Débours client » apparaît aussi dans la répartition par famille : c'est
+     la mention « hors chiffre d'affaires » qui prouve la ligne du total. */
+  verifierVrai('l’écran nomme le débours hors chiffre d’affaires',
+    /Débours client — hors chiffre d’affaires/.test(txt));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
 /* Un troisième argument ne joue que les scénarios dont le nom le contient.
    Sert à éprouver un contrôle en le cassant exprès : rejouer les quarante
    autres pour vérifier qu'un seul crie coûte deux minutes pour rien.
