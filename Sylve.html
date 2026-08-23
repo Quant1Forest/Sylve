@@ -1557,6 +1557,7 @@ if (froid && s > 0) montrer(s);
     <!-- ======================================================= véhicule -->
     <section class="vue" id="vue-carnetv" role="tabpanel"><div id="veh-carnet"></div></section>
     <section class="vue" id="vue-echeancesv" role="tabpanel"><div id="veh-echeances"></div></section>
+    <section class="vue" id="vue-coutsv" role="tabpanel"><div id="veh-couts"></div></section>
 
     <!-- ============================================== bois de chauffage -->
     <section class="vue" id="vue-stock" role="tabpanel">
@@ -7217,6 +7218,11 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.64', quoi: [
+    { t: 'Ce que votre vehicule coute, au kilometre', vue: 'coutsv' },
+    { t: 'Le carburant pro y entre seul ; le reste se coche sur la depense', vue: 'coutsv' },
+    { t: 'Et ce qui a coute le plus cher, en tete de liste', vue: 'coutsv' }
+  ] },
   { v: '4.63', quoi: [
     { t: 'Vos donneurs d ordre ne se cassent plus en deux lignes', vue: 'finances' },
     { t: 'Le controle technique est suivi comme les autres postes', vue: 'echeancesv' }
@@ -7235,12 +7241,6 @@ var NOTES_MAJ = [
     { t: 'La déclaration suit ce choix : mois, trimestre ou année', vue: 'analyses' },
     { t: 'La TVA se reverse ou se récupère — elle ne se « paie » pas', vue: 'analyses' },
     { t: 'Chaque mouvement dit l’année qu’il concerne', vue: 'analyses' }
-  ] },
-  { v: '4.59', quoi: [
-    { t: 'Déclarations : le mois, la TVA, les cotisations et l’impôt au même endroit', vue: 'analyses' },
-    { t: 'Ce que vous avez payé se note, remboursements compris', vue: 'analyses' },
-    { t: 'Un carnet d’entretien pour l’utilitaire, avec ses échéances', vue: 'carnetv' },
-    { t: 'La TVA collectée applique enfin le vrai taux de vos travaux', vue: 'analyses' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -7550,6 +7550,7 @@ function aller(v) {
   if (v === 'estimer') renderEstimer();
   if (v === 'carnetv') renderCarnetV();
   if (v === 'echeancesv') renderEcheancesV();
+  if (v === 'coutsv') renderCoutsV();
   try { if (window.scrollY || window.pageYOffset) window.scrollTo(0, 0); } catch (e) { }
 }
 
@@ -8546,7 +8547,7 @@ function init() {
           carnet: 'chantiers', chantier: 'chantiers', calendrier: 'calendrier',
           rendements: 'rendements', estimer: 'rendements', finances: 'finances', depenses: 'finances',
           charges: 'finances', stock2: 'stock', commandes: 'stock', revient: 'stock', carte: 'calendrier', analyses: 'finances',
-          carnetv: 'vehicule', echeancesv: 'vehicule' };
+          carnetv: 'vehicule', echeancesv: 'vehicule', coutsv: 'vehicule' };
         var mod = MOD_DE_VUE[vd] || 'cubage';
         renderReglages();
         if (actif && A.index.some(function (x) { return x.id === actif; })) {
@@ -8630,7 +8631,9 @@ PICTOS.lieux = PICTOS.carte;
 PICTOS.carnetv = '<path d="M3.5 15.6V9.4h9.6l3.3 3h4.1v3.2"/><path d="M9.6 16.2h4.6"/>' +
   '<circle cx="7.3" cy="16.2" r="1.8"/><circle cx="16.6" cy="16.2" r="1.8"/>';
 PICTOS.echeancesv = '<path d="M4.6 15.8a7.4 7.4 0 1 1 14.8 0"/><path d="m12 15.8 3.2-4.2"/>' +
-  '<circle cx="12" cy="15.8" r="1"/>';      /* « Où ? » et « Carte », même repère */
+  '<circle cx="12" cy="15.8" r="1"/>';
+PICTOS.coutsv = '<path d="M4.6 19.4h14.8"/><path d="M7.7 19.4v-4.6M12 19.4v-8.2M16.3 19.4v-6"/>' +
+  '<path d="M5.4 7.6h4.2M7.5 5.5v4.2"/>';      /* « Où ? » et « Carte », même repère */
 
 var MODULES = {
   cubage: {
@@ -8676,7 +8679,7 @@ var MODULES = {
     /* Le carnet d'entretien de l'utilitaire. Deux vues, jamais une seule :
        un module réduit à un onglet solitaire est interdit par un scénario. */
     nom: 'Véhicule', defaut: 'carnetv', groupe: 'entreprise',
-    vues: [['carnetv', 'Carnet'], ['echeancesv', 'Échéances']]
+    vues: [['carnetv', 'Carnet'], ['echeancesv', 'Échéances'], ['coutsv', 'Coûts']]
   },
   bois: {
     nom: 'Bois de chauffage', defaut: 'stock',
@@ -11782,6 +11785,101 @@ function echeancesVehicule() {
     return { p: p, aKm: aKm, aDate: aDate, rKm: rKm, rJours: rJours, etat: etat };
   });
 }
+/* Ce que le véhicule coûte réellement, ramené au kilomètre. C'est le chiffre
+   qui dit quand un utilitaire commence à coûter plus qu'il ne sert.
+   Le carburant « pro » y entre d'office : la catégorie est définie comme celle
+   de l'utilitaire, et lui demander de re-marquer cent vingt-quatre dépenses
+   n'aurait servi à rien. Tout le reste — carte grise, assurance, péage — se
+   rattache d'une case sur la dépense. */
+function depenseDuVehicule(d) {
+  if (!d) return false;
+  if (d.vehicule) return true;
+  return (FIN.lignesDepense(d) || []).some(function (l) { return l.categorie === 'CARB'; });
+}
+function coutsVehicule() {
+  var v = A.vehicule || {};
+  var iv = (v.interventions || []).filter(function (x) { return !x.garantie; });
+  var entretien = iv.reduce(function (t, x) { return t + C.nb(x.montant); }, 0);
+  var carburant = 0, autres = 0, nCarb = 0, nAutres = 0;
+  (A.depenses || []).forEach(function (d) {
+    if (!depenseDuVehicule(d)) return;
+    var lignes = FIN.lignesDepense(d) || [];
+    lignes.forEach(function (l) {
+      var ht = FIN.htLigne ? FIN.htLigne(l) : FIN.nb(l.ttc);
+      if (l.categorie === 'CARB') { carburant += ht; nCarb++; }
+      else { autres += ht; nAutres++; }
+    });
+  });
+  /* Les kilomètres parcourus dont on connaît le coût : du premier relevé au
+     dernier. Rapporter la dépense au compteur entier ferait mentir le
+     résultat quand l'historique ne remonte pas à la première mise en route. */
+  var kms = [];
+  (v.releves || []).forEach(function (r) { if (C.nb(r.km)) kms.push(C.nb(r.km)); });
+  (v.interventions || []).forEach(function (x) { if (C.nb(x.km)) kms.push(C.nb(x.km)); });
+  var premier = kms.length ? Math.min.apply(null, kms) : 0;
+  var dernier = kms.length ? Math.max.apply(null, kms) : 0;
+  var parcourus = Math.max(0, dernier - premier);
+  var total = C.arr(entretien + carburant + autres, 2);
+  var parKm = function (m) { return parcourus > 0 ? C.arr(m / parcourus, 4) : null; };
+  return {
+    entretien: C.arr(entretien, 2), carburant: C.arr(carburant, 2), autres: C.arr(autres, 2),
+    total: total, premier: premier, dernier: dernier, parcourus: parcourus,
+    nCarb: nCarb, nAutres: nAutres,
+    kmEntretien: parKm(entretien), kmCarburant: parKm(carburant), kmTotal: parKm(total),
+    /* Ce qui a coûté le plus cher, pour savoir où part l'argent. */
+    plusChers: iv.slice().sort(function (a, b) { return C.nb(b.montant) - C.nb(a.montant); }).slice(0, 5)
+  };
+}
+function centimes(v) {
+  if (v == null) return '—';
+  return E.fmt(C.arr(v * 100, 1), 1) + ' c€';
+}
+function renderCoutsV() {
+  var z = $('#veh-couts'); if (!z) return;
+  var c = coutsVehicule();
+  var ligne = function (nom, montant, parKm, detail) {
+    return '<div style="padding:6px 0;border-bottom:1px solid var(--trait)">' +
+      '<div style="display:flex;justify-content:space-between;align-items:baseline">' +
+      '<span style="font-size:13.5px">' + nom + '</span>' +
+      '<b class="num">' + eur(montant) + '</b></div>' +
+      '<div class="muted" style="font-size:12px;margin-top:1px">' +
+      (parKm != null ? centimes(parKm) + ' du kilomètre' : 'aucun kilométrage connu') +
+      (detail ? ' · ' + detail : '') + '</div></div>';
+  };
+  z.innerHTML =
+    '<div class="carte"><h2>Ce que le véhicule vous coûte</h2>' +
+    '<p class="muted" style="font-size:12px;margin:0 0 10px">Sur ' +
+    (c.parcourus ? '<b class="num">' + E.fmt(c.parcourus, 0) + '</b> km parcourus, de ' +
+      E.fmt(c.premier, 0) + ' à ' + E.fmt(c.dernier, 0) + ' au compteur'
+      : 'une période inconnue — notez le compteur dans le Carnet') + '.</p>' +
+    '<div class="kpi">' +
+    '<div class="carte2"><b class="num">' + centimes(c.kmTotal) + '</b><small>par kilomètre</small></div>' +
+    '<div class="carte2"><b class="num">' + eur(c.total) + '</b><small>en tout</small></div>' +
+    '</div>' +
+    '<div style="margin-top:13px">' +
+    ligne('Entretien et réparations', c.entretien, c.kmEntretien,
+      (A.vehicule.interventions || []).length + ' passages') +
+    ligne('Carburant', c.carburant, c.kmCarburant,
+      c.nCarb ? c.nCarb + ' plein' + (c.nCarb > 1 ? 's' : '') : 'aucune dépense en « carburant pro »') +
+    (c.autres ? ligne('Autres frais', c.autres, null,
+      c.nAutres + ' dépense' + (c.nAutres > 1 ? 's' : '') + ' rattachée' + (c.nAutres > 1 ? 's' : '')) : '') +
+    '</div>' +
+    '<p class="muted" style="font-size:11.5px;margin:10px 0 0">Le carburant « pro » compte ' +
+    'd’office. Pour tout le reste — carte grise, assurance, péage — cochez « concerne le ' +
+    'véhicule » sur la dépense.</p></div>' +
+
+    (c.plusChers.length ? '<div class="carte"><h2>Ce qui a coûté le plus</h2>' +
+      c.plusChers.map(function (x) {
+        return '<div style="padding:6px 0;border-bottom:1px solid var(--trait)">' +
+          '<div style="display:flex;justify-content:space-between;align-items:baseline">' +
+          '<span style="font-size:13.5px">' + esc(x.quoi || 'Intervention') + '</span>' +
+          '<b class="num">' + eur(C.nb(x.montant)) + '</b></div>' +
+          '<div class="muted" style="font-size:12px;margin-top:1px">' +
+          new Date(x.date).toLocaleDateString('fr-FR') +
+          (C.nb(x.km) ? ' · ' + E.fmt(C.nb(x.km), 0) + ' km' : '') + '</div></div>';
+      }).join('') + '</div>' : '');
+}
+
 function renderCarnetV() {
   var z = $('#veh-carnet'); if (!z) return;
   var v = A.vehicule || vehiculeDefaut();
@@ -12665,6 +12763,12 @@ function ouvrirDepense(id) {
     '<div class="champ"><label class="eyebrow" for="dp-num">N° de pièce</label>' +
     '<input type="text" id="dp-num" autocomplete="off" placeholder="pour retrouver le papier" value="' +
     esc(d.numero || '') + '"></div>' +
+    /* Une dépense du véhicule qui n'est pas du carburant : carte grise,
+       assurance, péage. Sans elle, ces frais restaient invisibles dans le
+       coût au kilomètre — et une carte grise, c'est cinq cents euros. */
+    '<label class="ligne-check" style="display:flex;align-items:center;gap:8px;' +
+    'font-size:13.5px;margin:0 0 11px"><input type="checkbox" id="dp-veh"' +
+    (d.vehicule ? ' checked' : '') + '> Cette dépense concerne le véhicule</label>' +
     (chOuv.length ? '<div class="champ"><label class="eyebrow" for="dp-ch">Rattacher à un chantier</label>' +
       '<select id="dp-ch"><option value="">— aucun —</option>' + chOuv.map(function (c2) {
         return '<option value="' + c2.id + '"' + (d.chantier === c2.id ? ' selected' : '') + '>' + esc(c2.nom || 'Chantier') + '</option>';
@@ -12694,6 +12798,9 @@ function ouvrirDepense(id) {
       fournisseur: $('#dp-four').value.trim(),
       numero: $('#dp-num').value.trim(),
       chantier: $('#dp-ch') ? ($('#dp-ch').value || null) : null,
+      /* Cochée à la main, la case vaut true ; venue du carnet, elle porte
+         l'identifiant de l'intervention. On ne l'écrase pas. */
+      vehicule: $('#dp-veh') && $('#dp-veh').checked ? (d.vehicule || true) : null,
       lignes: lignes.map(function (l) {
         return { libelle: l.libelle.trim(), categorie: l.categorie, ttc: FIN.nb(l.ttc), taux: FIN.nb(l.taux) };
       })
@@ -12706,9 +12813,10 @@ function ouvrirDepense(id) {
     } else { x.id = uid(); x.maj = Date.now(); A.depenses.push(x); }
     sauverDepenses().then(function () {
       fermerModale(); renderDepenses(); renderFinances(); renderAnalyses(); renderAccueil();
+      renderCoutsV();
       /* Une réparation qui ne vient pas du carnet du véhicule mérite d'y
          être notée aussi : c'est le kilométrage qui nourrit les échéances. */
-      var entretien = !id && !x.vehicule &&
+      var entretien = !id && !x.vehicule && !d.vehicule &&
         (x.lignes || []).some(function (l2) { return l2.categorie === 'ENTRETIEN'; });
       toast(entretien
         ? 'Dépense enregistrée. Pensez à noter l’intervention dans le carnet du véhicule.'
@@ -16570,7 +16678,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.63.0-20260823-2232';
+var VERSION = '4.64.0-20260823-2314';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
