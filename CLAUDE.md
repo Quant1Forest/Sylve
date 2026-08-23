@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.50.0-20260823-1027**
+Version courante : **4.51.0-20260823-1129**
 
 ---
 
@@ -979,6 +979,61 @@ pas sa propre facture.
   de passer en dessous de cent identifiants — un contrôle qui n'inspecte plus
   rien doit crier, pas rassurer.
 
+## Le temps se note à un seul endroit
+
+« Il y a trop d'endroits où je peux mettre du temps. Du coup je me perds un
+peu. » Quatre, exactement : `joursEstimes`, les journées posées (`jours`), le
+temps saisi (`temps`), et les lignes de travaux en unité `jour`.
+
+**`temps` fait foi, et c'était déjà écrit ici** — les rendements et le prix par
+journée le lisent depuis toujours. Mais la fiche affichait `totalFait()`, les
+journées *posées*, sous l'intitulé « journées faites ». Deux chiffres pour la
+même idée sur le même écran : c'est ça qui l'y perdait, pas le nombre de
+blocs.
+
+- **`tempsPasse()` tranche** : le temps noté gagne ; à défaut, `joursFactures()`
+  remplit le vide. **Jamais l'addition des deux** — un chantier à la fois noté
+  et facturé en journées compterait double. Règle validée par lui le 23 août.
+- **Le bloc dit d'où sort son chiffre** : « journées faites » quand il vient du
+  temps noté, « journées facturées » quand seule la facture en parle. C'est le
+  cas des trente-deux chantiers repris du carnet.
+- **Le bloc des journées annonce « posées »**, plus « faites », et dit que ces
+  jours-là répondent à *quand*, pas à *combien*. `totalFait()` garde son nom
+  côté moteur : il compte bien les journées posées à une date passée.
+- **Sur un chantier soldé, le crayon dit « modifier »** et ouvre « L'objectif de
+  ce chantier », avec une porte vers la saisie du temps. Il disait « estimer »
+  et modifiait un chiffre que le bloc n'affiche même plus à ce stade.
+- **La date du temps est facultative et vide.** Elle l'était déjà
+  techniquement — pré-remplie, elle avait l'air obligatoire, et on ne pouvait
+  pas dire « j'ai fait trois journées » sans dire quand. Sans date,
+  `dateParDefautTemps()` rattache le temps à la période du chantier, jamais à
+  aujourd'hui : sinon le temps d'un chantier de l'an dernier tomberait dans le
+  bilan de l'année en cours.
+
+## Le retour arrière remonte d'un cran
+
+Le bouton du téléphone quittait Sylve d'un coup, même au fond d'un module.
+`brancherRetourTelephone()` écoute `popstate` : une fenêtre ouverte se ferme
+d'abord, sinon module → partie → accueil, et depuis l'accueil seulement il
+sort.
+
+- **Un cran est empilé à la descente, consommé par la remontée.** C'est ce qui
+  donne **un** appui par étage. Ne jamais réempiler après une remontée : le
+  dernier appui ne sortirait plus de l'application.
+- **Fermer une fenêtre en réempile un**, sinon on perdrait un étage au passage.
+- **Un changement de module par le bandeau est latéral**, pas une descente :
+  `allerModule()` n'empile que si l'on vient de l'accueil ou du menu d'une
+  partie. Sans cette garde, les crans s'accumulent et il faut plusieurs appuis
+  pour sortir.
+- **`allerMenuParent()` ne sait pas remonter du menu d'une partie vers
+  l'accueil** : il lit le module courant, qui appartient encore à cette partie,
+  et y reviendrait en boucle. Le cas est traité dans le gestionnaire.
+- **On ressort des réglages par où l'on est entré.** La vue d'origine était
+  bien retenue, mais rejetée : la garde exigeait qu'elle appartienne au module
+  ouvert, or l'accueil et le menu d'une partie ne sont les vues d'aucun module.
+  On ressortait donc dans « Mon entreprise » après y être entré depuis
+  l'accueil.
+
 ## Le cubage se choisit en arrivant
 
 Le type de bordereau existait **depuis toujours** — `meta.classement`, quatre
@@ -1024,7 +1079,16 @@ cubage, `carnet` aux chantiers.
 
 ## Où en est le chantier — 23 août 2026
 
-**Version en ligne : 4.50.0.** Le contrôle passe à 856 vérifications.
+**Version en ligne : 4.51.0.** Le contrôle passe à 887 vérifications.
+
+**La 4.51, née d'une seule tournée dictée.** Il a parcouru la 4.50 et signalé
+six choses en un message : le retour des réglages, l'absence de flèche hors
+Entreprise, le retour arrière du téléphone, le crayon « estimer » sur un
+chantier payé, le prix de journée devenu muet, et « trop d'endroits où mettre
+du temps ». Les six n'en faisaient que deux — voir *Le temps se note à un seul
+endroit* et *Le retour arrière remonte d'un cran*. Confirmation de la méthode :
+**le symptôme qu'il décrit est juste, le regroupement se trouve en lisant le
+message entier.**
 
 **Le contrôle met désormais près de sept minutes**, alors que ce fichier
 promet moins de deux. La cause n'a pas été cherchée — à mesurer avant de
@@ -1093,6 +1157,11 @@ phrases plus loin il demandait *plus* de détail sur cet impayé. Les deux
 
 - **Le statut qui suit la saisie.** Il a demandé si remplir la facture devait
   faire passer le chantier en « Facturé ». Question posée, pas tranchée.
+- **La flèche de retour hors de l'Entreprise.** `#b-retour` est masquée dans
+  Cubage et Bois : choix d'origine, le bouton d'accueil y fait déjà le même
+  trajet. Il l'a remarqué le 23 août, a dit « d'accord » puis « il y a un petit
+  manque là ». Question posée, pas tranchée — et depuis que le retour arrière
+  du téléphone marche, elle se pose peut-être moins.
 - **Le nom du classement dans les exports.** `.xlsx`, CSV et impression
   écrivent toujours « Class. Comt ». Ces fichiers partent chez le client et
   reprennent le tableur d'origine : lui demander avant d'y toucher.
