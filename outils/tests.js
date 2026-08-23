@@ -4211,6 +4211,35 @@ scenario('Ligne : le produit du stock est fermé quand une sortie existe à part
 });
 
 /* --------------------------------------------------------------------- */
+scenario('TVA collectée : le vrai taux des travaux, pas 20 % par défaut', async () => {
+  /* Le module des finances recalculait le taux dans son coin et retombait sur
+     20 % dès qu'aucun taux n'était forcé à la main. La fiche du chantier, elle,
+     appliquait le vrai — 10 % sur des travaux forestiers chez un client avec
+     SIREN. Deux TVA différentes pour le même chantier, et c'est celle des
+     finances qu'on déclare. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'finances',
+    chantiers: [{ id: 'c1', nom: 'Coupe des Places', statut: 'facture', aDevis: false,
+      siren: true, temps: [], maj: Date.now(), dateFacture: Date.now(),
+      lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 2, prix: 500,
+        nature: 'prestation' }] }]
+  }));
+  const C = t.w.BCC, FIN = t.w.BCF;
+  const ch = t.stock('chantiers');
+
+  verifier('la fiche applique le taux réduit', 10, C.tauxLigne(ch[0].lignes[0], ch[0]));
+  const sansTaux = FIN.tvaCollectee(ch, null);
+  verifier('sans le taux injecté, les finances retombaient sur 20 %', 200, sansTaux.total);
+  const avecTaux = FIN.tvaCollectee(ch, null, C.tauxLigne);
+  verifier('avec lui, elles disent la même chose que la fiche', 100, avecTaux.total);
+  verifier('et le rangent sous le bon taux', { 10: 100 }, avecTaux.parTaux);
+
+  const bal = FIN.balanceTva(ch, [], null, C.tauxLigne);
+  verifier('le solde à payer suit', 100, bal.montant);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
 /* Un troisième argument ne joue que les scénarios dont le nom le contient.
    Sert à éprouver un contrôle en le cassant exprès : rejouer les quarante
    autres pour vérifier qu'un seul crie coûte deux minutes pour rien.

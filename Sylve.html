@@ -4511,7 +4511,13 @@ function dansPeriode(ts, b) { return ts != null && ts >= b.debut && ts <= b.fin;
 function dateRecette(ch) {
   return ch.dateFacture || ch.dateFin || ch.maj || null;
 }
-function lignesFacturees(chantiers, b) {
+/* « tauxDe » vient du module des chantiers : lui seul sait le taux d'une
+   ligne — celui de ses travaux, réduit ou non selon le SIREN du client.
+   Sans lui, ce module retombait sur 20 % pour toute ligne dont le taux n'est
+   pas forcé à la main, et la TVA collectée des Finances contredisait celle de
+   la fiche. C'est celle des Finances qu'on déclare : elle doit dire vrai.
+   Injecté plutôt qu'appelé, comme parFamille() et tauxReussite(). */
+function lignesFacturees(chantiers, b, tauxDe) {
   var out = [];
   (chantiers || []).forEach(function (ch) {
     if (['facture', 'paye'].indexOf(ch.statut) < 0) return;
@@ -4519,7 +4525,8 @@ function lignesFacturees(chantiers, b) {
     if (b && !dansPeriode(d, b)) return;
     (ch.lignes || []).forEach(function (l) {
       var ht = l.unite === 'forfait' ? nb(l.prix) : nb(l.quantite) * nb(l.prix);
-      var taux = (l.tva != null && l.tva !== '') ? nb(l.tva) : (nb(ch.tva) || 20);
+      var taux = tauxDe ? tauxDe(l, ch)
+        : ((l.tva != null && l.tva !== '') ? nb(l.tva) : (nb(ch.tva) || 20));
       out.push({ chantier: ch, ligne: l, date: d, ht: arr(ht, 2),
         nature: l.nature || 'prestation', taux: taux, paye: ch.statut === 'paye' });
     });
@@ -4557,9 +4564,9 @@ function chiffreAffaires(chantiers, b) {
    Collectée sur ce qui est facturé, déductible sur les achats payés.
    L'immobilisation est isolée : elle pèse lourd un trimestre et fausse
    la lecture si on la noie dans le reste. */
-function tvaCollectee(chantiers, b) {
+function tvaCollectee(chantiers, b, tauxDe) {
   var parTaux = {}, total = 0;
-  lignesFacturees(chantiers, b).forEach(function (x) {
+  lignesFacturees(chantiers, b, tauxDe).forEach(function (x) {
     var t = x.taux, m = arr(x.ht * t / 100, 2);
     parTaux[t] = arr((parTaux[t] || 0) + m, 2);
     total += m;
@@ -4580,8 +4587,8 @@ function tvaDeductible(depenses, b) {
   });
   return { immobilisations: arr(immo, 2), courant: arr(courant, 2), total: arr(total, 2), parTaux: parTaux };
 }
-function balanceTva(chantiers, depenses, b) {
-  var c = tvaCollectee(chantiers, b), d = tvaDeductible(depenses, b);
+function balanceTva(chantiers, depenses, b, tauxDe) {
+  var c = tvaCollectee(chantiers, b, tauxDe), d = tvaDeductible(depenses, b);
   var solde = arr(c.total - d.total, 2);
   return {
     collectee: c, deductible: d, solde: solde,
@@ -11619,7 +11626,7 @@ function renderEntreprise() {
 
   var b = periodeCourante();
   var ca = FIN.chiffreAffaires(A.chantiers, b);
-  var bal = FIN.balanceTva(A.chantiers, A.depenses, b);
+  var bal = FIN.balanceTva(A.chantiers, A.depenses, b, C.tauxLigne);
   if ($('#e-fi-n')) $('#e-fi-n').textContent = ca.total ? eur(ca.total) : '—';
   if ($('#e-fi-s')) {
     $('#e-fi-s').textContent = ca.total || bal.montant
@@ -11676,7 +11683,7 @@ function renderEntBilan() {
     if (c.statut === 'facture') { impayes++; impayesM += C.montant(c); }
   });
   var ca = FIN.chiffreAffaires(A.chantiers, b);
-  var bal = FIN.balanceTva(A.chantiers, A.depenses, b);
+  var bal = FIN.balanceTva(A.chantiers, A.depenses, b, C.tauxLigne);
   var bulle = function (val, etiquette, sous, cible, chaud) {
     return '<button class="bulle' + (chaud ? ' chaud' : '') + '" data-bulle="' + cible + '">' +
       '<span class="v num">' + val + '</span>' +
@@ -11976,7 +11983,7 @@ function renderFinances() {
   renderSelecteursPeriode();
   var b = periodeCourante();
   var ca = FIN.chiffreAffaires(A.chantiers, b);
-  var bal = FIN.balanceTva(A.chantiers, A.depenses, b);
+  var bal = FIN.balanceTva(A.chantiers, A.depenses, b, C.tauxLigne);
   var dep = FIN.totalDepenses(A.depenses, b);
   var res = FIN.resultat(A.chantiers, A.depenses, b);
   var tr = FIN.tauxReussite(A.chantiers, C.aDevis);
@@ -14606,7 +14613,7 @@ function htmlDepenses(an, b) {
   var dep = FIN.totalDepenses(A.depenses, b);
   var cat = FIN.parCategorie(A.depenses, b, FIN.nomCategorie);
   var four = FIN.parFournisseur(A.depenses, b);
-  var bal = FIN.balanceTva(A.chantiers, A.depenses, b);
+  var bal = FIN.balanceTva(A.chantiers, A.depenses, b, C.tauxLigne);
   var charges = FIN.totalChargesAnnuel(A.charges);
   return '<div class="carte"><h2>Dépenses — ' + esc(libellePeriode()) + '</h2>' +
     '<div class="kpi">' +
