@@ -4260,13 +4260,22 @@ scenario('Déclarations : le mois, la TVA de l’année, l’impôt par tranches
   verifierVrai('la pastille Déclarations existe', t.$('[data-ana="declarations"]'));
   t.clic('[data-ana="declarations"]'); await t.pause(350);
 
-  t.choisir('#decl-an', '2026'); await t.pause(300);
-  t.choisir('#decl-idx', '2'); await t.pause(300);
+  /* Un seul sélecteur de période, celui du haut : Analyses en portait déjà
+     un, et la pastille en avait ajouté un second. « Pourquoi il y a en
+     double, je ne comprends pas », et il avait raison. */
+  verifier('pas de second sélecteur de période', null, t.$('#decl-per'));
+  verifier('ni de mois propre à la pastille', null, t.$('#decl-idx'));
+  verifierVrai('celui du haut propose bien l’année',
+    t.$$('#an-type option').some(o => o.value === 'annee'));
+
+  t.choisir('#an-annee', '2026'); await t.pause(250);
+  t.choisir('#an-type', 'mois'); await t.pause(300);
+  t.choisir('#an-indice', '2'); await t.pause(350);
   let txt = t.texte('#ana-corps');
   verifierVrai('mars : la prestation y est, brute', /1 000/.test(txt));
   verifierVrai('et après son abattement de 50 %', /500/.test(txt));
 
-  t.choisir('#decl-idx', '6'); await t.pause(300);
+  t.choisir('#an-indice', '6'); await t.pause(350);
   txt = t.texte('#ana-corps');
   verifierVrai('juillet : la vente y est', /300/.test(txt));
   verifierVrai('mais pas la prestation de mars', !/1 000 €/.test(txt.replace(/\s+/g, ' ')));
@@ -4276,6 +4285,9 @@ scenario('Déclarations : le mois, la TVA de l’année, l’impôt par tranches
   verifierVrai('la TVA à 10 % est là', /Collectée à 10 %/.test(txt) && /100/.test(txt));
   verifierVrai('celle à 20 % aussi', /Collectée à 20 %/.test(txt) && /60/.test(txt));
   verifierVrai('et le solde à reverser', /À reverser/.test(txt) && /160/.test(txt));
+  verifierVrai('la TVA reste annuelle, et le dit', /TVA — année 2026/.test(txt));
+  verifierVrai('elle rappelle qu’il la collecte, sans la supporter',
+    /vous la reversez ou vous la récupérez/.test(txt));
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -4315,9 +4327,30 @@ scenario('Déclarations : un versement se note, son remboursement aussi', async 
   verifierVrai('le versement est gardé', v);
   verifier('avec son montant', 1000, v.montant);
   verifier('et son remboursement', 400, v.rembourse);
-  const txt = t.texte('#ana-corps');
-  verifierVrai('la liste montre le net', /Cotisations sociales — 600/.test(txt));
-  verifierVrai('sans perdre l’histoire', /1 000 € payés, 400 € remboursés/.test(txt));
+  verifier('sorti du compte par défaut', 'sortie', v.sens);
+  let txt = t.texte('#ana-corps');
+  verifierVrai('la liste montre le net, sorti', /Cotisations sociales — − 600/.test(txt));
+  verifierVrai('sans perdre l’histoire', /1 000 € versés, 400 € remboursés/.test(txt));
+
+  /* La TVA ne se paie pas : elle se reverse, ou elle se récupère. */
+  t.clic('#decl-vers'); await t.pause(350);
+  t.choisir('#vs-type', 'tva');
+  /* On remplit le remboursement AVANT de basculer en récupération : le champ
+     se cache mais garde sa valeur, et c'est là que se joue la garde. Laissé
+     vide, les deux comportements donnaient le même résultat et le sabotage ne
+     criait pas. */
+  t.saisir('#vs-remb', '50');
+  t.choisir('#vs-sens', 'entree'); await t.pause(200);
+  verifier('un remboursement n’a pas de sens sur une récupération', 'none',
+    t.$('#vs-remb-champ').style.display);
+  t.saisir('#vs-mont', '300');
+  t.clic('#vs-ok'); await t.pause(450);
+  const tva = (t.stock('versements') || []).filter(x => x.type === 'tva')[0];
+  verifier('la récupération est notée comme telle', 'entree', tva.sens);
+  verifier('sans remboursement', null, tva.rembourse);
+  txt = t.texte('#ana-corps');
+  verifierVrai('elle s’affiche en entrée', /TVA — \+ 300/.test(txt));
+  verifierVrai('et le bloc ne parle plus de « payé »', !/Ce que vous avez payé/.test(txt));
   verifier('aucune erreur', [], t.erreurs);
 });
 
