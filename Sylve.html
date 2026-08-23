@@ -4292,8 +4292,19 @@ function nomMoyenPaiement(c) {
   return x ? x.n : '';
 }
 
+/* Le nom d'un chantier : ce qu'on y fait, pour qui, et où. « Le nom ne veut
+   rien dire », disait-il de ceux qu'il tapait à la main. Proposé à la
+   création, jamais imposé : dès qu'il écrit le sien, il ne bouge plus. */
+function nomAutoChantier(travail, proprietaire, commune) {
+  var quoi = travail ? nomTravail(travail) : '';
+  var qui = [proprietaire, commune].filter(Boolean).join(', ');
+  if (quoi && qui) return quoi + ' — ' + qui;
+  return quoi || qui || '';
+}
+
 var M = {
   JOUR: JOUR, TRAVAUX: TRAVAUX, UNITES: UNITES, STATUTS: STATUTS,
+  nomAutoChantier: nomAutoChantier,
   MOYENS_PAIEMENT: MOYENS_PAIEMENT, nomMoyenPaiement: nomMoyenPaiement,
   travauxDeLigne: travauxDeLigne, ligneGroupee: ligneGroupee,
   nomTravauxLigne: nomTravauxLigne, tauxDesTravaux: tauxDesTravaux,
@@ -7103,6 +7114,11 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.56', quoi: [
+    { t: 'Créer un chantier tient en cinq champs', vue: 'carnet' },
+    { t: 'Le nom se propose : travaux, propriétaire, commune', vue: 'carnet' },
+    { t: 'Le type de travaux ouvre la première ligne, à chiffrer ensuite', vue: 'carnet' }
+  ] },
   { v: '4.55', quoi: [
     { t: 'La facture se lit dès l’en-tête : numéro, date, paiement', vue: 'carnet' },
     { t: 'Le moyen de paiement se note : virement, chèque, espèces', vue: 'carnet' },
@@ -7125,12 +7141,6 @@ var NOTES_MAJ = [
     { t: 'Les recettes se lisent famille par famille', vue: 'analyses' },
     { t: 'Le carnet suit l’ordre de la comptabilité : facture, puis devis', vue: 'carnet' },
     { t: 'La flèche de retour est là dans tous les modules' }
-  ] },
-  { v: '4.51', quoi: [
-    { t: 'Le temps que vous notez fait foi : fini les deux chiffres de journées', vue: 'carnet' },
-    { t: 'La date devient facultative quand vous notez du temps', vue: 'carnet' },
-    { t: 'Un chantier payé ne s’estime plus, il se corrige', vue: 'carnet' },
-    { t: 'Le retour arrière du téléphone remonte d’un cran au lieu de quitter' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -10282,105 +10292,7 @@ function majFinValidite() {
 /* Statut et champs du devis suivent la case, à chaque bascule. Un chantier
    posé à « devis envoyé » puis déclaré sans devis passe à l'étape d'après :
    celle où il en est réellement. */
-function renderCeDevis(c) {
-  var coche = $('#ce-adevis').checked;
-  var bloc = $('#ce-devis-bloc');
-  if (bloc) bloc.style.display = coche ? '' : 'none';
-  var sel = $('#ce-statut'); if (!sel) return;
-  var st = sel.value || c.statut || 'devis';
-  if (!coche && (st === 'devis' || st === 'envoye')) st = 'accepte';
-  sel.innerHTML = optionsStatutCh(st, coche);
-  sel.value = st;
-  majFinValidite();
-}
 
-function formEnteteCh(c) {
-  var cr = c.criteres || {};
-  return '<div class="champ"><label class="eyebrow" for="ce-nom">Nom du chantier</label>' +
-    '<input type="text" id="ce-nom" class="gros" autocomplete="off" value="' + esc(c.nom || '') + '"></div>' +
-    '<div class="grille g2">' +
-    '<div class="champ"><label class="eyebrow" for="ce-donneur">Donneur d’ordre' +
-    '<button type="button" class="mini-plus" data-ajlist="clients" data-ajchamp="ce-donneur" ' +
-    'title="Ajouter à la liste">+ liste</button></label>' +
-    '<input type="text" id="ce-donneur" autocomplete="off" list="liste-clients" placeholder="expert, gestionnaire…" value="' +
-    esc(c.donneur || c.client || '') + '">' +
-    '<p class="offre-liste" id="ce-donneur-offre"></p></div>' +
-    /* « Propriétaire facturé » laissait croire que la facture part chez lui.
-       Elle part chez le donneur d'ordre, qui la transmet ; le propriétaire
-       est celui qui règle. */
-    '<div class="champ"><label class="eyebrow" for="ce-proprio">Propriétaire' +
-    '<button type="button" class="mini-plus" data-ajlist="proprios" data-ajchamp="ce-proprio" ' +
-    'title="Ajouter à la liste">+ liste</button></label>' +
-    '<input type="text" id="ce-proprio" autocomplete="off" list="liste-proprios" value="' + esc(c.proprietaire || '') + '">' +
-    '<p class="offre-liste" id="ce-proprio-offre"></p></div>' +
-    '<div class="champ"><label class="eyebrow" for="ce-foret">Forêt</label>' +
-    '<input type="text" id="ce-foret" autocomplete="off" value="' + esc(c.foret || '') + '"></div>' +
-    '<div class="champ"><label class="eyebrow" for="ce-parc">Parcelle(s)</label>' +
-    '<input type="text" id="ce-parc" autocomplete="off" value="' + esc(c.parcelles || '') + '"></div>' +
-    '<div class="champ"><label class="eyebrow" for="ce-com">Commune</label>' +
-    '<input type="text" id="ce-com" autocomplete="off" value="' + esc(c.commune || '') + '"></div>' +
-    '<div class="champ"><label class="eyebrow" for="ce-numfact">N° de facture</label>' +
-    '<input type="text" id="ce-numfact" autocomplete="off" placeholder="celui de votre logiciel" value="' +
-    esc(c.numeroFacture || '') + '"></div>' +
-    /* Changer le statut inscrit la date du jour faute de mieux. Sans ces deux
-       champs, une facture réglée le mois dernier restait datée d'aujourd'hui
-       et il n'y avait aucun moyen de la corriger — ni pour la TVA, ni pour
-       les relances, ni pour reprendre un historique. */
-    '<div class="champ"><label class="eyebrow" for="ce-datefact">Facturé le</label>' +
-    '<input type="date" id="ce-datefact" value="' + versChamp(c.dateFacture) + '"></div>' +
-    '<div class="champ"><label class="eyebrow" for="ce-echpaie">À payer avant le</label>' +
-    '<input type="date" id="ce-echpaie" value="' + versChamp(c.echeancePaiement) + '"></div>' +
-    '<div class="champ"><label class="eyebrow" for="ce-datepaie">Payé le</label>' +
-    '<input type="date" id="ce-datepaie" value="' + versChamp(c.datePaiement) + '"></div>' +
-    '<div class="champ"><label class="eyebrow" for="ce-jest">Journées estimées</label>' +
-    '<input type="text" id="ce-jest" inputmode="decimal" autocomplete="off" value="' +
-    (c.joursEstimes != null ? esc(String(c.joursEstimes).replace('.', ',')) : '') + '"></div>' +
-    '<div class="champ"><label class="eyebrow" for="ce-pj">Prix de journée (€)</label>' +
-    '<input type="text" id="ce-pj" inputmode="decimal" placeholder="' +
-    (C.nb(A.cfg && A.cfg.prixJourVise) || 'défaut') + '" value="' +
-    (c.prixJour != null ? esc(String(c.prixJour).replace('.', ',')) : '') + '"></div>' +
-    '<div class="champ"><label class="eyebrow">Journées placées</label>' +
-    '<div id="ce-total-jours" class="gros" style="padding:9px 0;font-family:var(--mono)"></div></div>' +
-    '</div>' +
-    '<label class="ligne-check" style="display:flex;align-items:flex-start;gap:8px;font-size:13.5px;margin:10px 0 0">' +
-    '<input type="checkbox" id="ce-siren"' + (c.siren ? ' checked' : '') + ' style="margin-top:2px">' +
-    '<span>Propriétaire identifié producteur agricole (n° SIREN)' +
-    '<span class="muted" style="display:block;font-size:11.5px">Ouvre le taux réduit sur les travaux ' +
-    'qui y donnent droit. Chaque ligne prend alors son taux automatiquement.</span></span></label>' +
-    '<div class="grille g2" style="margin-top:10px">' +
-    '</div>' +
-
-    '<label class="eyebrow" style="margin-top:12px;display:block">Quand ? ' +
-    '<span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">(facultatif, modifiable plus tard)</span></label>' +
-    '<div id="ce-jours"></div>' +
-    '<p class="eyebrow" style="margin:14px 0 6px">Le peuplement <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">(facultatif)</span></p>' +
-    '<div class="grille g2">' +
-    '<div class="champ"><label class="eyebrow" for="ce-ess">Essence</label>' +
-    '<select id="ce-ess">' + optionsEssenceCh(cr.essence) + '</select></div>' +
-    '<div class="champ"><label class="eyebrow" for="ce-dens">Densité (tiges ou plants/ha)</label>' +
-    '<input type="text" id="ce-dens" inputmode="numeric" autocomplete="off" value="' + (cr.densite || '') + '"></div>' +
-    '</div>' +
-    '<p class="muted" style="font-size:12px;margin:7px 0 0">L’essence pour vos statistiques, ' +
-    'la densité parce que multipliée par la surface elle vous donne le nombre de plants. ' +
-    'La difficulté, elle, se note sur chaque ligne de travaux : ce qui ralentit une plantation ' +
-    'n’est pas ce qui ralentit un dégagement.</p>' +
-
-    '<p class="eyebrow" style="margin:16px 0 6px">Le devis</p>' +
-    '<label class="ligne-check" style="display:flex;align-items:flex-start;gap:8px;font-size:13.5px;margin:0">' +
-    '<input type="checkbox" id="ce-adevis"' + (C.aDevis(c) ? ' checked' : '') + ' style="margin-top:2px">' +
-    '<span>J’ai fait un devis pour ce chantier' +
-    '<span class="muted" style="display:block;font-size:11.5px">Décoché, les étapes de devis ' +
-    'disparaissent du statut et rien d’autre n’est à remplir ici.</span></span></label>' +
-    '<div id="ce-devis-bloc">' + champsDevisCh(c) + '</div>' +
-
-    '<div class="champ" style="margin-top:12px"><label class="eyebrow" for="ce-statut">Statut</label>' +
-    '<select id="ce-statut"></select></div>' +
-    '<div class="champ"><label class="eyebrow" for="ce-notes">Note</label>' +
-    '<input type="text" id="ce-notes" autocomplete="off" value="' + esc(c.notes || '') + '"></div>' +
-    '<div class="btn-rang" style="margin-top:11px">' +
-    '<button class="btn" id="ce-gps">' + (c.gps && c.gps.lat != null ? 'Position enregistrée ✓' : 'Enregistrer la position') + '</button>' +
-    '<button class="btn primaire" id="ce-ok">Valider</button></div>';
-}
 
 var ceJours = [], ceChantierId = null;
 
@@ -10538,94 +10450,80 @@ function ouvrirJourneesCh(id) {
   });
 }
 
-function ouvrirEnteteCh(id) {
-  var c = id ? chantier(id) : { statut: 'devis', lignes: [], temps: [] };
-  if (!c) return;
-  var gps = c.gps || null;
-  ceJours = C.journeesPlacees(c).map(function (x) { return { d: x.d, p: x.p }; });
-  ceChantierId = id || null;
+/* La création d'un chantier tenait en vingt-trois champs : le devis, la
+   facture, les journées, le peuplement, le statut, la note. Tout cela se
+   remplit maintenant bloc par bloc sur la fiche, une fois le chantier ouvert.
+   Il ne reste ici que ce qu'on sait au moment où le chantier arrive : pour
+   qui, où, et ce qu'on y fait. */
+function ouvrirEnteteCh() {
+  var nomTouche = false;
+  majDatalistClients(); majDatalistLieux();
+  modale('Nouveau chantier',
+    '<div class="grille g2">' +
+    '<div class="champ"><label class="eyebrow" for="ce-donneur">Donneur d’ordre' +
+    '<button type="button" class="mini-plus" data-ajlist="clients" data-ajchamp="ce-donneur" ' +
+    'title="Ajouter à la liste">+ liste</button></label>' +
+    '<input type="text" id="ce-donneur" autocomplete="off" list="liste-clients" ' +
+    'placeholder="expert, gestionnaire…">' +
+    '<p class="offre-liste" id="ce-donneur-offre"></p></div>' +
+    '<div class="champ"><label class="eyebrow" for="ce-proprio">Propriétaire' +
+    '<button type="button" class="mini-plus" data-ajlist="proprios" data-ajchamp="ce-proprio" ' +
+    'title="Ajouter à la liste">+ liste</button></label>' +
+    '<input type="text" id="ce-proprio" autocomplete="off" list="liste-proprios">' +
+    '<p class="offre-liste" id="ce-proprio-offre"></p></div>' +
+    '<div class="champ"><label class="eyebrow" for="ce-com">Commune</label>' +
+    '<input type="text" id="ce-com" autocomplete="off" list="liste-lieux"></div>' +
+    '<div class="champ"><label class="eyebrow" for="ce-foret">Forêt</label>' +
+    '<input type="text" id="ce-foret" autocomplete="off" list="liste-lieux"></div>' +
+    '</div>' +
+    /* Le type de travaux est su dès la création : il compose le nom, et il
+       ouvre la première ligne du bloc Travaux, à chiffrer plus tard. */
+    '<div class="champ"><label class="eyebrow" for="ce-trav">Type de travaux</label>' +
+    '<select id="ce-trav">' + optionsTravaux('', { vide: true }) + '</select>' +
+    '<p class="muted" style="font-size:11.5px;margin:5px 0 0">Une première ligne sera ' +
+    'ouverte dans les travaux, sans quantité ni prix : vous la chiffrerez ensuite.</p></div>' +
+    '<div class="champ"><label class="eyebrow" for="ce-nom">Nom du chantier</label>' +
+    '<input type="text" id="ce-nom" class="gros" autocomplete="off">' +
+    '<p class="muted" style="font-size:11.5px;margin:5px 0 0" id="ce-nom-aide">Proposé ' +
+    'd’après les travaux, le propriétaire et la commune. Écrivez le vôtre si vous préférez.</p></div>' +
+    '<div class="btn-rang" style="margin-top:11px">' +
+    '<button class="btn primaire" id="ce-ok">Créer le chantier</button></div>');
 
-  majDatalistClients();
-  modale(id ? 'En-tête du chantier' : 'Nouveau chantier', formEnteteCh(c));
-  renderCeJours();
-  renderCeDevis(c);
-  brancherEssenceCh('ce-ess', (c.criteres || {}).essence || '');
-  $('#ce-adevis').addEventListener('change', function () { renderCeDevis(c); });
   brancherOffreListe('ce-donneur', 'clients');
   brancherOffreListe('ce-proprio', 'proprios');
-  ['#ce-datedevis', '#ce-validite'].forEach(function (s) {
-    $(s).addEventListener('change', majFinValidite);
+  /* Le nom suit la saisie tant qu'il n'y a pas mis la main. Dès qu'il écrit
+     le sien, il se fige : c'est le sien, on ne l'écrase pas. */
+  var recomposer = function () {
+    if (nomTouche) return;
+    $('#ce-nom').value = C.nomAutoChantier($('#ce-trav').value,
+      $('#ce-proprio').value.trim(), $('#ce-com').value.trim());
+  };
+  ['#ce-proprio', '#ce-com'].forEach(function (x) {
+    $(x).addEventListener('input', recomposer);
   });
-  $('#ce-jest').addEventListener('input', renderCeJours);
-  brancherCeJours();
-  $('#ce-gps').addEventListener('click', function () {
-    var b = this;
-    releverPosition(b, function (pt) { gps = pt; b.textContent = 'Position enregistrée ✓'; toast('Position relevée.'); });
-  });
+  $('#ce-trav').addEventListener('change', recomposer);
+  $('#ce-nom').addEventListener('input', function () { nomTouche = true; });
+  recomposer();
+
   $('#ce-ok').addEventListener('click', function () {
     var nom = $('#ce-nom').value.trim();
     if (!nom) { toast('Donnez un nom au chantier.'); return; }
-    var jest = C.nb($('#ce-jest').value);
-    /* Placer plus de journées qu'on n'en a estimé n'est pas interdit — un
-       chantier déborde — mais ça ne se valide pas sans l'avoir vu. Un simple
-       avertissement se lisait après coup, une fois la fiche refermée. */
-    lireCeJours();
-    var pose = ceJours.reduce(function (s, j) { return s + C.nb(j.p); }, 0);
-    if (jest > 0 && pose > jest) {
-      var tropDe = C.arr(pose - jest, 2);
-      if (!confirm('Vous placez ' + E.fmt(pose, pose % 1 ? 1 : 0) + ' journées pour ' +
-        E.fmt(jest, jest % 1 ? 1 : 0) + ' estimées, soit ' +
-        String(tropDe).replace('.', ',') + ' de trop.\n\nEnregistrer quand même ?')) return;
-    }
-    var aDevisCoche = $('#ce-adevis').checked;
-    var essv = $('#ce-ess').value;
-    if (essv === '__ajouter') essv = '';
-    var criteres = Object.assign({}, c.criteres || {}, {
-      essence: essv || null,
-      densite: C.nb($('#ce-dens').value) || null
-    });
-    var maj = {
+    var trav = $('#ce-trav').value;
+    var c = {
+      id: uid(), cree: Date.now(), maj: Date.now(), statut: 'devis', aDevis: true,
       nom: nom, donneur: $('#ce-donneur').value.trim(),
-      proprietaire: $('#ce-proprio').value.trim(), foret: $('#ce-foret').value.trim(),
-      parcelles: $('#ce-parc').value.trim(), commune: $('#ce-com').value.trim(),
-      joursEstimes: jest > 0 ? jest : null,
-      prixJour: C.nb($('#ce-pj').value) || null,
-      jours: (function () {
-        lireCeJours();
-        var vus = {};
-        return ceJours.filter(function (j) {
-          if (!j.d || vus[j.d]) return false;
-          vus[j.d] = 1; return true;
-        }).sort(function (x, y) { return x.d - y.d; });
-      })(),
-      siren: $('#ce-siren').checked,
-      numeroFacture: $('#ce-numfact').value.trim(),
-      dateFacture: versDate($('#ce-datefact').value),
-      echeancePaiement: versDate($('#ce-echpaie').value),
-      datePaiement: versDate($('#ce-datepaie').value),
-      /* Décocher, c'est dire qu'il n'y a pas de devis : garder un numéro et
-         une date derrière ferait ressortir un devis fantôme plus tard. */
-      aDevis: aDevisCoche,
-      numeroDevis: aDevisCoche ? $('#ce-numdevis').value.trim() : '',
-      dateDevis: aDevisCoche ? versDate($('#ce-datedevis').value) : null,
-      validiteDevis: aDevisCoche ? (C.nb($('#ce-validite').value) || null) : null,
-      criteres: criteres,
-      statut: $('#ce-statut').value, notes: $('#ce-notes').value.trim(),
-      gps: gps, maj: Date.now()
+      proprietaire: $('#ce-proprio').value.trim(),
+      commune: $('#ce-com').value.trim(), foret: $('#ce-foret').value.trim(),
+      lignes: trav ? [{ travail: trav, unite: C.uniteDe(trav), quantite: '', prix: '',
+        nature: C.estFourniture(trav) ? 'vente' : 'prestation', note: '' }] : [],
+      temps: [], jours: []
     };
-    if (id) { Object.keys(maj).forEach(function (k) { c[k] = maj[k]; }); }
-    else {
-      maj.id = uid(); maj.lignes = []; maj.temps = []; maj.cree = Date.now();
-      A.chantiers.push(maj); c = maj;
-    }
+    A.chantiers.push(c);
     horodaterStatut(c);
-    /* L'ajout aux listes se propose désormais sous le champ, à la sortie de
-       celui-ci. Ne rien redemander ici : une confirmation à la validation
-       arrivait trop tard et coupait l'enregistrement. */
     sauverChantiers().then(function () {
       fermerModale(); renderCarnet(); renderAccueil(); renderRendements(); renderCalendrier();
-      if (id) renderFiche(); else ouvrirChantier(c.id);
-      toast(id ? 'Chantier modifié.' : 'Chantier créé.');
+      ouvrirChantier(c.id);
+      toast('Chantier créé.');
     });
   });
 }
@@ -11253,7 +11151,7 @@ function ouvrirStatut(id) {
     }).join('') +
     (C.aDevis(c) ? '' : '<p class="muted" style="font-size:12px;margin:11px 0 0">' +
       'Ce chantier n’a pas de devis : les étapes de devis n’y figurent pas. ' +
-      'Cochez-la dans l’en-tête pour les faire apparaître.</p>'));
+      'Cochez la case dans le bloc « Le devis » pour les faire apparaître.</p>'));
   $('#modale-corps').addEventListener('click', function (e) {
     var b = e.target.closest('[data-setstatut]'); if (!b) return;
     c.statut = b.dataset.setstatut;
@@ -15959,7 +15857,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.55.0-20260823-1710';
+var VERSION = '4.56.0-20260823-1730';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

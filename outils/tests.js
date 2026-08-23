@@ -274,12 +274,20 @@ scenario('Chantier : plus d\'échéance, et les jours pris se voient', async () 
   while (pris.getDay() === 0 || pris.getDay() === 6) pris.setDate(pris.getDate() + 1);
   const t = await ouvrir(Object.assign({}, VIDE, {
     module: 'chantiers',
-    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'accepte', lignes: [], temps: [],
-      jours: [{ d: pris.getTime(), p: 1 }], maj: Date.now() }]
+    /* Les journées ne se posent plus à la création : elles ont leur bloc sur
+       la fiche. On ouvre donc un second chantier pour voir que le jour déjà
+       pris par Vaux lui est signalé. */
+    chantiers: [
+      { id: 'c1', nom: 'Vaux', statut: 'accepte', lignes: [], temps: [],
+        jours: [{ d: pris.getTime(), p: 1 }], maj: Date.now() },
+      { id: 'c2', nom: 'Chaux', statut: 'accepte', lignes: [], temps: [],
+        jours: [], maj: Date.now() }
+    ]
   }));
   t.clic('[data-vue="carnet"]'); await t.pause(200);
-  t.clic('#c-nouveau'); await t.pause(300);
+  t.clic('[data-chouvrir="c2"]'); await t.pause(400);
   verifier('le champ « à finir avant le » a disparu', null, t.$('#ce-ech'));
+  t.clic('#f-jours'); await t.pause(350);
   t.clic('#ce-plusjour'); await t.pause(150);
   const propose = t.$('[data-cej="0"]').value;
   verifierVrai('la journée proposée évite le jour déjà pris',
@@ -300,12 +308,23 @@ scenario('Chantier : plus d\'échéance, et les jours pris se voient', async () 
 
 /* --------------------------------------------------------------------- */
 scenario('Listes : ajouter sans quitter le formulaire', async () => {
-  const t = await ouvrir(Object.assign({}, VIDE, { module: 'chantiers' }));
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'accepte', lignes: [], temps: [],
+      maj: Date.now() }]
+  }));
   t.clic('[data-vue="carnet"]'); await t.pause(200);
+  /* Le « + liste » vit sur le formulaire de création, qui ne garde plus que
+     donneur, propriétaire, lieu et travaux. */
   t.clic('#c-nouveau'); await t.pause(300);
   t.saisir('#ce-donneur', 'Jean Roman');
   t.clic('[data-ajlist="clients"]'); await t.pause(400);
   verifier('le donneur d\'ordre est dans la liste', ['Jean Roman'], t.stock('clients'));
+  t.clic('#modale-x'); await t.pause(250);
+
+  /* L'essence, elle, a rejoint le bloc « Le peuplement » de la fiche. */
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+  t.clic('#f-peuplement'); await t.pause(350);
   const ess = t.$('#ce-ess');
   verifierVrai('la liste des essences propose d\'en ajouter une',
     [...ess.options].some(o => o.value === '__ajouter'));
@@ -1328,31 +1347,43 @@ scenario('Devis : la case commande les étapes, et les mots qu’elles portent',
   /* Tout chantier ne part pas d'un devis. « Devis à envoyer » et « Sans
      suite » ne veulent alors rien dire : les étapes de devis sortent de la
      liste, et « Accepté » redevient « À planifier ». */
-  const t = await ouvrir(Object.assign({}, VIDE, { module: 'chantiers' }));
+  /* La case vit dans le bloc « Le devis » de la fiche, et les étapes dans le
+     formulaire de statut : la propriété traverse maintenant deux écrans. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'accepte', aDevis: true,
+      lignes: [], temps: [], maj: Date.now() }]
+  }));
   t.clic('[data-vue="carnet"]'); await t.pause(250);
-  t.clic('#c-nouveau'); await t.pause(350);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
 
-  verifierVrai('un chantier neuf part avec un devis', t.$('#ce-adevis').checked);
-  let l = options(t, '#ce-statut');
+  const etapes = async () => {
+    t.clic('#f-statut'); await t.pause(300);
+    const l = t.$$('[data-setstatut]').map(b => b.textContent.replace(/actuel/, '').trim());
+    t.clic('#modale-x'); await t.pause(200);
+    return l;
+  };
+  let l = await etapes();
   verifierVrai('« Devis à envoyer » est proposé', l.indexOf('Devis à envoyer') >= 0);
   verifierVrai('« Devis signé, à planifier » aussi', l.indexOf('Devis signé, à planifier') >= 0);
   verifierVrai('et « Devis refusé »', l.indexOf('Devis refusé') >= 0);
-  verifierVrai('les champs du devis sont visibles', t.$('#ce-devis-bloc').style.display !== 'none');
 
-  cocher(t, '#ce-adevis', false); await t.pause(200);
-  l = options(t, '#ce-statut');
+  t.clic('#f-devis'); await t.pause(350);
+  verifierVrai('la case est cochée sur ce chantier', t.$('#dv-a').checked);
+  verifierVrai('les champs du devis sont visibles', t.$('#dv-bloc').style.display !== 'none');
+  cocher(t, '#dv-a', false); await t.pause(250);
+  verifier('les champs du devis sont masqués', 'none', t.$('#dv-bloc').style.display);
+  t.clic('#dv-ok'); await t.pause(450);
+  verifier('la réponse est enregistrée', false, (t.stock('chantiers') || [])[0].aDevis);
+
+  l = await etapes();
   verifier('sans devis, six étapes restent', 6, l.length);
   verifierVrai('« Devis à envoyer » a disparu', l.indexOf('Devis à envoyer') < 0);
   verifierVrai('« Devis envoyé » aussi', l.indexOf('Devis envoyé') < 0);
   verifierVrai('« À planifier » a pris la place de « Devis signé »', l.indexOf('À planifier') >= 0);
   verifierVrai('et « Sans suite » celle de « Devis refusé »', l.indexOf('Sans suite') >= 0);
-  verifier('les champs du devis sont masqués', 'none', t.$('#ce-devis-bloc').style.display);
-  verifier('l’étape retenue est celle où il en est vraiment', 'accepte', t.$('#ce-statut').value);
 
-  t.saisir('#ce-nom', 'Sans devis'); await t.pause(100);
-  t.clic('#ce-ok'); await t.pause(400);
-  const c = (t.stock('chantiers') || [])[0];
-  verifier('la réponse est enregistrée', false, c.aDevis);
+  t.clic('[data-vue="carnet"]'); await t.pause(300);
   verifierVrai('et le badge du carnet dit « À planifier »',
     /À planifier/.test(t.$('#liste-chantiers').textContent));
   verifier('aucune erreur', [], t.erreurs);
@@ -1360,10 +1391,15 @@ scenario('Devis : la case commande les étapes, et les mots qu’elles portent',
 
 /* --------------------------------------------------------------------- */
 scenario('Devis : numéro, date d’édition et validité tiennent sur la fiche', async () => {
-  const t = await ouvrir(Object.assign({}, VIDE, { module: 'chantiers' }));
+  /* Le devis se saisit dans son bloc sur la fiche, plus à la création. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [{ id: 'c1', nom: 'Coupe des Places', statut: 'devis', aDevis: true,
+      lignes: [], temps: [], maj: Date.now() }]
+  }));
   t.clic('[data-vue="carnet"]'); await t.pause(250);
-  t.clic('#c-nouveau'); await t.pause(350);
-  t.saisir('#ce-nom', 'Coupe des Places'); await t.pause(100);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+  t.clic('#f-devis'); await t.pause(350);
   t.saisir('#ce-numdevis', 'D-2026-014'); await t.pause(100);
   t.choisir('#ce-datedevis', '2026-01-31'); await t.pause(150);
   t.choisir('#ce-validite', '1'); await t.pause(200);
@@ -1373,7 +1409,7 @@ scenario('Devis : numéro, date d’édition et validité tiennent sur la fiche'
   verifier('la fin de validité est annoncée en clair',
     'Valable jusqu’au 28/02/2026.', t.texte('#ce-validite-fin'));
 
-  t.clic('#ce-ok'); await t.pause(450);
+  t.clic('#dv-ok'); await t.pause(450);
   const c = (t.stock('chantiers') || [])[0];
   verifier('le numéro est retenu', 'D-2026-014', c.numeroDevis);
   verifier('la validité aussi', 1, c.validiteDevis);
@@ -4003,6 +4039,47 @@ scenario('Recettes : le débours se voit, hors du chiffre d’affaires', async (
      la mention « hors chiffre d'affaires » qui prouve la ligne du total. */
   verifierVrai('l’écran nomme le débours hors chiffre d’affaires',
     /Débours client — hors chiffre d’affaires/.test(txt));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Création : cinq champs, et le nom qui se propose', async () => {
+  /* Le formulaire tenait en vingt-trois champs : le devis, la facture, les
+     journées, le peuplement, le statut, la note. Tout cela se remplit bloc
+     par bloc sur la fiche. Il ne reste que ce qu'on sait en arrivant. */
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'chantiers' }));
+  t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.clic('#c-nouveau'); await t.pause(400);
+  verifier('le devis n’est plus demandé à la création', null, t.$('#dv-a'));
+  verifier('ni la facture', null, t.$('#ce-numfact'));
+  verifier('ni le statut', null, t.$('#ce-statut'));
+  verifier('ni le peuplement', null, t.$('#ce-dens'));
+  verifier('ni les journées', null, t.$('#ce-plusjour'));
+  verifierVrai('mais le type de travaux, oui', t.$('#ce-trav'));
+
+  t.saisir('#ce-proprio', 'Dupont');
+  t.saisir('#ce-com', 'Foncine'); await t.pause(250);
+  verifier('le nom se propose sans les travaux', 'Dupont, Foncine', t.$('#ce-nom').value);
+  t.choisir('#ce-trav', 'DEGAG'); await t.pause(250);
+  verifier('et le type de travaux le complète',
+    'Dégagement manuel — Dupont, Foncine', t.$('#ce-nom').value);
+
+  /* Un nom écrit à la main est le sien : il ne se fait plus écraser. */
+  t.saisir('#ce-nom', 'Le clos du haut'); await t.pause(150);
+  t.saisir('#ce-com', 'Chaux'); await t.pause(250);
+  verifier('le nom choisi tient', 'Le clos du haut', t.$('#ce-nom').value);
+
+  t.saisir('#ce-donneur', 'Cabinet Dubois');
+  t.clic('#ce-ok'); await t.pause(550);
+  const c = (t.stock('chantiers') || [])[0];
+  verifier('le chantier est créé sous son nom', 'Le clos du haut', c.nom);
+  verifier('avec son donneur d’ordre', 'Cabinet Dubois', c.donneur);
+  verifier('et sa commune', 'Chaux', c.commune);
+  verifier('une première ligne de travaux est ouverte', 'DEGAG', (c.lignes[0] || {}).travail);
+  verifier('sans quantité', '', c.lignes[0].quantite);
+  verifier('ni prix', '', c.lignes[0].prix);
+  verifierVrai('et l’on arrive sur la fiche',
+    t.$('#vue-chantier').classList.contains('actif'));
   verifier('aucune erreur', [], t.erreurs);
 });
 
