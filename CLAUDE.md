@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.52.0-20260823-1227**
+Version courante : **4.53.0-20260823-1532**
 
 ---
 
@@ -979,6 +979,59 @@ pas sa propre facture.
   de passer en dessous de cent identifiants — un contrôle qui n'inspecte plus
   rien doit crier, pas rassurer.
 
+## Le vert, et la couleur qui ne bouge plus
+
+« Des fois c'est bleu, des fois c'est vert, et je ne comprends pas pourquoi. »
+`appliquerCouleur()` repeignait toute l'application avec la couleur des
+**plaquettes du bordereau de cubage ouvert**. Elle ne touche plus qu'à
+`--plaq`, qui ne peint que la pastille du bordereau et les plaquettes du
+ruban de saisie.
+
+- **L'accent est le vert vif `#2E7D46`**, choisi sur maquette le 23 août.
+  Le bleu avait été validé le 3 août et ce fichier disait de ne plus rouvrir le
+  sujet : **c'est lui qui l'a rouvert**, et c'est sa décision.
+- **Le nom `Sylve` de l'écran de démarrage garde `--vert-marque`.** Il l'a
+  demandé expressément ; `.dem-nom` le faisait déjà, un scénario le garantit.
+
+## Le forfait groupé : plusieurs travaux sur une ligne
+
+« Du détourage avec de l'élagage de tiges… c'est juste une désignation, comme
+une ligne globale qui se divise en compartiments. Le prix, il est sur le
+global. » Donc : les travaux **désignent** ce que la ligne couvre, le prix
+porte sur l'ensemble, et il n'y a **pas de quantité**.
+
+- **`travail` reste le premier de la liste**, `travauxPlus` porte les
+  suivants : aucune ligne ancienne ne bouge, et les rendements, la famille et
+  l'historique continuent de lire `travail`.
+- **Une ligne groupée prend la famille de son premier travail.** Décision prise
+  faute de réponse, signalée comme telle — à rouvrir s'il groupe un jour deux
+  travaux de familles différentes.
+- **Sa règle de TVA** : même taux partout, on l'applique ; taux différents, le
+  formulaire **refuse d'enregistrer** et lui fait choisir (`tvaAtrancher()`).
+  Sans arbitrage, `tauxLigne()` retient le **plus élevé** — sous-facturer la
+  TVA coûte plus cher que l'inverse.
+- **Les taux ne divergent qu'avec un SIREN.** Sans SIREN tout est à 20 % et la
+  question ne se pose jamais. C'est pourquoi le scénario doit poser
+  `siren: true` pour éprouver la garde.
+- **Les fournitures ne sont pas proposées en travaux supplémentaires** : elles
+  ont leur propre nature et changeraient le sens de la ligne.
+
+## L'ordre des factures, et les fiches voisines
+
+`rangFacture()` rend « F-2026-0010 » comparable (année × 10⁶ + rang). **Entre
+deux chantiers facturés, le numéro prime sur tout** — c'est l'ordre de ses
+classeurs, et il départage deux factures du même jour, ce que la date seule ne
+savait pas faire. Dès que l'un des deux n'a pas de facture, on retombe sur
+`rangComptable()` : un chantier en cours n'a pas à être relégué.
+
+**La fiche porte « Précédente » et « Suivante »** sous le sélecteur, avec le
+rang, dans ce même ordre. `chantiersOrdonnes()` sert aux deux, pour qu'ils ne
+puissent pas diverger.
+
+**« Unité proposée »** a remplacé « Unité de facturation » : il facture la même
+prestation tantôt à la journée, tantôt à l'hectare, et croyait le mot
+contraignant alors qu'il ne fait que pré-remplir.
+
 ## Cinq familles au-dessus des prestations
 
 `TRAVAUX` correspond à ce qu'il appelle ses **sous-catégories** : quarante-cinq
@@ -1126,7 +1179,7 @@ cubage, `carnet` aux chantiers.
 
 ## Où en est le chantier — 23 août 2026
 
-**Version en ligne : 4.52.0.** Le contrôle passe à 924 vérifications.
+**Version en ligne : 4.53.0.** Le contrôle passe à 964 vérifications.
 
 **La 4.51, née d'une seule tournée dictée.** Il a parcouru la 4.50 et signalé
 six choses en un message : le retour des réglages, l'absence de flèche hors
@@ -1204,14 +1257,11 @@ phrases plus loin il demandait *plus* de détail sur cet impayé. Les deux
 
 - **Le statut qui suit la saisie.** Il a demandé si remplir la facture devait
   faire passer le chantier en « Facturé ». Question posée, pas tranchée.
-- **Plusieurs travaux sur une même ligne.** Il facture parfois un forfait
-  groupé — détourage *et* élagage de tiges — et ne peut rattacher qu'un seul
-  type de travaux. Il veut un « + travaux ». Sa règle de TVA est posée : même
-  taux sur les deux, on l'applique ; taux différents, **on l'oblige à
-  trancher** au lieu de choisir pour lui. **Reste à trancher : la quantité.**
-  Une seule pour la ligne, une par travail, ou aucune (forfait) ? Question
-  posée le 23 août, sans réponse. À faire **après** les familles, pas avant :
-  une ligne à deux travaux peut relever de deux familles.
+- **Les grandes familles dans les filtres du carnet.** Il s'y perd avec
+  trente-cinq chantiers dont trente et un payés : les filtres sont à plat
+  (ouvert, à compléter, en cours, facturé…) et il ne sait plus à quelle famille
+  chacun appartient. Il aime les groupes *En cours / Clos* du sélecteur de
+  fiche et voudrait la même chose. Dit le 23 août, jamais tranché.
 - **Le nom du classement dans les exports.** `.xlsx`, CSV et impression
   écrivent toujours « Class. Comt ». Ces fichiers partent chez le client et
   reprennent le tableur d'origine : lui demander avant d'y toucher.
