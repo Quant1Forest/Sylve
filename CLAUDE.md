@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.49.0-20260819-2122**
+Version courante : **4.50.0-20260823-1027**
 
 ---
 
@@ -240,6 +240,30 @@ travailler.
   à la branche de suppression : la croix ne retirait jamais rien, et sans
   console ouverte rien ne le disait. Une branche morte dans un `if/else if`
   ne se voit pas, elle se teste.
+- **Un jour est une case du calendrier, pas 86 400 000 millisecondes.** Quatre
+  comptes le faisaient en soustrayant deux timestamps : « devis envoyé il y a
+  X jours », « facturé il y a X jours », « terminé il y a X jours », et
+  `depuisQuand()` de l'indicateur de sauvegarde. Un devis envoyé il y a
+  quarante jours à 23 h ressortait donc à « 39 jours » toute la journée du
+  lendemain, et une sauvegarde faite hier soir annonçait « aujourd'hui ». Les
+  autres calculs du fichier passaient déjà par `minuit()` — ces quatre-là
+  étaient restés en arrière. Corrigé en 4.50.
+- **Les échéances de charges étaient repliées sur le 28.** `Math.min(jour, 28)`
+  était un pansement contre le « 31 février ». Deux dégâts : un prélèvement du
+  30 tombait deux jours trop tôt, et sa toute première échéance — antérieure à
+  sa propre `charge.debut` — passait sous la garde `ts < charge.debut` et
+  n'était donc **jamais** annoncée. Le repli se fait sur la fin du mois
+  d'arrivée (`new Date(an, mois + 1, 0).getDate()`), comme
+  `finValiditeDevis()` le faisait déjà correctement. Les dépenses automatiques
+  se recalent sans doublon : elles sont refaites à chaque ouverture et celles
+  qui ne correspondent plus à aucune échéance sont retirées.
+- **Deux scénarios ne cassaient que certains jours.** Celui des devis était
+  rouge sur la 4.49 *livrée* — il semait un `dateEnvoi` à 12 h, donc il passait
+  l'après-midi et échouait le matin. Celui des échéances ne tombait que quand
+  la date du jour plaçait une échéance après le 28. Un test qui dépend de
+  l'heure ou du quantième ne dit pas la vérité : il la dit une fois sur deux.
+  Semer **deux** valeurs de part et d'autre de la frontière — juste après
+  minuit et juste avant — est ce qui rend la propriété vérifiable.
 - **`toISOString()` n'est pas une date locale.** Un champ `<input type="date">`
   parle en heure locale ; `toISOString()` répond en heure de Greenwich, où
   minuit à Paris est 22 h la veille. Tout timestamp passé par `C.minuit()` en
@@ -955,9 +979,65 @@ pas sa propre facture.
   de passer en dessous de cent identifiants — un contrôle qui n'inspecte plus
   rien doit crier, pas rassurer.
 
-## Où en est le chantier — 19 août 2026
+## Le cubage se choisit en arrivant
 
-**Version en ligne : 4.49.0.** Le contrôle passe à 777 vérifications.
+Le type de bordereau existait **depuis toujours** — `meta.classement`, quatre
+valeurs — mais au huitième champ de l'en-tête, derrière un bouton « Nouveau
+bordereau » qui fabriquait un comtois sans le dire. Le manque était de
+**visibilité, pas d'écran** : c'est la règle déjà posée pour « Recettes ». Le
+choix est donc en haut de la vue `fichiers`, sur laquelle le module s'ouvre
+maintenant (`defaut: 'fichiers'`), et non dans un cinquième onglet qui aurait
+redit la liste des bordereaux.
+
+- **Les intitulés stockés ne changeront jamais.** `Class. Comt`,
+  `Class. Qualitatif`… sont la **clé de `cfg.qualites`** et le champ des
+  bordereaux déjà saisis. `NOM_CLASSEMENT` ne donne que le mot affiché :
+  *Cubage comtois*, *Classement ABCD*, *Chablis*, *Sans classement*. Même
+  raison que les clés `bordcub.*`.
+- **Les exports gardent le code** (`.xlsx`, CSV, impression) : ces fichiers
+  partent chez le client et reprennent le tableur d'origine. Question ouverte,
+  pas tranchée.
+- **`CRITERES_ABCD` vient de la fiche ONF** : A en 4 / 4,5 / 5 / 8 / 9 m et
+  45 cm de médian **sur écorce**, B, C et D en 4 m à 20 cm. `controlerBillon()`
+  rend des phrases, jamais un refus — la classe se juge sur la grume, Sylve n'a
+  que deux nombres. L'avis est `.avis.tiede`, pas `.rouge` : le rouge reste à
+  ce qui est faux.
+- **Le diamètre est remonté sur écorce avant comparaison** quand le bordereau
+  est tenu sous écorce, par la même racine que `cuber()` (`D / √(1−tx)`).
+- **`MOTIFS_REFACTION` porte les codes du mémento comtois** (C, D, G, R, GEL,
+  EE, P) et les notations de l'ABCD (−1P, −2P, −1D, −2D). En ABCD la notation
+  **porte sa purge**, donc `longueurMotifs()` en déduit la réfaction ; en
+  comtois non, elle se juge sur la grume et reste à la main.
+- **`migrerLibellesAbcd()` ne réécrit que ce qui est resté tel quel.**
+  « Actba » devient « Classe A », mais un libellé renommé à la main est le
+  sien et il le garde. Les listes de qualités partent dans les sauvegardes :
+  changer `QUALITES_DEF` ne suffisait pas.
+- **Changer de type sur un bordereau rempli prévient**, nomme les qualités
+  orphelines, et laisse décider. Vide, il ne demande rien.
+
+**`moduleDeVue()` remplace une liste tenue à la main.** Les liens des notes de
+mise à jour s'appuyaient sur une table de correspondance qui ne connaissait
+aucune vue du cubage : une note pointant sur le bordereau ouvrait Chantiers
+avec la barre du bas de travers. `MODULES` sait déjà à qui appartient chaque
+vue. Une vue partagée revient au premier module qui la déclare — `fichiers` au
+cubage, `carnet` aux chantiers.
+
+## Où en est le chantier — 23 août 2026
+
+**Version en ligne : 4.50.0.** Le contrôle passe à 856 vérifications.
+
+**Le contrôle met désormais près de sept minutes**, alors que ce fichier
+promet moins de deux. La cause n'a pas été cherchée — à mesurer avant de
+l'imputer à la croissance de la suite. En attendant, le filtre
+(`node outils/tests.js index.html "un bout de nom"`) reste le bon outil pour
+éprouver une garde.
+
+**Le 23 août : le cubage.** Le choix du cubage posé à l'arrivée du module, le
+classement ABCD contrôlé, les motifs de réfaction en boutons — voir *Le cubage
+se choisit en arrivant*. Trois défauts sans rapport ont été trouvés en chemin
+et corrigés : les comptes de jours en millisecondes, les échéances repliées
+sur le 28, les liens des notes de mise à jour. Les deux premiers dormaient
+derrière des scénarios qui ne cassaient que certains jours.
 
 L'historique est repris et vit sur le téléphone : 32 chantiers, 124 dépenses,
 6 charges fixes, 6 produits, 3 fournisseurs, 3 commandes, 9 sorties. Le fichier
@@ -1013,6 +1093,14 @@ phrases plus loin il demandait *plus* de détail sur cet impayé. Les deux
 
 - **Le statut qui suit la saisie.** Il a demandé si remplir la facture devait
   faire passer le chantier en « Facturé ». Question posée, pas tranchée.
+- **Le nom du classement dans les exports.** `.xlsx`, CSV et impression
+  écrivent toujours « Class. Comt ». Ces fichiers partent chez le client et
+  reprennent le tableur d'origine : lui demander avant d'y toucher.
+- **Les tarifs de cubage sur pied** (Algan, Schaeffer). Il a envoyé un cours de
+  dendrométrie le 22 août, puis répondu que c'était pour le contexte, rien à
+  faire. La fiche de martelage compte déjà les tiges par classe de Ø à 1,30 m
+  et ne dit aucun cube : le jour où il le demandera, c'est là que ça se
+  brancherait.
 
 **Garé, à ne pas rouvrir sans lui :**
 
