@@ -3039,48 +3039,65 @@ var JOUR = 86400000;
    Source : BOI-ANNX-000509 du 28/05/2025, annexe TVA du secteur de la
    sylviculture, complétée du b septies de l'article 279 du CGI.
    Le taux réduit de 10 % sur les travaux forestiers cesse au 1/1/2029. */
+/* Ses grandes familles, au-dessus des prestations. TRAVAUX correspond à ce
+   qu'il appelle ses sous-catégories : il manquait l'étage du dessus, celui
+   sur lequel il fait ses analyses.
+   Elles sont cinq et non sept : « Fourniture » et « Débours client », qu'il
+   citait aussi, existent déjà comme nature de ligne — et la nature décide de
+   l'abattement fiscal. Les redire ici ferait deux champs pour la même chose,
+   qui finiraient par se contredire. categorieLigne() recompose ses sept.
+   Le rangement livré n'est qu'un défaut : chaque travail porte sa famille
+   dans les réglages, et elle s'y change. */
+var CAT_TRAVAUX = [
+  { c: 'gestion', n: 'Journées de gestion' },
+  { c: 'plantation', n: 'Travaux de plantation' },
+  { c: 'sylvicole', n: 'Travaux d’amélioration sylvicole' },
+  { c: 'gibier', n: 'Protection gibier' },
+  { c: 'exploitation', n: 'Travaux d’exploitation' }
+];
+
 var TRAVAUX = [
   /* --- travaux forestiers : 10 % si le client est identifié, sinon 20 % --- */
-  { c: 'PLANT', n: 'Plantation, semis, mise en place des plants', u: 'plant', tvaSans: 20, tvaAvec: 10 },
-  { c: 'REGARNI', n: 'Regarni', u: 'plant', tvaSans: 20, tvaAvec: 10 },
-  { c: 'TRAVSOL', n: 'Travail du sol, potets, sous-solage, labour', u: 'ha', tvaSans: 20, tvaAvec: 10 },
-  { c: 'TUTEUR', n: 'Mise en place de tuteurs', u: 'unite', tvaSans: 20, tvaAvec: 10 },
-  { c: 'PROTEC', n: 'Pose de protections gibier', u: 'unite', tvaSans: 20, tvaAvec: 10 },
-  { c: 'DEPOSE', n: 'Dépose de protections gibier', u: 'unite', tvaSans: 20, tvaAvec: 10 },
-  { c: 'DEGAG', n: 'Dégagement manuel', u: 'ha', tvaSans: 20, tvaAvec: 10 },
-  { c: 'DEPRES', n: 'Dépressage', u: 'ha', tvaSans: 20, tvaAvec: 10 },
-  { c: 'DETOUR', n: 'Détourage', u: 'ha', tvaSans: 20, tvaAvec: 10 },
-  { c: 'JARDIN', n: 'Travaux sylvicoles jardinatoires', u: 'ha', tvaSans: 20, tvaAvec: 10 },
-  { c: 'DEBROU', n: 'Débroussaillage, désherbage', u: 'ha', tvaSans: 20, tvaAvec: 10 },
-  { c: 'NETT', n: 'Nettoiement', u: 'ha', tvaSans: 20, tvaAvec: 10 },
-  { c: 'ELAG', n: 'Élagage, ébranchage, éhouppage', u: 'ha', tvaSans: 20, tvaAvec: 10 },
-  { c: 'TAILLE', n: 'Taille des arbres et des haies', u: 'ha', tvaSans: 20, tvaAvec: 10 },
-  { c: 'BROY', n: 'Broyage (débroussaillage)', u: 'ha', tvaSans: 20, tvaAvec: 10 },
-  { c: 'DESSOU', n: 'Défrichage, dessouchage', u: 'ha', tvaSans: 20, tvaAvec: 10 },
-  { c: 'ANDAIN', n: 'Brûlage, andainage, ramassage des rémanents', u: 'ha', tvaSans: 20, tvaAvec: 10 },
-  { c: 'RANGE', n: 'Rangement de branches', u: 'ha', tvaSans: 20, tvaAvec: 10 },
-  { c: 'ENTRET', n: 'Entretien de plantation', u: 'ha', tvaSans: 20, tvaAvec: 10 },
-  { c: 'PISTE', n: 'Entretien de pistes, sentiers, curage de fossés', u: 'ml', tvaSans: 20, tvaAvec: 10 },
-  { c: 'PHYTO', n: 'Épandage de produits phytosanitaires', u: 'ha', tvaSans: 20, tvaAvec: 10 },
-  { c: 'ENGRAIS', n: 'Épandage d’engrais, amendements', u: 'ha', tvaSans: 20, tvaAvec: 10 },
-  { c: 'ABAT', n: 'Abattage, tronçonnage', u: 'ha', tvaSans: 20, tvaAvec: 10 },
-  { c: 'DEBARD', n: 'Débardage', u: 'ha', tvaSans: 20, tvaAvec: 10 },
-  { c: 'CLOIS', n: 'Ouverture de cloisonnements, layons', u: 'ml', tvaSans: 20, tvaAvec: 10 },
-  { c: 'GRILL', n: 'Pose de clôture gibier', u: 'ml', tvaSans: 20, tvaAvec: 10 },
+  { c: 'PLANT', cat: 'plantation', n: 'Plantation, semis, mise en place des plants', u: 'plant', tvaSans: 20, tvaAvec: 10 },
+  { c: 'REGARNI', cat: 'plantation', n: 'Regarni', u: 'plant', tvaSans: 20, tvaAvec: 10 },
+  { c: 'TRAVSOL', cat: 'plantation', n: 'Travail du sol, potets, sous-solage, labour', u: 'ha', tvaSans: 20, tvaAvec: 10 },
+  { c: 'TUTEUR', cat: 'gibier', n: 'Mise en place de tuteurs', u: 'unite', tvaSans: 20, tvaAvec: 10 },
+  { c: 'PROTEC', cat: 'gibier', n: 'Pose de protections gibier', u: 'unite', tvaSans: 20, tvaAvec: 10 },
+  { c: 'DEPOSE', cat: 'gibier', n: 'Dépose de protections gibier', u: 'unite', tvaSans: 20, tvaAvec: 10 },
+  { c: 'DEGAG', cat: 'sylvicole', n: 'Dégagement manuel', u: 'ha', tvaSans: 20, tvaAvec: 10 },
+  { c: 'DEPRES', cat: 'sylvicole', n: 'Dépressage', u: 'ha', tvaSans: 20, tvaAvec: 10 },
+  { c: 'DETOUR', cat: 'sylvicole', n: 'Détourage', u: 'ha', tvaSans: 20, tvaAvec: 10 },
+  { c: 'JARDIN', cat: 'sylvicole', n: 'Travaux sylvicoles jardinatoires', u: 'ha', tvaSans: 20, tvaAvec: 10 },
+  { c: 'DEBROU', cat: 'sylvicole', n: 'Débroussaillage, désherbage', u: 'ha', tvaSans: 20, tvaAvec: 10 },
+  { c: 'NETT', cat: 'sylvicole', n: 'Nettoiement', u: 'ha', tvaSans: 20, tvaAvec: 10 },
+  { c: 'ELAG', cat: 'sylvicole', n: 'Élagage, ébranchage, éhouppage', u: 'ha', tvaSans: 20, tvaAvec: 10 },
+  { c: 'TAILLE', cat: 'sylvicole', n: 'Taille des arbres et des haies', u: 'ha', tvaSans: 20, tvaAvec: 10 },
+  { c: 'BROY', cat: 'sylvicole', n: 'Broyage (débroussaillage)', u: 'ha', tvaSans: 20, tvaAvec: 10 },
+  { c: 'DESSOU', cat: 'exploitation', n: 'Défrichage, dessouchage', u: 'ha', tvaSans: 20, tvaAvec: 10 },
+  { c: 'ANDAIN', cat: 'sylvicole', n: 'Brûlage, andainage, ramassage des rémanents', u: 'ha', tvaSans: 20, tvaAvec: 10 },
+  { c: 'RANGE', cat: 'sylvicole', n: 'Rangement de branches', u: 'ha', tvaSans: 20, tvaAvec: 10 },
+  { c: 'ENTRET', cat: 'plantation', n: 'Entretien de plantation', u: 'ha', tvaSans: 20, tvaAvec: 10 },
+  { c: 'PISTE', cat: 'exploitation', n: 'Entretien de pistes, sentiers, curage de fossés', u: 'ml', tvaSans: 20, tvaAvec: 10 },
+  { c: 'PHYTO', cat: 'sylvicole', n: 'Épandage de produits phytosanitaires', u: 'ha', tvaSans: 20, tvaAvec: 10 },
+  { c: 'ENGRAIS', cat: 'sylvicole', n: 'Épandage d’engrais, amendements', u: 'ha', tvaSans: 20, tvaAvec: 10 },
+  { c: 'ABAT', cat: 'exploitation', n: 'Abattage, tronçonnage', u: 'ha', tvaSans: 20, tvaAvec: 10 },
+  { c: 'DEBARD', cat: 'exploitation', n: 'Débardage', u: 'ha', tvaSans: 20, tvaAvec: 10 },
+  { c: 'CLOIS', cat: 'exploitation', n: 'Ouverture de cloisonnements, layons', u: 'ml', tvaSans: 20, tvaAvec: 10 },
+  { c: 'GRILL', cat: 'gibier', n: 'Pose de clôture gibier', u: 'ml', tvaSans: 20, tvaAvec: 10 },
   /* --- travaux au taux normal quoi qu'il arrive --- */
-  { c: 'REPULSIF', n: 'Application de répulsifs', u: 'ha', tvaSans: 20, tvaAvec: 20, doute: true },
-  { c: 'JALON', n: 'Jalonnage des lignes', u: 'ml', tvaSans: 20, tvaAvec: 20 },
+  { c: 'REPULSIF', cat: 'gibier', n: 'Application de répulsifs', u: 'ha', tvaSans: 20, tvaAvec: 20, doute: true },
+  { c: 'JALON', cat: 'gestion', n: 'Jalonnage des lignes', u: 'ml', tvaSans: 20, tvaAvec: 20 },
   /* Le code reste MARQ pour ne pas décrocher les anciennes lignes : seul
      l'intitulé change. Marquage, martelage et comptage sont retirés — ce
      n'est pas ce métier-là. */
-  { c: 'MARQ', n: 'Balivage', u: 'ha', tvaSans: 20, tvaAvec: 20 },
-  { c: 'INVENT', n: 'Inventaire en plein', u: 'jour', tvaSans: 20, tvaAvec: 20 },
-  { c: 'CHABLIS', n: 'Repérage de chablis', u: 'jour', tvaSans: 20, tvaAvec: 20 },
-  { c: 'ROUTE', n: 'Création de routes, pistes, places de dépôt', u: 'ml', tvaSans: 20, tvaAvec: 20 },
-  { c: 'FOSSE', n: 'Création de fossés, ponceaux, passages busés', u: 'ml', tvaSans: 20, tvaAvec: 20 },
-  { c: 'DRAINAGE', n: 'Drainage', u: 'ml', tvaSans: 20, tvaAvec: 20 },
-  { c: 'EVAC', n: 'Évacuation des rémanents et déchets', u: 'ha', tvaSans: 20, tvaAvec: 20 },
-  { c: 'FENDAGE', n: 'Fendage de bois de chauffage', u: 'unite', tvaSans: 20, tvaAvec: 20 },
+  { c: 'MARQ', cat: 'gestion', n: 'Balivage', u: 'ha', tvaSans: 20, tvaAvec: 20 },
+  { c: 'INVENT', cat: 'gestion', n: 'Inventaire en plein', u: 'jour', tvaSans: 20, tvaAvec: 20 },
+  { c: 'CHABLIS', cat: 'gestion', n: 'Repérage de chablis', u: 'jour', tvaSans: 20, tvaAvec: 20 },
+  { c: 'ROUTE', cat: 'exploitation', n: 'Création de routes, pistes, places de dépôt', u: 'ml', tvaSans: 20, tvaAvec: 20 },
+  { c: 'FOSSE', cat: 'exploitation', n: 'Création de fossés, ponceaux, passages busés', u: 'ml', tvaSans: 20, tvaAvec: 20 },
+  { c: 'DRAINAGE', cat: 'exploitation', n: 'Drainage', u: 'ml', tvaSans: 20, tvaAvec: 20 },
+  { c: 'EVAC', cat: 'exploitation', n: 'Évacuation des rémanents et déchets', u: 'ha', tvaSans: 20, tvaAvec: 20 },
+  { c: 'FENDAGE', cat: 'exploitation', n: 'Fendage de bois de chauffage', u: 'unite', tvaSans: 20, tvaAvec: 20 },
   /* --- fournitures : taux propre, indépendant du SIREN du client --- */
   { c: 'F_TUTEUR', n: 'Fourniture de tuteurs', u: 'unite', fourniture: true, tvaSans: 20, tvaAvec: 20 },
   { c: 'F_PROTEC', n: 'Fourniture de protections gibier', u: 'unite', fourniture: true, tvaSans: 20, tvaAvec: 20 },
@@ -3203,13 +3220,40 @@ function appliquerTravauxPerso(cfg) {
     if (t) {
       if (p.n) t.n = p.n;
       if (p.u) t.u = p.u;
+      /* Le rangement livré n'est qu'un défaut : celui qu'il choisit prime. */
+      if (p.cat !== undefined) t.cat = p.cat;
     } else {
-      TRAVAUX.push({ c: code, n: p.n || code, u: p.u || 'unite',
+      TRAVAUX.push({ c: code, n: p.n || code, u: p.u || 'unite', cat: p.cat || '',
         tvaSans: nb(p.tvaSans) || 20, tvaAvec: nb(p.tvaAvec) || 20,
         fourniture: !!p.fourniture, perso: true, retire: retires.indexOf(code) >= 0 });
     }
   });
 }
+/* La famille d'un travail, et celle d'une ligne. La ligne est plus large : une
+   fourniture ou un débours ne relève d'aucune famille de travaux, sa nature
+   suffit à le dire. C'est ce qui reconstitue ses sept familles à partir de
+   cinq, sans jamais dire deux fois la même chose. */
+function categorieTravail(code) {
+  var t = trouve(TRAVAUX, code);
+  return t ? (t.cat || '') : '';
+}
+function nomCatTravail(c) {
+  var x = trouve(CAT_TRAVAUX, c);
+  return x ? x.n : '';
+}
+function categorieLigne(l) {
+  if (!l) return '';
+  if (l.nature === 'debours') return 'debours';
+  var t = trouve(TRAVAUX, l.travail);
+  if (l.nature === 'vente' || (t && t.fourniture)) return 'fourniture';
+  return (t && t.cat) || '';
+}
+function nomCategorieLigne(c) {
+  if (c === 'fourniture') return 'Fourniture';
+  if (c === 'debours') return 'Débours client';
+  return nomCatTravail(c) || 'Sans famille';
+}
+
 /* Les prestations proposées à la saisie : tout sauf celles mises de côté. */
 function travauxActifs(avecFournitures) {
   return TRAVAUX.filter(function (t) {
@@ -4016,9 +4060,20 @@ function dernierEvenement(c) {
 /* Du plus récent au plus ancien par défaut : c'est ce qu'on vient de toucher
    qu'on cherche. Mais reprendre un historique se fait dans l'autre sens, en
    remontant le temps — d'où le bouton. */
+/* L'ordre de la comptabilité, celui de ses classeurs : la date de facture fait
+   foi au plus haut niveau ; à défaut celle du devis ; à défaut le chantier le
+   plus récemment rentré.
+   À ne pas confondre avec dernierEvenement(), qui dit la dernière étape
+   franchie et date les sorties de stock : détourner celle-là aurait re-daté
+   ses mouvements. Un chantier payé la semaine dernière mais facturé il y a
+   trois mois se range à sa facture, pas à son paiement. */
+function rangComptable(c) {
+  if (!c) return 0;
+  return nb(c.dateFacture) || nb(c.dateDevis) || nb(c.cree) || nb(c.maj) || 0;
+}
 function tri(chantiers, ancienDabord) {
   return (chantiers || []).slice().sort(function (a, b) {
-    var da = dernierEvenement(a), db = dernierEvenement(b);
+    var da = rangComptable(a), db = rangComptable(b);
     if (da !== db) return ancienDabord ? da - db : db - da;
     return rangStatut(a.statut) - rangStatut(b.statut);
   });
@@ -4163,6 +4218,9 @@ function totaux(chantiers, cfg) {
 
 var M = {
   JOUR: JOUR, TRAVAUX: TRAVAUX, UNITES: UNITES, STATUTS: STATUTS,
+  CAT_TRAVAUX: CAT_TRAVAUX, categorieTravail: categorieTravail,
+  nomCatTravail: nomCatTravail, categorieLigne: categorieLigne,
+  nomCategorieLigne: nomCategorieLigne,
   ESSENCES_CH: ESSENCES_CH, NIVEAUX: NIVEAUX, nomEssenceCh: nomEssenceCh, nomNiveau: nomNiveau,
   lignesDe: lignesDe, monoTravail: monoTravail, tempsPourTravail: tempsPourTravail,
   uniteTravail: uniteTravail, quantiteTravail: quantiteTravail, rendementTravail: rendementTravail,
@@ -4185,7 +4243,7 @@ var M = {
   prixJour: prixJour, rendement: rendement,
   dureePrevue: dureePrevue, enRetard: enRetard, tri: tri, filtre: filtre, chercher: chercher,
   totaux: totaux,
-  dernierEvenement: dernierEvenement,
+  dernierEvenement: dernierEvenement, rangComptable: rangComptable,
   jourCle: jourCle, minuit: minuit, ajouteJours: ajouteJours, estWeekend: estWeekend,
   journeesPlacees: journeesPlacees, placerJour: placerJour, resteAPlacer: resteAPlacer,
   totalPlace: totalPlace, partDuJour: partDuJour,
@@ -4595,6 +4653,28 @@ function encaissementsParMois(chantiers, annee) {
   return t.map(function (v) { return arr(v, 2); });
 }
 
+/* Ce que rapporte chaque grande famille. parPrestation() descend au détail des
+   prestations ; celle-ci donne l'étage du dessus, celui sur lequel il raisonne
+   — et elle rend bien ses sept familles, fournitures et débours compris, sans
+   que rien ne soit dit deux fois.
+   Les deux fonctions lui sont passées plutôt qu'appelées : le module des
+   chantiers ne doit pas être atteint d'ici, sinon les deux finissent par
+   diverger. Même raison que tauxReussite(). */
+function parFamille(chantiers, b, familleDe, nomFamille) {
+  var m = {};
+  lignesFacturees(chantiers, b).forEach(function (x) {
+    var k = (familleDe ? familleDe(x.ligne) : '') || 'autre';
+    if (!m[k]) m[k] = { famille: k, nom: nomFamille ? nomFamille(k) : k, ht: 0, n: 0 };
+    m[k].ht += x.ht; m[k].n++;
+  });
+  var l = Object.keys(m).map(function (k) {
+    m[k].ht = arr(m[k].ht, 2); return m[k];
+  }).sort(function (a, b2) { return b2.ht - a.ht; });
+  var tot = l.reduce(function (s, x) { return s + x.ht; }, 0);
+  l.forEach(function (x) { x.part = tot > 0 ? Math.round(x.ht / tot * 100) : 0; });
+  return l;
+}
+
 /* Ce que rapporte chaque type de prestation. */
 function parPrestation(chantiers, b, nomTravail) {
   var m = {};
@@ -4703,7 +4783,8 @@ var M = {
   caParDonneur: caParDonneur,
   recettesParMois: recettesParMois, depensesParMois: depensesParMois,
   encaissementsParMois: encaissementsParMois,
-  parPrestation: parPrestation, parCategorie: parCategorie, parFournisseur: parFournisseur,
+  parPrestation: parPrestation, parFamille: parFamille,
+  parCategorie: parCategorie, parFournisseur: parFournisseur,
   simulation: simulation,
   PERIODICITES: PERIODICITES, parAn: parAn, nomPeriodicite: nomPeriodicite,
   coutAnnuel: coutAnnuel, totalChargesAnnuel: totalChargesAnnuel,
@@ -6940,6 +7021,12 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.52', quoi: [
+    { t: 'Vos cinq grandes familles au-dessus des prestations', vue: 'analyses' },
+    { t: 'Les recettes se lisent famille par famille', vue: 'analyses' },
+    { t: 'Le carnet suit l’ordre de la comptabilité : facture, puis devis', vue: 'carnet' },
+    { t: 'La flèche de retour est là dans tous les modules' }
+  ] },
   { v: '4.51', quoi: [
     { t: 'Le temps que vous notez fait foi : fini les deux chiffres de journées', vue: 'carnet' },
     { t: 'La date devient facultative quand vous notez du temps', vue: 'carnet' },
@@ -6962,11 +7049,6 @@ var NOTES_MAJ = [
     { t: 'Un produit dosé se lit au plant partout, y compris dans les coûts', vue: 'revient' },
     { t: 'Le carnet montre le numéro de facture, et le tri se retourne', vue: 'carnet' },
     { t: 'Plus d’estimation réclamée sur un chantier déjà payé', vue: 'carnet' }
-  ] },
-  { v: '4.47', quoi: [
-    { t: '« Prix de revient » devient « Rentabilité », et gagne une vue par année', vue: 'revient' },
-    { t: 'Vos ventes de fournitures année par année, mois par mois, et l’évolution', vue: 'revient' },
-    { t: 'Ce qui rapporte se lit en anneau ou en barres, au choix', vue: 'revient' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -8416,9 +8498,12 @@ function majBandeauModule() {
      suffit déjà : le bouton reste caché plutôt que de doubler ◈. */
   var ret = $('#b-retour');
   if (ret) {
+    /* Elle n'existait que dans les modules d'une partie : ailleurs, le bouton
+       d'accueil faisait déjà le même trajet. Il la veut partout — deux façons
+       de remonter valent mieux qu'une hésitation devant le bandeau. */
     var g = (MODULES[A.module] || {}).groupe;
-    ret.hidden = !g;
-    if (g) ret.title = 'Revenir à « ' + (NOMS_GROUPE[g] || g) + ' »';
+    ret.hidden = false;
+    ret.title = g ? 'Revenir à « ' + (NOMS_GROUPE[g] || g) + ' »' : 'Revenir à l’accueil';
   }
   var act = ACTIONS_MODULE[A.module] || [];
   $('#b-ctx').innerHTML = act.map(function (x) {
@@ -9628,13 +9713,46 @@ function ouvrirChantier(id) {
   if (A.module === 'chantiers') aller('chantier');
   else allerModule('chantiers', 'chantier');
 }
+/* Les travaux rangés par famille. Quarante-cinq lignes à plat, il fallait les
+   parcourir toutes pour retrouver la sienne. Les fournitures ont leur propre
+   groupe : leur famille vient de la nature de la ligne, pas des travaux. */
+function optionsTravaux(sel, opt) {
+  opt = opt || {};
+  var dispo = C.TRAVAUX.filter(function (t) {
+    return (!t.retire || t.c === sel) && !(opt.sansFournitures && t.fourniture);
+  });
+  var une = function (t) {
+    return '<option value="' + t.c + '"' + (sel === t.c ? ' selected' : '') + '>' +
+      esc(t.n) + '</option>';
+  };
+  var groupe = function (nom, l) {
+    return l.length ? '<optgroup label="' + esc(nom) + '">' + l.map(une).join('') + '</optgroup>' : '';
+  };
+  var h = opt.vide ? '<option value="">— prestation —</option>' : '';
+  C.CAT_TRAVAUX.forEach(function (cat) {
+    h += groupe(cat.n, dispo.filter(function (t) {
+      return !t.fourniture && t.cat === cat.c;
+    }));
+  });
+  h += groupe('Fourniture', dispo.filter(function (t) { return t.fourniture; }));
+  /* « Autre » et les prestations qu'il a créées lui-même n'ont pas de famille
+     tant qu'il ne leur en donne pas une dans les réglages. */
+  h += groupe('Sans famille', dispo.filter(function (t) {
+    return !t.fourniture && !C.nomCatTravail(t.cat);
+  }));
+  return h;
+}
+
 /* Le sélecteur en haut de la fiche : passer d'un chantier à l'autre sans
    repasser par le carnet. Les chantiers ouverts d'abord, les clos ensuite —
    c'est presque toujours dans les ouverts qu'il veut aller. */
 function optionsChantiers(sel) {
   var ouv = [], clos = [];
+  /* Même ordre que le carnet : celui de la comptabilité. Trier par « maj »
+     remontait un chantier dès qu'on l'ouvrait pour le corriger — l'ordre
+     paraissait alphabétique, c'est-à-dire dû au hasard. */
   (A.chantiers || []).slice().sort(function (a, b) {
-    return (b.maj || b.cree || 0) - (a.maj || a.cree || 0);
+    return C.rangComptable(b) - C.rangComptable(a);
   }).forEach(function (c) {
     var lieu = [c.commune, c.foret].filter(Boolean).join(', ');
     var o = '<option value="' + esc(c.id) + '"' + (c.id === sel ? ' selected' : '') + '>' +
@@ -10695,11 +10813,7 @@ function ouvrirLigne(id, idx) {
   if (!l) return;
   modale(idx != null ? 'Modifier la ligne' : 'Ajouter des travaux',
     '<div class="champ"><label class="eyebrow" for="cl-trav">Travaux</label>' +
-    '<select id="cl-trav">' + C.TRAVAUX.filter(function (t) {
-      return !t.retire || t.c === l.travail;
-    }).map(function (t) {
-      return '<option value="' + t.c + '"' + (l.travail === t.c ? ' selected' : '') + '>' + esc(t.n) + '</option>';
-    }).join('') + '</select></div>' +
+    '<select id="cl-trav">' + optionsTravaux(l.travail) + '</select></div>' +
     '<div class="grille g3">' +
     '<div class="champ"><label class="eyebrow" for="cl-unite">Unité</label>' +
     '<select id="cl-unite">' + C.UNITES.map(function (u) {
@@ -12140,6 +12254,16 @@ function ouvrirTravailRegle(code) {
     '<div class="champ"><label class="eyebrow" for="tr-nom">Nom</label>' +
     '<input type="text" id="tr-nom" class="gros" autocomplete="off" value="' +
     esc(t ? t.n : '') + '"></div>' +
+    /* La famille se règle ici : le rangement livré n'est qu'un défaut, et
+       c'est lui qui sait dans laquelle il compte ses chantiers. Les
+       fournitures n'en prennent pas — la nature de la ligne le dit déjà. */
+    (t && t.fourniture ? '' :
+      '<div class="champ"><label class="eyebrow" for="tr-cat">Famille</label>' +
+      '<select id="tr-cat"><option value="">— sans famille —</option>' +
+      C.CAT_TRAVAUX.map(function (x) {
+        return '<option value="' + x.c + '"' + (t && t.cat === x.c ? ' selected' : '') + '>' +
+          esc(x.n) + '</option>';
+      }).join('') + '</select></div>') +
     '<div class="grille g2">' +
     '<div class="champ"><label class="eyebrow" for="tr-unite">Unité de facturation</label>' +
     '<select id="tr-unite">' + C.UNITES.map(function (x) {
@@ -12186,10 +12310,12 @@ function ouvrirTravailRegle(code) {
       }
       var e = A.cfg.travauxPerso[code] || (A.cfg.travauxPerso[code] = {});
       e.n = nom; e.u = $('#tr-unite').value;
+      if ($('#tr-cat')) e.cat = $('#tr-cat').value;
     } else {
       var neuf = 'X' + Date.now().toString(36).toUpperCase();
       var tv = C.nb($('#tr-tva').value);
-      A.cfg.travauxPerso[neuf] = { n: nom, u: $('#tr-unite').value, tvaSans: tv, tvaAvec: tv };
+      A.cfg.travauxPerso[neuf] = { n: nom, u: $('#tr-unite').value, tvaSans: tv, tvaAvec: tv,
+        cat: $('#tr-cat') ? $('#tr-cat').value : '' };
     }
     C.appliquerTravauxPerso(A.cfg);
     sauverCfg();
@@ -12382,20 +12508,17 @@ function derniereJournee() {
 /* ------------------------------------------------------------- l'écran */
 var pst = [];
 
-function optionsTravaux(sel) {
-  return '<option value="">— prestation —</option>' + C.TRAVAUX.filter(function (t) {
-    return !t.fourniture && (!t.retire || t.c === sel);
-  }).map(function (t) {
-    return '<option value="' + t.c + '"' + (t.c === sel ? ' selected' : '') + '>' + esc(t.n) + '</option>';
-  }).join('');
-}
+/* Le sélecteur des postes d'une journée passe par la même fonction que celui
+   d'une ligne de chantier : il en existait deux du même nom, et la seconde
+   écrasait la première en silence. */
 function renderPostes() {
   var z = $('#mj-postes'); if (!z) return;
   z.innerHTML = pst.map(function (p, i) {
     var u = p.travaux ? C.courtUnite(C.uniteDe(p.travaux)) : '';
     return '<div class="carte2" style="margin-bottom:7px;padding:9px 10px">' +
       '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">' +
-      '<select data-pstt="' + i + '" style="flex:1">' + optionsTravaux(p.travaux) + '</select>' +
+      '<select data-pstt="' + i + '" style="flex:1">' +
+      optionsTravaux(p.travaux, { vide: true, sansFournitures: true }) + '</select>' +
       (pst.length > 1 ? '<button type="button" class="btn-min" data-pstsup="' + i + '">✕</button>' : '') +
       '</div><div class="grille g2">' +
       '<div class="champ" style="margin:0"><label class="eyebrow">Heures</label>' +
@@ -14215,6 +14338,7 @@ function htmlSimulation(sim) {
 function htmlRecettes(an, b) {
   var ca = FIN.chiffreAffaires(A.chantiers, b);
   var pres = FIN.parPrestation(A.chantiers, b, C.nomTravail);
+  var fam = FIN.parFamille(A.chantiers, b, C.categorieLigne, C.nomCategorieLigne);
   var don = FIN.caParDonneur(A.chantiers, b);
   var tr = FIN.tauxReussite(A.chantiers, C.aDevis);
   var refus = C.analyseRefus(A.chantiers);
@@ -14236,6 +14360,14 @@ function htmlRecettes(an, b) {
       { nom: 'facturé', valeurs: FIN.recettesParMois(A.chantiers, an), couleur: '#2E4A3C' },
       { nom: 'encaissé', valeurs: FIN.encaissementsParMois(A.chantiers, an), couleur: '#2E7D46' }
     ]) + '</div>' +
+
+    '<div class="carte"><h2>Par famille</h2>' +
+    '<p class="muted" style="font-size:12px;margin:0 0 10px">Vos grandes familles : ' +
+    'ce que chacune rapporte, fournitures et débours compris.</p>' +
+    barres(fam.map(function (f) {
+      return { nom: f.nom, valeur: f.ht, part: f.part,
+        detail: f.n > 1 ? f.n + ' lignes' : '' };
+    }), '#6A4A22') + '</div>' +
 
     '<div class="carte"><h2>Par type de travaux</h2>' +
     barres(pres.map(function (p) {
@@ -15581,7 +15713,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.51.0-20260823-1129';
+var VERSION = '4.52.0-20260823-1227';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

@@ -255,8 +255,14 @@ scenario('Bandeau : le retour remonte au menu de la partie', async () => {
   t.clic('#b-retour'); await t.pause(200);
   verifierVrai('on est revenu sur le menu de l\'entreprise',
     t.$('#vue-entreprise') && !t.$('#vue-entreprise').hidden);
+  /* Elle était masquée hors d'une partie — le bouton d'accueil y faisait déjà
+     le même trajet. Il l'a demandée partout le 23 août : « comme ça j'ai les
+     deux possibilités ». Hors partie, elle vise l'accueil. */
   t.clic('[data-module="cubage"]'); await t.pause(250);
-  verifier('caché dans le cubage : ◈ suffit', true, t.$('#b-retour').hidden);
+  verifier('elle est là dans le cubage aussi', false, t.$('#b-retour').hidden);
+  verifierVrai('et elle y vise l’accueil', /accueil/.test(t.$('#b-retour').title));
+  t.clic('#b-retour'); await t.pause(250);
+  verifierVrai('où elle ramène bien', t.$('#vue-accueil').classList.contains('actif'));
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -3506,6 +3512,145 @@ scenario('Réglages : on ressort par où l’on est entré', async () => {
   t.clic('#b-retour'); await t.pause(350);
   verifierVrai('depuis un module, on revient dans ce module',
     t.$('#vue-carnet').classList.contains('actif'));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Familles : cinq au-dessus des travaux, et sept à l’analyse', async () => {
+  /* Ce que Sylve appelait TRAVAUX correspond à ses sous-catégories : il
+     manquait l'étage du dessus, celui sur lequel il fait ses analyses.
+     Cinq familles et non sept : « Fourniture » et « Débours client » existent
+     déjà comme nature de ligne, et la nature décide de l'abattement fiscal.
+     Les redire ici ferait deux champs pour la même chose. */
+  const t = await ouvrir(VIDE);
+  const C = t.w.BCC;
+  verifier('cinq familles', 5, C.CAT_TRAVAUX.length);
+
+  verifier('le détourage est de l’amélioration sylvicole',
+    'sylvicole', C.categorieTravail('DETOUR'));
+  verifier('l’inventaire est une journée de gestion',
+    'gestion', C.categorieTravail('INVENT'));
+  verifier('la pose de protections est de la protection gibier',
+    'gibier', C.categorieTravail('PROTEC'));
+  verifier('le débardage est de l’exploitation',
+    'exploitation', C.categorieTravail('DEBARD'));
+  verifier('le regarni est de la plantation',
+    'plantation', C.categorieTravail('REGARNI'));
+
+  /* La ligne, elle, rend les sept : la nature complète les cinq. */
+  verifier('une prestation prend la famille de son travail', 'sylvicole',
+    C.categorieLigne({ travail: 'DETOUR', nature: 'prestation' }));
+  verifier('une fourniture se reconnaît à son travail', 'fourniture',
+    C.categorieLigne({ travail: 'F_TUTEUR', nature: 'prestation' }));
+  verifier('une vente aussi, quel que soit le travail', 'fourniture',
+    C.categorieLigne({ travail: 'DETOUR', nature: 'vente' }));
+  verifier('un débours prime sur tout', 'debours',
+    C.categorieLigne({ travail: 'F_TUTEUR', nature: 'debours' }));
+  verifier('les fournitures n’ont pas de famille de travaux', '',
+    C.categorieTravail('F_TUTEUR'));
+  verifier('et « Autre » non plus', '', C.categorieTravail('AUTRE'));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Familles : les travaux se choisissent par famille, et l’analyse suit', async () => {
+  const jadis = new Date(2026, 1, 10, 12).getTime();
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [{ id: 'c1', nom: 'Coupe des Places', statut: 'paye', aDevis: false,
+      temps: [], jours: [], dateFacture: jadis, datePaiement: jadis, maj: Date.now(),
+      lignes: [
+        { travail: 'DETOUR', unite: 'ha', quantite: 2, prix: 500, nature: 'prestation' },
+        { travail: 'INVENT', unite: 'jour', quantite: 1, prix: 400, nature: 'prestation' },
+        { travail: 'F_TUTEUR', unite: 'unite', quantite: 100, prix: 2, nature: 'vente' }
+      ] }]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.saisir('#c-rech', 'Places'); await t.pause(300);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+  t.clic('#f-ligne'); await t.pause(350);
+  verifierVrai('le formulaire de ligne s’ouvre', t.$('#cl-trav'));
+  const groupes = t.$$('#cl-trav optgroup').map(g => g.getAttribute('label'));
+  verifierVrai('le sélecteur est rangé par famille', groupes.length > 1);
+  verifierVrai('l’amélioration sylvicole en est une',
+    groupes.some(g => /amélioration sylvicole/.test(g)));
+  verifierVrai('les fournitures ont leur propre groupe',
+    groupes.indexOf('Fourniture') >= 0);
+  verifierVrai('« Autre » tombe dans les sans-famille',
+    groupes.indexOf('Sans famille') >= 0);
+  t.clic('#modale-x'); await t.pause(250);
+
+  /* L'analyse par famille : c'est ce qu'il attend depuis le début. */
+  t.clic('#b-accueil'); await t.pause(250);
+  t.clic('[data-module="entreprise"]'); await t.pause(250);
+  t.clic('[data-module="finances"]'); await t.pause(300);
+  t.clic('[data-vue="analyses"]'); await t.pause(300);
+  const an = t.$$('#vue-analyses [data-vueana], #vue-analyses .chip')
+    .filter(b => /Recettes/.test(b.textContent))[0];
+  if (an) { an.click(); await t.pause(350); }
+  const txt = t.texte('#vue-analyses');
+  verifierVrai('l’écran porte une analyse par famille', /Par famille/.test(txt));
+  verifierVrai('l’amélioration sylvicole y figure', /amélioration sylvicole/i.test(txt));
+  verifierVrai('les journées de gestion aussi', /Journées de gestion/i.test(txt));
+  verifierVrai('et la fourniture, venue de la nature', /Fourniture/.test(txt));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Familles : le rangement livré n’est qu’un défaut, il se change', async () => {
+  /* Quarante-cinq travaux rangés par nous : il faut qu'il puisse corriger
+     sans repasser par une livraison. */
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'chantiers' }));
+  t.clic('#b-reglages'); await t.pause(350);
+  t.clic('[data-regl="ent"]'); await t.pause(300);
+  t.clic('[data-liste="travaux"]'); await t.pause(300);
+  /* La liste ne déplie que les huit premières : le détourage est derrière. */
+  if (t.$('#rl-plus')) { t.clic('#rl-plus'); await t.pause(300); }
+  verifierVrai('le détourage est dans la liste', t.$('[data-lmodif="DETOUR"]'));
+  t.clic('[data-lmodif="DETOUR"]'); await t.pause(350);
+  verifierVrai('son formulaire porte la famille', t.$('#tr-cat'));
+  verifier('déjà rangée dans l’amélioration sylvicole', 'sylvicole', t.$('#tr-cat').value);
+  t.choisir('#tr-cat', 'gestion');
+  t.clic('#tr-ok'); await t.pause(450);
+  verifier('la famille choisie est retenue', 'gestion',
+    ((t.stock('cfg') || {}).travauxPerso || {}).DETOUR.cat);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Carnet : l’ordre est celui de la comptabilité', async () => {
+  /* « Ce qui fait foi au plus haut niveau, c'est la date de facture. Quand tu
+     n'en as pas, date du devis. Quand tu n'as pas non plus de date de devis,
+     c'est le dernier chantier rentré. » Le tri lisait « maj » : un chantier
+     remontait dès qu'on l'ouvrait pour le corriger, et l'ordre paraissait dû
+     au hasard. */
+  const le = (a, m, j) => new Date(a, m, j, 12).getTime();
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [
+      /* Facturé en janvier, mais touché à l'instant : il doit rester au fond. */
+      { id: 'vieux', nom: 'Vieux facturé', statut: 'paye', aDevis: false, lignes: [],
+        temps: [], dateFacture: le(2026, 0, 10), maj: Date.now(), cree: le(2026, 0, 1) },
+      /* Pas de facture, un devis de mars. */
+      { id: 'devis', nom: 'Devis de mars', statut: 'envoye', aDevis: true, lignes: [],
+        temps: [], dateDevis: le(2026, 2, 20), maj: le(2026, 2, 20), cree: le(2026, 2, 1) },
+      /* Ni l'un ni l'autre : c'est sa date de création qui parle. */
+      { id: 'neuf', nom: 'Rentré en juin', statut: 'devis', aDevis: true, lignes: [],
+        temps: [], maj: le(2026, 5, 1), cree: le(2026, 5, 5) }
+    ]
+  }));
+  const C = t.w.BCC;
+  verifier('la facture fait foi', le(2026, 0, 10),
+    C.rangComptable(t.stock('chantiers').filter(c => c.id === 'vieux')[0]));
+  verifier('à défaut le devis', le(2026, 2, 20),
+    C.rangComptable(t.stock('chantiers').filter(c => c.id === 'devis')[0]));
+  verifier('à défaut la date d’entrée', le(2026, 5, 5),
+    C.rangComptable(t.stock('chantiers').filter(c => c.id === 'neuf')[0]));
+
+  t.clic('[data-vue="carnet"]'); await t.pause(300);
+  t.choisir('#c-filtre', 'tous'); await t.pause(350);
+  const ordre = t.$$('[data-chouvrir]').map(b => b.dataset.chouvrir);
+  verifier('du plus récent au plus ancien', ['neuf', 'devis', 'vieux'], ordre);
   verifier('aucune erreur', [], t.erreurs);
 });
 
