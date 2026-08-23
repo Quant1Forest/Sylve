@@ -1348,6 +1348,9 @@ if (froid && s > 0) montrer(s);
           <button class="tuile" data-module="finances"><span class="ic rond"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><path d="M16.4 7.6a5.7 5.7 0 0 0-8.5 4.5 5.7 5.7 0 0 0 8.5 4.5"/><path d="M6.3 10.6h6.8M6.3 13.6h6.8"/></svg></span>
             <span><b>Finances</b><small id="e-fi-s">Bilan, recettes, dépenses, analyses</small></span>
             <span class="chiffre"><b id="e-fi-n">—</b><span>facturé</span></span></button>
+          <button class="tuile" data-module="vehicule"><span class="ic rond"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><path d="M3.5 15.6V9.4h9.6l3.3 3h4.1v3.2"/><path d="M9.6 16.2h4.6"/><circle cx="7.3" cy="16.2" r="1.8"/><circle cx="16.6" cy="16.2" r="1.8"/></svg></span>
+            <span><b>Véhicule</b><small id="e-vh-s">Carnet d'entretien, échéances</small></span>
+            <span class="chiffre"><b id="e-vh-n">—</b><span>km</span></span></button>
                 </div>
       </div>
     </section>
@@ -1452,6 +1455,7 @@ if (froid && s > 0) montrer(s);
           <button class="chip" data-ana="ensemble" aria-pressed="true">Vue d'ensemble</button>
           <button class="chip" data-ana="recettes" aria-pressed="false">Recettes</button>
           <button class="chip" data-ana="depenses" aria-pressed="false">Dépenses</button>
+          <button class="chip" data-ana="declarations" aria-pressed="false">Déclarations</button>
         </div>
         <div class="grille g3" style="margin-top:11px">
           <div class="champ"><label class="eyebrow" for="an-type">Vue</label>
@@ -1549,6 +1553,10 @@ if (froid && s > 0) montrer(s);
     <section class="vue" id="vue-chantier" role="tabpanel">
       <div id="fiche-chantier"></div>
     </section>
+
+    <!-- ======================================================= véhicule -->
+    <section class="vue" id="vue-carnetv" role="tabpanel"><div id="veh-carnet"></div></section>
+    <section class="vue" id="vue-echeancesv" role="tabpanel"><div id="veh-echeances"></div></section>
 
     <!-- ============================================== bois de chauffage -->
     <section class="vue" id="vue-stock" role="tabpanel">
@@ -4864,6 +4872,22 @@ function simulation(chantiers, b, cfg) {
   };
 }
 
+/* L'impôt tel qu'il le calcule : sa base s'ajoute au revenu de son autre
+   emploi, qui consomme déjà la tranche à 0 %. Ce qui arrive ici entre donc
+   directement dans la tranche à 11 %, dont il reste une capacité donnée,
+   puis bascule au taux suivant. Les trois nombres sont à lui : les tranches
+   changent chaque année, et sa situation aussi. Rien n'est officiel ici. */
+function impotEstime(base, cfg) {
+  var c = cfg || {};
+  var capacite = c.impotCapacite != null ? nb(c.impotCapacite) : 17978;
+  var t1 = c.impotTaux1 != null ? nb(c.impotTaux1) : 11;
+  var t2 = c.impotTaux2 != null ? nb(c.impotTaux2) : 30;
+  var b1 = Math.min(nb(base), capacite), b2 = Math.max(0, nb(base) - capacite);
+  return { capacite: capacite, t1: t1, t2: t2, base1: arr(b1, 2), base2: arr(b2, 2),
+    tranche1: arr(b1 * t1 / 100, 2), tranche2: arr(b2 * t2 / 100, 2),
+    total: arr(b1 * t1 / 100 + b2 * t2 / 100, 2) };
+}
+
 /* Taux de réussite des devis : combien de propositions se transforment.
    Qui a un devis se lit sur la fiche depuis la 4.36 ; la règle vit dans le
    module chantiers, qu'on ne veut pas appeler d'ici — elle arrive donc en
@@ -4900,7 +4924,7 @@ var M = {
   encaissementsParMois: encaissementsParMois,
   parPrestation: parPrestation, parFamille: parFamille,
   parCategorie: parCategorie, parFournisseur: parFournisseur,
-  simulation: simulation,
+  simulation: simulation, impotEstime: impotEstime,
   PERIODICITES: PERIODICITES, parAn: parAn, nomPeriodicite: nomPeriodicite,
   coutAnnuel: coutAnnuel, totalChargesAnnuel: totalChargesAnnuel,
   echeances: echeances, chargesDues: chargesDues,
@@ -5552,10 +5576,10 @@ function aPurger(entrees, maintenant, jours) {
 
 var FORMAT_SAUVEGARDE = 'bordcub-sauvegarde-1';
 
-function construireSauvegarde(cfg, bordereaux, piles, chantiers, depenses, clients, articles, charges, proprios, fournisseurs, commandes, sorties, journees) {
+function construireSauvegarde(cfg, bordereaux, piles, chantiers, depenses, clients, articles, charges, proprios, fournisseurs, commandes, sorties, journees, versements, vehicule) {
   return {
     format: FORMAT_SAUVEGARDE,
-    version: 7,
+    version: 8,
     date: new Date().toISOString(),
     config: cfg || null,
     bordereaux: (bordereaux || []).filter(Boolean),
@@ -5569,7 +5593,9 @@ function construireSauvegarde(cfg, bordereaux, piles, chantiers, depenses, clien
     fournisseurs: (fournisseurs || []).filter(Boolean),
     commandes: (commandes || []).filter(Boolean),
     sorties: (sorties || []).filter(Boolean),
-    journees: (journees || []).filter(Boolean)
+    journees: (journees || []).filter(Boolean),
+    versements: (versements || []).filter(Boolean),
+    vehicule: vehicule || null
   };
 }
 
@@ -5589,13 +5615,16 @@ function lireSauvegarde(o) {
       fournisseurs: (o.fournisseurs || []).filter(Boolean),
       commandes: (o.commandes || []).filter(Boolean),
       sorties: (o.sorties || []).filter(Boolean),
-      journees: (o.journees || []).filter(Boolean), complete: true };
+      journees: (o.journees || []).filter(Boolean),
+      versements: (o.versements || []).filter(Boolean),
+      vehicule: o.vehicule || null, complete: true };
     /* Une sauvegarde peut ne contenir que du stock ou que des dépenses : la
        refuser faute de bordereau revenait à interdire l'import à qui ne fait
        pas de cubage. */
     var vide = true;
     ['bordereaux', 'piles', 'chantiers', 'depenses', 'clients', 'articles',
-      'charges', 'proprios', 'fournisseurs', 'commandes', 'sorties', 'journees'].forEach(function (k) {
+      'charges', 'proprios', 'fournisseurs', 'commandes', 'sorties', 'journees',
+      'versements'].forEach(function (k) {
         if (r[k].length) vide = false;
       });
     return vide ? null : r;
@@ -5675,6 +5704,7 @@ var A = {
   cfg: null, index: [], bord: null, piles: [], chantiers: [], module: 'cubage', ici: null,
   vuePiles: 'stock', filtreCh: 'ouverts', rechCh: '', triAncien: false, chOuvert: null, clients: [], proprios: [], estim: null, imp: null, articles: [], charges: [], fournisseurs: [], commandes: [], sorties: [], mvt: 'achats', journees: [], lieuxRegles: [], listeReglee: 'clients', revient: null, calMois: null, calJour: null, nbAlertes: 0, planifie: null,
   depenses: [], periode: null, filtreDep: 'tous', vueAna: 'ensemble', secReglages: 'general',
+  versements: [], vehicule: null, decl: null,
   vue: 'saisie', sousVue: 'synthese', edition: null,
   memeGrume: false, classementRegl: 'Class. Comt', filtre: ''
 };
@@ -5710,6 +5740,8 @@ function sauver() {
   }, 350);
 }
 function sauverCfg() { return ecrire('bordcub.cfg', A.cfg); }
+function sauverVersements() { return ecrire('bordcub.versements', A.versements); }
+function sauverVehicule() { return ecrire('bordcub.vehicule', A.vehicule); }
 
 /* Les quatre classes de l'ABCD s'intitulaient « Actba », « Bctba » : du
    vocabulaire de tableur que personne ne lit sous la pluie. Les listes de
@@ -6464,7 +6496,7 @@ function sauvegarderTout() {
   if (!c.length) { toast('Rien à sauvegarder.'); return Promise.resolve(); }
   var poids = '';
   return tousLesBordereaux().then(function (bs) {
-    var txt = JSON.stringify(B.construireSauvegarde(A.cfg, bs, A.piles, A.chantiers, A.depenses, A.clients, A.articles, A.charges, A.proprios, A.fournisseurs, A.commandes, A.sorties, A.journees), null, 1);
+    var txt = JSON.stringify(B.construireSauvegarde(A.cfg, bs, A.piles, A.chantiers, A.depenses, A.clients, A.articles, A.charges, A.proprios, A.fournisseurs, A.commandes, A.sorties, A.journees, A.versements, A.vehicule), null, 1);
     try { poids = B.octets(new Blob([txt]).size); } catch (e) { poids = B.octets(txt.length); }
     return partager('Sylve-' + B.jour(Date.now()) + '.json', txt, 'application/json');
   }).then(marquerExport).then(function () {
@@ -6493,7 +6525,7 @@ function instantaneDuJour() {
       if (!aDesDonnees()) return;
       return Store.set(cle, JSON.stringify(B.construireSauvegarde(A.cfg, bs, sansPhotos(A.piles),
         A.chantiers, A.depenses, A.clients, A.articles, A.charges, A.proprios, A.fournisseurs,
-        A.commandes, A.sorties, A.journees)));
+        A.commandes, A.sorties, A.journees, A.versements, A.vehicule)));
     });
   }).then(function () {
     return Store.keys();
@@ -6664,6 +6696,34 @@ function integrer(objet, source, remplace) {
       if (A.sorties.some(function (x) { return x.id === so.id; })) so.id = uid();
       A.sorties.push(so); nm++;
     });
+    A.versements = A.versements || [];
+    (s.versements || []).forEach(function (vv) {
+      if (!vv || vv.montant == null) return;
+      if (A.versements.some(function (x) { return x.id === vv.id; })) return;
+      A.versements.push(vv); nm++;
+    });
+    /* Le carnet du véhicule est un objet unique : on fusionne ses listes.
+       Les postes se dédoublonnent par le nom — les semés d'origine portent
+       un identifiant différent sur chaque téléphone. */
+    if (s.vehicule) {
+      A.vehicule = A.vehicule || vehiculeDefaut();
+      ['interventions', 'releves'].forEach(function (k) {
+        (s.vehicule[k] || []).forEach(function (x) {
+          if (!x) return;
+          A.vehicule[k] = A.vehicule[k] || [];
+          if (A.vehicule[k].some(function (y) { return y.id === x.id; })) return;
+          A.vehicule[k].push(x); nm++;
+        });
+      });
+      (s.vehicule.postes || []).forEach(function (x) {
+        if (!x || !x.nom) return;
+        A.vehicule.postes = A.vehicule.postes || [];
+        if (A.vehicule.postes.some(function (y) { return y.nom === x.nom; })) return;
+        A.vehicule.postes.push(x); nm++;
+      });
+      if (s.vehicule.infos && (s.vehicule.infos.nom || s.vehicule.infos.note) &&
+        !((A.vehicule.infos || {}).nom)) A.vehicule.infos = s.vehicule.infos;
+    }
     A.journees = A.journees || [];
     (s.journees || []).forEach(function (jj) {
       if (!jj || !jj.postes) return;
@@ -6673,7 +6733,7 @@ function integrer(objet, source, remplace) {
     return Promise.all([np ? sauverPiles() : null, nc ? sauverChantiers() : null,
       nd ? sauverDepenses() : null, na ? sauverArticles() : null, ng ? sauverCharges() : null,
       nf ? sauverFournisseurs() : null, nm ? sauverCommandes() : null, nm ? sauverSorties() : null,
-      nm ? sauverJournees() : null]);
+      nm ? sauverJournees() : null, sauverVersements(), sauverVehicule()]);
   }).then(function () {
     if (dernier) { A.bord = dernier; return ecrire('bordcub.actif', dernier.id); }
   }).then(function () {
@@ -7025,7 +7085,7 @@ function exportStockXlsx() {
 var SEC_DE_MODULE = {
   cubage: 'cubage', bois: 'bois',
   chantiers: 'journee', calendrier: 'alertes', rendements: 'journee',
-  finances: 'fin', stock: 'stock'
+  finances: 'fin', stock: 'stock', vehicule: 'vehicule'
 };
 var RACCOURCIS_REGLAGES = {
   maj: ['general', 'maj'],
@@ -7137,6 +7197,12 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.59', quoi: [
+    { t: 'Déclarations : le mois, la TVA, les cotisations et l’impôt au même endroit', vue: 'analyses' },
+    { t: 'Ce que vous avez payé se note, remboursements compris', vue: 'analyses' },
+    { t: 'Un carnet d’entretien pour l’utilitaire, avec ses échéances', vue: 'carnetv' },
+    { t: 'La TVA collectée applique enfin le vrai taux de vos travaux', vue: 'analyses' }
+  ] },
   { v: '4.58', quoi: [
     { t: 'La TVA se force aussi à 0 %, ce qu’un débours demande', vue: 'carnet' },
     { t: 'Le produit du stock est fermé quand une sortie existe déjà à part', vue: 'carnet' }
@@ -7155,12 +7221,6 @@ var NOTES_MAJ = [
     { t: 'La facture se lit dès l’en-tête : numéro, date, paiement', vue: 'carnet' },
     { t: 'Le moyen de paiement se note : virement, chèque, espèces', vue: 'carnet' },
     { t: 'Le débours s’affiche à part, hors du chiffre d’affaires', vue: 'analyses' }
-  ] },
-  { v: '4.54', quoi: [
-    { t: 'Les filtres du carnet se rangent en cours et clos', vue: 'carnet' },
-    { t: 'Précédente et suivante suivent l’ordre de vos factures', vue: 'carnet' },
-    { t: 'Poser des journées vous ramène à la fiche du chantier', vue: 'carnet' },
-    { t: 'Saisir une facture propose de passer le chantier en facturé', vue: 'carnet' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -7461,6 +7521,8 @@ function aller(v) {
   if (v === 'revient') renderRevient();
   if (v === 'rendements') renderRendements();
   if (v === 'estimer') renderEstimer();
+  if (v === 'carnetv') renderCarnetV();
+  if (v === 'echeancesv') renderEcheancesV();
   try { if (window.scrollY || window.pageYOffset) window.scrollTo(0, 0); } catch (e) { }
 }
 
@@ -7798,13 +7860,48 @@ function brancher() {
       renderAnalyses(); renderFinances(); renderDepenses(); renderAccueil();
     });
   });
+  $('#ana-corps').addEventListener('click', function (e) {
+    if (e.target.closest('#decl-vers')) { ouvrirVersement(null); return; }
+    var vm = e.target.closest('[data-versmod]');
+    if (vm) ouvrirVersement(vm.dataset.versmod);
+  });
   $('#ana-corps').addEventListener('change', function (e) {
+    if (e.target.closest('#decl-per') || e.target.closest('#decl-idx') || e.target.closest('#decl-an')) {
+      var neuf = { per: $('#decl-per').value, an: Number($('#decl-an').value),
+        idx: Number($('#decl-idx').value) || 0 };
+      /* Changer de rythme replie l'indice : le T3 n'est pas le mois de mars. */
+      if (A.decl && neuf.per !== A.decl.per) neuf.idx = 0;
+      A.decl = neuf;
+      renderAnalyses(); return;
+    }
+    if (e.target.closest('#decl-cot') || e.target.closest('#decl-cap') ||
+      e.target.closest('#decl-t1') || e.target.closest('#decl-t2')) {
+      A.cfg.tauxCotisations = FIN.nb($('#decl-cot').value) || null;
+      A.cfg.impotCapacite = $('#decl-cap').value.trim() === '' ? null : FIN.nb($('#decl-cap').value);
+      A.cfg.impotTaux1 = $('#decl-t1').value.trim() === '' ? null : FIN.nb($('#decl-t1').value);
+      A.cfg.impotTaux2 = $('#decl-t2').value.trim() === '' ? null : FIN.nb($('#decl-t2').value);
+      sauverCfg(); renderAnalyses(); return;
+    }
     if (!e.target.closest('#sim-cot') && !e.target.closest('#sim-imp') && !e.target.closest('#sim-base')) return;
     A.cfg.tauxCotisations = FIN.nb($('#sim-cot').value) || null;
     A.cfg.tauxImpot = FIN.nb($('#sim-imp').value) || null;
     A.cfg.baseCotisations = $('#sim-base').value === 'brut' ? 'brut' : 'abattu';
     A.cfg.baseImpot = A.cfg.baseCotisations;
     sauverCfg(); renderAnalyses();
+  });
+
+  /* --- véhicule --- */
+  $('#veh-carnet').addEventListener('click', function (e) {
+    if (e.target.closest('#vh-infos')) { ouvrirInfosVehicule(); return; }
+    if (e.target.closest('#vh-releve')) { ouvrirReleveV(); return; }
+    if (e.target.closest('#vh-plus')) { ouvrirInterventionV(null); return; }
+    var m2 = e.target.closest('[data-vhmod]');
+    if (m2) ouvrirInterventionV(m2.dataset.vhmod);
+  });
+  $('#veh-echeances').addEventListener('click', function (e) {
+    if (e.target.closest('#vh-posteplus')) { ouvrirPosteV(null); return; }
+    var p2 = e.target.closest('[data-vhposte]');
+    if (p2) ouvrirPosteV(p2.dataset.vhposte);
   });
 
   /* --- stock : inventaire --- */
@@ -8342,7 +8439,8 @@ function init() {
       lire('bordcub.clients', []), lire('bordcub.depenses', []), lire('bordcub.proprios', []),
       lire('bordcub.articles', []), lire('bordcub.charges', []), lire('bordcub.fournisseurs', []),
       lire('bordcub.commandes', []), lire('bordcub.sorties', []),
-      lire('bordcub.journees', []), lire('bordcub.lieux', [])]);
+      lire('bordcub.journees', []), lire('bordcub.lieux', []),
+      lire('bordcub.versements', []), lire('bordcub.vehicule', null)]);
   })
     .then(function (res) {
       A.export = res[3] || 0;
@@ -8362,6 +8460,13 @@ function init() {
       A.sorties = res[14] || [];
       A.journees = res[15] || [];
       A.lieuxRegles = res[16] || [];
+      A.versements = res[17] || [];
+      /* Semé une fois, et aussitôt enregistré : sans ça, chaque ouverture
+         referait les postes avec de nouveaux identifiants, et les
+         interventions qui les désignent auraient pointé dans le vide.
+         Une fois écrit, un carnet vidé volontairement de ses postes le reste. */
+      A.vehicule = res[18] || vehiculeDefaut();
+      if (!res[18]) sauverVehicule();
       A.cfg = res[0] || E.configDefaut();
       var d = E.configDefaut();
       ['essences', 'qualites', 'favoris'].forEach(function (k) { if (!A.cfg[k]) A.cfg[k] = d[k]; });
@@ -8419,7 +8524,8 @@ function init() {
         var MOD_DE_VUE = { stock: 'bois', bois: 'bois', lieux: 'bois',
           carnet: 'chantiers', chantier: 'chantiers', calendrier: 'calendrier',
           rendements: 'rendements', estimer: 'rendements', finances: 'finances', depenses: 'finances',
-          charges: 'finances', stock2: 'stock', commandes: 'stock', revient: 'stock', carte: 'calendrier', analyses: 'finances' };
+          charges: 'finances', stock2: 'stock', commandes: 'stock', revient: 'stock', carte: 'calendrier', analyses: 'finances',
+          carnetv: 'vehicule', echeancesv: 'vehicule' };
         var mod = MOD_DE_VUE[vd] || 'cubage';
         renderReglages();
         if (actif && A.index.some(function (x) { return x.id === actif; })) {
@@ -8499,7 +8605,11 @@ var PICTOS = {
             + '<rect x="6.6" y="8.7" width="10.8" height="5" rx="1.4"/>'
             + '<rect x="8.8" y="3.2" width="6.4" height="5" rx="1.4"/>'
 };
-PICTOS.lieux = PICTOS.carte;      /* « Où ? » et « Carte », même repère */
+PICTOS.lieux = PICTOS.carte;
+PICTOS.carnetv = '<path d="M3.5 15.6V9.4h9.6l3.3 3h4.1v3.2"/><path d="M9.6 16.2h4.6"/>' +
+  '<circle cx="7.3" cy="16.2" r="1.8"/><circle cx="16.6" cy="16.2" r="1.8"/>';
+PICTOS.echeancesv = '<path d="M4.6 15.8a7.4 7.4 0 1 1 14.8 0"/><path d="m12 15.8 3.2-4.2"/>' +
+  '<circle cx="12" cy="15.8" r="1"/>';      /* « Où ? » et « Carte », même repère */
 
 var MODULES = {
   cubage: {
@@ -8540,6 +8650,12 @@ var MODULES = {
        de la rentabilité. */
     vues: [['stock2', 'Inventaire'], ['commandes', 'Entrées / sorties'],
     ['revient', 'Rentabilité']]
+  },
+  vehicule: {
+    /* Le carnet d'entretien de l'utilitaire. Deux vues, jamais une seule :
+       un module réduit à un onglet solitaire est interdit par un scénario. */
+    nom: 'Véhicule', defaut: 'carnetv', groupe: 'entreprise',
+    vues: [['carnetv', 'Carnet'], ['echeancesv', 'Échéances']]
   },
   bois: {
     nom: 'Bois de chauffage', defaut: 'stock',
@@ -11591,6 +11707,276 @@ var TITRE_ALERTE = { impaye: 'Facture impayée', retard: 'Chantier en retard',
   approche: 'Chantier prévu' };
 
 /* Écran Entreprise : un chiffre parlant sur chaque tuile. */
+/* ================================================== VÉHICULE
+   Le carnet d'entretien de l'utilitaire : les interventions avec leur
+   kilométrage, le compteur, et les échéances à prévoir. Rien d'identifiant
+   n'est livré ici — l'identité du véhicule se saisit sur place et part dans
+   les sauvegardes, comme le logo de l'entreprise. */
+function vehiculeDefaut() {
+  /* Les périodicités semées sont des ordres de grandeur d'utilitaire —
+     celles de son propre document de suivi. Chacune se corrige sur place ;
+     la fiche d'entretien du constructeur fait foi. Semé une seule fois :
+     un carnet vidé de ses postes reste vide. */
+  return { infos: {}, releves: [], interventions: [], seme: true, postes: [
+    { id: uid() + 'r', nom: 'Révision (vidange + filtres)', pkm: 30000, pmois: 24 },
+    { id: uid() + 'c', nom: 'Courroie de distribution', pkm: 160000, pmois: 120 },
+    { id: uid() + 'p', nom: 'Plaquettes de frein', pkm: 40000 },
+    { id: uid() + 'l', nom: 'Liquide de frein', pmois: 24 },
+    { id: uid() + 'n', nom: 'Pneus', pkm: 60000 },
+    { id: uid() + 'e', nom: 'Embrayage', pkm: 200000 }
+  ] };
+}
+/* Le compteur ne recule pas : le plus grand kilométrage jamais noté fait
+   foi, qu'il vienne d'un relevé ou d'une intervention. */
+function kmVehicule() {
+  var v = A.vehicule || {}, km = 0;
+  (v.releves || []).forEach(function (r) { if (C.nb(r.km) > km) km = C.nb(r.km); });
+  (v.interventions || []).forEach(function (i) { if (C.nb(i.km) > km) km = C.nb(i.km); });
+  return km;
+}
+/* Chaque poste, situé par rapport au compteur et à aujourd'hui. Un poste
+   jamais fait compte depuis zéro : une courroie d'origine à 176 000 km est
+   bien en retard sur ses 160 000. */
+function echeancesVehicule() {
+  var v = A.vehicule || {}, km = kmVehicule(), now = Date.now();
+  return (v.postes || []).map(function (p) {
+    var aKm = C.nb(p.pkm) ? C.nb(p.dernierKm) + C.nb(p.pkm) : null;
+    var aDate = null;
+    if (C.nb(p.pmois) && p.dernierDate) {
+      var d2 = new Date(p.dernierDate);
+      d2.setMonth(d2.getMonth() + C.nb(p.pmois));
+      aDate = d2.getTime();
+    }
+    var rKm = (aKm != null && km) ? aKm - km : null;
+    var rJours = aDate != null ? Math.round((C.minuit(aDate) - C.minuit(now)) / C.JOUR) : null;
+    var etat = 'ok';
+    if ((rKm != null && rKm <= 0) || (rJours != null && rJours <= 0)) etat = 'retard';
+    else if ((rKm != null && rKm <= 5000) || (rJours != null && rJours <= 60)) etat = 'bientot';
+    return { p: p, aKm: aKm, aDate: aDate, rKm: rKm, rJours: rJours, etat: etat };
+  });
+}
+function renderCarnetV() {
+  var z = $('#veh-carnet'); if (!z) return;
+  var v = A.vehicule || vehiculeDefaut();
+  var km = kmVehicule();
+  var iv = (v.interventions || []).slice().sort(function (a, b) { return (b.date || 0) - (a.date || 0); });
+  var totalHT = iv.reduce(function (t2, x) { return t2 + (x.garantie ? 0 : C.nb(x.montant)); }, 0);
+  z.innerHTML =
+    '<div class="carte">' + teteBloc('Le véhicule', 'vh-infos', 'modifier') +
+    '<h2 style="margin:0">' + esc((v.infos || {}).nom || 'Mon utilitaire') + '</h2>' +
+    ((v.infos || {}).note ? '<p class="muted" style="font-size:12.5px;margin:3px 0 0">' +
+      esc(v.infos.note) + '</p>' : '') +
+    '<div class="kpi" style="margin-top:11px">' +
+    '<div class="carte2"><b class="num">' + (km ? E.fmt(km, 0) : '—') + '</b><small>km au compteur</small></div>' +
+    '<div class="carte2"><b class="num">' + iv.length + '</b><small>interventions</small></div>' +
+    '<div class="carte2"><b class="num">' + (totalHT ? eur(C.arr(totalHT, 2)) : '—') +
+    '</b><small>entretien hors garantie</small></div></div>' +
+    '<div class="btn-rang" style="margin-top:11px">' +
+    '<button class="btn btn-min" id="vh-releve">Noter le compteur</button></div></div>' +
+
+    '<div class="carte"><div class="carte-titre"><h2>Historique</h2>' +
+    '<button class="btn primaire btn-min" id="vh-plus">+ Intervention</button></div>' +
+    '<p class="sous-titre-bloc">Chaque passage à l’atelier, avec son kilométrage. ' +
+    'C’est lui qui nourrit les échéances de l’onglet d’à côté.</p>' +
+    (iv.length ? iv.map(function (x) {
+      return '<div class="liste-item"><div class="li-c"><b>' + esc(x.quoi || 'Intervention') + '</b>' +
+        '<small>' + new Date(x.date).toLocaleDateString('fr-FR') +
+        (C.nb(x.km) ? ' · ' + E.fmt(C.nb(x.km), 0) + ' km' : '') +
+        (x.garantie ? ' · garantie' : (C.nb(x.montant) ? ' · ' + eur(C.nb(x.montant)) : '')) +
+        (x.depense ? ' · dépense liée' : '') + '</small></div>' +
+        '<button class="btn-min" data-vhmod="' + x.id + '">Modifier</button></div>';
+    }).join('') : '<div class="vide"><p>Aucune intervention notée. Le carnet se remplit ' +
+      'au fil des passages à l’atelier.</p></div>') + '</div>';
+}
+function renderEcheancesV() {
+  var z = $('#veh-echeances'); if (!z) return;
+  var km = kmVehicule();
+  var items = echeancesVehicule().sort(function (x, y) {
+    var r = { retard: 0, bientot: 1, ok: 2 };
+    if (r[x.etat] !== r[y.etat]) return r[x.etat] - r[y.etat];
+    return (x.rKm != null ? x.rKm : 1e9) - (y.rKm != null ? y.rKm : 1e9);
+  });
+  z.innerHTML = '<div class="carte"><div class="carte-titre"><h2>À prévoir</h2>' +
+    '<button class="btn primaire btn-min" id="vh-posteplus">+ Poste</button></div>' +
+    '<p class="sous-titre-bloc">Des ordres de grandeur, jamais une certitude : la fiche ' +
+    'd’entretien du constructeur fait foi. Chaque périodicité se corrige sur place.</p>' +
+    (km ? '' : '<div class="avis tiede">Notez le compteur dans le Carnet : sans kilométrage, ' +
+      'rien ne peut être situé.</div>') +
+    (items.length ? items.map(function (x) {
+      var p = x.p, quand = [], dernier = [];
+      if (x.rKm != null) quand.push(x.rKm <= 0 ? 'dépassée de ' + E.fmt(-x.rKm, 0) + ' km'
+        : 'dans ' + E.fmt(x.rKm, 0) + ' km');
+      if (x.rJours != null) quand.push(x.rJours <= 0 ? 'échue depuis ' + Math.abs(x.rJours) + ' j'
+        : 'dans ' + x.rJours + ' j');
+      if (C.nb(p.dernierKm)) dernier.push(E.fmt(C.nb(p.dernierKm), 0) + ' km');
+      if (p.dernierDate) dernier.push(new Date(p.dernierDate).toLocaleDateString('fr-FR'));
+      return '<div class="liste-item">' +
+        '<span class="pastille" style="background:' + (x.etat === 'retard' ? 'var(--alerte)'
+          : x.etat === 'bientot' ? '#B98A00' : '#2E7D46') + ';margin-top:4px"></span>' +
+        '<div class="li-c"><b>' + esc(p.nom) + (quand.length ? ' — ' + quand.join(', ') : '') + '</b>' +
+        '<small>' + (dernier.length ? 'fait à ' + dernier.join(' · ') : 'jamais fait') +
+        (C.nb(p.pkm) ? ' · tous les ' + E.fmt(C.nb(p.pkm), 0) + ' km' : '') +
+        (C.nb(p.pmois) ? ' · tous les ' + C.nb(p.pmois) + ' mois' : '') + '</small></div>' +
+        '<button class="btn-min" data-vhposte="' + p.id + '">Modifier</button></div>';
+    }).join('') : '<div class="vide"><p>Aucun poste suivi.</p></div>') + '</div>';
+}
+function ouvrirInfosVehicule() {
+  var v = A.vehicule, inf = v.infos || {};
+  modale('Le véhicule',
+    '<div class="champ"><label class="eyebrow" for="vn-nom">Nom</label>' +
+    '<input type="text" id="vn-nom" class="gros" autocomplete="off" placeholder="mon utilitaire" value="' +
+    esc(inf.nom || '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="vn-note">Repères</label>' +
+    '<input type="text" id="vn-note" autocomplete="off" placeholder="immatriculation, mise en circulation…" value="' +
+    esc(inf.note || '') + '"></div>' +
+    '<p class="muted" style="font-size:11.5px;margin:5px 0 0">Ces repères restent sur votre ' +
+    'téléphone et partent dans vos sauvegardes.</p>' +
+    '<div class="btn-rang" style="margin-top:9px"><button class="btn primaire" id="vn-ok">Enregistrer</button></div>');
+  $('#vn-ok').addEventListener('click', function () {
+    v.infos = { nom: $('#vn-nom').value.trim(), note: $('#vn-note').value.trim() };
+    sauverVehicule().then(function () { fermerModale(); renderCarnetV(); toast('Véhicule enregistré.'); });
+  });
+}
+function ouvrirReleveV() {
+  modale('Le compteur',
+    '<div class="grille g2">' +
+    '<div class="champ"><label class="eyebrow" for="vr-km">Kilométrage</label>' +
+    '<input type="text" id="vr-km" class="gros" inputmode="numeric" autocomplete="off"></div>' +
+    '<div class="champ"><label class="eyebrow" for="vr-date">Relevé le</label>' +
+    '<input type="date" id="vr-date" value="' + versChamp(Date.now()) + '"></div></div>' +
+    '<div class="btn-rang" style="margin-top:9px"><button class="btn primaire" id="vr-ok">Noter</button></div>');
+  $('#vr-ok').addEventListener('click', function () {
+    var k = C.nb($('#vr-km').value);
+    if (!(k > 0)) { toast('Kilométrage attendu.'); return; }
+    A.vehicule.releves = A.vehicule.releves || [];
+    A.vehicule.releves.push({ id: uid(), km: k, date: versDate($('#vr-date').value) || Date.now() });
+    sauverVehicule().then(function () {
+      fermerModale(); renderCarnetV(); renderEcheancesV(); renderEntreprise(); toast('Compteur noté.');
+    });
+  });
+}
+function ouvrirInterventionV(id) {
+  var v = A.vehicule;
+  var x = id ? (v.interventions || []).filter(function (i) { return i.id === id; })[0] : null;
+  if (id && !x) return;
+  var postesSel = x && x.postes ? x.postes.slice() : [];
+  modale(x ? 'Modifier l’intervention' : 'Nouvelle intervention',
+    '<div class="champ"><label class="eyebrow" for="vi-quoi">Ce qui a été fait</label>' +
+    '<input type="text" id="vi-quoi" class="gros" autocomplete="off" ' +
+    'placeholder="révision, plaquettes, courroie…" value="' + esc(x ? x.quoi : '') + '"></div>' +
+    '<div class="grille g3">' +
+    '<div class="champ"><label class="eyebrow" for="vi-date">Date</label>' +
+    '<input type="date" id="vi-date" value="' + versChamp(x ? x.date : Date.now()) + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="vi-km">Kilométrage</label>' +
+    '<input type="text" id="vi-km" inputmode="numeric" value="' + (x && x.km ? x.km : '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="vi-mont">Montant (€)</label>' +
+    '<input type="text" id="vi-mont" inputmode="decimal" value="' +
+    (x && x.montant != null ? esc(String(x.montant).replace('.', ',')) : '') + '"></div></div>' +
+    '<label class="ligne-check" style="display:flex;align-items:center;gap:8px;font-size:13.5px;margin:2px 0 9px">' +
+    '<input type="checkbox" id="vi-gar"' + (x && x.garantie ? ' checked' : '') + '> Pris sous garantie</label>' +
+    '<label class="eyebrow" style="display:block;margin-bottom:5px">Cette intervention couvre</label>' +
+    '<div class="chips" id="vi-postes">' + (v.postes || []).map(function (p) {
+      return '<button type="button" class="chip" data-vip="' + p.id + '" aria-pressed="' +
+        (postesSel.indexOf(p.id) >= 0) + '">' + esc(p.nom) + '</button>';
+    }).join('') + '</div>' +
+    '<p class="muted" style="font-size:11.5px;margin:5px 0 0">Les postes cochés repartent ' +
+    'de ce kilométrage pour leur prochaine échéance.</p>' +
+    (x && x.depense
+      ? '<p class="muted" style="font-size:12px;margin:9px 0 0">Une dépense est liée à cette intervention.</p>'
+      : '<label class="ligne-check" style="display:flex;align-items:center;gap:8px;font-size:13.5px;margin:9px 0 0">' +
+        '<input type="checkbox" id="vi-dep"> Créer la dépense correspondante</label>') +
+    '<div class="btn-rang" style="margin-top:11px">' +
+    '<button class="btn primaire" id="vi-ok">Enregistrer</button>' +
+    (x ? '<button class="btn danger btn-min" id="vi-sup">Supprimer</button>' : '') + '</div>');
+  $('#vi-postes').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-vip]'); if (!b) return;
+    var i2 = postesSel.indexOf(b.dataset.vip);
+    if (i2 >= 0) postesSel.splice(i2, 1); else postesSel.push(b.dataset.vip);
+    b.setAttribute('aria-pressed', String(i2 < 0));
+  });
+  $('#vi-ok').addEventListener('click', function () {
+    var quoi = $('#vi-quoi').value.trim();
+    if (!quoi) { toast('Dites ce qui a été fait.'); return; }
+    var maj = { quoi: quoi, date: versDate($('#vi-date').value) || Date.now(),
+      km: C.nb($('#vi-km').value) || null, montant: C.nb($('#vi-mont').value) || null,
+      garantie: $('#vi-gar').checked, postes: postesSel.slice() };
+    if (x) { Object.keys(maj).forEach(function (k) { x[k] = maj[k]; }); }
+    else { maj.id = uid(); v.interventions.push(maj); x = maj; }
+    /* Les postes couverts repartent d'ici : c'est ce qui nourrit l'échéance. */
+    (v.postes || []).forEach(function (p) {
+      if (postesSel.indexOf(p.id) < 0) return;
+      if (maj.km && maj.km >= C.nb(p.dernierKm)) p.dernierKm = maj.km;
+      if (!p.dernierDate || maj.date >= p.dernierDate) p.dernierDate = maj.date;
+    });
+    var creeDep = $('#vi-dep') && $('#vi-dep').checked && !x.depense;
+    var apres = function () {
+      sauverVehicule().then(function () {
+        fermerModale(); renderCarnetV(); renderEcheancesV(); renderEntreprise();
+        toast(creeDep ? 'Intervention notée, dépense créée — vérifiez sa TVA dans les Dépenses.'
+          : 'Intervention notée.');
+      });
+    };
+    if (creeDep) {
+      /* La dépense part en « Réparation matériel », TVA 20 % par défaut — le
+         garage facture presque toujours ainsi — et se corrige dans les
+         Dépenses. Le lien empêche la suggestion inverse de la réclamer. */
+      var dp = { id: uid(), date: maj.date, fournisseur: '', vehicule: x.id, maj: Date.now(),
+        lignes: [{ libelle: quoi, categorie: 'ENTRETIEN', ttc: C.nb(maj.montant), taux: 20 }] };
+      x.depense = dp.id;
+      A.depenses.push(dp);
+      sauverDepenses().then(function () { renderDepenses(); renderFinances(); apres(); });
+    } else { apres(); }
+  });
+  if (id) {
+    $('#vi-sup').addEventListener('click', function () {
+      if (!confirm('Supprimer cette intervention ?')) return;
+      v.interventions = v.interventions.filter(function (i) { return i.id !== id; });
+      sauverVehicule().then(function () {
+        fermerModale(); renderCarnetV(); renderEcheancesV(); toast('Intervention supprimée.');
+      });
+    });
+  }
+}
+function ouvrirPosteV(id) {
+  var v = A.vehicule;
+  var p = id ? (v.postes || []).filter(function (x) { return x.id === id; })[0] : null;
+  if (id && !p) return;
+  modale(p ? 'Modifier le poste' : 'Nouveau poste',
+    '<div class="champ"><label class="eyebrow" for="vp-nom">Poste</label>' +
+    '<input type="text" id="vp-nom" class="gros" autocomplete="off" value="' + esc(p ? p.nom : '') + '"></div>' +
+    '<div class="grille g2">' +
+    '<div class="champ"><label class="eyebrow" for="vp-pkm">Tous les (km)</label>' +
+    '<input type="text" id="vp-pkm" inputmode="numeric" placeholder="—" value="' +
+    (p && p.pkm ? p.pkm : '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="vp-pmois">Ou tous les (mois)</label>' +
+    '<input type="text" id="vp-pmois" inputmode="numeric" placeholder="—" value="' +
+    (p && p.pmois ? p.pmois : '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="vp-dkm">Dernier fait (km)</label>' +
+    '<input type="text" id="vp-dkm" inputmode="numeric" placeholder="jamais" value="' +
+    (p && p.dernierKm ? p.dernierKm : '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="vp-ddate">Dernier fait le</label>' +
+    '<input type="date" id="vp-ddate" value="' + (p && p.dernierDate ? versChamp(p.dernierDate) : '') + '"></div></div>' +
+    '<div class="btn-rang" style="margin-top:9px">' +
+    '<button class="btn primaire" id="vp-ok">Enregistrer</button>' +
+    (p ? '<button class="btn danger btn-min" id="vp-sup">Retirer</button>' : '') + '</div>');
+  $('#vp-ok').addEventListener('click', function () {
+    var nom = $('#vp-nom').value.trim();
+    if (!nom) { toast('Nommez le poste.'); return; }
+    var maj = { nom: nom, pkm: C.nb($('#vp-pkm').value) || null, pmois: C.nb($('#vp-pmois').value) || null,
+      dernierKm: C.nb($('#vp-dkm').value) || null, dernierDate: versDate($('#vp-ddate').value) };
+    if (p) { Object.keys(maj).forEach(function (k) { p[k] = maj[k]; }); }
+    else { maj.id = uid(); v.postes.push(maj); }
+    sauverVehicule().then(function () { fermerModale(); renderEcheancesV(); toast('Poste enregistré.'); });
+  });
+  if (p) {
+    $('#vp-sup').addEventListener('click', function () {
+      if (!confirm('Retirer « ' + p.nom + ' » du suivi ?')) return;
+      v.postes = v.postes.filter(function (x) { return x.id !== id; });
+      sauverVehicule().then(function () { fermerModale(); renderEcheancesV(); toast('Poste retiré.'); });
+    });
+  }
+}
+
 function renderEntreprise() {
   var ouv = C.filtre(A.chantiers, 'ouverts').length;
   var t = C.totaux(A.chantiers, A.cfg);
@@ -11628,6 +12014,14 @@ function renderEntreprise() {
   var ca = FIN.chiffreAffaires(A.chantiers, b);
   var bal = FIN.balanceTva(A.chantiers, A.depenses, b, C.tauxLigne);
   if ($('#e-fi-n')) $('#e-fi-n').textContent = ca.total ? eur(ca.total) : '—';
+  var kmV = kmVehicule();
+  if ($('#e-vh-n')) $('#e-vh-n').textContent = kmV ? E.fmt(kmV, 0) : '—';
+  if ($('#e-vh-s')) {
+    var nRet = echeancesVehicule().filter(function (x) { return x.etat === 'retard'; }).length;
+    $('#e-vh-s').textContent = nRet
+      ? nRet + ' échéance' + (nRet > 1 ? 's' : '') + ' dépassée' + (nRet > 1 ? 's' : '')
+      : 'Carnet d’entretien, échéances';
+  }
   if ($('#e-fi-s')) {
     $('#e-fi-s').textContent = ca.total || bal.montant
       ? libellePeriode() + ' · TVA ' + eur(bal.montant) + ' ' +
@@ -12281,7 +12675,13 @@ function ouvrirDepense(id) {
     } else { x.id = uid(); x.maj = Date.now(); A.depenses.push(x); }
     sauverDepenses().then(function () {
       fermerModale(); renderDepenses(); renderFinances(); renderAnalyses(); renderAccueil();
-      toast(id ? 'Dépense modifiée.' : 'Dépense enregistrée.');
+      /* Une réparation qui ne vient pas du carnet du véhicule mérite d'y
+         être notée aussi : c'est le kilométrage qui nourrit les échéances. */
+      var entretien = !id && !x.vehicule &&
+        (x.lignes || []).some(function (l2) { return l2.categorie === 'ENTRETIEN'; });
+      toast(entretien
+        ? 'Dépense enregistrée. Pensez à noter l’intervention dans le carnet du véhicule.'
+        : (id ? 'Dépense modifiée.' : 'Dépense enregistrée.'));
     });
   });
 }
@@ -14458,6 +14858,7 @@ function renderAnalyses() {
   });
   if (vue === 'recettes') z.innerHTML = htmlRecettes(an, b);
   else if (vue === 'depenses') z.innerHTML = htmlDepenses(an, b);
+  else if (vue === 'declarations') z.innerHTML = htmlDeclarations();
   else z.innerHTML = htmlEnsemble(an, b);
 }
 
@@ -14543,6 +14944,173 @@ function htmlSimulation(sim) {
       : '<p class="muted" style="font-size:12.5px;margin:11px 0 0">Saisissez vos taux pour obtenir une estimation.</p>') +
     '<p class="muted" style="font-size:11.5px;margin:10px 0 0">Estimation avec vos propres taux : ' +
     'Sylve n’en connaît aucun et ne remplace ni la MSA ni votre comptable.</p></div>';
+}
+
+/* La déclaration se prépare ici : le chiffre de la période, la TVA de
+   l'année, l'estimation des cotisations et de l'impôt, et le suivi de ce qui
+   a été payé. Ces chiffres existaient, éparpillés sur trois écrans — le jour
+   de la déclaration, il les recopiait de tête. Base retenue : le chiffre
+   d'affaires FACTURÉ, à sa demande expresse — le micro-BIC se déclare
+   normalement sur l'encaissé, il le sait, c'est son choix. */
+var TYPES_VERSEMENT = [
+  { c: 'cotisations', n: 'Cotisations sociales' },
+  { c: 'impot', n: 'Impôt sur le revenu' },
+  { c: 'tva', n: 'TVA' },
+  { c: 'cfe', n: 'CFE' },
+  { c: 'autre', n: 'Autre' }
+];
+function nomVersement(code) {
+  var x = TYPES_VERSEMENT.filter(function (t) { return t.c === code; })[0];
+  return x ? x.n : (code || '');
+}
+function htmlDeclarations() {
+  if (!A.decl) {
+    var d0 = new Date();
+    A.decl = { per: 'mois', an: d0.getFullYear(), idx: d0.getMonth() };
+  }
+  var d = A.decl;
+  var bDecl = FIN.bornes(d.per === 'trimestre' ? 'trimestre' : 'mois', d.an, d.idx);
+  var ca = FIN.chiffreAffaires(A.chantiers, bDecl);
+  var MOIS_N = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet',
+    'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+  var anCour = new Date().getFullYear(), annees = [];
+  for (var a2 = anCour; a2 >= anCour - 4; a2--) annees.push(a2);
+  var opt = function (v, n2, sel) {
+    return '<option value="' + v + '"' + (sel ? ' selected' : '') + '>' + esc(String(n2)) + '</option>';
+  };
+  var choixIdx = d.per === 'trimestre'
+    ? [0, 1, 2, 3].map(function (i) { return opt(i, 'T' + (i + 1), d.idx === i); }).join('')
+    : MOIS_N.map(function (n2, i) { return opt(i, n2, d.idx === i); }).join('');
+
+  var h = '<div class="carte"><h2>La déclaration de chiffre d’affaires</h2>' +
+    '<p class="muted" style="font-size:12px;margin:0 0 10px">Le chiffre d’affaires ' +
+    '<b>facturé</b> sur la période, hors débours : brut pour la déclaration, puis ' +
+    'après l’abattement forfaitaire, pour savoir sur quoi portent cotisations et impôt.</p>' +
+    '<div class="grille g3">' +
+    '<div class="champ"><label class="eyebrow" for="decl-per">Déclaration</label>' +
+    '<select id="decl-per">' + opt('mois', 'Mensuelle', d.per === 'mois') +
+    opt('trimestre', 'Trimestrielle', d.per === 'trimestre') + '</select></div>' +
+    '<div class="champ"><label class="eyebrow" for="decl-idx">' +
+    (d.per === 'trimestre' ? 'Trimestre' : 'Mois') + '</label>' +
+    '<select id="decl-idx">' + choixIdx + '</select></div>' +
+    '<div class="champ"><label class="eyebrow" for="decl-an">Année</label>' +
+    '<select id="decl-an">' + annees.map(function (a3) { return opt(a3, a3, d.an === a3); }).join('') +
+    '</select></div></div>' +
+    '<div style="margin-top:4px">' +
+    ligneCA('Prestations de services', ca.prestation, ca.prestationApres, '50 %') +
+    ligneCA('Ventes de fournitures', ca.vente, ca.venteApres, '71 %') +
+    '<div style="display:flex;justify-content:space-between;padding-top:9px;margin-top:5px;border-top:2px solid var(--encre)">' +
+    '<b>À déclarer</b><b class="num" style="font-size:18px">' + eur(ca.total) + '</b></div>' +
+    (ca.debours ? '<p class="muted" style="font-size:11.5px;margin:6px 0 0">Le débours (' +
+      eur(ca.debours) + ') est déjà écarté.</p>' : '') +
+    '</div></div>';
+
+  var bAn = FIN.bornes('annee', d.an);
+  var bal = FIN.balanceTva(A.chantiers, A.depenses, bAn, C.tauxLigne);
+  var taux = Object.keys(bal.collectee.parTaux).sort(function (x, y) { return Number(x) - Number(y); });
+  var ligneT = function (nom, montant) {
+    return '<div style="display:flex;justify-content:space-between;font-size:13.5px;padding:3px 0">' +
+      '<span>' + nom + '</span><span class="num">' + montant + '</span></div>';
+  };
+  h += '<div class="carte"><h2>TVA — année ' + d.an + '</h2>' +
+    (taux.length ? taux.map(function (tx) {
+      return ligneT('Collectée à ' + esc(String(tx).replace('.', ',')) + ' %', eur(bal.collectee.parTaux[tx]));
+    }).join('') : '<p class="muted" style="font-size:12.5px;margin:0 0 3px">Rien de facturé sur ' + d.an + '.</p>') +
+    ligneT('Déductible sur vos achats', '− ' + eur(bal.deductible.total)) +
+    '<div style="display:flex;justify-content:space-between;padding-top:9px;margin-top:5px;border-top:2px solid var(--encre)">' +
+    '<b>' + (bal.sens === 'a_recuperer' ? 'À récupérer' : 'À reverser') + '</b>' +
+    '<b class="num" style="font-size:18px">' + eur(bal.montant) + '</b></div></div>';
+
+  var caAn = FIN.chiffreAffaires(A.chantiers, bAn);
+  var tCot = FIN.nb(A.cfg.tauxCotisations);
+  var imp = FIN.impotEstime(caAn.totalApres, A.cfg);
+  var cot = FIN.arr(caAn.totalApres * tCot / 100, 2);
+  h += '<div class="carte"><h2>Cotisations et impôt — année ' + d.an + '</h2>' +
+    '<p class="muted" style="font-size:12px;margin:0 0 10px">Une estimation avec vos taux, sur la ' +
+    'base après abattement (' + eur(caAn.totalApres) + '). Votre autre emploi consommant déjà la ' +
+    'tranche à 0 %, cette base entre directement dans celle à ' + esc(String(imp.t1).replace('.', ',')) +
+    ' %. Rien d’officiel : ni l’Urssaf, ni les impôts, ni un comptable.</p>' +
+    '<div class="grille g2">' +
+    '<div class="champ"><label class="eyebrow" for="decl-cot">Cotisations (%)</label>' +
+    '<input type="text" id="decl-cot" inputmode="decimal" placeholder="25" value="' +
+    (tCot ? String(tCot).replace('.', ',') : '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="decl-cap">Reste dans la tranche (€)</label>' +
+    '<input type="text" id="decl-cap" inputmode="decimal" value="' + imp.capacite + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="decl-t1">Taux de la tranche (%)</label>' +
+    '<input type="text" id="decl-t1" inputmode="decimal" value="' + String(imp.t1).replace('.', ',') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="decl-t2">Taux au-delà (%)</label>' +
+    '<input type="text" id="decl-t2" inputmode="decimal" value="' + String(imp.t2).replace('.', ',') + '"></div>' +
+    '</div>' +
+    '<div class="kpi" style="margin-top:4px">' +
+    '<div class="carte2"><b class="num">' + (tCot ? eur(cot) : '—') + '</b><small>cotisations</small></div>' +
+    '<div class="carte2"><b class="num">' + eur(imp.total) + '</b><small>impôt estimé</small></div>' +
+    '<div class="carte2"><b class="num">' + eur(FIN.arr((tCot ? cot : 0) + imp.total, 2)) +
+    '</b><small>ensemble</small></div></div>' +
+    (imp.base2 ? '<p class="muted" style="font-size:11.5px;margin:9px 0 0">Dont ' + eur(imp.base1) + ' à ' +
+      esc(String(imp.t1).replace('.', ',')) + ' % et ' + eur(imp.base2) + ' à ' +
+      esc(String(imp.t2).replace('.', ',')) + ' %.</p>' : '') + '</div>';
+
+  var vs = (A.versements || []).slice().sort(function (x, y) { return (y.date || 0) - (x.date || 0); });
+  var netAn = 0;
+  vs.forEach(function (v) {
+    if (new Date(v.date).getFullYear() === d.an) netAn += FIN.nb(v.montant) - FIN.nb(v.rembourse);
+  });
+  h += '<div class="carte"><div class="carte-titre"><h2>Ce que vous avez payé</h2>' +
+    '<button class="btn primaire btn-min" id="decl-vers">+ Versement</button></div>' +
+    '<p class="sous-titre-bloc">Chaque versement avec sa date — et, s’il a été remboursé ' +
+    'en tout ou partie, le remboursement sur la même ligne.' +
+    (netAn ? ' Net payé en ' + d.an + ' : <b class="num">' + eur(FIN.arr(netAn, 2)) + '</b>.' : '') + '</p>' +
+    (vs.length ? vs.map(function (v) {
+      var net = FIN.arr(FIN.nb(v.montant) - FIN.nb(v.rembourse), 2);
+      return '<div class="liste-item"><div class="li-c"><b>' + esc(nomVersement(v.type)) + ' — ' + eur(net) + '</b>' +
+        '<small>' + new Date(v.date).toLocaleDateString('fr-FR') +
+        (FIN.nb(v.rembourse) ? ' · ' + eur(v.montant) + ' payés, ' + eur(v.rembourse) + ' remboursés' : '') +
+        (v.note ? ' · ' + esc(v.note) : '') + '</small></div>' +
+        '<button class="btn-min" data-versmod="' + v.id + '">Modifier</button></div>';
+    }).join('') : '<p class="muted" style="font-size:12.5px;margin:0">Aucun versement noté. C’est ici que ' +
+      'se garde la trace de ce qui est parti : cotisations, impôt, TVA, CFE.</p>') + '</div>';
+  return h;
+}
+
+function ouvrirVersement(id) {
+  var v = id ? (A.versements || []).filter(function (x) { return x.id === id; })[0] : null;
+  if (id && !v) return;
+  modale(v ? 'Modifier le versement' : 'Nouveau versement',
+    '<div class="grille g2">' +
+    '<div class="champ"><label class="eyebrow" for="vs-type">Quoi</label>' +
+    '<select id="vs-type">' + TYPES_VERSEMENT.map(function (t) {
+      return '<option value="' + t.c + '"' + (v && v.type === t.c ? ' selected' : '') + '>' + esc(t.n) + '</option>';
+    }).join('') + '</select></div>' +
+    '<div class="champ"><label class="eyebrow" for="vs-date">Payé le</label>' +
+    '<input type="date" id="vs-date" value="' + versChamp(v ? v.date : Date.now()) + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="vs-mont">Montant (€)</label>' +
+    '<input type="text" id="vs-mont" class="gros" inputmode="decimal" value="' +
+    (v ? esc(String(v.montant).replace('.', ',')) : '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="vs-remb">Dont remboursé (€)</label>' +
+    '<input type="text" id="vs-remb" inputmode="decimal" placeholder="rien" value="' +
+    (v && v.rembourse ? esc(String(v.rembourse).replace('.', ',')) : '') + '"></div></div>' +
+    '<div class="champ"><label class="eyebrow" for="vs-note">Note</label>' +
+    '<input type="text" id="vs-note" autocomplete="off" placeholder="régularisation, échéancier…" value="' +
+    esc((v && v.note) || '') + '"></div>' +
+    '<div class="btn-rang" style="margin-top:9px">' +
+    '<button class="btn primaire" id="vs-ok">Enregistrer</button>' +
+    (v ? '<button class="btn danger btn-min" id="vs-sup">Supprimer</button>' : '') + '</div>');
+  $('#vs-ok').addEventListener('click', function () {
+    var m = FIN.nb($('#vs-mont').value);
+    if (!(m > 0)) { toast('Montant attendu.'); return; }
+    var maj = { type: $('#vs-type').value, date: versDate($('#vs-date').value) || Date.now(),
+      montant: m, rembourse: FIN.nb($('#vs-remb').value) || null, note: $('#vs-note').value.trim() };
+    if (v) { Object.keys(maj).forEach(function (k) { v[k] = maj[k]; }); }
+    else { maj.id = uid(); A.versements.push(maj); }
+    sauverVersements().then(function () { fermerModale(); renderAnalyses(); toast('Versement noté.'); });
+  });
+  if (v) {
+    $('#vs-sup').addEventListener('click', function () {
+      if (!confirm('Supprimer ce versement ?')) return;
+      A.versements = A.versements.filter(function (x) { return x.id !== v.id; });
+      sauverVersements().then(function () { fermerModale(); renderAnalyses(); toast('Versement supprimé.'); });
+    });
+  }
 }
 
 function htmlRecettes(an, b) {
@@ -15930,7 +16498,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.58.0-20260823-1801';
+var VERSION = '4.59.0-20260823-2013';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

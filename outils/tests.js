@@ -381,14 +381,14 @@ scenario('Accueil : des pictogrammes dessinés, plus des caractères de rempliss
       tuile && !/[▤▥▦▧▨▩]/.test(tuile.querySelector('.ic').textContent));
   });
   verifier('le bouton accueil n’affiche plus de losange', '', t.texte('#b-accueil'));
-  /* Second niveau : les cinq tuiles de l'entreprise, cerclées. Devis n'avait
-     aucun écran à lui, et Analyses est devenue un onglet de Finances. */
-  const sous = ['chantiers', 'calendrier', 'rendements', 'stock', 'finances'];
+  /* Second niveau : les six tuiles de l'entreprise, cerclées — Véhicule est
+     arrivé en 4.59. */
+  const sous = ['chantiers', 'calendrier', 'rendements', 'stock', 'finances', 'vehicule'];
   const cercles = sous.filter(m => {
     const b = t.$('#vue-entreprise [data-module="' + m + '"]');
     return b && b.querySelector('.ic.rond svg.pic');
   });
-  verifier('les cinq tuiles de l’entreprise sont cerclées', sous, cercles);
+  verifier('les six tuiles de l’entreprise sont cerclées', sous, cercles);
   verifierVrai('aucun caractère de remplissage ne subsiste dans les tuiles',
     t.$$('.tuile .ic').every(e => !/[▤▥▦▧▨▩⏱≈◫]/.test(e.textContent)));
   /* Le logo ne doit exister qu'une fois dans le fichier : l'accueil et le
@@ -1874,7 +1874,7 @@ scenario('Modules : Devis disparaît, Analyses devient un onglet de Finances', a
   const t = await ouvrir(Object.assign({}, VIDE, { module: 'entreprise' }));
   const tuiles = t.$$('#vue-entreprise .tuiles .tuile')
     .map(b => b.dataset.module);
-  verifier('cinq tuiles restent', 5, tuiles.length);
+  verifier('six tuiles restent — Véhicule est arrivé depuis', 6, tuiles.length);
   verifierVrai('plus de tuile Devis', tuiles.indexOf('devis') < 0);
   verifierVrai('plus de tuile Analyses', tuiles.indexOf('analyses') < 0);
   verifierVrai('Chantiers, Calendrier, Rendements, Stock et Finances sont là',
@@ -4236,6 +4236,142 @@ scenario('TVA collectée : le vrai taux des travaux, pas 20 % par défaut', asyn
 
   const bal = FIN.balanceTva(ch, [], null, C.tauxLigne);
   verifier('le solde à payer suit', 100, bal.montant);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Déclarations : le mois, la TVA de l’année, l’impôt par tranches', async () => {
+  /* Les chiffres existaient, éparpillés sur trois écrans : le jour de la
+     déclaration, il les recopiait de tête. */
+  const le = (a, m, j) => new Date(a, m, j, 12).getTime();
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'finances',
+    cfg: { tauxCotisations: 25 },
+    chantiers: [
+      { id: 'c1', nom: 'Prestation de mars', statut: 'facture', aDevis: false, siren: true,
+        temps: [], maj: Date.now(), dateFacture: le(2026, 2, 10),
+        lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 2, prix: 500, nature: 'prestation' }] },
+      { id: 'c2', nom: 'Vente de juillet', statut: 'paye', aDevis: false,
+        temps: [], maj: Date.now(), dateFacture: le(2026, 6, 5),
+        lignes: [{ travail: 'F_PROTEC', unite: 'unite', quantite: 100, prix: 3, nature: 'vente' }] }
+    ]
+  }));
+  t.clic('[data-vue="analyses"]'); await t.pause(350);
+  verifierVrai('la pastille Déclarations existe', t.$('[data-ana="declarations"]'));
+  t.clic('[data-ana="declarations"]'); await t.pause(350);
+
+  t.choisir('#decl-an', '2026'); await t.pause(300);
+  t.choisir('#decl-idx', '2'); await t.pause(300);
+  let txt = t.texte('#ana-corps');
+  verifierVrai('mars : la prestation y est, brute', /1 000/.test(txt));
+  verifierVrai('et après son abattement de 50 %', /500/.test(txt));
+
+  t.choisir('#decl-idx', '6'); await t.pause(300);
+  txt = t.texte('#ana-corps');
+  verifierVrai('juillet : la vente y est', /300/.test(txt));
+  verifierVrai('mais pas la prestation de mars', !/1 000 €/.test(txt.replace(/\s+/g, ' ')));
+
+  /* La TVA de l'année applique le vrai taux : 10 % sur la prestation avec
+     SIREN, 20 % sur la fourniture. */
+  verifierVrai('la TVA à 10 % est là', /Collectée à 10 %/.test(txt) && /100/.test(txt));
+  verifierVrai('celle à 20 % aussi', /Collectée à 20 %/.test(txt) && /60/.test(txt));
+  verifierVrai('et le solde à reverser', /À reverser/.test(txt) && /160/.test(txt));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Déclarations : l’impôt commence dans la tranche à 11 %', async () => {
+  /* Son autre emploi consomme la tranche à 0 % : la base d'ici entre
+     directement à 11 %, puis bascule à 30 % au-delà de la capacité. */
+  const t = await ouvrir(VIDE);
+  const FIN = t.w.BCF;
+  const sous = FIN.impotEstime(10000, {});
+  verifier('sous la capacité, tout est à 11 %', 1100, sous.total);
+  verifier('rien dans la seconde tranche', 0, sous.tranche2);
+  const dessus = FIN.impotEstime(20000, {});
+  verifier('la première tranche se remplit', 17978, dessus.base1);
+  verifier('à 11 %', 1977.58, dessus.tranche1);
+  verifier('le reste passe à 30 %', 606.6, dessus.tranche2);
+  verifier('et le total suit', 2584.18, dessus.total);
+  const sien = FIN.impotEstime(20000, { impotCapacite: 15000, impotTaux1: 12, impotTaux2: 31 });
+  verifier('ses propres nombres priment', 1800 + 1550, sien.total);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Déclarations : un versement se note, son remboursement aussi', async () => {
+  /* La première année, ses cotisations lui ont été remboursées deux fois :
+     le net doit se lire sans perdre la trace de ce qui s'est passé. */
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'finances' }));
+  t.clic('[data-vue="analyses"]'); await t.pause(350);
+  t.clic('[data-ana="declarations"]'); await t.pause(350);
+  t.clic('#decl-vers'); await t.pause(350);
+  t.choisir('#vs-type', 'cotisations');
+  t.saisir('#vs-mont', '1000');
+  t.saisir('#vs-remb', '400');
+  t.saisir('#vs-note', 'forfait début d’activité');
+  t.clic('#vs-ok'); await t.pause(450);
+  const v = (t.stock('versements') || [])[0];
+  verifierVrai('le versement est gardé', v);
+  verifier('avec son montant', 1000, v.montant);
+  verifier('et son remboursement', 400, v.rembourse);
+  const txt = t.texte('#ana-corps');
+  verifierVrai('la liste montre le net', /Cotisations sociales — 600/.test(txt));
+  verifierVrai('sans perdre l’histoire', /1 000 € payés, 400 € remboursés/.test(txt));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Véhicule : le carnet note, le compteur suit, l’échéance prévient', async () => {
+  const t = await ouvrir(VIDE);
+  t.clic('[data-module="entreprise"]'); await t.pause(300);
+  t.clic('[data-module="vehicule"]'); await t.pause(400);
+  verifierVrai('le module ouvre sur le carnet', t.$('#vue-carnetv').classList.contains('actif'));
+  verifier('avec deux onglets', 2, t.$$('#onglets button').length);
+  verifier('des postes sont semés d’avance', 6, (t.stock('vehicule') || {}).postes.length);
+
+  t.clic('#vh-plus'); await t.pause(350);
+  t.saisir('#vi-quoi', 'Révision et plaquettes');
+  t.saisir('#vi-km', '176000');
+  t.saisir('#vi-mont', '400');
+  const chip = t.$$('#vi-postes .chip').filter(b => /Révision/.test(b.textContent))[0];
+  verifierVrai('les postes se cochent depuis l’intervention', chip);
+  chip.click(); await t.pause(150);
+  t.$('#vi-dep').checked = true;
+  t.clic('#vi-ok'); await t.pause(500);
+
+  const v = t.stock('vehicule');
+  verifier('l’intervention est au carnet', 1, v.interventions.length);
+  verifierVrai('le compteur suit le kilométrage noté',
+    /176\u00A0000|176 000/.test(t.texte('#veh-carnet')));
+  const dep = (t.stock('depenses') || [])[0];
+  verifierVrai('la dépense correspondante est créée', dep);
+  verifier('en réparation matériel', 'ENTRETIEN', dep.lignes[0].categorie);
+  verifierVrai('et liée à l’intervention', dep.vehicule === v.interventions[0].id);
+
+  t.clic('[data-vue="echeancesv"]'); await t.pause(350);
+  const ech = t.texte('#veh-echeances');
+  verifierVrai('la révision cochée repart du kilométrage',
+    /Révision[^—]*— dans 30 000 km/.test(ech.replace(/\u00A0/g, ' ')));
+  verifierVrai('la courroie jamais faite est dépassée',
+    /Courroie[^—]*— dépassée de 16 000 km/.test(ech.replace(/\u00A0/g, ' ')));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Véhicule : une dépense d’entretien suggère le carnet, pas deux fois', async () => {
+  /* Le kilométrage nourrit les échéances : une réparation saisie dans les
+     Dépenses mérite d'être notée au carnet aussi. Mais celle que le carnet
+     vient de créer ne doit pas la réclamer en retour. */
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'finances' }));
+  t.clic('[data-vue="depenses"]'); await t.pause(300);
+  t.clic('#dep-nouvelle'); await t.pause(400);
+  t.saisir('[data-dl="0"]', 'Vidange');
+  t.saisir('[data-dlttc="0"]', '250');
+  t.choisir('[data-dlcat="0"]', 'ENTRETIEN'); await t.pause(200);
+  t.clic('#dp-ok'); await t.pause(500);
+  verifierVrai('la suggestion est faite',
+    /carnet du véhicule/.test(t.$('#toast').textContent));
   verifier('aucune erreur', [], t.erreurs);
 });
 
