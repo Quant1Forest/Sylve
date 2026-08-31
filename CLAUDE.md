@@ -892,9 +892,9 @@ node outils/importer-carnet.js "<comptabilité.xlsx>" ["<stock.xlsx>"] [sortie.j
 ## Le coût au kilomètre : chaque poste a son dénominateur
 
 La 4.64 divisait tout par la même chose et **se trompait d’un facteur
-vingt-quatre**. Un peu plus d’un an de dépenses de carburant
-rapportés à toute la vie du véhicule
-donnaient moins d’un centime du kilomètre, là où la réalité en vaut une quinzaine. Son
+vingt-quatre**. Un peu plus d’un an de dépenses de carburant rapporté à toute la vie du
+véhicule donnait moins d’un centime du kilomètre, là où la réalité en vaut
+une quinzaine. Son
 repère à lui l’a débusqué en une phrase : *« sept cents bornes, c’est presque
 un plein, donc presque cent balles »*. L’entretien, lui, était juste — ses
 interventions et son kilométrage sont sur la même horloge.
@@ -918,11 +918,11 @@ repères de `A.vehicule.infos` — `kmAchat`, `prixAchat`, `kmRevente`,
 de quoi se calculer : une ligne dit ce qui lui manque plutôt qu’un zéro qui
 passerait pour un chiffre.
 
-**Le véhicule a été acheté d’occasion**, gardé jusqu’à une borne de revente
-visés — c’est le précédent propriétaire qui l’avait pris neuf. L’historique
+**Le véhicule a été acheté d’occasion**, tard dans sa vie, avec une borne de
+revente visée — c’est le précédent propriétaire qui l’avait pris neuf. L’historique
 d’entretien d’avant son achat **compte quand même** : il ne l’a pas payé, mais
-c’est la seule base fiable pour savoir ce que ce véhicule coûte. Avec le peu de
-kilomètres à lui, ses propres factures ne diraient rien. Ces
+c’est la seule base fiable pour savoir ce que ce véhicule coûte. Avec le peu
+de kilomètres qu’il a faits depuis, ses propres factures ne diraient rien. Ces
 interventions vivent donc dans le carnet et **jamais dans les dépenses**.
 
 **`prixLitreMoyen()` est une moyenne pondérée par les quantités** — un plein
