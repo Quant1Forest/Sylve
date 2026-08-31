@@ -76,6 +76,9 @@ button{cursor:pointer;background:none;border:none}
 .mini-plus:hover{border-color:var(--encre);color:var(--encre)}
 .mini-plus[disabled]{opacity:.45;cursor:default}
 .jour-pris{font-size:11.5px;color:#8A6A00;margin:3px 0 0 2px;line-height:1.35}
+/* Un poste du coût au kilomètre qui n'a pas de quoi se calculer : il dit ce
+   qui lui manque plutôt que d'afficher un zéro qui passerait pour un chiffre. */
+.manque-v{color:var(--tiede)}
 /* Sous-titre d'un bloc de la fiche : dit à quoi le bloc sert, pour qu'on
    ne confonde plus le prévu (Journées) et le réel (Temps passé). */
 .sous-titre-bloc{font-size:12px;color:var(--doux);margin:0 0 10px;line-height:1.4}
@@ -4408,7 +4411,12 @@ var CATEGORIES = [
   { c: 'PETITMAT', n: 'Petits outillages / matériels', immo: false },
   { c: 'FOURN', n: 'Achats de fourniture', immo: false, aide: 'plants, protections, tuteurs' },
   { c: 'ADMIN', n: 'Frais administratif', immo: false, fixe: true },
-  { c: 'ENTRETIEN', n: 'Réparation matériel', immo: false },
+  { c: 'ENTRETIEN', n: 'Réparation matériel', immo: false, aide: 'tronçonneuse, débroussailleuse' },
+  /* Le garage, la carte grise, les pièces : ce qui appartient au véhicule
+     sans être du carburant. Sans elle, la carte grise finissait en frais
+     administratif — cinq cents euros que le coût au kilomètre ne voyait
+     jamais — et une facture de garage se confondait avec la tronçonneuse. */
+  { c: 'VEHIC', n: 'Frais véhicule', immo: false, aide: 'garage, carte grise, pièces' },
   { c: 'IMMO', n: 'Immobilisation', immo: true, aide: 'véhicule, matériel durable' },
   { c: 'DEPL', n: 'Frais de déplacement', immo: false, aide: 'péage, parking, nuitée' },
   { c: 'CARBPERSO', n: 'Frais de carburant perso', immo: false,
@@ -4447,6 +4455,31 @@ var NATURES = [
 function trouve(l, c) { for (var i = 0; i < l.length; i++) if (l[i].c === c) return l[i]; return null; }
 function nomCategorie(c) { var x = trouve(CATEGORIES, c); return x ? x.n : (c || ''); }
 function estImmo(c) { var x = trouve(CATEGORIES, c); return !!(x && x.immo); }
+/* Les deux carburants : celui de l'utilitaire et celui du véhicule personnel.
+   Ce sont eux, et eux seuls, qui portent un nombre de litres. */
+function estCarburant(c) { return c === 'CARB' || c === 'CARBPERSO'; }
+/* Le prix du litre se relevait dans un réglage, qu'il fallait retenir de
+   corriger — « ça change tout le temps ». Il se calcule maintenant sur ses
+   propres pleins : total payé divisé par total de litres, donc pondéré par
+   la quantité, un plein de soixante litres pesant plus qu'un de vingt.
+   Les pleins dont les litres ne sont pas notés sont simplement ignorés — ni
+   au numérateur ni au dénominateur. Compter zéro litre pour un plein payé
+   ferait exploser le prix moyen ; l'écarter ne fait que réduire l'assiette,
+   et le chiffre se précise à chaque ticket saisi. */
+function prixLitreMoyen(depenses, categorie) {
+  var euros = 0, litres = 0, n = 0, total = 0;
+  (depenses || []).forEach(function (d) {
+    lignesDepense(d).forEach(function (l) {
+      if (l.categorie !== categorie) return;
+      total++;
+      var q = nb(l.litres);
+      if (!(q > 0)) return;
+      euros += nb(l.ttc); litres += q; n++;
+    });
+  });
+  if (!(litres > 0)) return null;
+  return { prix: arr(euros / litres, 3), n: n, total: total, litres: arr(litres, 1) };
+}
 function nomNature(c) { var x = trouve(NATURES, c); return x ? x.n : (c || ''); }
 function abattementDe(c) { var x = trouve(NATURES, c); return x ? x.abattement : 0.5; }
 function estHorsCA(c) { var x = trouve(NATURES, c); return !!(x && x.horsCA); }
@@ -4918,6 +4951,7 @@ var M = {
   estHorsCA: estHorsCA, categoriesFixes: categoriesFixes, sansTvaDe: sansTvaDe,
   nb: nb, arr: arr, htDe: htDe, tvaDe: tvaDe, ttcDe: ttcDe,
   lignesDepense: lignesDepense, htLigne: htLigne, tvaLigne: tvaLigne,
+  estCarburant: estCarburant, prixLitreMoyen: prixLitreMoyen,
   bornes: bornes, dansPeriode: dansPeriode,
   dateRecette: dateRecette, lignesFacturees: lignesFacturees, chiffreAffaires: chiffreAffaires,
   tvaCollectee: tvaCollectee, tvaDeductible: tvaDeductible, balanceTva: balanceTva,
@@ -7220,6 +7254,13 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.65', quoi: [
+    { t: 'Le cout au kilometre etait faux : le carburant est enfin juste', vue: 'coutsv' },
+    { t: 'Le prix du litre se calcule sur vos pleins, si vous notez les litres', vue: 'depenses' },
+    { t: 'Une categorie « Frais vehicule » : garage, carte grise, pieces', vue: 'depenses' },
+    { t: 'L achat du vehicule se repartit sur ce qu il reste a rouler', vue: 'carnetv' },
+    { t: 'Une facture de garage se verse dans le carnet d une case', vue: 'depenses' }
+  ] },
   { v: '4.64', quoi: [
     { t: 'Ce que votre vehicule coute, au kilometre', vue: 'coutsv' },
     { t: 'Le carburant pro y entre seul ; le reste se coche sur la depense', vue: 'coutsv' },
@@ -7237,12 +7278,6 @@ var NOTES_MAJ = [
     { t: 'Le carnet du véhicule s’importe depuis une sauvegarde', vue: 'carnetv' },
     { t: 'Le pont arrière Dangel est suivi comme les autres postes', vue: 'echeancesv' },
     { t: 'Les cotisations disent sur quelle base elles sont calculées', vue: 'analyses' }
-  ] },
-  { v: '4.60', quoi: [
-    { t: 'Un seul choix de période dans Analyses — fini le double', vue: 'analyses' },
-    { t: 'La déclaration suit ce choix : mois, trimestre ou année', vue: 'analyses' },
-    { t: 'La TVA se reverse ou se récupère — elle ne se « paie » pas', vue: 'analyses' },
-    { t: 'Chaque mouvement dit l’année qu’il concerne', vue: 'analyses' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -11796,38 +11831,90 @@ function echeancesVehicule() {
 function depenseDuVehicule(d) {
   if (!d) return false;
   if (d.vehicule) return true;
-  return (FIN.lignesDepense(d) || []).some(function (l) { return l.categorie === 'CARB'; });
-}
-function coutsVehicule() {
-  var v = A.vehicule || {};
-  var iv = (v.interventions || []).filter(function (x) { return !x.garantie; });
-  var entretien = iv.reduce(function (t, x) { return t + C.nb(x.montant); }, 0);
-  var carburant = 0, autres = 0, nCarb = 0, nAutres = 0;
-  (A.depenses || []).forEach(function (d) {
-    if (!depenseDuVehicule(d)) return;
-    var lignes = FIN.lignesDepense(d) || [];
-    lignes.forEach(function (l) {
-      var ht = FIN.htLigne ? FIN.htLigne(l) : FIN.nb(l.ttc);
-      if (l.categorie === 'CARB') { carburant += ht; nCarb++; }
-      else { autres += ht; nAutres++; }
-    });
+  return (FIN.lignesDepense(d) || []).some(function (l) {
+    return l.categorie === 'CARB' || l.categorie === 'VEHIC';
   });
-  /* Les kilomètres parcourus dont on connaît le coût : du premier relevé au
-     dernier. Rapporter la dépense au compteur entier ferait mentir le
-     résultat quand l'historique ne remonte pas à la première mise en route. */
+}
+/* Une dépense née d'une intervention du carnet, ou versée dedans, porte
+   l'identifiant de cette intervention au lieu d'un simple « true ». Son
+   montant est déjà compté par le carnet : le recompter ici doublerait
+   l'entretien. */
+function depenseLieeAuCarnet(d) {
+  return !!(d && d.vehicule && d.vehicule !== true);
+}
+/* Ce que le véhicule coûte au kilomètre. La première version divisait tout
+   par la même chose et se trompait d'un facteur vingt-quatre : treize mois
+   de carburant rapportés à sept ans de kilomètres. Chaque coût a son propre
+   dénominateur, et il n'y en a pas deux pareils :
+
+   — l'entretien se rapporte à l'étendue que le carnet couvre réellement ;
+   — le carburant ne se divise pas, il se modélise (consommation × prix) ;
+   — l'achat et les frais uniques se répartissent sur ce qui reste à rouler
+     avec, pas sur ce qui l'a déjà été : une carte grise payée hier ne coûte
+     pas un euro du kilomètre parce qu'on n'a fait que cinq cents mètres ;
+   — les frais annuels se rapportent aux kilomètres d'une année.
+
+   Le total n'est donc pas une division mais une somme de taux. C'est lui qui
+   sert à chiffrer un déplacement. */
+function coutsVehicule() {
+  var v = A.vehicule || {}, inf = v.infos || {}, cfg = A.cfg || {};
+
+  var iv = (v.interventions || []).filter(function (x) { return !x.garantie; });
+  var entretien = C.arr(iv.reduce(function (t, x) { return t + C.nb(x.montant); }, 0), 2);
   var kms = [];
   (v.releves || []).forEach(function (r) { if (C.nb(r.km)) kms.push(C.nb(r.km)); });
   (v.interventions || []).forEach(function (x) { if (C.nb(x.km)) kms.push(C.nb(x.km)); });
   var premier = kms.length ? Math.min.apply(null, kms) : 0;
   var dernier = kms.length ? Math.max.apply(null, kms) : 0;
-  var parcourus = Math.max(0, dernier - premier);
-  var total = C.arr(entretien + carburant + autres, 2);
-  var parKm = function (m) { return parcourus > 0 ? C.arr(m / parcourus, 4) : null; };
+  var etendue = Math.max(0, dernier - premier);
+  var kmEntretien = etendue > 0 && entretien > 0 ? C.arr(entretien / etendue, 5) : null;
+
+  /* Le carburant réellement payé sert à connaître le prix du litre, jamais à
+     être divisé par des kilomètres qu'il n'a pas parcourus. */
+  var moy = FIN.prixLitreMoyen(A.depenses, 'CARB');
+  var prixL = moy ? moy.prix : (C.nb(cfg.prixLitre) || 1.75);
+  var l100 = C.nb(cfg.litres100) || 9;
+  var kmCarburant = C.arr(l100 / 100 * prixL, 5);
+
+  /* Ce qu'il roulera encore avec : c'est là-dessus que se répartit ce qui se
+     paie une fois. Sans les deux bornes, on ne répartit rien. */
+  var kmAchat = C.nb(inf.kmAchat), kmRevente = C.nb(inf.kmRevente);
+  var aRouler = kmRevente > kmAchat ? kmRevente - kmAchat : 0;
+  var prixAchat = C.nb(inf.prixAchat);
+  var kmAchatParKm = aRouler > 0 && prixAchat > 0 ? C.arr(prixAchat / aRouler, 5) : null;
+
+  var uniques = 0, nUniques = 0, carbReel = 0, nCarb = 0;
+  (A.depenses || []).forEach(function (d) {
+    if (!depenseDuVehicule(d)) return;
+    var lie = depenseLieeAuCarnet(d);
+    (FIN.lignesDepense(d) || []).forEach(function (l) {
+      var ht = FIN.htLigne(l);
+      if (l.categorie === 'CARB') { carbReel += ht; nCarb++; return; }
+      if (l.categorie === 'CARBPERSO') return;
+      if (lie) return;
+      uniques += ht; nUniques++;
+    });
+  });
+  uniques = C.arr(uniques, 2);
+  var kmUniques = aRouler > 0 && uniques > 0 ? C.arr(uniques / aRouler, 5) : null;
+
+  var fraisAn = C.nb(inf.fraisAn), kmParAn = C.nb(inf.kmParAn);
+  var kmAnnuel = fraisAn > 0 && kmParAn > 0 ? C.arr(fraisAn / kmParAn, 5) : null;
+
+  var parts = [kmCarburant, kmEntretien, kmAchatParKm, kmUniques, kmAnnuel];
+  var total = 0, connu = false;
+  parts.forEach(function (p) { if (p != null) { total += p; connu = true; } });
+
   return {
-    entretien: C.arr(entretien, 2), carburant: C.arr(carburant, 2), autres: C.arr(autres, 2),
-    total: total, premier: premier, dernier: dernier, parcourus: parcourus,
-    nCarb: nCarb, nAutres: nAutres,
-    kmEntretien: parKm(entretien), kmCarburant: parKm(carburant), kmTotal: parKm(total),
+    entretien: entretien, etendue: etendue, premier: premier, dernier: dernier,
+    kmEntretien: kmEntretien,
+    prixLitre: prixL, moyenne: moy, l100: l100, kmCarburant: kmCarburant,
+    carbReel: C.arr(carbReel, 2), nCarb: nCarb,
+    prixAchat: prixAchat, kmAchat: kmAchat, kmRevente: kmRevente, aRouler: aRouler,
+    kmAchatParKm: kmAchatParKm,
+    uniques: uniques, nUniques: nUniques, kmUniques: kmUniques,
+    fraisAn: fraisAn, kmParAn: kmParAn, kmAnnuel: kmAnnuel,
+    kmTotal: connu ? C.arr(total, 5) : null,
     /* Ce qui a coûté le plus cher, pour savoir où part l'argent. */
     plusChers: iv.slice().sort(function (a, b) { return C.nb(b.montant) - C.nb(a.montant); }).slice(0, 5)
   };
@@ -11839,36 +11926,93 @@ function centimes(v) {
 function renderCoutsV() {
   var z = $('#veh-couts'); if (!z) return;
   var c = coutsVehicule();
-  var ligne = function (nom, montant, parKm, detail) {
-    return '<div style="padding:6px 0;border-bottom:1px solid var(--trait)">' +
-      '<div style="display:flex;justify-content:space-between;align-items:baseline">' +
-      '<span style="font-size:13.5px">' + nom + '</span>' +
-      '<b class="num">' + eur(montant) + '</b></div>' +
+  /* Chaque ligne dit son taux et sur quoi il est bâti. Un chiffre au
+     kilomètre dont on ignore le dénominateur ne se vérifie pas. */
+  var ligne = function (nom, parKm, base, manque) {
+    return '<div style="padding:7px 0;border-bottom:1px solid var(--trait)">' +
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">' +
+      '<span style="font-size:13.5px' + (parKm == null ? ';color:var(--gris)' : '') + '">' + nom + '</span>' +
+      '<b class="num">' + (parKm != null ? centimes(parKm) : '—') + '</b></div>' +
       '<div class="muted" style="font-size:12px;margin-top:1px">' +
-      (parKm != null ? centimes(parKm) + ' du kilomètre' : 'aucun kilométrage connu') +
-      (detail ? ' · ' + detail : '') + '</div></div>';
+      (parKm != null ? base : '<span class="manque-v">' + manque + '</span>') + '</div></div>';
   };
+  var km = kmVehicule();
+  var faits = c.kmAchat && km > c.kmAchat ? km - c.kmAchat : 0;
+
   z.innerHTML =
-    '<div class="carte"><h2>Ce que le véhicule vous coûte</h2>' +
-    '<p class="muted" style="font-size:12px;margin:0 0 10px">Sur ' +
-    (c.parcourus ? '<b class="num">' + E.fmt(c.parcourus, 0) + '</b> km parcourus, de ' +
-      E.fmt(c.premier, 0) + ' à ' + E.fmt(c.dernier, 0) + ' au compteur'
-      : 'une période inconnue — notez le compteur dans le Carnet') + '.</p>' +
-    '<div class="kpi">' +
-    '<div class="carte2"><b class="num">' + centimes(c.kmTotal) + '</b><small>par kilomètre</small></div>' +
-    '<div class="carte2"><b class="num">' + eur(c.total) + '</b><small>en tout</small></div>' +
+    '<div class="carte"><h2>Ce que coûte un kilomètre</h2>' +
+    '<div class="kpi" style="margin-top:0">' +
+    '<div class="carte2"><b class="num">' + centimes(c.kmTotal) + '</b><small>du kilomètre, tout compris</small></div>' +
+    '<div class="carte2"><b class="num">' +
+    (c.kmTotal != null ? eur(C.arr(c.kmTotal * 100, 2)) : '—') + '</b><small>pour 100 km</small></div>' +
     '</div>' +
-    '<div style="margin-top:13px">' +
-    ligne('Entretien et réparations', c.entretien, c.kmEntretien,
-      (A.vehicule.interventions || []).length + ' passages') +
-    ligne('Carburant', c.carburant, c.kmCarburant,
-      c.nCarb ? c.nCarb + ' plein' + (c.nCarb > 1 ? 's' : '') : 'aucune dépense en « carburant pro »') +
-    (c.autres ? ligne('Autres frais', c.autres, null,
-      c.nAutres + ' dépense' + (c.nAutres > 1 ? 's' : '') + ' rattachée' + (c.nAutres > 1 ? 's' : '')) : '') +
+    '<p class="muted" style="font-size:12px;margin:10px 0 0">Ce n’est pas une division unique : ' +
+    'chaque poste se rapporte à ce qui lui correspond. Le détail est en dessous, ligne à ligne.</p>' +
     '</div>' +
-    '<p class="muted" style="font-size:11.5px;margin:10px 0 0">Le carburant « pro » compte ' +
-    'd’office. Pour tout le reste — carte grise, assurance, péage — cochez « concerne le ' +
-    'véhicule » sur la dépense.</p></div>' +
+
+    '<div class="carte"><h2>D’où sort ce chiffre</h2>' +
+    ligne('Carburant', c.kmCarburant,
+      E.fmt(c.l100, 1) + ' L/100 km à ' + E.fmt(c.prixLitre, 3) + ' € le litre' +
+      (c.moyenne
+        ? ' — moyenne pondérée sur ' + c.moyenne.n + ' plein' + (c.moyenne.n > 1 ? 's' : '') +
+          ' de ' + c.moyenne.total + ', soit ' + E.fmt(c.moyenne.litres, 0) + ' L'
+        : ' — prix du réglage, faute de litres saisis'), '') +
+    ligne('Entretien et réparations', c.kmEntretien,
+      eur(c.entretien) + ' sur ' + E.fmt(c.etendue, 0) + ' km de carnet, de ' +
+      E.fmt(c.premier, 0) + ' à ' + E.fmt(c.dernier, 0) + ' au compteur',
+      'Aucune intervention chiffrée dans le carnet.') +
+    ligne('Achat du véhicule', c.kmAchatParKm,
+      eur(c.prixAchat) + ' réparti sur ' + E.fmt(c.aRouler, 0) + ' km — de ' +
+      E.fmt(c.kmAchat, 0) + ' à votre achat jusqu’à ' + E.fmt(c.kmRevente, 0),
+      'Renseignez le prix payé, le compteur à l’achat et jusqu’où vous comptez le garder.') +
+    ligne('Carte grise et frais uniques', c.kmUniques,
+      eur(c.uniques) + ' en ' + c.nUniques + ' dépense' + (c.nUniques > 1 ? 's' : '') +
+      ', réparti sur ' + E.fmt(c.aRouler, 0) + ' km',
+      c.uniques > 0
+        ? 'Il manque jusqu’où vous comptez garder le véhicule.'
+        : 'Aucune dépense en « Frais véhicule ».') +
+    ligne('Assurance et frais annuels', c.kmAnnuel,
+      eur(c.fraisAn) + ' par an pour ' + E.fmt(c.kmParAn, 0) + ' km par an',
+      'Renseignez vos frais annuels et vos kilomètres par an.') +
+    (c.kmTotal != null
+      ? '<div style="display:flex;justify-content:space-between;margin-top:11px;padding-top:9px;' +
+        'border-top:2px solid var(--encre)"><b>Total</b>' +
+        '<b class="num" style="font-size:19px">' + centimes(c.kmTotal) + '</b></div>'
+      : '') +
+    '<p class="muted" style="font-size:11.5px;margin:11px 0 0">Le carburant « pro » et les ' +
+    '« Frais véhicule » comptent d’office. Pour le reste, cochez « concerne le véhicule » ' +
+    'sur la dépense. Une facture déjà notée dans le carnet n’est jamais comptée deux fois.</p>' +
+    ((!c.kmAchatParKm || !c.kmAnnuel)
+      ? '<div class="btn-rang" style="margin-top:11px">' +
+        '<button class="btn btn-min" id="vc-infos">Compléter la fiche du véhicule</button></div>'
+      : '') +
+    '</div>' +
+
+    (faits ? '<div class="carte"><h2>Depuis que vous l’avez</h2>' +
+      '<div class="kpi" style="margin-top:0">' +
+      '<div class="carte2"><b class="num">' + E.fmt(faits, 0) + '</b><small>km parcourus</small></div>' +
+      '<div class="carte2"><b class="num">' +
+      (c.kmTotal != null ? eur(C.arr(c.kmTotal * faits, 0)) : '—') + '</b><small>ce qu’ils vous ont coûté</small></div>' +
+      '</div><p class="muted" style="font-size:11.5px;margin:10px 0 0">Au taux ci-dessus. ' +
+      'Il reste ' + E.fmt(Math.max(0, c.kmRevente - km), 0) + ' km avant les ' +
+      E.fmt(c.kmRevente, 0) + ' que vous visez.</p></div>' : '') +
+
+    (c.carbReel ? '<div class="carte"><h2>Vos pleins</h2>' +
+      '<div class="kpi" style="margin-top:0">' +
+      '<div class="carte2"><b class="num">' + eur(c.carbReel) + '</b><small>payés en ' + c.nCarb +
+      ' plein' + (c.nCarb > 1 ? 's' : '') + '</small></div>' +
+      (c.moyenne ? '<div class="carte2"><b class="num">' + E.fmt(c.moyenne.prix, 3) +
+        ' €</b><small>le litre, en moyenne</small></div>' : '') +
+      '</div>' +
+      (c.moyenne
+        ? (c.moyenne.n < c.moyenne.total
+          ? '<p class="muted" style="font-size:11.5px;margin:10px 0 0">' +
+            (c.moyenne.total - c.moyenne.n) + ' plein' + (c.moyenne.total - c.moyenne.n > 1 ? 's' : '') +
+            ' sans litres saisis, écarté' + (c.moyenne.total - c.moyenne.n > 1 ? 's' : '') +
+            ' de la moyenne. Chaque ticket saisi la précise.</p>' : '')
+        : '<p class="muted" style="font-size:11.5px;margin:10px 0 0">Aucun plein ne porte ses ' +
+          'litres : le prix du litre vient du réglage. Notez-les sur la dépense pour obtenir ' +
+          'votre vrai prix moyen.</p>') + '</div>' : '') +
 
     (c.plusChers.length ? '<div class="carte"><h2>Ce qui a coûté le plus</h2>' +
       c.plusChers.map(function (x) {
@@ -11880,6 +12024,8 @@ function renderCoutsV() {
           new Date(x.date).toLocaleDateString('fr-FR') +
           (C.nb(x.km) ? ' · ' + E.fmt(C.nb(x.km), 0) + ' km' : '') + '</div></div>';
       }).join('') + '</div>' : '');
+
+  if ($('#vc-infos')) $('#vc-infos').addEventListener('click', function () { ouvrirInfosVehicule(); });
 }
 
 function renderCarnetV() {
@@ -11956,12 +12102,56 @@ function ouvrirInfosVehicule() {
     '<div class="champ"><label class="eyebrow" for="vn-note">Repères</label>' +
     '<input type="text" id="vn-note" autocomplete="off" placeholder="immatriculation, mise en circulation…" value="' +
     esc(inf.note || '') + '"></div>' +
-    '<p class="muted" style="font-size:11.5px;margin:5px 0 0">Ces repères restent sur votre ' +
-    'téléphone et partent dans vos sauvegardes.</p>' +
-    '<div class="btn-rang" style="margin-top:9px"><button class="btn primaire" id="vn-ok">Enregistrer</button></div>');
+    /* Ce qui se paie une fois ne se divise pas par les kilomètres déjà
+       faits : il faut savoir de quel compteur à quel compteur il sera à lui. */
+    '<p class="eyebrow" style="margin:15px 0 7px">Ce qu’il vous coûte</p>' +
+    '<div class="grille g2">' +
+    '<div class="champ"><label class="eyebrow" for="vn-kma">Compteur à l’achat</label>' +
+    '<input type="text" id="vn-kma" inputmode="numeric" placeholder="0 si neuf" value="' +
+    (inf.kmAchat ? inf.kmAchat : '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="vn-prix">Prix payé (€)</label>' +
+    '<input type="text" id="vn-prix" inputmode="decimal" value="' +
+    (inf.prixAchat != null && inf.prixAchat !== '' ? esc(String(inf.prixAchat).replace('.', ',')) : '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="vn-kmr">Gardé jusqu’à (km)</label>' +
+    '<input type="text" id="vn-kmr" inputmode="numeric" placeholder="250 000" value="' +
+    (inf.kmRevente ? inf.kmRevente : '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="vn-kman">Kilomètres par an</label>' +
+    '<input type="text" id="vn-kman" inputmode="numeric" value="' +
+    (inf.kmParAn ? inf.kmParAn : '') + '"></div>' +
+    '</div>' +
+    '<div class="champ"><label class="eyebrow" for="vn-fan">Assurance et frais annuels (€/an)</label>' +
+    '<input type="text" id="vn-fan" inputmode="decimal" value="' +
+    (inf.fraisAn != null && inf.fraisAn !== '' ? esc(String(inf.fraisAn).replace('.', ',')) : '') + '">' +
+    '<p class="muted" style="font-size:11.5px;margin:5px 0 0" id="vn-aide-fan"></p></div>' +
+    '<p class="muted" style="font-size:11.5px;margin:5px 0 0">Le prix payé et la borne de ' +
+    'revente servent à répartir l’achat et la carte grise. Sans eux, ces postes restent vides ' +
+    'plutôt que de sortir un chiffre faux. Tout reste sur votre téléphone.</p>' +
+    '<div class="btn-rang" style="margin-top:11px"><button class="btn primaire" id="vn-ok">Enregistrer</button></div>');
+  /* Ce qu'il paie déjà en assurance sur douze mois est une base bien meilleure
+     qu'un chiffre de tête — mais elle se propose, elle ne s'impose pas. */
+  (function () {
+    var an = Date.now() - 365 * C.JOUR, s = 0;
+    (A.depenses || []).forEach(function (d) {
+      if (!d.vehicule || C.nb(d.date) < an) return;
+      (FIN.lignesDepense(d) || []).forEach(function (l) {
+        if (l.categorie === 'ASSUR') s += FIN.htLigne(l);
+      });
+    });
+    if (s > 0 && $('#vn-aide-fan')) {
+      $('#vn-aide-fan').textContent = 'Vos assurances marquées « véhicule » sur douze mois : ' +
+        E.fmt(C.arr(s, 2), 2) + ' €.';
+    }
+  })();
   $('#vn-ok').addEventListener('click', function () {
-    v.infos = { nom: $('#vn-nom').value.trim(), note: $('#vn-note').value.trim() };
-    sauverVehicule().then(function () { fermerModale(); renderCarnetV(); toast('Véhicule enregistré.'); });
+    var kma = C.nb($('#vn-kma').value), kmr = C.nb($('#vn-kmr').value);
+    if (kmr > 0 && kmr <= kma) { toast('La borne de revente doit dépasser le compteur d’achat.'); return; }
+    v.infos = { nom: $('#vn-nom').value.trim(), note: $('#vn-note').value.trim(),
+      kmAchat: kma || null, prixAchat: C.nb($('#vn-prix').value) || null,
+      kmRevente: kmr || null, kmParAn: C.nb($('#vn-kman').value) || null,
+      fraisAn: C.nb($('#vn-fan').value) || null };
+    sauverVehicule().then(function () {
+      fermerModale(); renderCarnetV(); renderCoutsV(); toast('Véhicule enregistré.');
+    });
   });
 }
 function ouvrirReleveV() {
@@ -11996,7 +12186,7 @@ function ouvrirInterventionV(id) {
     '<input type="date" id="vi-date" value="' + versChamp(x ? x.date : Date.now()) + '"></div>' +
     '<div class="champ"><label class="eyebrow" for="vi-km">Kilométrage</label>' +
     '<input type="text" id="vi-km" inputmode="numeric" value="' + (x && x.km ? x.km : '') + '"></div>' +
-    '<div class="champ"><label class="eyebrow" for="vi-mont">Montant (€)</label>' +
+    '<div class="champ"><label class="eyebrow" for="vi-mont">Montant HT (€)</label>' +
     '<input type="text" id="vi-mont" inputmode="decimal" value="' +
     (x && x.montant != null ? esc(String(x.montant).replace('.', ',')) : '') + '"></div></div>' +
     '<label class="ligne-check" style="display:flex;align-items:center;gap:8px;font-size:13.5px;margin:2px 0 9px">' +
@@ -12044,11 +12234,15 @@ function ouvrirInterventionV(id) {
       });
     };
     if (creeDep) {
-      /* La dépense part en « Réparation matériel », TVA 20 % par défaut — le
-         garage facture presque toujours ainsi — et se corrige dans les
-         Dépenses. Le lien empêche la suggestion inverse de la réclamer. */
+      /* La dépense part en « Frais véhicule », TVA 20 % par défaut — le garage
+         facture presque toujours ainsi — et se corrige dans les Dépenses. Le
+         carnet raisonne en hors taxes, la dépense en TTC : la TVA se rajoute
+         ici, sans quoi elle serait sous-déclarée d'un cinquième.
+         Le lien empêche la suggestion inverse de la réclamer, et empêche
+         surtout que le coût au kilomètre compte le même argent deux fois. */
       var dp = { id: uid(), date: maj.date, fournisseur: '', vehicule: x.id, maj: Date.now(),
-        lignes: [{ libelle: quoi, categorie: 'ENTRETIEN', ttc: C.nb(maj.montant), taux: 20 }] };
+        lignes: [{ libelle: quoi, categorie: 'VEHIC',
+          ttc: C.arr(C.nb(maj.montant) * 1.2, 2), taux: 20 }] };
       x.depense = dp.id;
       A.depenses.push(dp);
       sauverDepenses().then(function () { renderDepenses(); renderFinances(); apres(); });
@@ -12692,6 +12886,32 @@ function renderDepenses() {
 
 var depLignes = [];
 
+/* Le prix au litre de la ligne, réécrit seul à chaque frappe : redessiner le
+   bloc entier ferait perdre le curseur au milieu du nombre. Même raison que
+   les conversions du stock. */
+function textePrixLitre(l) {
+  return (FIN.nb(l.litres) > 0 && FIN.nb(l.ttc) > 0)
+    ? '<b>' + E.fmt(FIN.arr(FIN.nb(l.ttc) / FIN.nb(l.litres), 3), 3) + ' €</b> le litre.'
+    : 'Facultatif — sert au prix moyen du litre, et donc au coût du véhicule.';
+}
+function majPrixLitres() {
+  $$('#dp-lignes [data-dlprix]').forEach(function (p) {
+    var l = depLignes[Number(p.dataset.dlprix)];
+    if (l) p.innerHTML = textePrixLitre(l);
+  });
+}
+/* La dépense ouverte est-elle déjà rattachée à une intervention du carnet ?
+   Si oui, la proposer une seconde fois créerait un doublon. */
+var depDejaAuCarnet = false;
+function majOffreCarnet() {
+  var z = $('#dp-carnet'); if (!z) return;
+  var offrable = !depDejaAuCarnet && depLignes.some(function (l) {
+    return l.categorie === 'VEHIC' && FIN.nb(l.ttc) > 0;
+  });
+  z.hidden = !offrable;
+  if (!offrable && $('#dp-hist')) { $('#dp-hist').checked = false; $('#dp-histkm').hidden = true; }
+}
+
 function renderDepLignes() {
   var z = $('#dp-lignes'); if (!z) return;
   z.innerHTML = depLignes.map(function (l, i) {
@@ -12714,16 +12934,33 @@ function renderDepLignes() {
         return '<option value="' + c2.c + '"' + (l.categorie === c2.c ? ' selected' : '') + '>' + c2.n + '</option>';
       }).join('') + '</select></div></div>' +
       (FIN.estImmo(l.categorie) ? '<p class="muted" style="font-size:11.5px;margin:5px 0 0">Immobilisation — isolée dans la balance de TVA.</p>' : '') +
+      /* Le prix du litre change tous les mois : le relever dans un réglage
+         demandait de penser à le corriger. Noté ici, il se calcule tout seul
+         en moyenne pondérée par les quantités. Facultatif — un plein sans
+         litres est écarté de la moyenne, jamais compté pour zéro. */
+      (FIN.estCarburant(l.categorie)
+        ? '<div style="display:flex;gap:9px;align-items:flex-end;margin-top:7px">' +
+          '<div class="champ" style="margin:0;width:8em;flex:none">' +
+          '<label class="eyebrow">Litres</label>' +
+          '<input type="text" data-dllitres="' + i + '" inputmode="decimal" placeholder="—" value="' +
+          (l.litres != null && l.litres !== '' ? esc(String(l.litres).replace('.', ',')) : '') + '"></div>' +
+          '<p class="muted" style="font-size:11.5px;margin:0 0 9px;flex:1" data-dlprix="' + i + '">' +
+          textePrixLitre(l) + '</p></div>'
+        : '') +
       '</div>';
   }).join('') +
     '<button type="button" class="btn-min" id="dp-plusligne">+ une ligne</button>';
   majApercuDep();
+  majOffreCarnet();
 }
 function lireDepLignes() {
   $$('#dp-lignes [data-dl]').forEach(function (i) { depLignes[Number(i.dataset.dl)].libelle = i.value; });
   $$('#dp-lignes [data-dlttc]').forEach(function (i) { depLignes[Number(i.dataset.dlttc)].ttc = FIN.nb(i.value); });
   $$('#dp-lignes [data-dltaux]').forEach(function (i) { depLignes[Number(i.dataset.dltaux)].taux = FIN.nb(i.value); });
   $$('#dp-lignes [data-dlcat]').forEach(function (i) { depLignes[Number(i.dataset.dlcat)].categorie = i.value; });
+  $$('#dp-lignes [data-dllitres]').forEach(function (i) {
+    depLignes[Number(i.dataset.dllitres)].litres = i.value.trim() ? FIN.nb(i.value) : '';
+  });
 }
 function majApercuDep() {
   var z = $('#dp-apercu'); if (!z) return;
@@ -12744,10 +12981,12 @@ function ouvrirDepense(id) {
   depLignes = id
     ? FIN.lignesDepense(d).map(function (l) {
       return { libelle: l.libelle || '', categorie: l.categorie || 'PETITMAT',
-        ttc: l.ttc != null ? l.ttc : '', taux: FIN.nb(l.taux) };
+        ttc: l.ttc != null ? l.ttc : '', taux: FIN.nb(l.taux),
+        litres: l.litres != null ? l.litres : '' };
     })
     : [];
   if (!depLignes.length) depLignes = [{ libelle: '', categorie: 'PETITMAT', ttc: '', taux: 20 }];
+  depDejaAuCarnet = depenseLieeAuCarnet(d);
   var chOuv = A.chantiers.slice().sort(function (x, y) { return (y.maj || 0) - (x.maj || 0); });
 
   modale(id ? 'Modifier la dépense' : 'Nouvelle dépense',
@@ -12776,12 +13015,38 @@ function ouvrirDepense(id) {
         return '<option value="' + c2.id + '"' + (d.chantier === c2.id ? ' selected' : '') + '>' + esc(c2.nom || 'Chantier') + '</option>';
       }).join('') + '</select></div>' : '') +
     '</div>' +
+    /* Une facture de garage a deux vies : une dépense, et une ligne du carnet
+       qui fait repartir les échéances. La saisir deux fois est le meilleur
+       moyen de n'en saisir qu'une. Elle se verse donc d'une case — et le lien
+       posé empêche que le même argent soit compté deux fois au kilomètre.
+       Toutes les dépenses du véhicule ne sont pas des interventions : une
+       carte grise n'a rien à faire dans un carnet d'entretien. D'où la case
+       plutôt qu'un automatisme. */
+    '<div id="dp-carnet" hidden>' +
+    '<label class="ligne-check" style="display:flex;align-items:center;gap:8px;' +
+    'font-size:13.5px;margin:0 0 9px"><input type="checkbox" id="dp-hist"> ' +
+    'Noter aussi dans le carnet d’entretien</label>' +
+    '<div id="dp-histkm" hidden><div class="champ" style="width:11em">' +
+    '<label class="eyebrow" for="dp-km">Kilométrage</label>' +
+    '<input type="text" id="dp-km" inputmode="numeric" value="' +
+    (kmVehicule() || '') + '"></div>' +
+    '<p class="muted" style="font-size:11.5px;margin:0 0 11px">L’intervention sera créée ' +
+    'pour son montant hors taxes. Cochez ensuite dans le carnet ce qu’elle couvre, ' +
+    'pour que les échéances repartent d’ici.</p></div></div>' +
     '<div class="btn-rang" style="margin-top:11px">' +
     '<button class="btn primaire" id="dp-ok">Enregistrer</button></div>');
 
   renderDepLignes();
+  majOffreCarnet();
+  if ($('#dp-hist')) {
+    $('#dp-hist').addEventListener('change', function () {
+      $('#dp-histkm').hidden = !$('#dp-hist').checked;
+    });
+  }
 
-  $('#dp-lignes').addEventListener('input', function () { lireDepLignes(); majApercuDep(); });
+  $('#dp-lignes').addEventListener('input', function () {
+    lireDepLignes(); majApercuDep(); majPrixLitres(); majOffreCarnet();
+  });
   $('#dp-lignes').addEventListener('change', function (e) {
     lireDepLignes();
     if (e.target.closest('[data-dlcat]')) renderDepLignes(); else majApercuDep();
@@ -12804,7 +13069,11 @@ function ouvrirDepense(id) {
          l'identifiant de l'intervention. On ne l'écrase pas. */
       vehicule: $('#dp-veh') && $('#dp-veh').checked ? (d.vehicule || true) : null,
       lignes: lignes.map(function (l) {
-        return { libelle: l.libelle.trim(), categorie: l.categorie, ttc: FIN.nb(l.ttc), taux: FIN.nb(l.taux) };
+        var o = { libelle: l.libelle.trim(), categorie: l.categorie, ttc: FIN.nb(l.ttc), taux: FIN.nb(l.taux) };
+        /* Les litres ne vivent que sur une ligne de carburant : les garder
+           après un changement de catégorie fausserait le prix moyen. */
+        if (FIN.estCarburant(l.categorie) && FIN.nb(l.litres) > 0) o.litres = FIN.nb(l.litres);
+        return o;
       })
     };
     /* on retire les anciens champs à plat pour éviter un double comptage */
@@ -12813,16 +13082,42 @@ function ouvrirDepense(id) {
       Object.keys(x).forEach(function (k) { d[k] = x[k]; });
       d.maj = Date.now();
     } else { x.id = uid(); x.maj = Date.now(); A.depenses.push(x); }
-    sauverDepenses().then(function () {
+    var cible = id ? d : x;
+    /* Le versement dans le carnet : le montant retenu est le hors taxes des
+       seules lignes « Frais véhicule », pas le total du ticket — le carnet
+       raisonne en HT, comme l'historique repris de ses factures, et le même
+       ticket peut porter du gasoil à côté de la réparation. */
+    var versaCarnet = false;
+    if ($('#dp-hist') && $('#dp-hist').checked && !depDejaAuCarnet) {
+      var htVeh = 0, quoi = '';
+      (x.lignes || []).forEach(function (l2) {
+        if (l2.categorie !== 'VEHIC') return;
+        htVeh += FIN.htLigne(l2);
+        if (!quoi && l2.libelle) quoi = l2.libelle;
+      });
+      var inter = { id: uid(), quoi: quoi || 'Passage au garage', date: x.date,
+        km: C.nb($('#dp-km').value) || null, montant: C.arr(htVeh, 2),
+        garantie: false, postes: [], depense: cible.id };
+      A.vehicule.interventions = A.vehicule.interventions || [];
+      A.vehicule.interventions.push(inter);
+      cible.vehicule = inter.id;
+      versaCarnet = true;
+    }
+    var fini = function () {
       fermerModale(); renderDepenses(); renderFinances(); renderAnalyses(); renderAccueil();
-      renderCoutsV();
+      renderCarnetV(); renderEcheancesV(); renderCoutsV(); renderEntreprise();
       /* Une réparation qui ne vient pas du carnet du véhicule mérite d'y
          être notée aussi : c'est le kilométrage qui nourrit les échéances. */
-      var entretien = !id && !x.vehicule && !d.vehicule &&
+      var entretien = !id && !cible.vehicule &&
         (x.lignes || []).some(function (l2) { return l2.categorie === 'ENTRETIEN'; });
-      toast(entretien
-        ? 'Dépense enregistrée. Pensez à noter l’intervention dans le carnet du véhicule.'
-        : (id ? 'Dépense modifiée.' : 'Dépense enregistrée.'));
+      toast(versaCarnet
+        ? 'Dépense enregistrée, et notée dans le carnet — cochez ce qu’elle couvre.'
+        : entretien
+          ? 'Dépense enregistrée. Pensez à noter l’intervention dans le carnet du véhicule.'
+          : (id ? 'Dépense modifiée.' : 'Dépense enregistrée.'));
+    };
+    sauverDepenses().then(function () {
+      if (versaCarnet) sauverVehicule().then(fini); else fini();
     });
   });
 }
@@ -16680,7 +16975,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.64.0-20260823-2314';
+var VERSION = '4.65.0-20260831-2110';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

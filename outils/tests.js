@@ -4386,7 +4386,10 @@ scenario('Véhicule : le carnet note, le compteur suit, l’échéance prévient
     /176\u00A0000|176 000/.test(t.texte('#veh-carnet')));
   const dep = (t.stock('depenses') || [])[0];
   verifierVrai('la dépense correspondante est créée', dep);
-  verifier('en réparation matériel', 'ENTRETIEN', dep.lignes[0].categorie);
+  /* « Réparation matériel », c'est la tronçonneuse. Le garage a désormais sa
+     propre catégorie, sans quoi une facture de véhicule et une lame de
+     débroussailleuse se comptaient au même endroit. */
+  verifier('en frais véhicule', 'VEHIC', dep.lignes[0].categorie);
   verifierVrai('et liée à l’intervention', dep.vehicule === v.interventions[0].id);
 
   t.clic('[data-vue="echeancesv"]'); await t.pause(350);
@@ -4571,55 +4574,219 @@ scenario('Fusionner : le carnet arrive, et rien d’autre ne bouge', async () =>
 });
 
 /* --------------------------------------------------------------------- */
-scenario('Véhicule : le coût au kilomètre, entretien et carburant', async () => {
-  /* « Si je sais qu'un chantier me coûte tant, je réfléchis. » Le coût au
-     kilomètre est le chiffre qui dit quand un utilitaire commence à coûter
-     plus qu'il ne sert. */
-  const le = (a, m, j) => new Date(a, m, j, 12).getTime();
-  const t = await ouvrir(Object.assign({}, VIDE, {
-    module: 'finances',
-    vehicule: {
-      infos: { nom: 'Utilitaire' }, releves: [], postes: [],
-      interventions: [
-        { id: 'i1', quoi: 'Révision', date: le(2025, 0, 10), km: 100000, montant: 400, garantie: false },
-        { id: 'i2', quoi: 'Amortisseurs', date: le(2026, 0, 10), km: 150000, montant: 1200, garantie: false },
-        /* Sous garantie : rien n'est sorti de sa poche. */
-        { id: 'i3', quoi: 'Moteur', date: le(2025, 5, 1), km: 120000, montant: 3000, garantie: true }
-      ]
-    },
-    depenses: [
-      /* Le carburant « pro » compte d'office : la catégorie est celle de
-         l'utilitaire, il n'a rien à re-marquer. */
-      { id: 'd1', date: le(2025, 6, 1), lignes: [{ libelle: 'Gasoil', categorie: 'CARB', ttc: 120, taux: 20 }] },
-      { id: 'd2', date: le(2025, 8, 1), lignes: [{ libelle: 'Gasoil', categorie: 'CARB', ttc: 120, taux: 20 }] },
-      /* La carte grise ne compte que parce qu'elle est cochée. */
-      { id: 'd3', date: le(2025, 1, 1), vehicule: true,
-        lignes: [{ libelle: 'Carte grise', categorie: 'COTIS', ttc: 500, taux: 0 }] },
-      /* Le carburant du véhicule personnel n'a rien à faire là. */
-      { id: 'd4', date: le(2025, 2, 1), lignes: [{ libelle: 'Essence perso', categorie: 'CARBPERSO', ttc: 60, taux: 20 }] }
+/* Le carnet, les dépenses et la fiche du véhicule d'un même essai. Les
+   nombres sont choisis pour tomber ronds : un taux au kilomètre qu'il faut
+   recalculer à la main pour relire le test ne se relit pas. */
+const LE_V = (a, m, j) => new Date(a, m, j, 12).getTime();
+const VEHIC_ESSAI = () => ({
+  module: 'finances',
+  /* 10 L/100 à 2 € le litre : le carburant vaut donc 20 c€ du kilomètre, et
+     ce chiffre ne doit rien devoir aux dépenses de carburant saisies. */
+  cfg: { litres100: 10, prixLitre: 2 },
+  vehicule: {
+    infos: { nom: 'Utilitaire', kmAchat: 100000, prixAchat: 20000,
+      kmRevente: 200000, kmParAn: 10000, fraisAn: 600 },
+    releves: [], postes: [],
+    interventions: [
+      { id: 'i1', quoi: 'Révision', date: LE_V(2025, 0, 10), km: 100000, montant: 400, garantie: false },
+      { id: 'i2', quoi: 'Amortisseurs', date: LE_V(2026, 0, 10), km: 150000, montant: 1200, garantie: false },
+      /* Sous garantie : rien n'est sorti de sa poche. */
+      { id: 'i3', quoi: 'Moteur', date: LE_V(2025, 5, 1), km: 120000, montant: 3000, garantie: true }
     ]
-  }));
+  },
+  depenses: [
+    /* Le carburant « pro » compte d'office : la catégorie est celle de
+       l'utilitaire, il n'a rien à re-marquer. */
+    { id: 'd1', date: LE_V(2025, 6, 1), lignes: [{ libelle: 'Gasoil', categorie: 'CARB', ttc: 120, taux: 20 }] },
+    { id: 'd2', date: LE_V(2025, 8, 1), lignes: [{ libelle: 'Gasoil', categorie: 'CARB', ttc: 120, taux: 20 }] },
+    /* Cinq cents euros de carte grise, en « Frais véhicule ». */
+    { id: 'd3', date: LE_V(2025, 1, 1),
+      lignes: [{ libelle: 'Carte grise', categorie: 'VEHIC', ttc: 500, taux: 0 }] },
+    /* Le carburant du véhicule personnel n'a rien à faire là. */
+    { id: 'd4', date: LE_V(2025, 2, 1), lignes: [{ libelle: 'Essence perso', categorie: 'CARBPERSO', ttc: 60, taux: 20 }] }
+  ]
+});
+const ouvrirCoutsV = async (graines) => {
+  const t = await ouvrir(Object.assign({}, VIDE, graines));
   t.clic('[data-module="entreprise"]'); await t.pause(300);
   t.clic('[data-module="vehicule"]'); await t.pause(400);
   t.clic('[data-vue="coutsv"]'); await t.pause(400);
-  const txt = t.texte('#veh-couts');
+  return t;
+};
+const texteCouts = t => t.texte('#veh-couts').replace(/ /g, ' ');
 
-  /* 50 000 km parcourus, de 100 000 à 150 000. */
-  /* De 100 000 à 150 000 : la dépense n'est rapportée qu'aux kilomètres
-     dont on connaît le coût, jamais au compteur entier — sinon le prix du
-     kilomètre serait sous-évalué sur un véhicule repris en cours de vie. */
-  verifierVrai('les kilomètres parcourus sont ceux qu’on connaît',
-    /Sur 50 000 km parcourus/.test(txt.replace(/\u00A0/g, ' ')));
+/* --------------------------------------------------------------------- */
+scenario('Véhicule : chaque coût a son propre dénominateur', async () => {
+  /* La première version divisait tout par la même chose et se trompait d'un
+     facteur vingt-quatre : treize mois de carburant rapportés à sept ans de
+     kilomètres, soit 0,65 c€ le kilomètre là où la réalité en vaut seize.
+     Un plein de sept cents kilomètres coûte environ cent euros ; c'est ce
+     repère-là qui a débusqué le défaut. */
+  const t = await ouvrirCoutsV(VEHIC_ESSAI());
+  const txt = texteCouts(t);
+
+  /* Les dépenses de carburant saisies valent 200 € HT et l'étendue du carnet
+     50 000 km : l'ancien calcul aurait affiché 0,4 c€ au lieu de 20. C'est cet
+     écart-là que la vérification garde. */
+  verifierVrai('le carburant est modélisé, pas divisé', /Carburant20,0 c€/.test(txt));
+  verifierVrai('et il dit sur quoi il repose', /10,0 L\/100 km à 2,000 € le litre/.test(txt));
+
+  /* 1 600 € hors garantie sur les 50 000 km que le carnet couvre. */
   verifierVrai('l’entretien exclut ce qui était sous garantie',
-    /Entretien et réparations1 600 €/.test(txt.replace(/\u00A0/g, ' ')));
-  verifierVrai('le carburant pro compte sans rien cocher',
-    /Carburant200 €/.test(txt.replace(/\u00A0/g, ' ')));
-  /* Une carte grise ne porte pas de TVA : les 500 € comptent en entier. */
-  verifierVrai('la carte grise cochée compte aussi',
-    /Autres frais500 €/.test(txt.replace(/\u00A0/g, ' ')));
-  verifierVrai('le carburant personnel n’y entre pas', !/60,00/.test(txt));
+    /Entretien et réparations3,2 c€/.test(txt));
+  verifierVrai('et il annonce l’étendue du carnet',
+    /1 600 € sur 50 000 km de carnet/.test(txt));
+
+  /* 20 000 € sur les 100 000 km qui restent à rouler avec — jamais sur ceux
+     déjà faits : une carte grise payée hier ne vaut pas un euro du kilomètre
+     parce qu'on n'a fait que cinq cents mètres depuis. */
+  verifierVrai('l’achat se répartit sur ce qui reste à rouler',
+    /Achat du véhicule20,0 c€/.test(txt));
+  verifierVrai('la carte grise aussi', /Carte grise et frais uniques0,5 c€/.test(txt));
+  verifierVrai('les frais annuels se rapportent aux kilomètres d’une année',
+    /Assurance et frais annuels6,0 c€/.test(txt));
+
+  /* 20 + 3,2 + 20 + 0,5 + 6 = 49,7 : le total est une somme de taux, pas une
+     division unique. */
+  verifierVrai('le total additionne les cinq taux', /Total49,7 c€/.test(txt));
+  verifierVrai('et se lit aussi aux cent kilomètres', /49,70 €pour 100 km/.test(txt));
+
+  verifierVrai('le carburant personnel n’y entre pas', !/Essence perso/.test(txt));
   verifierVrai('et l’intervention la plus chère est nommée',
     /Ce qui a coûté le plus/.test(txt) && /Amortisseurs/.test(txt));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Véhicule : le prix du litre est une moyenne pondérée', async () => {
+  /* « Il faudrait faire une moyenne pondérée par rapport à la quantité,
+     évidemment, pas juste une moyenne simple. » Un plein de soixante litres
+     pèse trois fois un plein de vingt. */
+  const g = VEHIC_ESSAI();
+  g.depenses = [
+    /* 60 L à 1,50 € = 90 €, puis 20 L à 2,50 € = 50 €.
+       Moyenne simple des deux prix : 2,000 €. Moyenne pondérée : 140 / 80 =
+       1,750 €. Les deux nombres diffèrent, donc le test distingue bien les
+       deux calculs — avec deux pleins de même volume il ne prouverait rien. */
+    { id: 'd1', date: LE_V(2025, 6, 1),
+      lignes: [{ libelle: 'Gasoil', categorie: 'CARB', ttc: 90, taux: 20, litres: 60 }] },
+    { id: 'd2', date: LE_V(2025, 8, 1),
+      lignes: [{ libelle: 'Gasoil', categorie: 'CARB', ttc: 50, taux: 20, litres: 20 }] },
+    /* Ce plein-là n'a pas ses litres : il est écarté de la moyenne. Le compter
+       pour zéro litre laisserait la division intacte tout en gonflant le prix
+       moyen — c'est le piège que l'utilisateur avait vu venir. */
+    { id: 'd3', date: LE_V(2025, 9, 1),
+      lignes: [{ libelle: 'Gasoil', categorie: 'CARB', ttc: 400, taux: 20 }] }
+  ];
+  const t = await ouvrirCoutsV(g);
+  const txt = texteCouts(t);
+
+  verifierVrai('la moyenne est pondérée par les litres', /1,750 € le litre/.test(txt));
+  verifierVrai('et non la moyenne simple des prix', !/2,000 € le litre/.test(txt));
+  verifierVrai('le plein sans litres est écarté, pas compté pour zéro',
+    /moyenne pondérée sur 2 pleins de 3/.test(txt));
+  verifierVrai('et l’écart est annoncé', /1 plein sans litres saisis, écarté/.test(txt));
+  /* 10 L/100 à 1,750 € : le carburant retombe à 17,5 c€. */
+  verifierVrai('le carburant suit ce prix-là', /Carburant17,5 c€/.test(txt));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Véhicule : sans litres saisis, le réglage prend le relais', async () => {
+  const t = await ouvrirCoutsV(VEHIC_ESSAI());
+  const txt = texteCouts(t);
+  verifierVrai('le prix vient du réglage', /prix du réglage, faute de litres saisis/.test(txt));
+  verifierVrai('et le calcul se fait quand même', /Carburant20,0 c€/.test(txt));
+  verifierVrai('l’écran invite à saisir les litres',
+    /Aucun plein ne porte ses litres/.test(txt));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Véhicule : une facture notée au carnet n’est pas comptée deux fois', async () => {
+  /* La nouvelle catégorie « Frais véhicule » ouvre la porte au double
+     comptage : la même facture de garage peut vivre en dépense et en
+     intervention. Le lien entre les deux tranche — le carnet compte, la
+     dépense se tait. */
+  const g = VEHIC_ESSAI();
+  g.depenses.push(
+    /* Liée à l'intervention i2 : ses 1 200 € sont déjà dans l'entretien. */
+    { id: 'd5', date: LE_V(2026, 0, 10), vehicule: 'i2',
+      lignes: [{ libelle: 'Amortisseurs', categorie: 'VEHIC', ttc: 1440, taux: 20 }] }
+  );
+  const t = await ouvrirCoutsV(g);
+  const txt = texteCouts(t);
+  /* Sans la garde, les 1 200 € de la dépense s'ajouteraient aux 500 € de carte
+     grise : 1 700 / 100 000 = 1,7 c€ au lieu de 0,5. */
+  verifierVrai('les frais uniques ne retiennent que la carte grise',
+    /Carte grise et frais uniques0,5 c€/.test(txt));
+  verifierVrai('et le disent en une seule dépense', /500 € en 1 dépense/.test(txt));
+  verifierVrai('l’entretien, lui, ne bouge pas',
+    /Entretien et réparations3,2 c€/.test(txt));
+  verifierVrai('le total reste celui des cinq taux', /Total49,7 c€/.test(txt));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Véhicule : la dépense se verse dans le carnet', async () => {
+  /* « Il faudrait que je puisse cocher : est-ce que ça s'ajoute à
+     l'historique ? » Toutes les dépenses du véhicule ne sont pas des
+     interventions — une carte grise n'a rien à faire dans un carnet
+     d'entretien — d'où la case plutôt qu'un automatisme. */
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'finances' }));
+  t.clic('[data-vue="depenses"]'); await t.pause(300);
+  t.clic('#dep-nouvelle'); await t.pause(400);
+
+  verifierVrai('l’offre du carnet est cachée tant que rien ne s’y rapporte',
+    t.$('#dp-carnet').hidden);
+  t.saisir('[data-dl="0"]', 'Plaquettes avant');
+  t.saisir('[data-dlttc="0"]', '360');
+  t.choisir('[data-dlcat="0"]', 'VEHIC'); await t.pause(250);
+  verifierVrai('elle apparaît sur une ligne « Frais véhicule »', !t.$('#dp-carnet').hidden);
+  verifierVrai('le kilométrage reste caché tant qu’on ne coche pas', t.$('#dp-histkm').hidden);
+
+  cocher(t, '#dp-hist', true); await t.pause(150);
+  verifierVrai('cocher ouvre le kilométrage', !t.$('#dp-histkm').hidden);
+  t.saisir('#dp-km', '176299');
+  t.clic('#dp-ok'); await t.pause(600);
+
+  const v = t.stock('vehicule');
+  const inter = (v.interventions || [])[0];
+  verifierVrai('l’intervention est créée', !!inter);
+  verifier('avec le libellé de la ligne', 'Plaquettes avant', inter.quoi);
+  verifier('et son kilométrage', 176299, inter.km);
+  /* 360 TTC à 20 % font 300 HT : le carnet raisonne en hors taxes, comme
+     l'historique repris de ses factures. Y verser le TTC gonflerait
+     l'entretien d'un cinquième. */
+  verifier('le carnet retient le hors taxes', 300, inter.montant);
+
+  const d = (t.stock('depenses') || []).filter(x => x.vehicule === inter.id)[0];
+  verifierVrai('la dépense porte le lien vers l’intervention', !!d);
+  verifierVrai('et le message dit que le carnet a été complété',
+    /notée dans le carnet/.test(t.$('#toast').textContent));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Véhicule : l’intervention crée sa dépense en TTC', async () => {
+  /* Le sens inverse. Le carnet parle hors taxes, la dépense parle TTC :
+     recopier l'un dans l'autre sous-déclarait la TVA d'un cinquième. */
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'entreprise' }));
+  t.clic('[data-module="vehicule"]'); await t.pause(400);
+  t.clic('#vh-plus'); await t.pause(400);
+  t.saisir('#vi-quoi', 'Révision');
+  t.saisir('#vi-km', '180000');
+  t.saisir('#vi-mont', '300');
+  cocher(t, '#vi-dep', true);
+  t.clic('#vi-ok'); await t.pause(600);
+
+  const d = (t.stock('depenses') || [])[0];
+  verifierVrai('la dépense est créée', !!d);
+  verifier('en « Frais véhicule »', 'VEHIC', d.lignes[0].categorie);
+  verifier('et la TVA est rajoutée par-dessus le hors taxes', 360, d.lignes[0].ttc);
+  const v = t.stock('vehicule');
+  verifier('le carnet garde son montant hors taxes', 300,
+    (v.interventions || []).filter(x => x.quoi === 'Révision')[0].montant);
   verifier('aucune erreur', [], t.erreurs);
 });
 

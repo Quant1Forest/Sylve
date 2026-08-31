@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.59.0-20260823-2013**
+Version courante : **4.65.0-20260831-2110**
 
 ---
 
@@ -888,6 +888,74 @@ node outils/importer-carnet.js "<comptabilité.xlsx>" ["<stock.xlsx>"] [sortie.j
   doit tomber au centime sur celui du tableau de bord, et l'écart sur le
   chiffre d'affaires doit valoir exactement les débours — le tableur les
   exclut, `chiffreAffaires` aussi.
+
+## Le coût au kilomètre : chaque poste a son dénominateur
+
+La 4.64 divisait tout par la même chose et **se trompait d’un facteur
+vingt-quatre**. Treize mois de dépenses de carburant (964 €, 17 pleins)
+rapportés à sept ans de kilomètres (148 691 km, l’étendue du carnet)
+donnaient 0,65 centime du kilomètre, là où la réalité en vaut seize. Son
+repère à lui l’a débusqué en une phrase : *« sept cents bornes, c’est presque
+un plein, donc presque cent balles »*. L’entretien, lui, était juste — ses
+interventions et son kilométrage sont sur la même horloge.
+
+**La leçon générale : un numérateur et un dénominateur qui ne couvrent pas la
+même période ne se divisent pas.** Le total n’est donc plus une division mais
+une **somme de taux**, chacun bâti sur ce qui lui correspond :
+
+| Poste | Rapporté à |
+|---|---|
+| Carburant | rien — il se modélise, consommation × prix du litre |
+| Entretien | l’étendue que le carnet couvre réellement |
+| Achat, carte grise | ce qu’il **reste** à rouler avec (`kmRevente − kmAchat`) |
+| Assurance, frais annuels | les kilomètres d’une année |
+
+**Ce qui se paie une fois ne se répartit pas sur ce qui a déjà été roulé.**
+C’est lui qui a posé le problème : *« si j’ai fait que cinq cents kilomètres,
+ton calcul il est faux, ça veut dire un euro du kilomètre »*. D’où les quatre
+repères de `A.vehicule.infos` — `kmAchat`, `prixAchat`, `kmRevente`,
+`kmParAn`, `fraisAn` — et le refus d’afficher un poste tant qu’il lui manque
+de quoi se calculer : une ligne dit ce qui lui manque plutôt qu’un zéro qui
+passerait pour un chiffre.
+
+**Le véhicule a été acheté d’occasion à 176 299 km**, gardé jusqu’à 250 000
+visés — c’est le précédent propriétaire qui l’avait pris neuf. L’historique
+d’entretien d’avant son achat **compte quand même** : il ne l’a pas payé, mais
+c’est la seule base fiable pour savoir ce que ce véhicule coûte. Avec quatre
+mille kilomètres à lui, ses propres factures ne diraient rien. Ces
+interventions vivent donc dans le carnet et **jamais dans les dépenses**.
+
+**`prixLitreMoyen()` est une moyenne pondérée par les quantités** — un plein
+de soixante litres pèse trois fois un plein de vingt. Il l’a demandé ainsi, et
+il a vu le piège tout seul : *« maintenant tu ne pourras pas, parce que si ça
+compte zéro »*. La réponse : **un plein sans litres est écarté**, ni au
+numérateur ni au dénominateur, et l’écran dit sur quelle assiette il
+travaille (« moyenne sur 6 pleins de 17 »). Aucun litre saisi, on retombe sur
+le réglage. Le champ n’apparaît que sur les deux catégories carburant, et la
+moyenne du fourgon ne lit que `CARB` : le perso est un autre véhicule, peut-
+être un autre carburant.
+
+## Frais véhicule, et le double comptage qu’il ouvre
+
+`VEHIC` — garage, carte grise, pièces — est né d’une remarque de sa part : la
+carte grise finissait en frais administratif, et une facture de garage se
+confondait avec une lame de débroussailleuse en « Réparation matériel ».
+
+**Mais la même facture peut vivre deux fois** : en dépense et en intervention
+du carnet. `depenseLieeAuCarnet()` tranche — une dépense qui porte
+l’identifiant d’une intervention (`d.vehicule` valant autre chose que `true`)
+est déjà comptée par le carnet et ne compte pas une seconde fois. Un scénario
+l’éprouve en cassant la garde : sans elle, 1 700 € au lieu de 500.
+
+**Le va-et-vient marche dans les deux sens et se dit à l’écran.** L’intervention
+peut créer sa dépense ; une dépense en « Frais véhicule » peut se verser dans
+le carnet, par une case — **pas automatiquement** : une carte grise n’a rien à
+faire dans un carnet d’entretien. Le message de fin nomme ce qui a été créé.
+
+**Le carnet raisonne en hors taxes**, comme l’historique repris de ses
+factures ; la dépense en TTC. La conversion se fait au passage, dans les deux
+sens. L’ancien code recopiait le HT en TTC et **sous-déclarait la TVA d’un
+cinquième**.
 
 ## Le devis, quand il y en a un
 
