@@ -892,9 +892,9 @@ node outils/importer-carnet.js "<comptabilité.xlsx>" ["<stock.xlsx>"] [sortie.j
 ## Le coût au kilomètre : chaque poste a son dénominateur
 
 La 4.64 divisait tout par la même chose et **se trompait d’un facteur
-vingt-quatre**. Treize mois de dépenses de carburant (964 €, 17 pleins)
-rapportés à sept ans de kilomètres (148 691 km, l’étendue du carnet)
-donnaient 0,65 centime du kilomètre, là où la réalité en vaut seize. Son
+vingt-quatre**. Un peu plus d’un an de dépenses de carburant rapporté à toute la vie du
+véhicule donnait moins d’un centime du kilomètre, là où la réalité en vaut
+une quinzaine. Son
 repère à lui l’a débusqué en une phrase : *« sept cents bornes, c’est presque
 un plein, donc presque cent balles »*. L’entretien, lui, était juste — ses
 interventions et son kilométrage sont sur la même horloge.
@@ -918,11 +918,11 @@ repères de `A.vehicule.infos` — `kmAchat`, `prixAchat`, `kmRevente`,
 de quoi se calculer : une ligne dit ce qui lui manque plutôt qu’un zéro qui
 passerait pour un chiffre.
 
-**Le véhicule a été acheté d’occasion à 176 299 km**, gardé jusqu’à 250 000
-visés — c’est le précédent propriétaire qui l’avait pris neuf. L’historique
+**Le véhicule a été acheté d’occasion**, tard dans sa vie, avec une borne de
+revente visée — c’est le précédent propriétaire qui l’avait pris neuf. L’historique
 d’entretien d’avant son achat **compte quand même** : il ne l’a pas payé, mais
-c’est la seule base fiable pour savoir ce que ce véhicule coûte. Avec quatre
-mille kilomètres à lui, ses propres factures ne diraient rien. Ces
+c’est la seule base fiable pour savoir ce que ce véhicule coûte. Avec le peu
+de kilomètres qu’il a faits depuis, ses propres factures ne diraient rien. Ces
 interventions vivent donc dans le carnet et **jamais dans les dépenses**.
 
 **`prixLitreMoyen()` est une moyenne pondérée par les quantités** — un plein
@@ -930,7 +930,7 @@ de soixante litres pèse trois fois un plein de vingt. Il l’a demandé ainsi, 
 il a vu le piège tout seul : *« maintenant tu ne pourras pas, parce que si ça
 compte zéro »*. La réponse : **un plein sans litres est écarté**, ni au
 numérateur ni au dénominateur, et l’écran dit sur quelle assiette il
-travaille (« moyenne sur 6 pleins de 17 »). Aucun litre saisi, on retombe sur
+travaille (« moyenne sur tant de pleins sur tant »). Aucun litre saisi, on retombe sur
 le réglage. Le champ n’apparaît que sur les deux catégories carburant, et la
 moyenne du fourgon ne lit que `CARB` : le perso est un autre véhicule, peut-
 être un autre carburant.
