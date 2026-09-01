@@ -5279,6 +5279,119 @@ scenario('Dépense : la case « concerne le véhicule » la rattache', async () 
 });
 
 /* --------------------------------------------------------------------- */
+scenario('Journées : une journée passée sans temps noté se réclame au lancement', async () => {
+  /* « Il faudrait me forcer la main quand la journée est finie, pour que je
+     remplisse. Sinon je me dis : ok, je le ferai plus tard, et après je ne le
+     fais pas et j'oublie. » Sans ce rattrapage, les rendements se vident en
+     silence et le chantier finit par s'annoncer « en retard ». */
+  const JOUR = 86400000;
+  const j = n => { const d = new Date(Date.now() + n * JOUR); d.setHours(12, 0, 0, 0); return d.getTime(); };
+  const jourFR = ts => new Date(ts).toLocaleDateString('fr-FR');
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'entreprise', cfg: { heuresJour: 8 },
+    chantiers: [{ id: 'c1', nom: 'Dégagement Martin', statut: 'encours', maj: Date.now(),
+      lignes: [],
+      /* Le temps d'avant-hier est noté : cette journée-là ne doit pas revenir. */
+      temps: [{ date: j(-2), duree: 7, unite: 'h', personnes: 1 }],
+      jours: [
+        { d: j(-3), p: 1 },   /* passée, rien de noté : à réclamer */
+        { d: j(-2), p: 1 },   /* passée, mais notée */
+        { d: j(0), p: 1 },    /* aujourd'hui : la journée n'est pas finie */
+        { d: j(2), p: 1 }     /* à venir */
+      ] }]
+  }));
+
+  verifierVrai('le rappel est sur l’accueil', t.$('[data-journeenudge]'));
+  const dit = t.texte('#a-journees');
+  /* Une seule journée manque : ni celle qui est notée, ni celle du jour même
+     — elle n'est pas finie — ni celle à venir. */
+  verifierVrai('une seule journée est réclamée', /Journée du /.test(dit));
+  verifierVrai('et c’est la bonne', dit.indexOf(jourFR(j(-3))) >= 0);
+  verifierVrai('elle nomme le chantier', /Dégagement Martin/.test(dit));
+  verifierVrai('ni celle du jour même', dit.indexOf(jourFR(j(0))) < 0);
+  verifierVrai('ni celle qui est déjà notée', dit.indexOf(jourFR(j(-2))) < 0);
+
+  /* Le rappel ouvre la saisie, sa date déjà posée : c'est le geste demandé,
+     pas un renvoi vers un écran où il faudrait retrouver le jour. */
+  t.clic('[data-journeenudge]'); await t.pause(600);
+  verifierVrai('il ouvre la saisie du temps', t.$('#ct-duree'));
+  verifier('à la date de la journée manquante', jourISO(j(-3)), t.$('#ct-date').value);
+  t.saisir('#ct-duree', '6');
+  t.clic('#ct-ok'); await t.pause(600);
+  verifier('la journée est notée', 2, (t.stock('chantiers') || [])[0].temps.length);
+  verifier('plus rien à réclamer', 0,
+    t.w.BCC.journeesANoter(t.stock('chantiers'), Date.now()).length);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Journées : le rappel se chasse jusqu’au prochain lancement', async () => {
+  /* Comme les deux autres rappels de l'accueil : un rappel qu'on ne peut pas
+     fermer finit par ne plus être lu. Mais le chasser n'efface rien. */
+  const JOUR = 86400000;
+  const hier = new Date(Date.now() - JOUR); hier.setHours(12, 0, 0, 0);
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'entreprise',
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'encours', lignes: [], temps: [],
+      jours: [{ d: hier.getTime(), p: 1 }], maj: Date.now() }]
+  }));
+  verifierVrai('le rappel est là', t.$('[data-journeenudge]'));
+  t.clic('#a-journees-fermer'); await t.pause(300);
+  verifierVrai('un doigt le chasse', !t.$('[data-journeenudge]'));
+  verifier('mais la journée reste à noter', 1,
+    t.w.BCC.journeesANoter(t.stock('chantiers'), Date.now()).length);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Devis : on peut en attacher un à un chantier déjà facturé', async () => {
+  /* « J'ai plein de travaux enregistrés avec des factures, j'ai des devis, et
+     j'aimerais bien les attacher — ne serait-ce que pour attester qu'il y a
+     eu un devis. » Fusionner les deux blocs avait fermé cette porte : sur un
+     chantier facturé, le crayon ouvre la facture, et plus rien ne menait au
+     devis. */
+  const JOUR = 86400000;
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [{ id: 'c1', nom: 'Travaux Maciota', statut: 'paye', aDevis: false,
+      temps: [], maj: Date.now(), numeroFacture: 'F-2026-0012',
+      dateFacture: Date.now() - 5 * JOUR, datePaiement: Date.now(),
+      jours: [{ d: Date.now() - 10 * JOUR, p: 1 }],
+      lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 3, prix: 700, nature: 'prestation' }] }]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.choisir('#c-filtre', 'tous'); await t.pause(250);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+
+  verifierVrai('le bloc dit qu’aucun devis n’est attaché',
+    /Aucun devis attaché/.test(t.texte('#vue-chantier')));
+  const bouton = t.$('#f-devis');
+  verifierVrai('et propose d’en attacher un', bouton);
+  verifier('le bouton le dit', 'Attacher un devis', bouton.textContent);
+
+  t.clic('#f-devis'); await t.pause(400);
+  cocher(t, '#dv-a', true); await t.pause(250);
+  t.saisir('#ce-numdevis-an', '2026');
+  t.saisir('#ce-numdevis-rg', '7');
+  t.choisir('#ce-signe', jourISO(Date.now() - 20 * JOUR)); await t.pause(150);
+  t.clic('#dv-ok'); await t.pause(500);
+
+  const c = (t.stock('chantiers') || [])[0];
+  verifier('le devis est attaché', true, c.aDevis);
+  verifier('avec son numéro', 'D-2026-0007', c.numeroDevis);
+  /* Attacher un devis ne fait jamais reculer un chantier payé. */
+  verifier('et le statut ne recule pas', 'paye', c.statut);
+
+  const f = t.texte('#vue-chantier');
+  verifierVrai('la fiche l’affiche en pied de bloc', /DevisD-2026-0007/.test(f));
+  /* Signé il y a vingt jours, dernière journée posée il y a dix : dix jours.
+     « Savoir, à partir du moment où le devis est signé, sous combien de temps
+     je réalise les travaux. » */
+  verifierVrai('et dit en combien de temps il a été réalisé', /Réalisé en10 jours/.test(f));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
 /* Un troisième argument ne joue que les scénarios dont le nom le contient.
    Sert à éprouver un contrôle en le cassant exprès : rejouer les quarante
    autres pour vérifier qu'un seul crie coûte deux minutes pour rien.

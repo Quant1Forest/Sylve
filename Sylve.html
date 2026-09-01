@@ -1327,6 +1327,7 @@ if (froid && s > 0) montrer(s);
             style="width:auto;flex:none;padding:11px 13px">⚙</button>
         </div>
         <div id="a-sauvegarde"></div>
+        <div id="a-journees"></div>
         <div id="a-echeances"></div>
         <div id="a-devis"></div>
         <p class="eyebrow" style="margin:22px 0 8px">Entreprise</p>
@@ -3724,6 +3725,26 @@ function dureePrevue(ch) {
    le chantier n'est pas clos. Les journées placées font foi si elles existent. */
 /* En retard : l'échéance est passée, ou la dernière journée placée l'est
    sans que le chantier soit clos. */
+/* Une journée posée sur une date passée, sans qu'aucun temps n'y soit noté :
+   on y était, on ne sait pas combien de temps ça a pris. « Sinon je me dis
+   ok, je le ferai plus tard, et après je ne le fais pas et j'oublie. » Sans
+   ce rattrapage, les rendements se vident en silence et le chantier finit
+   par s'annoncer « en retard » sans qu'on sache pourquoi. */
+function journeesANoter(chantiers, maintenant) {
+  var m = minuit(maintenant), out = [];
+  (chantiers || []).forEach(function (ch) {
+    if (['sansuite', 'devis', 'envoye'].indexOf(ch.statut) >= 0) return;
+    var notes = {};
+    (ch.temps || []).forEach(function (t) { if (t.date) notes[jourCle(t.date)] = 1; });
+    journeesPlacees(ch).forEach(function (j) {
+      /* Le jour même n'est pas fini : on ne réclame rien avant demain. */
+      if (j.d >= m) return;
+      if (notes[jourCle(j.d)]) return;
+      out.push({ chantier: ch, d: j.d, p: nb(j.p) });
+    });
+  });
+  return out.sort(function (a, b) { return a.d - b.d; });
+}
 function enRetard(ch, maintenant) {
   if (!ch) return false;
   if (['termine', 'facture', 'paye', 'sansuite'].indexOf(ch.statut) >= 0) return false;
@@ -4441,7 +4462,7 @@ var M = {
   heuresPostes: heuresPostes, heuresJournee: heuresJournee, joursJournee: joursJournee,
   prixJourVise: prixJourVise, bilanJournees: bilanJournees, HEURES_JOUR: HEURES_JOUR,
   prixJour: prixJour, rendement: rendement,
-  dureePrevue: dureePrevue, enRetard: enRetard, tri: tri, filtre: filtre, chercher: chercher,
+  dureePrevue: dureePrevue, enRetard: enRetard, journeesANoter: journeesANoter, tri: tri, filtre: filtre, chercher: chercher,
   totaux: totaux,
   dernierEvenement: dernierEvenement, rangComptable: rangComptable,
   rangFacture: rangFacture,
@@ -7072,6 +7093,32 @@ function renderNudgeEcheances() {
     'le premier ' + al[0].texte.split(' ·')[0] + ' : ' + (al[0].charge.libelle || 'charge'));
 }
 
+/* « Il faudrait me forcer la main quand la journée est finie, pour que je
+   remplisse. Sinon je me dis : ok, je le ferai plus tard, et après je ne le
+   fais pas et j'oublie. » Une journée posée puis passée sans temps noté ne
+   se réclame nulle part : elle vide les rendements en silence et finit par
+   faire dire « en retard » au chantier sans qu'on sache pourquoi.
+   Comme les deux autres rappels, il se chasse d'un doigt jusqu'au prochain
+   lancement : un rappel qu'on ne peut pas fermer finit par ne plus être lu. */
+var journeesChassees = false;
+function renderNudgeJournees() {
+  var z = $('#a-journees'); if (!z) return;
+  var l = journeesChassees ? [] : C.journeesANoter(A.chantiers, Date.now());
+  if (!l.length) { z.innerHTML = ''; return; }
+  var p = l[0];
+  var titre = l.length === 1
+    ? 'Journée du ' + dateCourte(p.d) + ' à noter'
+    : l.length + ' journées passées sans être notées';
+  var sous = l.length === 1
+    ? (p.chantier.nom || 'chantier') + ' — combien de temps y avez-vous passé ?'
+    : 'la plus ancienne : ' + dateCourte(p.d) + ', ' + (p.chantier.nom || 'chantier');
+  z.innerHTML = '<div class="alerte" data-journeenudge="1" style="margin-top:12px">' +
+    '<i class="ic" style="background:#2E7D46"></i>' +
+    '<span><b>' + esc(titre) + '</b><small>' + esc(sous) + '</small></span>' +
+    '<button class="fermer" id="a-journees-fermer" title="Masquer jusqu’au prochain lancement" ' +
+    'aria-label="Masquer">×</button></div>';
+}
+
 /* Un devis en attente ne se rappelle pas tout seul : il dort dans le carnet
    pendant que sa validité court. Il vit donc au même endroit que les
    prélèvements — l'accueil, le seul écran qu'on voit à coup sûr. Le module
@@ -7335,6 +7382,11 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.68', quoi: [
+    { t: 'Une journee passee sans temps note vous est reclamee au lancement' },
+    { t: 'Un devis s attache a un chantier deja facture', vue: 'chantier' },
+    { t: 'Et la fiche dit en combien de temps il a ete realise', vue: 'chantier' }
+  ] },
   { v: '4.67', quoi: [
     { t: 'Les journees et le temps passe ne font plus qu un bloc', vue: 'chantier' },
     { t: 'Ce qui est fait a gauche ; une journee passee sort du reste a faire', vue: 'chantier' },
@@ -7361,10 +7413,6 @@ var NOTES_MAJ = [
     { t: 'Ce que votre vehicule coute, au kilometre', vue: 'coutsv' },
     { t: 'Le carburant pro y entre seul ; le reste se coche sur la depense', vue: 'coutsv' },
     { t: 'Et ce qui a coute le plus cher, en tete de liste', vue: 'coutsv' }
-  ] },
-  { v: '4.63', quoi: [
-    { t: 'Vos donneurs d ordre ne se cassent plus en deux lignes', vue: 'finances' },
-    { t: 'Le controle technique est suivi comme les autres postes', vue: 'echeancesv' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -8269,6 +8317,20 @@ function brancher() {
     }
     if (e.target.closest('[data-echeance]')) allerModule('finances', 'charges');
   });
+  $('#a-journees').addEventListener('click', function (e) {
+    if (e.target.closest('#a-journees-fermer')) {
+      journeesChassees = true;
+      renderNudgeJournees();
+      return;
+    }
+    if (!e.target.closest('[data-journeenudge]')) return;
+    /* On ouvre la plus ancienne, sa date déjà posée : c'est le geste qu'il
+       demandait, pas un renvoi vers un écran où il faudrait la retrouver. */
+    var l = C.journeesANoter(A.chantiers, Date.now());
+    if (!l.length) return;
+    ouvrirChantier(l[0].chantier.id);
+    ouvrirTemps(l[0].chantier.id, l[0].d);
+  });
   $('#a-devis').addEventListener('click', function (e) {
     if (e.target.closest('#a-devis-fermer')) {
       devisChasses = true;
@@ -8972,7 +9034,7 @@ function renderAccueil() {
   $('#a-bois-s').textContent = A.piles.length
     ? A.piles.length + (A.piles.length > 1 ? ' piles' : ' pile')
     : 'Aucune pile enregistrée';
-  renderNudgeSauvegarde(); renderNudgeEcheances(); renderNudgeDevis(); renderMaJournee();
+  renderNudgeSauvegarde(); renderNudgeEcheances(); renderNudgeDevis(); renderNudgeJournees(); renderMaJournee();
   renderEntreprise();
 }
 
@@ -10384,6 +10446,19 @@ function ligneTravaux(c, l, i) {
     '<button class="btn-min" data-lmod="' + i + '">Modifier</button> ' +
     '<button class="btn-min" data-lsup="' + i + '">✕</button></div></div>';
 }
+/* « Ce qui peut être intéressant, c'est de savoir à partir du moment où le
+   devis est signé, sous combien de temps je réalise les travaux. » Il compte
+   en jours de calendrier, pas en millisecondes : une signature du 2 à 23 h et
+   un chantier fini le 3 au matin font un jour, pas zéro. */
+function delaiRealisation(c) {
+  if (!c.dateSignature) return '';
+  var fin = C.dateChantier(c);
+  if (!fin || fin < c.dateSignature) return '';
+  var n = Math.round((C.minuit(fin) - C.minuit(c.dateSignature)) / C.JOUR);
+  return '<div class="l"><span>Réalisé en</span><b class="num">' +
+    (n <= 0 ? 'moins d’un jour' : n + ' jour' + (n > 1 ? 's' : '')) +
+    '</b></div>';
+}
 function blocTravaux(c) {
   var e = etapeTravaux(c);
   var titre = e === 'facture' ? 'La facture' : e === 'devis' ? 'Le devis' : 'Ce qu’il y a à faire';
@@ -10443,9 +10518,19 @@ function blocTravaux(c) {
         : '<p style="font-size:12.5px;margin:7px 0 0;color:var(--vert-marque)">' +
           '<b>Facturé à l’identique.</b> Rien n’a bougé depuis le devis signé.</p>') +
       '</div>';
-  } else if (e === 'facture' && C.aDevis(c) && c.numeroDevis) {
+  } else if (e === 'facture' && C.aDevis(c)) {
     pied = '<div class="pied-devis"><div class="l"><span>Devis</span>' +
-      '<b class="num">' + esc(c.numeroDevis) + '</b></div></div>';
+      '<b class="num">' + esc(c.numeroDevis || '—') + '</b></div>' +
+      (c.dateSignature ? '<div class="l"><span>Signé le</span><b class="num">' +
+        dateCourte(c.dateSignature) + '</b></div>' : '') +
+      delaiRealisation(c) + '</div>';
+  } else if (e === 'facture') {
+    /* Un chantier facturé sans devis attaché : le crayon du bloc ouvre la
+       facture, et plus rien ne menait au devis. « J'ai plein de travaux
+       enregistrés avec des factures, j'ai des devis, et j'aimerais bien les
+       attacher. » Régression de la fusion des deux blocs. */
+    pied = '<div class="pied-devis"><p class="muted" style="font-size:12.5px;margin:0">' +
+      'Aucun devis attaché à ce chantier.</p></div>';
   } else if (e === 'todo') {
     pied = '<div class="pied-devis"><p class="muted" style="font-size:12.5px;margin:0">' +
       'Pas de devis sur ce chantier. Ces lignes deviendront la facture telles ' +
@@ -10457,6 +10542,13 @@ function blocTravaux(c) {
   if (e !== 'facture') {
     pied += '<div class="btn-rang" style="margin-top:11px">' +
       '<button class="btn btn-min" id="f-facture">Saisir la facture</button></div>';
+  } else {
+    /* Et dans l'autre sens : une fois facturé, c'est le devis qui devient
+       inatteignable si on ne lui laisse pas sa porte. Un devis s'attache
+       toujours après coup — ne serait-ce que pour attester qu'il a existé. */
+    pied += '<div class="btn-rang" style="margin-top:11px">' +
+      '<button class="btn btn-min" id="f-devis">' +
+      (C.aDevis(c) ? 'Modifier le devis' : 'Attacher un devis') + '</button></div>';
   }
 
   return '<div class="carte">' +
@@ -11674,7 +11766,7 @@ function ouvrirLigne(id, idx) {
 function dateParDefautTemps(c) {
   return C.nb(c.dateFin) || C.nb(c.dateFacture) || C.nb(c.debut) || Date.now();
 }
-function ouvrirTemps(id) {
+function ouvrirTemps(id, quand) {
   var c = chantier(id); if (!c) return;
   modale('Temps passé — ' + (c.nom || 'chantier'),
     '<div class="grille g2">' +
@@ -11685,7 +11777,7 @@ function ouvrirTemps(id) {
        Elle était aussi pré-remplie par toISOString(), qui répond en heure de
        Greenwich : avant deux heures du matin, elle proposait la veille. */
     '<div class="champ"><label class="eyebrow" for="ct-date">Date (facultative)</label>' +
-    '<input type="date" id="ct-date"></div>' +
+    '<input type="date" id="ct-date" value="' + (quand ? versChamp(quand) : '') + '"></div>' +
     '<div class="champ"><label class="eyebrow" for="ct-act">Activité</label>' +
     '<select id="ct-act"><option value="">— toutes —</option>' +
     (c.lignes || []).map(function (l) { return '<option value="' + l.travail + '">' + C.nomTravail(l.travail) + '</option>'; }).join('') +
@@ -17347,7 +17439,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.67.0-20260901-1050';
+var VERSION = '4.68.0-20260901-1610';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
