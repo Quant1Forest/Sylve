@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.66.0-20260831-2340**
+Version courante : **4.67.0-20260901-1050**
 
 ---
 
@@ -1362,6 +1362,104 @@ franchie, l'autre le rang comptable.
 masquée hors d'une partie — le bouton d'accueil y faisait déjà le trajet. Il
 l'a voulue partout : « comme ça j'ai les deux possibilités. » Hors partie, elle
 vise l'accueil.
+
+## Le temps tient dans un seul bloc, et se compte en heures
+
+*« Est-ce qu’il n’y a pas moyen de regrouper ces deux blocs ? Parce que si
+déjà je sais quelle journée… »* Oui — **depuis que tout se compte en heures,
+le prévu et le fait ont la même forme**. « Les journées » et « Le temps
+passé » n’en font plus qu’un : une date, ce qui a été **fait**, ce qui était
+**prévu**.
+
+**Les deux listes restent distinctes en base.** `jours` sont des dates posées
+sur l’agenda, `temps` est ce qu’on y a passé, et l’avertissement plus haut
+tient toujours : ne jamais brancher l’une sur l’autre. `lignesTemps()` ne les
+rapproche **qu’à l’écran**, ligne à ligne, par la date.
+
+- **Le fait est à gauche.** *« J’aurais plutôt mis les journées faites à
+  gauche, ce qui sont prévus au milieu. »* C’est la colonne qu’on vient lire.
+- **Une journée passée sort du « reste à faire ».** Il l’a relevé sur la
+  maquette : *« les journées faites ne sont plus comptabilisées comme des
+  journées prévues »*. Compter les deux, c’est compter deux fois la même
+  journée. Le total se lit donc **fait · reste à faire · estimé au devis**, et
+  les deux premiers s’additionnent pour donner le troisième quand tout tombe
+  juste.
+- **Une saisie sans date a sa propre ligne**, marquée « rattrapage » : elle
+  compte, mais elle ne tombe sur aucune case du calendrier.
+
+## Une durée s’écrit « 2 j 4 h », jamais « 2,4 j »
+
+*« Vu qu’une journée c’est sur huit heures et pas sur dix, on ne peut pas
+juste mettre trois virgule deux si j’ai fait trois jours et deux heures. »*
+
+`ditDuree(heures, cfg)` rend la journée entière et le reste en heures.
+`heuresSaisie(t, cfg)` donne les heures d’une saisie quelle que soit l’unité
+dans laquelle elle a été notée — les anciennes parlent parfois en journées.
+Tout le bloc, le bilan du devis compris, passe par là.
+
+**Le sélecteur « journées / heures » a disparu** de la saisie du temps :
+*« soit tu mets tout en heures, soit tu ne mets pas tout en heures »*. Des
+crans de 1 h à la journée entière écrivent dans le champ, sans le remplacer.
+`partsPossibles()` ne propose plus non plus les ¼ ½ ¾ — ils disaient la même
+chose autrement, à côté des heures.
+
+**Mais ce qu’il a déjà posé est à lui.** *« Si c’est une demi-journée, tu peux
+laisser des demi-journées, ce n’est pas très grave. »* Une valeur qui ne tombe
+pas sur une heure ronde — une demi-journée de sept heures — est gardée telle
+quelle par le repli sur `courante`. Un scénario le garantit : **les crans
+changent, ses données ne bougent pas.**
+
+## Le jour déjà pris propose, il ne constate plus
+
+*« Il faudrait que ça me dise : attention, tel jour, autre chose est déjà
+prévu. Voulez-vous le remplacer ou annuler ? »* L’avertissement existait
+depuis longtemps — il constatait, sans rien proposer, et il fallait retrouver
+le jour libre soi-même.
+
+Le même calcul qui sert à `+ une journée` déplace maintenant la date
+(`data-cesuivant`) : ni week-end, ni jour déjà posé ici, ni retenu ailleurs.
+Il l’a demandé parce que passer par le Calendrier était un cul-de-sac —
+*« dans le calendrier, je ne pouvais pas revenir en arrière directement dans
+le chantier »*.
+
+## Une échéance qui tombe aujourd’hui est arrivée
+
+`synchroniserDepensesCharges()` bornait à `minuit(aujourd’hui)`, alors qu’une
+échéance est horodatée **à midi** : un prélèvement du jour même restait « à
+venir » toute la journée et n’entrait dans les dépenses que le lendemain. La
+borne est la **fin** du jour.
+
+**Même famille que les quatre comptes de jours en millisecondes** : on
+comparait une heure à une frontière de jour. Et **le défaut s’est révélé par
+le calendrier** — la suite était verte le 31 août, rouge le 1er septembre.
+
+Le scénario, lui, comptait les échéances passées avec « le numéro du mois »
+et n’était juste que du 5 au 31. Il sème désormais une charge **calée sur le
+quantième du jour**, quel que soit ce jour : une garde écrite « si on est le
+1er » ne mordrait qu’une fois par mois.
+
+## Pourquoi le contrôle est long, et ce qui a été essayé
+
+Sept minutes, alors que ce fichier en promet deux. La cause a enfin été
+mesurée :
+
+- **500 `t.pause()` cumulent 161 secondes de sommeil** par passage, pour des
+  écritures qui rendent la main en quelques millisecondes ;
+- **175 ouvertures de JSDOM**, environ une seconde chacune.
+
+**Une attente conditionnelle a été essayée, et retirée.** L’application
+comptait ses écritures en vol, le banc sondait ce compteur au lieu de dormir :
+sept minutes tombaient à trois. Mais des scénarios devenaient rouges — le
+défilement des réglages, différé de 60 ms, et deux autres — et **une suite qui
+garde ses calculs d’argent ne se paie pas d’un peu de vitesse**. Le vrai
+gisement est ailleurs : ce sont les 175 ouvertures qu’il faudrait regrouper,
+pas les attentes qu’il faudrait raccourcir.
+
+**Et un piège de filtre à connaître.** `node outils/tests.js index.html "e"`
+ne joue pas un scénario : « e » est dans tous les noms, donc la suite entière
+tourne. Éprouver cinq sabotages ainsi, c’est cinq passages complets — dix
+minutes d’attente pour rien. **Toujours filtrer sur un bout de nom
+distinctif.**
 
 ## Le temps se note à un seul endroit
 

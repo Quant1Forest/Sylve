@@ -354,20 +354,158 @@ scenario('Fiche : changer de chantier sans repasser par le carnet', async () => 
 });
 
 /* --------------------------------------------------------------------- */
-scenario('Fiche : prévu et réel ne se confondent plus', async () => {
+scenario('Fiche : un seul bloc pour le temps, prévu et fait côte à côte', async () => {
+  /* « Est-ce qu'il n'y a pas moyen de regrouper ces deux blocs ? Parce que si
+     déjà je sais quelle journée… » Depuis que tout se compte en heures, le
+     prévu et le fait ont la même forme : une date, deux colonnes. */
+  const JOUR = 86400000;
+  const hier = new Date(Date.now() - JOUR); hier.setHours(12, 0, 0, 0);
+  const demain = new Date(Date.now() + JOUR); demain.setHours(12, 0, 0, 0);
   const t = await ouvrir(Object.assign({}, VIDE, {
-    module: 'chantiers',
-    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'accepte', lignes: [], temps: [],
-      jours: [{ d: Date.now(), p: 1 }], maj: Date.now() }]
+    module: 'chantiers', cfg: { heuresJour: 8 },
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'accepte', maj: Date.now(),
+      lignes: [{ travail: 'DEGAG', unite: 'jour', quantite: 3, prix: 800, nature: 'prestation' }],
+      jours: [{ d: hier.getTime(), p: 1 }, { d: demain.getTime(), p: 1 }],
+      temps: [
+        { date: hier.getTime(), duree: 7, unite: 'h', personnes: 1 },
+        /* Un rattrapage sans date : il compte, mais il ne tombe sur aucune
+           case du calendrier. */
+        { date: null, duree: 4, unite: 'h', personnes: 1 }
+      ] }]
   }));
-  t.clic('[data-chouvrir="c1"]'); await t.pause(250);
-  const f = t.texte('#fiche-chantier');
-  verifierVrai('le bloc des travaux se nomme d\'après l\'étape',
-    /Ce que le devis contient|Les travaux prévus|Ce qui est facturé/.test(f));
-  verifierVrai('le bloc Journées dit que c\'est du prévu', /Ce que vous avez prévu/.test(f));
-  verifierVrai('le bloc Temps passé dit que c\'est du réel', /Ce que vous avez réellement fait/.test(f));
-  verifierVrai('le bouton ne redemande pas de placer ce qui l\'est',
-    t.texte('#f-planifier') === 'Modifier les journées');
+  t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+
+  /* Un seul bloc : « Le temps passé » n'existe plus à part. */
+  const titres = t.$$('#vue-chantier .etape-bloc, #vue-chantier .carte > h2')
+    .map(e => e.textContent);
+  verifierVrai('le bloc des journées est là', titres.indexOf('Les journées') >= 0);
+  verifierVrai('et « Temps passé » n’est plus un bloc à part',
+    titres.indexOf('Temps passé') < 0);
+
+  /* Le fait est à gauche : « j'aurais plutôt mis les journées faites à
+     gauche, ce qui sont prévus au milieu ». */
+  const tete = t.$$('#vue-chantier .jtete span').map(e => e.textContent);
+  verifier('les colonnes sont dans son ordre', ['Date', 'Fait', 'Prévu'], tete);
+
+  const rangs = t.$$('#vue-chantier .jrang')
+    .map(e => e.textContent.replace(/\s+/g, ' ').trim());
+  /* Huit heures posées se lisent « 1 j » : c'est une journée entière. */
+  verifierVrai('le jour passé montre ce qui est fait et ce qui était prévu',
+    rangs.some(r => /7 h/.test(r) && /1 j/.test(r)));
+  verifierVrai('le jour à venir n’a rien de fait',
+    rangs.some(r => /à venir/.test(r) && /—/.test(r)));
+  verifierVrai('le rattrapage sans date figure aussi',
+    rangs.some(r => /sans date/.test(r) && /4 h/.test(r)));
+
+  /* 7 h + 4 h = 11 h, soit 1 j 3 h avec des journées de huit heures. */
+  const f = t.texte('#vue-chantier');
+  verifierVrai('le total fait se lit en jours et en heures', /1 j 3 h/.test(f));
+  /* Et jamais en virgule : « on ne peut pas juste mettre trois virgule deux
+     si j'ai fait trois jours et deux heures ». */
+  verifierVrai('jamais en journées à virgule', !/1,4 j|1,38 j/.test(f));
+
+  /* Seul le jour à venir reste à faire. Compter aussi celui d'hier, c'est
+     compter deux fois la même journée : « les journées faites ne sont plus
+     comptabilisées comme des journées prévues ». */
+  verifierVrai('une journée passée sort du reste à faire', /1 jreste à faire/.test(f));
+  verifierVrai('l’estimation du devis est rappelée', /3 jestimé au devis/.test(f));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Temps : tout se note en heures, plus de quarts de journée', async () => {
+  /* « Soit tu mets tout en heures, soit tu ne mets pas tout en heures. Là
+     c'est compliqué : tu mets une heure, trois heures, et entre deux un quart
+     de journée, une demi-journée, et du coup je me perds. » */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers', cfg: { heuresJour: 8 },
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'accepte', maj: Date.now(),
+      lignes: [], temps: [], jours: [{ d: Date.now(), p: 1 }] }]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+
+  t.clic('#f-temps'); await t.pause(400);
+  verifier('le sélecteur journées/heures a disparu', null, t.$('#ct-unite'));
+  verifierVrai('le champ demande des heures',
+    /Combien d’heures/.test(t.texte('#modale-corps')));
+  const crans = t.$$('#ct-crans [data-cth]').map(b => b.dataset.cth);
+  verifier('un cran par heure, de 1 à la journée', 8, crans.length);
+  verifier('le premier vaut une heure', '1', crans[0]);
+  t.clic('[data-cth="3"]'); await t.pause(150);
+  verifier('le cran écrit dans le champ', '3', t.$('#ct-duree').value);
+  t.clic('#ct-ok'); await t.pause(450);
+  const c = (t.stock('chantiers') || [])[0];
+  verifier('le temps est noté en heures', 'h', c.temps[0].unite);
+  verifier('et vaut trois heures', 3, c.temps[0].duree);
+
+  /* Les dates posées ne proposent plus que des heures. */
+  t.clic('#f-jours'); await t.pause(400);
+  const parts = options(t, '[data-cepart="0"]');
+  verifierVrai('plus de demi ni de quart de journée',
+    !parts.some(x => /½|¼|¾/.test(x)));
+  verifierVrai('rien que des heures', parts.every(x => / h/.test(x)));
+  verifierVrai('et la journée entière est nommée', parts.some(x => /8 h · 1 j/.test(x)));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Temps : une demi-journée déjà posée n’est pas réécrite', async () => {
+  /* « Après, si c'est une demi-journée, tu peux laisser des demi-journées, ce
+     n'est pas très grave. » Ce qu'il a saisi est à lui : les crans changent,
+     ses données ne bougent pas. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers', cfg: { heuresJour: 7 },
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'accepte', maj: Date.now(),
+      lignes: [], temps: [], jours: [{ d: Date.now(), p: 0.5 }] }]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+  t.clic('#f-jours'); await t.pause(400);
+  /* 0,5 journée de sept heures ne tombe sur aucune heure ronde : le cran est
+     gardé tel quel plutôt que replié sur le voisin. */
+  verifier('la valeur posée est toujours celle qui est choisie', '0.5',
+    t.$('[data-cepart="0"]').value);
+  t.clic('#cj-ok'); await t.pause(450);
+  verifier('et elle survit à un enregistrement', 0.5,
+    (t.stock('chantiers') || [])[0].jours[0].p);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Agenda : un jour déjà pris propose le suivant au lieu de constater', async () => {
+  /* « Il faudrait que ça me dise : attention, tel jour, autre chose est déjà
+     prévu. Voulez-vous le remplacer ou annuler ? » L'avertissement existait
+     mais ne proposait rien : il fallait retrouver le jour libre soi-même. */
+  const JOUR = 86400000;
+  const pris = new Date(Date.now() + 3 * JOUR); pris.setHours(12, 0, 0, 0);
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    /* Les week-ends sont ouverts : sinon le jour libre suivant dépendrait du
+       jour de la semaine où le test tourne. */
+    module: 'chantiers', cfg: { heuresJour: 8, weekends: true },
+    chantiers: [
+      { id: 'c1', nom: 'Plantation Bernard', statut: 'accepte', lignes: [], temps: [],
+        jours: [{ d: pris.getTime(), p: 1 }], maj: Date.now() },
+      { id: 'c2', nom: 'Dégagement Martin', statut: 'accepte', lignes: [], temps: [],
+        jours: [], maj: Date.now() }
+    ]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.clic('[data-chouvrir="c2"]'); await t.pause(400);
+  t.clic('#f-jours'); await t.pause(400);
+  t.clic('#ce-plusjour'); await t.pause(250);
+  /* On le pose exprès sur le jour déjà retenu par l'autre chantier. */
+  t.choisir('[data-cej="0"]', jourISO(pris.getTime())); await t.pause(300);
+
+  const dit = t.texte('#ce-jours');
+  verifierVrai('le conflit est annoncé avant, pas après', /est déjà pris/.test(dit));
+  verifierVrai('et il nomme le chantier qui le tient', /Plantation Bernard/.test(dit));
+  verifierVrai('le jour libre suivant est proposé', t.$('[data-cesuivant="0"]'));
+  t.clic('[data-cesuivant="0"]'); await t.pause(300);
+  verifierVrai('et la date a bougé',
+    t.$('[data-cej="0"]').value !== jourISO(pris.getTime()));
+  verifierVrai('le conflit a disparu', !/est déjà pris/.test(t.texte('#ce-jours')));
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -560,9 +698,12 @@ scenario('Charges fixes : annoncées avant, jamais réclamées après', async ()
 });
 
 /* --------------------------------------------------------------------- */
-scenario('Journées : on pose des heures, pas seulement des demi-journées', async () => {
-  /* On part parfois trois heures sur un chantier avant d'aller ailleurs :
-     « 1 j » ou « ½ j » ne suffisait pas. */
+scenario('Journées : on pose des heures, et rien que des heures', async () => {
+  /* On part parfois trois heures sur un chantier avant d'aller ailleurs.
+     Les heures ont d'abord été ajoutées à côté des fractions de journée ;
+     elles ont fini par les remplacer, parce que les deux disaient la même
+     chose autrement : « soit tu mets tout en heures, soit tu ne mets pas
+     tout en heures ». */
   const t = await ouvrir(Object.assign({}, VIDE, {
     module: 'chantiers', cfg: { heuresJour: 8 },
     chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'accepte', lignes: [], temps: [],
@@ -576,9 +717,12 @@ scenario('Journées : on pose des heures, pas seulement des demi-journées', asy
   const sel = t.$('[data-cepart="0"]');
   verifierVrai('la part se choisit dans une liste', sel && sel.tagName === 'SELECT');
   const libelles = [...sel.options].map(o => o.textContent);
-  ['1 j', '¾ j', '½ j', '¼ j'].forEach(x =>
-    verifierVrai('« ' + x + ' » est proposé', libelles.indexOf(x) >= 0));
-  verifierVrai('les heures aussi', libelles.indexOf('3 h') >= 0);
+  ['¾ j', '½ j', '¼ j'].forEach(x =>
+    verifierVrai('« ' + x + ' » n’est plus proposé', libelles.indexOf(x) < 0));
+  verifierVrai('trois heures se posent', libelles.indexOf('3 h') >= 0);
+  /* La journée entière reste nommée : c'est le cran qu'on prend le plus. */
+  verifierVrai('et la journée entière est dite', libelles.indexOf('8 h · 1 j') >= 0);
+  verifier('un cran par heure, pas un de plus', 8, libelles.length);
   /* 3 h sur une journée de 8 h font 0,375 de journée. */
   const troisH = [...sel.options].filter(o => o.textContent === '3 h')[0];
   verifier('3 h valent la bonne part de journée', 0.375, Number(troisH.value));
@@ -1574,27 +1718,48 @@ scenario('Charges : la case décide une fois, les dépenses suivent toutes seule
      décide sur la charge, et les échéances déjà passées y entrent d'elles-
      mêmes depuis le premier paiement. C'est la TVA qu'on récupère. */
   const an = new Date().getFullYear();
-  const debut = new Date(an, 0, 5, 12).getTime();
+  const auj = new Date();
+  const debut = new Date(an, 0, 1, 12).getTime();
   const t = await ouvrir(Object.assign({}, VIDE, {
     module: 'finances',
     charges: [
       { id: 'g1', libelle: 'Logiciel', beneficiaire: 'l’éditeur', ttc: 12, periodicite: 'mensuel',
-        categorie: 'ABO', taux: 20, dansDepenses: true, debut: debut, jour: 5, moisReference: 0 },
+        categorie: 'ABO', taux: 20, dansDepenses: true, debut: debut, jour: 1, moisReference: 0 },
       { id: 'g2', libelle: 'Prêt matériel', beneficiaire: 'la banque', ttc: 385, periodicite: 'mensuel',
-        categorie: 'PRET', taux: 0, dansDepenses: false, debut: debut, jour: 5, moisReference: 0 }
+        categorie: 'PRET', taux: 0, dansDepenses: false, debut: debut, jour: 1, moisReference: 0 },
+      /* Prélevée le quantième du jour, et démarrée ce mois-ci : sa seule
+         échéance tombe aujourd'hui. Elle est horodatée à midi, et la borne
+         était le début du jour — le prélèvement du jour même restait donc
+         « à venir » toute la journée et n'entrait que le lendemain. */
+      { id: 'g3', libelle: 'Assurance du jour', beneficiaire: 'l’assureur', ttc: 60,
+        periodicite: 'mensuel', categorie: 'ABO', taux: 20, dansDepenses: true,
+        debut: new Date(auj.getFullYear(), auj.getMonth(), 1, 12).getTime(),
+        jour: auj.getDate(), moisReference: 0 }
     ]
   }));
-  const auto = () => (t.stock('depenses') || []).filter(d => d.auto);
+  const auto = () => (t.stock('depenses') || []).filter(d => d.auto && d.charge === 'g1');
+  const toutAuto = () => (t.stock('depenses') || []).filter(d => d.auto);
+  /* Le prélèvement tombe le 1er : toutes les échéances de l’année en cours
+     sont donc passées, quel que soit le jour où le test tourne. Avec le 5, ce
+     compte n’était juste que du 5 au 31 — vert hier, rouge ce matin, un 1er.
+     Un test qui dépend du quantième ne dit la vérité qu’une fois sur deux. */
   const mois = new Date().getMonth() + 1;
   verifier('une dépense par échéance passée du logiciel', mois, auto().length);
-  verifierVrai('toutes rattachées à la charge', auto().every(d => d.charge === 'g1'));
-  verifierVrai('le prêt n’en crée aucune', !auto().some(d => d.charge === 'g2'));
+  verifierVrai('toutes rattachées à leur charge',
+    toutAuto().every(d => d.charge === 'g1' || d.charge === 'g3'));
+  verifierVrai('le prêt n’en crée aucune', !toutAuto().some(d => d.charge === 'g2'));
   verifierVrai('la catégorie de la charge est reprise',
     auto().every(d => d.lignes[0].categorie === 'ABO'));
   verifierVrai('et son taux de TVA', auto().every(d => d.lignes[0].taux === 20));
   /* Rien au-delà d'aujourd'hui : on ne paie pas une échéance à venir. */
+  const finDuJour = new Date(new Date().setHours(23, 59, 59, 999)).getTime();
   verifierVrai('aucune échéance future n’est comptée',
-    auto().every(d => d.date <= Date.now()));
+    toutAuto().every(d => d.date <= finDuJour));
+  /* Et celle qui tombe aujourd'hui est arrivée : elle compte. */
+  const duJour = toutAuto().filter(d => d.charge === 'g3');
+  verifier('l’échéance du jour même est comptée, une fois', 1, duJour.length);
+  verifierVrai('et elle est datée d’aujourd’hui',
+    duJour.length === 1 && jourISO(duJour[0].date) === jourISO(Date.now()));
 
   /* Corriger le montant corrige les dépenses, sans en créer de nouvelles. */
   t.clic('[data-vue="charges"]'); await t.pause(250);
@@ -1611,6 +1776,8 @@ scenario('Charges : la case décide une fois, les dépenses suivent toutes seule
   dep.dispatchEvent(new t.w.Event('change', { bubbles: true }));
   t.clic('#cg-ok'); await t.pause(500);
   verifier('décocher les retire toutes', 0, auto().length);
+  verifierVrai('sans toucher à celles d’une autre charge',
+    toutAuto().some(d => d.charge === 'g3'));
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -1619,10 +1786,10 @@ scenario('Charges : une échéance pointée à la main n’est jamais comptée d
   /* Garde essentielle : l'ancien pointage manuel a laissé des dépenses en
      base. Les recréer automatiquement doublerait la TVA déduite. */
   const an = new Date().getFullYear();
-  const debut = new Date(an, 0, 5, 12).getTime();
+  const debut = new Date(an, 0, 1, 12).getTime();
   const t = await ouvrir(Object.assign({}, VIDE, {
     charges: [{ id: 'g1', libelle: 'Logiciel', ttc: 12, periodicite: 'mensuel',
-      categorie: 'ABO', taux: 20, dansDepenses: true, debut: debut, jour: 5, moisReference: 0 }],
+      categorie: 'ABO', taux: 20, dansDepenses: true, debut: debut, jour: 1, moisReference: 0 }],
     depenses: [{ id: 'd1', date: debut, charge: 'g1', fournisseur: 'l’éditeur',
       lignes: [{ libelle: 'Logiciel', categorie: 'ABO', ttc: 12, taux: 20 }] }]
   }));
@@ -2106,14 +2273,14 @@ scenario('Journées : une date passée compte comme faite, pas comme prévue', a
   t.clic('[data-vue="carnet"]'); await t.pause(250);
   t.clic('[data-chouvrir="c1"]'); await t.pause(350);
   const fiche = t.$('#vue-chantier').textContent;
-  /* Le bloc dit « posées » depuis que « faites » est réservé au temps
-     réellement noté : les deux blocs parlaient de journées sans que rien ne
-     dise lequel répond à quoi. Le moteur, lui, garde totalFait() — il compte
-     toujours les journées posées à une date passée. */
-  verifierVrai('la fiche annonce les journées posées', /posées/.test(fiche));
-  verifierVrai('et celles à venir', /à venir/.test(fiche));
-  verifierVrai('elle rappelle que le temps se saisit à part',
-    /temps réellement passé/.test(fiche));
+  /* Les deux blocs n'en font plus qu'un : le prévu et le fait se lisent
+     côte à côte, ligne par date. Le moteur, lui, garde totalFait() — il
+     compte toujours les journées posées à une date passée. */
+  verifierVrai('la fiche distingue le fait du prévu',
+    /Fait/.test(fiche) && /Prévu/.test(fiche));
+  verifierVrai('et signale ce qui reste à venir', /à venir/.test(fiche));
+  verifierVrai('elle dit où va le temps réellement passé',
+    /réellement passé/.test(fiche));
   verifier('aucune erreur', [], t.erreurs);
 });
 

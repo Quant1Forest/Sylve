@@ -96,6 +96,19 @@ button{cursor:pointer;background:none;border:none}
 .marque-l.chg{background:var(--tiede-fond);color:var(--tiede);border:1px solid var(--tiede-trait)}
 .marque-l.ret{background:var(--alerte-fond);color:var(--alerte);border:1px solid #D9BCAE}
 .ligne-retiree b{text-decoration:line-through;color:var(--gris)}
+/* Un jour du chantier : ce qu'on y a fait à gauche — la colonne qu'on vient
+   lire — et ce qui reste prévu à droite. */
+.jtete{display:grid;grid-template-columns:1fr auto auto;gap:12px;padding-bottom:5px;
+  border-bottom:1px solid var(--trait-fort)}
+.jtete span{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gris)}
+.jtete span:not(:first-child),.jrang .jv{min-width:4.4em;text-align:right}
+.jrang{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:baseline;
+  padding:8px 0;border-bottom:1px solid var(--trait)}
+.jrang .jd{font-size:13.5px}
+.jrang .jd small{display:block;font-size:11.5px;color:var(--gris)}
+.jrang .jv{font-family:var(--mono);font-size:14px;font-weight:600}
+.jrang .jv.vide{color:var(--gris-clair);font-weight:400}
+.jrang.avenir .jd{color:var(--gris)}
 .dit-avant{font-size:12px;color:var(--tiede);margin-top:3px}
 /* Sous-titre d'un bloc de la fiche : dit à quoi le bloc sert, pour qu'on
    ne confonde plus le prévu (Journées) et le réel (Temps passé). */
@@ -3804,6 +3817,24 @@ function totalAVenir(ch, maintenant) {
    Les autres unités — l'hectare, le plant — ne disent rien du temps : là,
    l'estimation reste la sienne. Jamais l'addition des deux, pour la même
    raison que tempsPasse() ne cumule pas le noté et le facturé. */
+/* Les heures d'une saisie de temps, quelle que soit l'unité dans laquelle
+   elle a été notée. Les anciennes saisies parlent parfois en journées. */
+function heuresSaisie(t, cfg) {
+  return arr((t && t.unite === 'h') ? nb(t.duree) : nb(t && t.duree) * HEURES_JOUR(cfg), 2);
+}
+/* « 2 j 4 h », jamais « 2,4 j ». Avec des journées de huit heures, la virgule
+   ne se relit pas : « quatre heures ici, trois là, cinq ici, sept là, au final
+   j'ai trois virgule quelque chose ». Un jour est une journée entière, le
+   reste se dit en heures. */
+function ditDuree(heures, cfg) {
+  var hj = HEURES_JOUR(cfg) || 8, tot = arr(heures, 2);
+  if (!tot) return '—';
+  var j = Math.floor(tot / hj), h = arr(tot - j * hj, 2);
+  var p = [];
+  if (j) p.push(j + ' j');
+  if (h) p.push(String(arr(h, 1)).replace('.', ',') + ' h');
+  return p.join(' ');
+}
 function joursDevis(ch) {
   var j = 0;
   ((ch && ch.lignes) || []).forEach(function (l) {
@@ -4416,6 +4447,7 @@ var M = {
   rangFacture: rangFacture,
   jourCle: jourCle, minuit: minuit, ajouteJours: ajouteJours, estWeekend: estWeekend,
   journeesPlacees: journeesPlacees, placerJour: placerJour, resteAPlacer: resteAPlacer, joursPrevus: joursPrevus, joursDevis: joursDevis,
+  heuresSaisie: heuresSaisie, ditDuree: ditDuree,
   travauxHorsJournees: travauxHorsJournees,
   totalPlace: totalPlace, partDuJour: partDuJour,
   journeesFaites: journeesFaites, journeesAVenir: journeesAVenir,
@@ -7303,6 +7335,14 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.67', quoi: [
+    { t: 'Les journees et le temps passe ne font plus qu un bloc', vue: 'chantier' },
+    { t: 'Ce qui est fait a gauche ; une journee passee sort du reste a faire', vue: 'chantier' },
+    { t: 'Tout se note en heures : plus de quarts ni de demi-journees', vue: 'chantier' },
+    { t: 'Une duree se lit « 2 j 4 h », plus jamais en virgule', vue: 'chantier' },
+    { t: 'Un jour deja pris propose le suivant au lieu de constater', vue: 'chantier' },
+    { t: 'Une echeance qui tombe aujourd hui entre le jour meme', vue: 'depenses' }
+  ] },
   { v: '4.66', quoi: [
     { t: 'Un seul bloc pour les travaux : devis, puis facture', vue: 'chantier' },
     { t: 'Ce qui a change depuis le devis est marque sur la ligne', vue: 'chantier' },
@@ -7325,10 +7365,6 @@ var NOTES_MAJ = [
   { v: '4.63', quoi: [
     { t: 'Vos donneurs d ordre ne se cassent plus en deux lignes', vue: 'finances' },
     { t: 'Le controle technique est suivi comme les autres postes', vue: 'echeancesv' }
-  ] },
-  { v: '4.62', quoi: [
-    { t: 'Restaurer un fichier annonce vraiment ce qu’il contient' },
-    { t: 'Fusionner ajoute sans toucher au reste — c’est vérifié', vue: 'carnetv' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -10474,6 +10510,116 @@ function blocTravaux(c) {
     pied + '</div>';
 }
 
+/* Un seul bloc pour le temps. « Est-ce qu'il n'y a pas moyen de regrouper ces
+   deux blocs ? Parce que si déjà je sais quelle journée… » Oui : depuis que
+   tout se compte en heures, le prévu et le fait ont la même forme.
+   Les deux listes restent distinctes en base — « jours » sont des dates
+   posées sur l'agenda, « temps » est ce qu'on y a passé — et le projet
+   avertit de ne jamais brancher l'une sur l'autre. Ce n'est qu'à l'écran
+   qu'elles se rejoignent, ligne à ligne, par la date.
+   Le fait est à gauche : c'est ce qu'il a demandé, et c'est la colonne qu'on
+   vient lire. */
+function lignesTemps(c) {
+  var par = {}, sansDate = { fait: 0, prevu: 0, actes: [], temps: [] };
+  var cle = function (ts) { return C.jourCle(ts); };
+  C.journeesPlacees(c).forEach(function (x) {
+    var k = cle(x.d);
+    par[k] = par[k] || { d: C.minuit(x.d), fait: 0, prevu: 0, actes: [], temps: [] };
+    par[k].prevu += C.nb(x.p) * C.HEURES_JOUR(A.cfg);
+  });
+  (c.temps || []).forEach(function (t) {
+    var h = C.heuresSaisie(t, A.cfg);
+    /* Une saisie sans date est un rattrapage : elle compte, mais elle ne
+       tombe sur aucune case du calendrier. */
+    var cible = t.date ? null : sansDate;
+    if (!cible) {
+      var k = cle(t.date);
+      par[k] = par[k] || { d: C.minuit(t.date), fait: 0, prevu: 0, actes: [], temps: [] };
+      cible = par[k];
+    }
+    cible.fait += h;
+    cible.temps.push(t);
+    if (t.activite && cible.actes.indexOf(t.activite) < 0) cible.actes.push(t.activite);
+  });
+  var out = Object.keys(par).map(function (k) { return par[k]; })
+    .sort(function (a, b) { return a.d - b.d; });
+  if (sansDate.fait) { sansDate.sans = true; out.push(sansDate); }
+  return out;
+}
+function blocJournees(c, bil, pj, vise, rends, mixteNonMarque) {
+  var hj = C.HEURES_JOUR(A.cfg) || 8;
+  var rangs = lignesTemps(c);
+  var auj = C.minuit(Date.now());
+  var faitH = 0, resteH = 0;
+  rangs.forEach(function (r) {
+    faitH += r.fait;
+    /* Une journée passée sort du « reste à faire » : elle n'est plus à faire,
+       elle est faite. Compter les deux, c'est compter deux fois la même
+       journée — c'est ce qu'il a relevé sur la maquette. */
+    if (!r.sans && r.d > auj && r.prevu) resteH += r.prevu;
+  });
+  var prevus = C.joursPrevus(c);
+  var jf = function (h) { return C.ditDuree(h, A.cfg); };
+
+  var lignes = rangs.map(function (r) {
+    var quand = r.sans ? 'sans date' : dateCourte(r.d);
+    var avenir = !r.sans && r.d > auj;
+    return '<div class="jrang' + (avenir ? ' avenir' : '') + '">' +
+      '<span class="jd">' + esc(quand) +
+      (r.sans ? ' <span class="muted" style="font-size:11.5px">(rattrapage)</span>'
+        : avenir ? ' <span class="muted" style="font-size:11.5px">à venir</span>' : '') +
+      (r.actes.length ? '<small>' + esc(r.actes.map(C.nomTravail).join(', ')) + '</small>' : '') +
+      '</span>' +
+      '<span class="jv num' + (r.fait ? '' : ' vide') + '">' + (r.fait ? jf(r.fait) : '—') + '</span>' +
+      '<span class="jv num' + (r.prevu ? '' : ' vide') + '">' + (r.prevu ? jf(r.prevu) : '—') + '</span>' +
+      '</div>';
+  }).join('');
+
+  return '<div class="carte">' + teteBloc('Les journées', 'f-jours', 'modifier') +
+    '<p class="sous-titre-bloc">Le <b>prévu</b> retient la date sur l’agenda. Le <b>fait</b> ' +
+    'est ce que vous y avez réellement passé — c’est lui qui donne vos rendements. ' +
+    'Une journée fait ' + hj + ' h, réglable.</p>' +
+    (lignes
+      ? '<div class="jtete"><span>Date</span><span>Fait</span><span>Prévu</span></div>' + lignes
+      : '<div class="vide"><p>Aucune date posée, aucun temps noté.</p></div>') +
+    '<div class="kpi">' +
+    '<div class="carte2"><b class="num">' + jf(faitH) + '</b><small>fait</small></div>' +
+    '<div class="carte2"><b class="num">' + (resteH ? jf(resteH) : '—') +
+    '</b><small>reste à faire</small></div>' +
+    (prevus ? '<div class="carte2"><b class="num">' + jf(prevus * hj) +
+      '</b><small>estimé au devis</small></div>' : '') +
+    '</div>' +
+    '<div class="btn-rang" style="margin-top:11px">' +
+    '<button class="btn btn-min" id="f-planifier">Poser des dates</button>' +
+    '<button class="btn primaire btn-min" id="f-temps">+ Du temps fait</button></div>' +
+
+    /* Ce que ce temps rapporte, et ce qu'il dit des rendements. */
+    (faitH ? '<div class="kpi">' +
+      (pj ? '<div class="carte2"><b class="num">' + eur(pj) + '</b><small>par jour-homme' +
+        (vise ? (pj >= vise ? ' ✓' : ' ✕') : '') + '</small></div>' : '') +
+      rends + '</div>' : '') +
+    (bil.prevues != null && bil.faites > 0
+      ? '<div class="carte2" style="margin-top:11px;border-color:' +
+        (bil.ecart > 0.25 ? '#B4231F' : bil.ecart < -0.25 ? '#2E7D46' : 'var(--trait)') + '">' +
+        '<div style="display:flex;justify-content:space-between;font-size:13.5px">' +
+        '<span>Le devis paie</span><b class="num">' + jf(bil.prevues * hj) + ' à ' + eur(vise) + ' la journée</b></div>' +
+        '<div style="display:flex;justify-content:space-between;font-size:13.5px;margin-top:3px">' +
+        '<span>J’y ai passé</span><b class="num">' + jf(bil.faites * hj) + '</b></div>' +
+        '<div style="display:flex;justify-content:space-between;font-size:13.5px;margin-top:3px">' +
+        '<span class="muted">soit</span><b class="num">' + eur(bil.obtenu) + ' la journée</b></div>' +
+        '<p class="muted" style="font-size:12px;margin:7px 0 0">' +
+        (Math.abs(bil.ecart) <= 0.25
+          ? 'Estimation juste.'
+          : bil.ecart > 0
+            ? jf(bil.ecart * hj) + ' de plus que prévu : ' + eur(vise - bil.obtenu) + ' perdus par jour.'
+            : jf(-bil.ecart * hj) + ' de moins que prévu : ' + eur(bil.obtenu - vise) + ' gagnés par jour.') +
+        '</p></div>'
+      : (vise && pj ? '<p class="muted" style="font-size:12px;margin:9px 0 0">Objectif ' + eur(vise) +
+        ' — ' + (pj >= vise ? 'atteint' : 'manque ' + eur(vise - pj)) + ' par jour.</p>' : '')) +
+    (mixteNonMarque ? '<p class="muted" style="font-size:12px;margin:9px 0 0">Plusieurs travaux sur ' +
+      'ce chantier : précisez l’activité dans chaque saisie de temps pour obtenir les rendements.</p>' : '') +
+    '</div>';
+}
 function renderFiche() {
   var z = $('#fiche-chantier'); if (!z) return;
   var c = chantier(A.chOuvert);
@@ -10552,89 +10698,7 @@ function renderFiche() {
     blocValeur(c, m, pj, vise) +
     blocTravaux(c) +
 
-    '<div class="carte">' + teteBloc('Les journées', 'f-jours', 'modifier') +
-    '<div class="carte-titre" style="margin:0 0 4px">' +
-    '<button class="btn primaire btn-min" id="f-planifier">' +
-    (C.journeesPlacees(c).length ? 'Modifier les journées' : 'Placer sur l’agenda') +
-    '</button></div>' +
-    /* Ce bloc et « Le temps passé » parlaient tous les deux de journées, sans
-       que rien ne dise lequel répond à quoi. Celui-ci dit quand, l'autre dit
-       combien. */
-    '<p class="sous-titre-bloc">Ce que vous avez <b>prévu</b> : les jours retenus sur l’agenda. ' +
-    'Ils y sont bloqués provisoirement tant que le chantier n’est pas signé. ' +
-    'Ces jours disent <b>quand</b> vous y étiez ; le temps réellement passé se note plus bas.</p>' +
-    (function () {
-      var pl = C.journeesPlacees(c), est = C.joursPrevus(c), tot = C.totalPlace(c);
-      if (!pl.length) {
-        return '<p class="muted" style="font-size:12.5px;margin:0">' +
-          (est ? E.fmt(est, est % 1 ? 1 : 0) + ' journée' + (est > 1 ? 's' : '') + ' estimée' +
-            (est > 1 ? 's' : '') + ', aucune placée.'
-            : 'Aucune journée estimée ni placée.') + '</p>';
-      }
-      var reste = C.resteAPlacer(c);
-      var fait = C.totalFait(c), venir = C.totalAVenir(c);
-      var jf = function (v) { return E.fmt(v, v % 1 ? 1 : 0); };
-      /* Trois nombres, et le premier est celui qui a eu lieu : un chantier
-         saisi après coup n'a que des journées faites, et parler d'estimation
-         sur lui n'aurait aucun sens. */
-      return '<div class="kpi" style="margin:0 0 9px">' +
-        '<div class="carte2"><b class="num">' + jf(fait) + '</b><small>posées</small></div>' +
-        '<div class="carte2"><b class="num">' + jf(venir) + '</b><small>à venir</small></div>' +
-        (reste != null && reste > 0
-          ? '<div class="carte2"><b class="num">' + jf(reste) + '</b><small>à placer</small></div>'
-          : (reste != null && reste < 0
-            ? '<div class="carte2"><b class="num">' + jf(-reste) + '</b><small>de trop</small></div>'
-            : '')) +
-        '</div>' +
-        '<p class="muted" style="font-size:12px;margin:0 0 7px">' +
-        jf(tot) + (est ? ' sur ' + jf(est) + ' estimée' + (est > 1 ? 's' : '') : '') +
-        ' placée' + (tot > 1 ? 's' : '') +
-        '. Une journée passée compte comme faite ; le temps réellement passé, ' +
-        'lui, se saisit à part.</p>' +
-        '<div class="chips">' + pl.map(function (j) {
-          var dd = new Date(j.d);
-          return '<span class="chip" style="cursor:default">' + dd.getDate() + ' ' +
-            MOIS_NOMS[dd.getMonth()].slice(0, 4) + (j.p !== 1 ? ' ½' : '') + '</span>';
-        }).join('') + '</div>';
-    })() +
-    '</div>' +
-
-    '<div class="carte"><div class="carte-titre"><h2>Temps passé</h2>' +
-    '<button class="btn primaire btn-min" id="f-temps">+ Temps</button></div>' +
-    '<p class="sous-titre-bloc">Ce que vous avez <b>réellement</b> fait — à ne pas confondre avec ' +
-    'les journées prévues ci-dessus. Se remplit tout seul quand vous saisissez « Ma journée » ; ' +
-    'le bouton n’est qu’un rattrapage. C’est ce réel qui donne vos rendements.</p>' +
-    (temps || '<div class="vide"><p>Aucun temps saisi. À remplir en fin de chantier.</p></div>') +
-    (j ? '<div class="kpi">' +
-      '<div class="carte2"><b class="num">' + E.fmt(j, 2) + '</b><small>jours-homme</small></div>' +
-      (C.tempsMoi(c, A.cfg) !== j ? '<div class="carte2"><b class="num">' + E.fmt(C.tempsMoi(c, A.cfg), 2) +
-        '</b><small>mes journées</small></div>' : '') +
-      (pj ? '<div class="carte2"><b class="num">' + eur(pj) + '</b><small>par jour-homme' +
-        (vise ? (pj >= vise ? ' ✓' : ' ✕') : '') + '</small></div>' : '') +
-      rends + '</div>' +
-      (bil.prevues != null && bil.faites > 0
-        ? '<div class="carte2" style="margin-top:11px;border-color:' +
-          (bil.ecart > 0.25 ? '#B4231F' : bil.ecart < -0.25 ? '#2E7D46' : 'var(--trait)') + '">' +
-          '<div style="display:flex;justify-content:space-between;font-size:13.5px">' +
-          '<span>Le devis paie</span><b class="num">' + E.fmt(bil.prevues, 2) + ' j à ' + eur(vise) + '</b></div>' +
-          '<div style="display:flex;justify-content:space-between;font-size:13.5px;margin-top:3px">' +
-          '<span>J’y ai passé</span><b class="num">' + E.fmt(bil.faites, 2) + ' j</b></div>' +
-          '<div style="display:flex;justify-content:space-between;font-size:13.5px;margin-top:3px">' +
-          '<span class="muted">soit</span><b class="num">' + eur(bil.obtenu) + ' la journée</b></div>' +
-          '<p class="muted" style="font-size:12px;margin:7px 0 0">' +
-          (Math.abs(bil.ecart) <= 0.25
-            ? 'Estimation juste.'
-            : bil.ecart > 0
-              ? E.fmt(bil.ecart, 2) + ' journée' + (bil.ecart > 1 ? 's' : '') + ' de plus que prévu : ' +
-                eur(vise - bil.obtenu) + ' perdus par jour.'
-              : E.fmt(-bil.ecart, 2) + ' journée' + (-bil.ecart > 1 ? 's' : '') + ' de moins que prévu : ' +
-                eur(bil.obtenu - vise) + ' gagnés par jour.') + '</p></div>'
-        : vise && pj ? '<p class="muted" style="font-size:12px;margin:9px 0 0">Objectif ' + eur(vise) +
-          ' — ' + (pj >= vise ? 'atteint' : 'manque ' + eur(vise - pj)) + ' par jour.</p>' : '') +
-      (mixteNonMarque ? '<p class="muted" style="font-size:12px;margin:9px 0 0">Plusieurs travaux sur ce chantier : ' +
-        'précisez l’activité dans chaque saisie de temps pour obtenir les rendements.</p>' : '') : '') +
-    '</div>' +
-
+    blocJournees(c, bil, pj, vise, rends, mixteNonMarque) +
 
     (function () {
       var conso = ST.consommationChantier(A.articles, c.id);
@@ -10769,12 +10833,17 @@ function prisCeJour(occ, ts) {
    ailleurs. Les heures sont converties en part de journée d'après le réglage
    « heures dans une journée », et une valeur déjà en base qui ne tombe sur
    aucun cran reste proposée telle quelle. */
+/* Rien que des heures, de une à la journée entière. Les crans ¼ ½ ¾ vivaient
+   à côté et disaient la même chose autrement : « soit tu mets tout en heures,
+   soit tu ne mets pas tout en heures ». Une valeur déjà posée qui ne tombe
+   pas sur une heure ronde est gardée telle quelle — ses demi-journées sont à
+   lui, on ne les réécrit pas. */
 function partsPossibles(courante) {
   var hj = C.HEURES_JOUR(A.cfg) || 8;
-  var crans = [{ p: 1, n: '1 j' }, { p: 0.75, n: '¾ j' }, { p: 0.5, n: '½ j' }, { p: 0.25, n: '¼ j' }];
-  for (var h = 1; h < hj; h++) {
+  var crans = [];
+  for (var h = 1; h <= hj; h++) {
     var p = C.arr(h / hj, 4);
-    if (!crans.some(function (x) { return x.p === p; })) crans.push({ p: p, n: h + ' h' });
+    crans.push({ p: p, n: h + ' h' + (h === hj ? ' · 1 j' : '') });
   }
   if (courante > 0 && !crans.some(function (x) { return x.p === courante; })) {
     crans.push({ p: courante, n: E.fmt(courante, 2) + ' j' });
@@ -10802,14 +10871,24 @@ function renderCeJours() {
       '<select data-cepart="' + i + '" style="flex:none;width:5.6em">' +
       partsPossibles(C.nb(j.p)) + '</select>' +
       '<button type="button" class="btn-min" data-cedel="' + i + '" style="flex:none">✕</button></div>' +
-      (doublon ? '<div class="jour-pris">déjà posé plus haut</div>'
-        : pris.length ? '<div class="jour-pris">déjà pris : ' + esc(pris.join(', ')) + '</div>' : '') +
+      (doublon
+        ? '<div class="jour-pris">Ce jour est déjà posé plus haut.' +
+          '<button type="button" class="btn-min" data-cedel="' + i + '" ' +
+          'style="margin-left:7px">Retirer celui-ci</button></div>'
+        : pris.length
+          ? '<div class="jour-pris"><b>Le ' + dateCourte(j.d) + ' est déjà pris</b> — ' +
+            esc(pris.join(', ')) + '.' +
+            '<button type="button" class="btn-min" data-cesuivant="' + i + '" ' +
+            'style="margin-left:7px">Prendre le jour libre suivant</button>' +
+            '<button type="button" class="btn-min" data-cedel="' + i + '" ' +
+            'style="margin-left:5px">Annuler</button></div>'
+          : '') +
       '</div>';
   }).join('') +
     '<button type="button" class="btn-min" id="ce-plusjour">+ une journée</button>' +
     (nbPris ? '<p class="jour-pris" style="margin:8px 0 0">' + nbPris + ' journée' +
       (nbPris > 1 ? 's' : '') + ' tombe' + (nbPris > 1 ? 'nt' : '') + ' sur un jour déjà retenu. ' +
-      'Rien ne l’interdit — une demi-journée de chaque côté, par exemple — mais vérifiez.</p>' : '');
+      'Rien ne l’interdit — quelques heures de chaque côté, par exemple — mais vérifiez.</p>' : '');
   var tj = $('#ce-total-jours');
   if (tj) {
     tj.textContent = total ? E.fmt(total, total % 1 ? 1 : 0) : '—';
@@ -10832,20 +10911,28 @@ function lireCeJours() {
 function brancherCeJours() {
   $('#ce-jours').addEventListener('click', function (e) {
     var plus = e.target.closest('#ce-plusjour'), del = e.target.closest('[data-cedel]');
-    if (plus) {
+    var suivant = e.target.closest('[data-cesuivant]');
+    if (plus || suivant) {
       lireCeJours();
       /* on propose le prochain jour réellement libre : ni week-end, ni déjà
          posé ici, ni retenu par un autre chantier. Il peut toujours le
-         changer à la main derrière. */
-      var base = C.minuit(ceJours.length ? ceJours[ceJours.length - 1].d + C.JOUR : Date.now());
+         changer à la main derrière.
+         Le même calcul déplace une date qui tombe sur un jour déjà pris : il
+         demandait qu'on le lui dise « avant, pas après », et le dire sans rien
+         proposer l'obligeait à chercher le jour libre lui-même. */
+      var rang = suivant ? Number(suivant.dataset.cesuivant) : -1;
+      var depuis = suivant ? ceJours[rang].d + C.JOUR
+        : (ceJours.length ? ceJours[ceJours.length - 1].d + C.JOUR : Date.now());
+      var base = C.minuit(depuis);
       var occLibre = C.occupation(A.chantiers, base, base + 90 * C.JOUR, A.cfg);
       var posesIci = {};
-      ceJours.forEach(function (j) { if (j.d) posesIci[j.d] = 1; });
+      ceJours.forEach(function (j, n) { if (j.d && n !== rang) posesIci[j.d] = 1; });
       var garde = 0;
       while (garde++ < 90 && (
         (C.estWeekend(base) && !(A.cfg && A.cfg.weekends)) ||
         posesIci[base] || prisCeJour(occLibre, base).length)) base += C.JOUR;
-      ceJours.push({ d: base, p: 1 });
+      if (suivant) ceJours[rang].d = base;
+      else ceJours.push({ d: base, p: 1 });
       renderCeJours();
     } else if (del) {
       lireCeJours();
@@ -11603,10 +11690,12 @@ function ouvrirTemps(id) {
     '<select id="ct-act"><option value="">— toutes —</option>' +
     (c.lignes || []).map(function (l) { return '<option value="' + l.travail + '">' + C.nomTravail(l.travail) + '</option>'; }).join('') +
     '</select></div>' +
-    '<div class="champ"><label class="eyebrow" for="ct-duree">Durée</label>' +
+    /* Le sélecteur « journées / heures » a disparu : on notait une heure ici,
+       un quart de journée là, et les deux ne se comparaient plus. Tout se
+       note en heures, et le nombre d'heures d'une journée se règle une fois
+       pour toutes dans les Réglages. */
+    '<div class="champ"><label class="eyebrow" for="ct-duree">Combien d’heures ?</label>' +
     '<input type="text" id="ct-duree" class="gros" inputmode="decimal" autocomplete="off"></div>' +
-    '<div class="champ"><label class="eyebrow" for="ct-unite">En</label>' +
-    '<select id="ct-unite"><option value="j">journées</option><option value="h">heures</option></select></div>' +
     '<div class="champ"><label class="eyebrow" for="ct-pers">Personnes sur place</label>' +
     '<input type="text" id="ct-pers" inputmode="numeric" value="1"></div>' +
     '<div class="champ"><label class="eyebrow" for="ct-km">Kilomètres</label>' +
@@ -11617,27 +11706,45 @@ function ouvrirTemps(id) {
     '<p class="muted" style="font-size:12px;margin:7px 0 0">Sans date, le temps est ' +
     'rattaché à la période du chantier — pas à aujourd’hui, qui fausserait le bilan ' +
     'de l’année en cours.</p>' +
+    '<div class="chips" id="ct-crans" style="margin:2px 0 11px">' +
+    (function () {
+      var hj = C.HEURES_JOUR(A.cfg) || 8, out = '';
+      for (var h = 1; h <= hj; h++) {
+        out += '<button type="button" class="chip" data-cth="' + h + '">' + h + ' h' +
+          (h === hj ? '<small>1 j</small>' : '') + '</button>';
+      }
+      return out;
+    })() + '</div>' +
     '<div class="carte2" id="ct-apercu" style="margin:11px 0"></div>' +
     '<div class="btn-rang"><button class="btn primaire" id="ct-ok">Enregistrer</button></div>');
   var apercu = function () {
-    var t = { duree: C.nb($('#ct-duree').value), unite: $('#ct-unite').value,
+    var t = { duree: C.nb($('#ct-duree').value), unite: 'h',
       personnes: C.nb($('#ct-pers').value), sansMoi: $('#ct-sansmoi').checked };
     var jh = C.joursSaisie(t, A.cfg), mj = C.mesJours(t, A.cfg);
     $('#ct-apercu').innerHTML = jh
-      ? '<b class="num" style="font-size:20px">' + E.fmt(jh, 2) + '</b> jours-homme' +
+      ? '<b class="num" style="font-size:20px">' +
+        C.ditDuree(jh * (C.HEURES_JOUR(A.cfg) || 8), A.cfg) + '</b> en jours-homme' +
         '<div class="muted" style="font-size:12px">dont ' + E.fmt(mj, 2) + ' à moi' +
         (jh > mj ? ' — les autres facturent les leurs' : '') + '</div>'
       : '<span class="muted">Indiquez une durée.</span>';
   };
   ['#ct-duree', '#ct-pers'].forEach(function (s) { $(s).addEventListener('input', apercu); });
-  ['#ct-unite', '#ct-sansmoi'].forEach(function (s) { $(s).addEventListener('change', apercu); });
+  $('#ct-sansmoi').addEventListener('change', apercu);
+  $('#ct-crans').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-cth]'); if (!b) return;
+    $('#ct-duree').value = b.dataset.cth;
+    $$('#ct-crans [data-cth]').forEach(function (x) {
+      x.setAttribute('aria-pressed', String(x === b));
+    });
+    apercu();
+  });
   apercu();
   $('#ct-ok').addEventListener('click', function () {
     var d = C.nb($('#ct-duree').value);
     if (d <= 0) { toast('Durée attendue.'); return; }
     c.temps = c.temps || [];
     c.temps.push({ date: versDate($('#ct-date').value) || dateParDefautTemps(c), duree: d,
-      unite: $('#ct-unite').value, personnes: C.nb($('#ct-pers').value) || 1,
+      unite: 'h', personnes: C.nb($('#ct-pers').value) || 1,
       sansMoi: $('#ct-sansmoi').checked || undefined,
       km: C.nb($('#ct-km').value) || undefined,
       activite: $('#ct-act').value || null });
@@ -15272,7 +15379,12 @@ function chargeDansDepenses(c) {
      même dépense serait comptée deux fois et la TVA doublerait ;
    — décocher la case ne retire que les dépenses automatiques. */
 function synchroniserDepensesCharges() {
-  var jusqua = C.minuit(Date.now());
+  /* La borne est la fin d'aujourd'hui, pas son début : une échéance est
+     horodatée à midi, si bien qu'un prélèvement qui tombe le jour même
+     restait « à venir » toute la journée et n'entrait dans les dépenses que
+     le lendemain. Même famille que les quatre comptes de jours en
+     millisecondes : on comparait une heure à une frontière de jour. */
+  var jusqua = C.minuit(Date.now()) + C.JOUR - 1;
   var cle = function (idCharge, ts) { return idCharge + '|' + ts; };
   var attendues = [];
   (A.charges || []).forEach(function (c) {
@@ -17235,7 +17347,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.66.0-20260831-2340';
+var VERSION = '4.67.0-20260901-1050';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
