@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.67.0-20260901-1050**
+Version courante : **4.68.0-20260901-1610**
 
 ---
 
@@ -1362,6 +1362,72 @@ franchie, l'autre le rang comptable.
 masquée hors d'une partie — le bouton d'accueil y faisait déjà le trajet. Il
 l'a voulue partout : « comme ça j'ai les deux possibilités. » Hors partie, elle
 vise l'accueil.
+
+## La journée qui passe sans être notée
+
+*« Imaginons que j’enregistre, je me dis aujourd’hui je vais travailler à tel
+endroit. Le jour passe, et je ne remplis pas ma journée. Qu’est-ce qui se
+passe ? »* Rien — et c’était le problème. La journée posée restait là, aucun
+temps n’était noté, les rendements se vidaient en silence, et le chantier
+finissait par s’annoncer **« en retard »** sans qu’il sache pourquoi.
+
+*« Il faudrait me forcer la main quand la journée est finie. Sinon je me dis :
+ok, je le ferai plus tard, et après je ne le fais pas et j’oublie. »*
+
+`journeesANoter()` liste les journées **posées, passées, et sans aucun temps
+noté ce jour-là**. Trois exclusions comptent, et chacune a son sabotage :
+
+- **le jour même n’est pas fini** : on ne réclame rien avant demain ;
+- **une journée déjà notée** ne revient pas ;
+- un chantier au stade du devis n’a rien à noter.
+
+Le rappel vit sur l’accueil (`#a-journees`), **au-dessus** des échéances et des
+devis : un jour non noté est perdu pour toujours, les deux autres attendent.
+Il **ouvre la saisie du temps avec sa date déjà posée** — c’est le geste qu’il
+demandait, pas un renvoi vers un écran où il faudrait retrouver le jour. Comme
+les deux autres, il se chasse d’un doigt jusqu’au prochain lancement, et le
+chasser n’efface rien.
+
+**`enRetard()` mérite d’être relu à ce sujet.** Il ne parle pas d’une échéance
+manquée : il dit que **toutes les journées posées sont derrière** et que le
+chantier n’est pas soldé. Le mot l’a induit en erreur deux fois. Le rappel
+ci-dessus règle la cause la plus fréquente ; le mot reste à revoir.
+
+## Attacher un devis après coup
+
+**Régression introduite par la fusion des blocs, et trouvée par lui.** Sur un
+chantier facturé, le crayon du bloc ouvre la facture — et plus rien ne menait
+au devis. *« J’ai plein de travaux enregistrés avec des factures, j’ai des
+devis, et j’aimerais bien les attacher, ne serait-ce que pour attester qu’il y
+a eu un devis. »*
+
+Le pied du bloc porte donc **« Attacher un devis »** / « Modifier le devis »
+à l’étape facture, comme il porte « Saisir la facture » aux étapes d’avant.
+**Leçon générale : chaque étape doit garder une porte vers les autres.** Un
+bloc qui change de nom avec l’avancement ferme, sans le vouloir, ce qu’il
+n’affiche plus.
+
+Attacher un devis après coup **ne fige rien** — `figerDevis()` ne se déclenche
+qu’au passage en facturé — et **ne fait jamais reculer le statut**.
+
+**`delaiRealisation()`** en découle : *« savoir, à partir du moment où le devis
+est signé, sous combien de temps je réalise les travaux »*. De
+`dateSignature` à `dateChantier()`, en **jours de calendrier** — `minuit()`
+des deux côtés, pas une soustraction de millisecondes.
+
+## Le Calendrier, resté sans revue
+
+Premier passage dessus, le 1er septembre. Rien de cassé, mais deux questions
+de sa part, **non tranchées** :
+
+- **« Pourquoi il y a un carnet dans le calendrier ? »** Le module déclare
+  trois vues — Agenda, Carte, Carnet — et `carnet` appartient d’abord aux
+  Chantiers (`moduleDeVue()` le rend à son premier propriétaire). C’est un
+  raccourci, pas un doublon de données ; il ne voit pas à quoi il sert. Le
+  retirer laisserait deux onglets, donc la garde de l’onglet solitaire ne
+  s’oppose pas. **Lui demander avant.**
+- **La Carte** est vide : elle affiche les chantiers géolocalisés, et il n’en
+  a jamais placé un seul. Même question.
 
 ## Le temps tient dans un seul bloc, et se compte en heures
 
