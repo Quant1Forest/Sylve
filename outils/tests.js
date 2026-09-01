@@ -362,7 +362,8 @@ scenario('Fiche : prévu et réel ne se confondent plus', async () => {
   }));
   t.clic('[data-chouvrir="c1"]'); await t.pause(250);
   const f = t.texte('#fiche-chantier');
-  verifierVrai('le bloc Travaux dit ce qu\'il chiffre', /Ce que vous facturez/.test(f));
+  verifierVrai('le bloc des travaux se nomme d\'après l\'étape',
+    /Ce que le devis contient|Les travaux prévus|Ce qui est facturé/.test(f));
   verifierVrai('le bloc Journées dit que c\'est du prévu', /Ce que vous avez prévu/.test(f));
   verifierVrai('le bloc Temps passé dit que c\'est du réel', /Ce que vous avez réellement fait/.test(f));
   verifierVrai('le bouton ne redemande pas de placer ce qui l\'est',
@@ -1400,7 +1401,11 @@ scenario('Devis : numéro, date d’édition et validité tiennent sur la fiche'
   t.clic('[data-vue="carnet"]'); await t.pause(250);
   t.clic('[data-chouvrir="c1"]'); await t.pause(400);
   t.clic('#f-devis'); await t.pause(350);
-  t.saisir('#ce-numdevis', 'D-2026-014'); await t.pause(100);
+  /* Il ne tape que le chiffre : les zéros et le préfixe se posent seuls. */
+  t.saisir('#ce-numdevis-an', '2026');
+  t.saisir('#ce-numdevis-rg', '14'); await t.pause(100);
+  verifierVrai('l’aperçu montre le numéro complet',
+    /D-2026-0014/.test(t.texte('#ce-numdevis-vu')));
   t.choisir('#ce-datedevis', '2026-01-31'); await t.pause(150);
   t.choisir('#ce-validite', '1'); await t.pause(200);
 
@@ -1411,11 +1416,11 @@ scenario('Devis : numéro, date d’édition et validité tiennent sur la fiche'
 
   t.clic('#dv-ok'); await t.pause(450);
   const c = (t.stock('chantiers') || [])[0];
-  verifier('le numéro est retenu', 'D-2026-014', c.numeroDevis);
+  verifier('le numéro est retenu, complété à quatre chiffres', 'D-2026-0014', c.numeroDevis);
   verifier('la validité aussi', 1, c.validiteDevis);
   verifier('et la date d’édition', '2026-01-31', jourISO(c.dateDevis));
   verifierVrai('la fiche affiche le numéro du devis',
-    /D-2026-014/.test(t.$('#vue-chantier').textContent));
+    /D-2026-0014/.test(t.$('#vue-chantier').textContent));
   verifierVrai('et jusqu’à quand il vaut',
     /jusqu’au 28\/02\/2026/.test(t.$('#vue-chantier').textContent));
 
@@ -1518,17 +1523,20 @@ scenario('Facturé : le numéro est demandé là où on bascule', async () => {
   t.clic('[data-chstatut="c1"]'); await t.pause(300);
   t.clic('[data-setstatut="facture"]'); await t.pause(350);
 
-  verifierVrai('le numéro est demandé aussitôt', t.$('#nf-num'));
-  t.saisir('#nf-num', 'F-2026-044'); await t.pause(100);
+  verifierVrai('le numéro est demandé aussitôt', t.$('#nf-num-rg'));
+  /* Aucune facture encore : le rang proposé est le premier de l'année. */
+  verifier('et le suivant est proposé', '1', t.$('#nf-num-rg').value);
+  t.saisir('#nf-num-an', '2026');
+  t.saisir('#nf-num-rg', '44'); await t.pause(100);
   t.clic('#nf-ok'); await t.pause(400);
   const c = (t.stock('chantiers') || [])[0];
   verifier('le statut a changé', 'facture', c.statut);
-  verifier('et le numéro est posé', 'F-2026-044', c.numeroFacture);
+  verifier('et le numéro est posé', 'F-2026-0044', c.numeroFacture);
 
   /* Déjà renseigné, on ne redemande pas. */
   t.clic('[data-chstatut="c1"]'); await t.pause(300);
   t.clic('[data-setstatut="paye"]'); await t.pause(400);
-  verifier('rien n’est redemandé quand le numéro est là', null, t.$('#nf-num'));
+  verifier('rien n’est redemandé quand le numéro est là', null, t.$('#nf-num-rg'));
   verifier('le statut a bien suivi', 'paye', (t.stock('chantiers') || [])[0].statut);
   verifier('aucune erreur', [], t.erreurs);
 });
@@ -3005,17 +3013,21 @@ scenario('Fiche : des blocs dans l’ordre de la vie du chantier', async () => {
   t.clic('[data-chouvrir="c1"]'); await t.pause(400);
 
   /* Les blocs, dans l'ordre. */
-  const etapes = t.$$('#vue-chantier .etape-bloc').map(e => e.textContent);
+  /* « Ce que ça vaut » ne porte plus de crayon — il ne fait que lire ce que
+     le bloc des travaux contient — donc plus d'étiquette d'étape. L'ordre se
+     lit sur les deux formes de titre à la fois, dans l'ordre du document. */
+  const etapes = t.$$('#vue-chantier .etape-bloc, #vue-chantier .carte > h2')
+    .map(e => e.textContent);
   verifier('le chantier d’abord', 'Le chantier', etapes[0]);
   verifier('puis ce que ça vaut', 'Ce que ça vaut', etapes[1]);
-  verifier('puis le devis', 'Le devis', etapes[2]);
-  verifierVrai('la facture est plus bas', etapes.indexOf('La facture') > 2);
-
-  /* Ce qui n'est pas encore atteint reste visible, en retrait. */
-  const fact = t.$$('#vue-chantier .carte.avenir')
-    .filter(e => /La facture/.test(e.textContent))[0];
-  verifierVrai('la facture s’annonce comme une étape à venir', fact);
-  verifierVrai('et le dit en clair', /Pas encore facturé/.test(fact.textContent));
+  /* Le devis et la facture ne font plus deux blocs : c'est le même, qui
+     change de nom avec l'étape. Il n'y a donc jamais deux listes de
+     travaux à tenir — « les travaux sont liés au devis ou à la facture ». */
+  verifier('puis le bloc des travaux, nommé « Le devis »', 'Le devis', etapes[1 + 1]);
+  verifierVrai('et pas de second bloc facture à côté',
+    etapes.indexOf('La facture') < 0);
+  verifierVrai('les lignes du devis sont dedans',
+    /Ce que le devis contient/.test(t.texte('#vue-chantier')));
 
   /* Le bloc d'argent parle au futur tant que rien n'est facturé. */
   const val = t.$$('#vue-chantier .carte')
@@ -3025,26 +3037,41 @@ scenario('Fiche : des blocs dans l’ordre de la vie du chantier', async () => {
   /* 1 200 plants × 2,10 € = 2 520 € sur 4 journées : 630 € la journée. */
   verifierVrai('avec le prix de journée qui en découle', /630/.test(val.textContent));
   verifierVrai('comparé à l’objectif', /objectif/.test(val.textContent));
+  /* « C'est bien d'avoir un bloc visuel où je n'ai rien à modifier. » */
+  verifierVrai('et rien ne s’y saisit', !val.querySelector('.modif-bloc'));
+  verifierVrai('il dit d’où vient son contenu',
+    /Rien à saisir ici/.test(val.textContent));
 
   /* Chaque crayon ouvre son seul sujet. */
   verifier('plus de bouton « en-tête »', null, t.$('#f-entete'));
-  t.clic('#f-facture'); await t.pause(350);
-  const corps = t.$('#modale-corps');
-  verifierVrai('le formulaire de facture s’ouvre', t.$('#fc-num'));
-  verifier('quatre champs, pas vingt-trois', 4, corps.querySelectorAll('input').length);
-  verifierVrai('et rien du devis dedans', !/numéro de devis/i.test(corps.textContent));
-  t.saisir('#fc-num', 'F-2026-031');
-  t.choisir('#fc-date', '2026-10-03');
-  t.clic('#fc-ok'); await t.pause(450);
-  verifier('la facture est enregistrée', 'F-2026-031',
-    (t.stock('chantiers') || [])[0].numeroFacture);
-  verifierVrai('et le bloc n’est plus en attente',
-    !t.$$('#vue-chantier .carte.avenir').some(e => /La facture/.test(e.textContent)));
+  t.clic('#f-devis'); await t.pause(350);
+  verifierVrai('le crayon du bloc ouvre le devis', t.$('#dv-a'));
+  t.clic('#modale-fermer'); await t.pause(250);
 
-  /* L'estimation garde sa place, même une fois le chantier avancé. */
+  /* On facture : le même bloc change de nom, et le devis se replie dessous. */
+  t.clic('#f-statut'); await t.pause(300);
+  t.clic('[data-setstatut="facture"]'); await t.pause(400);
+  t.saisir('#nf-num-an', '2026');
+  t.saisir('#nf-num-rg', '31');
+  t.choisir('#nf-date', '2026-10-03');
+  t.clic('#nf-ok'); await t.pause(500);
+  verifier('la facture est enregistrée', 'F-2026-0031',
+    (t.stock('chantiers') || [])[0].numeroFacture);
+  const apres = t.$$('#vue-chantier .etape-bloc, #vue-chantier .carte > h2')
+    .map(e => e.textContent);
+  verifierVrai('le bloc s’appelle maintenant « La facture »',
+    apres.indexOf('La facture') >= 0);
+  verifierVrai('et « Le devis » n’est plus un bloc à part',
+    apres.indexOf('Le devis') < 0);
+  /* Le devis n'est pas perdu pour autant : il se lit en pied de bloc. */
+  verifierVrai('mais il se replie en pied, avec son numéro',
+    /Le devis D-2026-014 disait/.test(t.texte('#vue-chantier')));
+  verifierVrai('et rien n’a bougé depuis',
+    /Facturé à l’identique/.test(t.texte('#vue-chantier')));
+
+  /* L'estimation garde sa place, dans le bloc des travaux. */
   t.clic('#f-estim'); await t.pause(350);
   verifierVrai('l’estimation s’ouvre seule', t.$('#es-jest'));
-  verifier('avec les journées déjà estimées', '4', t.$('#es-jest').value);
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -3058,11 +3085,17 @@ scenario('Fiche : sans devis, le bloc le dit au lieu de mentir', async () => {
   }));
   t.clic('[data-vue="carnet"]'); await t.pause(250);
   t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+  /* Sans devis, le bloc ne ment pas en s'appelant « Le devis » : il porte
+     le nom de ce qu'il contient. Les lignes sont les mêmes, et elles
+     deviendront la facture telles quelles. */
+  const etapes = t.$$('#vue-chantier .etape-bloc').map(e => e.textContent);
+  verifierVrai('le bloc s’appelle « Ce qu’il y a à faire »',
+    etapes.indexOf('Ce qu’il y a à faire') >= 0);
+  verifierVrai('et jamais « Le devis »', etapes.indexOf('Le devis') < 0);
   const dev = t.$$('#vue-chantier .carte')
-    .filter(e => /Le devis/.test(e.textContent))[0];
-  verifierVrai('le bloc devis est là quand même', dev);
-  verifierVrai('mais en retrait', dev.classList.contains('avenir'));
-  verifierVrai('et il dit pourquoi', /n’a pas de devis/.test(dev.textContent));
+    .filter(e => /Ce qu’il y a à faire/.test(e.textContent))[0];
+  verifierVrai('il annonce les travaux prévus', /Les travaux prévus/.test(dev.textContent));
+  verifierVrai('et il dit pourquoi', /Pas de devis sur ce chantier/.test(dev.textContent));
 
   /* On peut en attacher un depuis là. */
   t.clic('#f-devis'); await t.pause(350);
@@ -3071,11 +3104,14 @@ scenario('Fiche : sans devis, le bloc le dit au lieu de mentir', async () => {
   t.$('#dv-a').checked = true;
   t.$('#dv-a').dispatchEvent(new t.w.Event('change', { bubbles: true }));
   await t.pause(200);
-  t.saisir('#ce-numdevis', 'D-2026-020');
+  t.saisir('#ce-numdevis-an', '2026');
+  t.saisir('#ce-numdevis-rg', '20');
   t.clic('#dv-ok'); await t.pause(450);
   const c = (t.stock('chantiers') || [])[0];
   verifier('le devis est attaché', true, c.aDevis);
-  verifier('avec son numéro', 'D-2026-020', c.numeroDevis);
+  verifier('avec son numéro', 'D-2026-0020', c.numeroDevis);
+  verifierVrai('et le bloc prend enfin son nom',
+    t.$$('#vue-chantier .etape-bloc').map(e => e.textContent).indexOf('Le devis') >= 0);
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -3450,7 +3486,11 @@ scenario('Fiche : un chantier payé ne s’estime plus, il se corrige', async ()
   t.clic('[data-vue="carnet"]'); await t.pause(250);
   t.saisir('#c-rech', 'Places'); await t.pause(300);
   t.clic('[data-chouvrir="c1"]'); await t.pause(400);
-  verifier('le crayon ne parle plus d’estimer', 'modifier ✎', t.texte('#f-estim'));
+  /* Il ne dit plus « estimer » : sur un chantier payé, plus rien ne
+     s'estime. Le bouton vit désormais dans le bloc des travaux, avec ce
+     qui chiffre le chantier. */
+  verifierVrai('le crayon ne parle plus d’estimer',
+    !/estimer/i.test(t.texte('#f-estim')));
 
   t.clic('#f-estim'); await t.pause(300);
   const modale = t.texte('#modale');
@@ -3894,9 +3934,11 @@ scenario('Carnet : les filtres se rangent en cours et clos', async () => {
 });
 
 /* --------------------------------------------------------------------- */
-scenario('Facture : saisir le numéro propose de passer le chantier en facturé', async () => {
-  /* Il l'a demandé le 19 août, tranché le 23 : Sylve propose, il confirme.
-     Le statut ne doit jamais partir tout seul. */
+scenario('Facture : la remplir fait basculer le chantier, sans rien demander', async () => {
+  /* Question posée le 19 août, laissée ouverte, tranchée le 31 : « bien sûr,
+     une facture remplie bascule automatiquement le chantier en facturé ».
+     La fenêtre de confirmation ne faisait qu'ajouter un geste à un choix
+     déjà fait en remplissant les champs. */
   const t = await ouvrir(Object.assign({}, VIDE, {
     module: 'chantiers',
     chantiers: [{ id: 'c1', nom: 'Coupe des Places', statut: 'encours', aDevis: false,
@@ -3908,25 +3950,285 @@ scenario('Facture : saisir le numéro propose de passer le chantier en facturé'
   let demande = null;
   t.w.confirm = m => { demande = m; return false; };
   t.clic('#f-facture'); await t.pause(350);
-  t.saisir('#fc-num', 'F-2026-0042');
+  t.saisir('#fc-num-an', '2026');
+  t.saisir('#fc-num-rg', '42');
   t.$('#fc-date').value = jourISO(Date.now());
   t.clic('#fc-ok'); await t.pause(450);
-  verifierVrai('la question est posée', /Le passer en/.test(demande || ''));
-  verifierVrai('elle nomme le statut visé', /Factur/.test(demande || ''));
-  verifier('refuser laisse le statut', 'encours', (t.stock('chantiers') || [])[0].statut);
-  verifier('mais la facture est bien enregistrée', 'F-2026-0042',
-    (t.stock('chantiers') || [])[0].numeroFacture);
 
-  t.w.confirm = () => true;
+  verifier('plus aucune question posée', null, demande);
+  verifier('le chantier est passé en facturé', 'facture', (t.stock('chantiers') || [])[0].statut);
+  verifier('avec son numéro complété', 'F-2026-0042', (t.stock('chantiers') || [])[0].numeroFacture);
+  verifierVrai('et le message dit que le statut a suivi',
+    /chantier « Factur/.test(t.$('#toast').textContent));
+
+  /* Un paiement va plus loin que la facture : on l'y suit. */
+  t.clic('#f-facture'); await t.pause(350);
+  t.$('#fc-paie').value = jourISO(Date.now());
+  t.clic('#fc-ok'); await t.pause(450);
+  verifier('un paiement saisi mène jusqu’à payé', 'paye', (t.stock('chantiers') || [])[0].statut);
+
+  /* Et jamais en arrière : rouvrir la facture d'un chantier payé ne le
+     ramène pas à « facturé ». */
+  t.clic('#f-facture'); await t.pause(350);
+  t.$('#fc-paie').value = '';
+  t.clic('#fc-ok'); await t.pause(450);
+  verifier('on ne revient jamais en arrière', 'paye', (t.stock('chantiers') || [])[0].statut);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Devis : le signer fait avancer le chantier tout seul', async () => {
+  /* « Il faut que j'aie la possibilité de dire quand il est signé, et donc
+     automatiquement à ce moment-là que ça change le statut aussi. » La date
+     est demandée : sans elle on ne sait plus quand l'engagement a été pris. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [{ id: 'c1', nom: 'Coupe des Places', statut: 'envoye', aDevis: true,
+      lignes: [], temps: [], maj: Date.now() }]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(300);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+  t.clic('#f-devis'); await t.pause(350);
+  verifierVrai('la date de signature est demandée', t.$('#ce-signe'));
+  t.choisir('#ce-signe', '2026-09-14'); await t.pause(150);
+  t.clic('#dv-ok'); await t.pause(450);
+
+  const c = (t.stock('chantiers') || [])[0];
+  verifier('la date est retenue', '2026-09-14', jourISO(c.dateSignature));
+  verifier('et le chantier avance', 'accepte', c.statut);
+  verifierVrai('la fiche l’affiche', /Signé le14\/09\/2026/.test(t.texte('#vue-chantier')));
+
+  /* Jamais en arrière : un chantier déjà en cours ne redevient pas
+     « à planifier » parce qu'on corrige la date du devis. */
+  t.clic('#f-statut'); await t.pause(300);
+  t.clic('[data-setstatut="encours"]'); await t.pause(400);
+  t.clic('#f-devis'); await t.pause(350);
+  t.choisir('#ce-signe', '2026-09-15'); await t.pause(150);
+  t.clic('#dv-ok'); await t.pause(450);
+  verifier('le statut ne recule pas', 'encours', (t.stock('chantiers') || [])[0].statut);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Devis : la photo se prend au passage, jamais après coup', async () => {
+  /* Le devis signé ne bouge plus : au moment où le chantier bascule, on garde
+     une photo de ses lignes. Sur un chantier déjà facturé — les trente-deux
+     repris du carnet — figer l'existant appellerait « devis » ce qui n'en a
+     jamais été un, et tout paraîtrait conforme à un devis inexistant. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [
+      { id: 'c1', nom: 'Avec devis', statut: 'termine', aDevis: true, temps: [], maj: Date.now(),
+        lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 4, prix: 800, nature: 'prestation' }] },
+      /* Repris du carnet : déjà payé, aucun devis n'a existé. */
+      { id: 'c2', nom: 'Repris du carnet', statut: 'paye', aDevis: false, temps: [], maj: Date.now(),
+        numeroFacture: 'F-2025-0007', datePaiement: Date.now(),
+        lignes: [{ travail: 'PLANT', unite: 'plant', quantite: 500, prix: 2, nature: 'prestation' }] },
+      /* Celui-ci a bien eu un devis, mais il est facturé depuis longtemps et
+         aucune photo n'a été prise à l'époque. La garde « aDevis » ne le
+         protège pas : seule la condition de passage le protège. */
+      { id: 'c3', nom: 'Facturé de longue date', statut: 'paye', aDevis: true, temps: [],
+        maj: Date.now(), numeroDevis: 'D-2025-0003', numeroFacture: 'F-2025-0012',
+        dateFacture: Date.now(), datePaiement: Date.now(),
+        lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 2, prix: 700, nature: 'prestation' }] }
+    ]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(300);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+  verifierVrai('rien n’est figé tant que le chantier n’est pas facturé',
+    !(t.stock('chantiers') || []).filter(c => c.id === 'c1')[0].devisFige);
+
+  t.clic('#f-statut'); await t.pause(300);
+  t.clic('[data-setstatut="facture"]'); await t.pause(400);
+  t.clic('#nf-passer'); await t.pause(450);
+  const c1 = (t.stock('chantiers') || []).filter(c => c.id === 'c1')[0];
+  verifierVrai('la photo est prise au passage', !!c1.devisFige);
+  verifier('avec le total du devis', 3200, c1.devisFige.total);
+  verifierVrai('et un identifiant sur chaque ligne', !!(c1.lignes[0] || {}).uid);
+
+  /* Le second : déjà payé à l'ouverture, on n'invente pas de devis.
+     On passe par le sélecteur de la fiche : le carnet ne liste que les
+     chantiers ouverts, et un clic sur un payé n'y trouve rien — le
+     scénario continuait alors sur le chantier précédent sans le dire. */
+  t.choisir('#f-choix', 'c2'); await t.pause(450);
+  verifierVrai('on est bien passé sur le chantier repris',
+    /Repris du carnet/.test(t.texte('#f-bloc-chantier')));
   t.clic('#f-facture'); await t.pause(350);
   t.clic('#fc-ok'); await t.pause(450);
-  verifier('accepter le fait passer', 'facture', (t.stock('chantiers') || [])[0].statut);
+  verifierVrai('un chantier déjà payé ne se voit pas inventer un devis',
+    !(t.stock('chantiers') || []).filter(c => c.id === 'c2')[0].devisFige);
 
-  /* Une fois facturé, on ne repose plus la question. */
-  demande = null;
+  /* Et celui qui avait bien un devis : le rouvrir et l'enregistrer ne doit
+     pas figer aujourd'hui ce qui a été facturé il y a des mois. */
+  t.choisir('#f-choix', 'c3'); await t.pause(450);
+  verifierVrai('on est bien passé sur celui qui avait un devis',
+    /Facturé de longue date/.test(t.texte('#f-bloc-chantier')));
   t.clic('#f-facture'); await t.pause(350);
   t.clic('#fc-ok'); await t.pause(450);
-  verifier('plus de question sur un chantier déjà facturé', null, demande);
+  verifierVrai('ni celui qui avait un devis mais est facturé depuis longtemps',
+    !(t.stock('chantiers') || []).filter(c => c.id === 'c3')[0].devisFige);
+  verifierVrai('et sa fiche ne prétend pas qu’il est conforme à un devis',
+    !/Facturé à l’identique/.test(t.texte('#vue-chantier')));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Facture : ce qui a bougé depuis le devis est marqué sur la ligne', async () => {
+  /* « On ne comprend pas à quel endroit il y a eu le changement. » La marque
+     est donc sur la ligne, pas dans un récapitulatif — et il n'y a toujours
+     qu'une seule liste de travaux. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [{ id: 'c1', nom: 'Coupe des Places', statut: 'facture', aDevis: true,
+      temps: [], maj: Date.now(), numeroDevis: 'D-2026-0014', numeroFacture: 'F-2026-0031',
+      dateFacture: Date.now(),
+      lignes: [
+        /* Inchangée : 4 × 800 = 3 200, comme au devis. */
+        { uid: 'L1', travail: 'DEGAG', unite: 'ha', quantite: 4, prix: 800,
+          nature: 'prestation', note: 'Dégagement parcelle 12' },
+        /* Le devis en annonçait 500, la facture 300. */
+        { uid: 'L2', travail: 'PLANT', unite: 'plant', quantite: 100, prix: 3,
+          nature: 'prestation', note: 'Regarni' },
+        /* Sans identifiant dans la photo : elle est arrivée après. */
+        { travail: 'PROT', unite: 'unite', quantite: 25, prix: 10,
+          nature: 'prestation', note: 'Repose de protections' }
+      ],
+      devisFige: { date: Date.now() - 86400000, total: 3200, lignes: [
+        { uid: 'L1', montant: 3200, titre: 'Dégagement parcelle 12' },
+        { uid: 'L2', montant: 500, titre: 'Regarni' },
+        { uid: 'L3', montant: 150, titre: 'Gaines fournies' }
+      ] } }]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(300);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+  const f = t.texte('#vue-chantier');
+
+  verifierVrai('la ligne inchangée ne porte aucune marque',
+    !/Dégagement parcelle 12 (ajoutée|modifiée|retirée)/.test(f));
+  verifierVrai('celle qui a bougé est dite modifiée', /Regarni modifiée/.test(f));
+  verifierVrai('et elle dit ce que le devis annonçait', /Le devis disait 500 €/.test(f));
+  verifierVrai('celle qui est arrivée après est dite ajoutée',
+    /Repose de protections ajoutée/.test(f));
+  /* Une ligne du devis non facturée ne se voit nulle part si on se contente
+     de la retirer, et l'écart devient inexplicable. */
+  verifierVrai('celle qui a disparu reste visible, barrée',
+    /Gaines fournies retirée/.test(f));
+
+  /* 3 200 + 300 + 250 = 3 750, contre 3 200 au devis. Le total du devis se
+     retrouve aussi sur la première ligne : on vise donc la phrase entière. */
+  verifierVrai('le pied rappelle ce que le devis disait', /disait3 200 €/.test(f));
+  verifierVrai('et ce qui est facturé', /Facturé3 750 €/.test(f));
+  verifierVrai('il compte les trois changements',
+    /1 ligne ajoutée, 1 modifiée, 1 retirée/.test(f));
+  verifierVrai('et chiffre l’écart', /550 € de plus/.test(f));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Facture : conforme au devis, le pied le dit aussi', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'facture', aDevis: true, temps: [],
+      maj: Date.now(), numeroDevis: 'D-2026-0009', numeroFacture: 'F-2026-0021',
+      dateFacture: Date.now(),
+      lignes: [{ uid: 'L1', travail: 'DEGAG', unite: 'ha', quantite: 4, prix: 800,
+        nature: 'prestation', note: 'Dégagement' }],
+      devisFige: { date: Date.now() - 86400000, total: 3200,
+        lignes: [{ uid: 'L1', montant: 3200, titre: 'Dégagement' }] } }]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(300);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+  const f = t.texte('#vue-chantier');
+  verifierVrai('le pied dit que rien n’a bougé', /Facturé à l’identique/.test(f));
+  verifierVrai('et aucune ligne n’est marquée',
+    !/(ajoutée|modifiée|retirée)/.test(f));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Devis : les journées se déduisent des lignes, sans double saisie', async () => {
+  /* « Si je fais mon devis avec trois journées, il faut que dans mon temps
+     estimé ça bloque à trois jours. Je n'ai pas à le remplir deux fois. »
+     Et quand une autre ligne se chiffre autrement, le dire : l'estimation ne
+     parle pas d'elle. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers', cfg: { prixJourVise: 650 },
+    chantiers: [
+      { id: 'c1', nom: 'À la journée', statut: 'accepte', aDevis: true, temps: [], maj: Date.now(),
+        /* Trois journées au devis, et une ligne à l'hectare que le temps
+           déduit ne couvre pas. */
+        lignes: [
+          { travail: 'DEGAG', unite: 'jour', quantite: 3, prix: 800, nature: 'prestation' },
+          { travail: 'PLANT', unite: 'ha', quantite: 2, prix: 400, nature: 'prestation' }
+        ] },
+      { id: 'c2', nom: 'À l’hectare', statut: 'accepte', aDevis: true, temps: [], maj: Date.now(),
+        joursEstimes: 5,
+        lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 6, prix: 500, nature: 'prestation' }] }
+    ]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(300);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+  const f1 = t.texte('#vue-chantier');
+  verifierVrai('le temps se lit dans le bloc des travaux',
+    /Le temps que ça demande/.test(f1));
+  verifierVrai('et vaut les trois journées du devis',
+    /Le temps que ça demande ✎3 j/.test(f1));
+  verifierVrai('l’écran dit d’où ça vient', /Déduit des lignes en journées/.test(f1));
+  /* Sans cette mention, il croirait que les trois journées couvrent la
+     plantation à l'hectare aussi. */
+  verifierVrai('et nomme ce que ça ne couvre pas',
+    /ne tient pas compte de plantation/i.test(f1));
+
+  /* Aucune ligne en journées : c'est son estimation qui parle. */
+  t.choisir('#f-choix', 'c2'); await t.pause(450);
+  verifierVrai('on est bien sur le chantier à l’hectare',
+    /À l’hectare/.test(t.texte('#f-bloc-chantier')));
+  const f2 = t.texte('#vue-chantier');
+  verifierVrai('sans ligne en journées, l’estimation reste la sienne',
+    /Le temps que ça demande ✎5 j/.test(f2));
+  verifierVrai('et l’écran le dit', /Aucune ligne n’est libellée en journées/.test(f2));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Numéro : le suivant est proposé, jamais imposé', async () => {
+  /* « Ce serait même qu'il puisse proposer plus un, comme ça ça me simplifie
+     les choses. » Proposé quand le champ est vide, et l'année reste à lui :
+     une facture se saisit parfois après le 31 décembre. */
+  /* L'année se lit sur l'horloge, jamais en dur : un test écrit avec 2026
+     passe au vert aujourd'hui et ment le 1er janvier. */
+  const an = new Date().getFullYear();
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [
+      { id: 'c1', nom: 'Déjà facturé', statut: 'paye', aDevis: false, temps: [], lignes: [],
+        numeroFacture: 'F-' + an + '-0007', dateFacture: Date.now(), maj: Date.now() },
+      /* L'an dernier, et un rang bien plus haut : il ne doit pas peser sur
+         la séquence de cette année. */
+      { id: 'c2', nom: 'L’an dernier', statut: 'paye', aDevis: false, temps: [], lignes: [],
+        numeroFacture: 'F-' + (an - 1) + '-0031', dateFacture: Date.now(), maj: Date.now() },
+      { id: 'c3', nom: 'À facturer', statut: 'termine', aDevis: false, temps: [], lignes: [],
+        maj: Date.now() }
+    ]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(300);
+  t.clic('[data-chouvrir="c3"]'); await t.pause(400);
+  t.clic('#f-facture'); await t.pause(400);
+
+  /* Le suivant se lit avant qu'il ait tapé quoi que ce soit : taper
+     par-dessus puis vérifier n'éprouvait rien du tout. */
+  verifier('l’année en cours est proposée', String(an), t.$('#fc-num-an').value);
+  verifier('et le rang suivant de cette année-là', '8', t.$('#fc-num-rg').value);
+  verifierVrai('l’aperçu complète les zéros',
+    new RegExp('F-' + an + '-0008').test(t.texte('#fc-num-vu')));
+
+  /* Rien n'est imposé : il numérote parfois hors séquence. */
+  t.saisir('#fc-num-rg', '105'); await t.pause(120);
+  verifierVrai('mais il reste libre de le changer',
+    new RegExp('F-' + an + '-0105').test(t.texte('#fc-num-vu')));
+  t.clic('#fc-ok'); await t.pause(450);
+  verifier('c’est son numéro qui est retenu', 'F-' + an + '-0105',
+    (t.stock('chantiers') || []).filter(c => c.id === 'c3')[0].numeroFacture);
   verifier('aucune erreur', [], t.erreurs);
 });
 

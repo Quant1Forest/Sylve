@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.65.0-20260831-2110**
+Version courante : **4.66.0-20260831-2340**
 
 ---
 
@@ -561,6 +561,114 @@ qui n'en consomme pas. Un scénario l'a attrapé.
 
 **Et un rappel de méthode** : écrire ces notes par `node -e` dans le shell
 mange les accents graves du Markdown. Passer par un fichier.
+
+## Un seul bloc pour les travaux, trois visages
+
+*« Les travaux sont liés au devis ou à la facture. C’est net. »* Le bloc
+« Travaux » autonome a donc disparu : `blocDevis()` et `blocFacture()` sont
+fondus dans **`blocTravaux()`**, qui change de nom avec l’étape — comme
+`blocValeur()` change déjà de mots.
+
+| `etapeTravaux(c)` | Intitulé | En-tête |
+|---|---|---|
+| `todo` | Ce qu’il y a à faire | rien |
+| `devis` | Le devis | numéro, date, validité, envoi, signature |
+| `facture` | La facture | numéro, date, échéance, paiement |
+
+**Il n’y a jamais deux listes de lignes.** C’était le point dur : une seule
+liste, plus une **photo du devis** prise au moment du passage en facturé
+(`figerDevis`). C’est elle qui permet de dire *où* le changement a eu lieu —
+sa vraie question : *« on ne comprend pas à quel endroit il y a eu le
+changement »*. La marque est donc **sur la ligne** : `ajoutée`, `modifiée`
+(avec ce que le devis disait), `retirée` (barrée, gardée visible — sinon
+l’écart devient inexplicable).
+
+**La photo se prend au passage, jamais après.** Sur un chantier déjà facturé
+— tous ceux repris du carnet — figer l’existant appellerait « devis » ce qui
+n’en a jamais été un, et tout paraîtrait conforme à un devis inexistant.
+D’où la comparaison `avant !== c.statut` dans `majChantier()` **et** dans
+`ouvrirStatut()`. Une ligne née après la photo n’a pas d’`uid` dedans : c’est
+ce qui la désigne comme ajoutée, sans rien marquer à la saisie.
+
+**Le devis n’est pas perdu quand la facture arrive** : il se replie en pied
+de bloc — son numéro, ce qu’il disait, l’écart. Et *« Facturé à l’identique »*
+quand rien n’a bougé : l’absence de changement est une information.
+
+**`blocValeur()` n’a plus de crayon.** *« C’est bien d’avoir un bloc visuel où
+je n’ai rien à modifier. »* Il ne fait que lire le bloc des travaux, et ses
+mots suivent l’étape : prévu / proposé / facturé.
+
+**Piège à connaître** : le crayon du bloc vaut `f-devis` avant la facture et
+`f-facture` après. Un accès à la facture avant la bascule restait nécessaire —
+un bouton « Saisir la facture » vit dans le pied. Sans lui, un numéro saisi
+d’avance n’avait aucun chemin, et un scénario s’est arrêté dessus.
+
+## Les journées se déduisent du devis
+
+*« Si je fais mon devis avec trois journées, il faut que dans mon temps estimé
+ça bloque à trois jours. Je n’ai pas à le remplir deux fois. »*
+
+`joursDevis()` somme les lignes en unité `jour` ; **`joursPrevus()`** rend
+cette somme, ou `joursEstimes` à défaut. **Jamais l’addition des deux** — même
+règle que `tempsPasse()`, et pour la même raison. Toutes les lectures passent
+par là : `resteAPlacer`, `journeesPrevues`, les alertes, la fiche.
+
+**Et `travauxHorsJournees()` nomme ce que la déduction ne couvre pas.** Un
+devis qui mêle des journées et de l’hectare : sans cette mention il croirait
+que les journées couvrent tout. *« Il faudrait que tu puisses mettre juste à
+côté : attention, ne tient compte que du dégagement. »*
+
+L’estimation vit maintenant **dans le bloc des travaux**, avec ce qui la
+chiffre. Elle était deux blocs plus haut, dans un formulaire à part : encore
+deux endroits pour une même idée.
+
+## Le numéro se compose
+
+`F-2026-0016`, `D-2026-0042` : préfixe fixe, année modifiable, rang sur
+quatre chiffres. **Il ne tape que le chiffre**, les zéros se posent seuls.
+`champNumero` / `brancherNumero` / `lireNumero` servent aux trois formulaires
+(devis, facture, et la demande à la bascule).
+
+- **`prochainRang()` propose le suivant** de l’année en cours, jamais imposé —
+  il numérote parfois hors séquence. Les numéros d’une autre année ne pèsent
+  pas sur la séquence.
+- **`decomposerNumero()` est permissif** : un numéro d’une autre forme n’est
+  pas perdu, on en garde les derniers chiffres.
+- **Un test qui écrit l’année en dur ment le 1er janvier.** Le scénario la lit
+  sur l’horloge et sème ses numéros avec.
+
+## Le statut suit la saisie
+
+Deux questions restées ouvertes, tranchées le 31 août :
+
+- **Une facture remplie bascule le chantier**, sans confirmation. La fenêtre
+  n’ajoutait qu’un geste à un choix déjà fait en remplissant les champs. Un
+  paiement saisi mène jusqu’à « Payé ».
+- **Un devis signé fait avancer le chantier**, et **la date est demandée** :
+  sans elle on ne sait plus quand l’engagement a été pris (`dateSignature`).
+
+**Jamais en arrière**, dans les deux cas : la comparaison se fait sur
+`rangStatut`, pas sur l’égalité. Corriger la date d’un devis ne doit pas
+ramener un chantier en cours à « à planifier ».
+
+## Deux scénarios qui ne prouvaient rien
+
+Le sabotage les a désignés, et la leçon vaut au-delà :
+
+- **Le suivant proposé n’était jamais lu.** Le test tapait un numéro
+  par-dessus la proposition, puis vérifiait ce qu’il venait de taper. Casser
+  `prochainRang()` ne changeait rien. **Lire la valeur avant d’agir dessus.**
+- **Le figeage n’était éprouvé que là où une autre garde suffisait.** Le cas
+  testé était un chantier sans devis, arrêté par `aDevis`. Il fallait un
+  chantier **avec** devis et déjà facturé — le seul endroit où la condition de
+  passage protège toute seule.
+
+**Et une navigation de test qui n’allait nulle part.** Le scénario changeait
+de chantier par le carnet ; or le carnet ne liste que les **ouverts**, et un
+clic sur un chantier payé ne trouvait rien. Tout le reste se jouait sur le
+premier chantier, au point de lui poser un numéro de facture au passage — sans
+qu’aucune vérification ne s’en aperçoive. Passer par `#f-choix`, qui les liste
+tous, et **vérifier qu’on est bien arrivé** avant de continuer.
 
 ## Journées faites, échéance de paiement, fiche à compléter
 
@@ -1439,8 +1547,22 @@ phrases plus loin il demandait *plus* de détail sur cet impayé. Les deux
 
 **Proposé, en attente de sa réponse :**
 
-- **Le statut qui suit la saisie.** Il a demandé si remplir la facture devait
-  faire passer le chantier en « Facturé ». Question posée, pas tranchée.
+- **Les achats futurs envisagés.** Une liste de ce qu’il compte acheter —
+  petit ou gros matériel, toutes catégories — rangée **par priorité**, avec un
+  montant estimé. Il saisit le **TTC**, le hors taxes se déduit. L’objet est de
+  savoir ce qui l’attend en dépenses, pas de tenir un budget. Dicté le 31 août,
+  à cadrer : où ça vit (Finances ? Stock ?), et si une ligne devient une
+  dépense d’un geste une fois l’achat fait.
+- **Les notes existent déjà, mais il ne les trouve pas.** Il a demandé « un
+  endroit où mettre des notes, comme l’application Notes du téléphone, avec des
+  titres et des couleurs » — puis s’est interrompu : « ah mais si je peux le
+  faire là ? ». C’est `A.cfg.notes`, sur l’écran Entreprise, sous « À traiter » :
+  titre, précision, six couleurs. **Encore un manque de visibilité, pas
+  d’absence** — le même diagnostic que « Recettes » et que le choix du cubage.
+  Sa vraie question est ailleurs : **faut-il les sortir d’Entreprise** pour les
+  poser plus haut, à côté des outils de terrain ? Il ne tranche pas, moi non
+  plus. Ne pas en écrire un second jeu.
+
 - **Les grandes familles dans les filtres du carnet.** Il s'y perd avec
   trente-cinq chantiers dont trente et un payés : les filtres sont à plat
   (ouvert, à compléter, en cours, facturé…) et il ne sait plus à quelle famille

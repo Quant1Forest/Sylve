@@ -79,6 +79,26 @@ button{cursor:pointer;background:none;border:none}
 /* Un poste du coût au kilomètre qui n'a pas de quoi se calculer : il dit ce
    qui lui manque plutôt que d'afficher un zéro qui passerait pour un chiffre. */
 .manque-v{color:var(--tiede)}
+/* Le numéro composé : le préfixe et les tirets sont écrits, il ne tape que
+   l'année et le rang. Les zéros de tête se posent tout seuls. */
+.numcomp{display:flex;gap:6px;align-items:center}
+.numcomp .pref{font-family:var(--mono);font-size:20px;font-weight:700;padding:0 2px}
+.numcomp input{font-size:19px;font-weight:600;text-align:center;padding:8px 4px}
+.numcomp .an{width:5.2em;flex:none}
+.numcomp .rg{width:4.6em;flex:none}
+.apercu-num{margin:6px 0 0;font-size:13px;color:var(--doux)}
+.apercu-num b{font-family:var(--mono);font-size:16px;color:var(--encre);letter-spacing:.02em}
+/* Ce qui a bougé entre le devis signé et la facture. La marque est sur la
+   ligne : c'est là qu'on cherche, pas dans un récapitulatif. */
+.marque-l{
+  display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.05em;
+  text-transform:uppercase;padding:2px 7px;border-radius:99px;vertical-align:2px;
+}
+.marque-l.ajout{background:var(--accent-doux);color:var(--vert-marque);border:1px solid #C4DCCC}
+.marque-l.chg{background:var(--tiede-fond);color:var(--tiede);border:1px solid var(--tiede-trait)}
+.marque-l.ret{background:var(--alerte-fond);color:var(--alerte);border:1px solid #D9BCAE}
+.ligne-retiree b{text-decoration:line-through;color:var(--gris)}
+.dit-avant{font-size:12px;color:var(--tiede);margin-top:3px}
 /* Sous-titre d'un bloc de la fiche : dit à quoi le bloc sert, pour qu'on
    ne confonde plus le prévu (Journées) et le réel (Temps passé). */
 .sous-titre-bloc{font-size:12px;color:var(--doux);margin:0 0 10px;line-height:1.4}
@@ -3779,9 +3799,39 @@ function totalAVenir(ch, maintenant) {
   return arr(journeesAVenir(ch, maintenant).reduce(function (s, j) { return s + nb(j.p); }, 0), 2);
 }
 
+/* Les journées que le chantier demande. Quand une ligne est libellée en
+   journées, c'est le devis qui le dit — les ressaisir à la main faisait deux
+   chiffres pour une même idée, et c'est exactement ce qui l'y perdait :
+   « il y a trop d'endroits où je peux mettre du temps ».
+   Les autres unités — l'hectare, le plant — ne disent rien du temps : là,
+   l'estimation reste la sienne. Jamais l'addition des deux, pour la même
+   raison que tempsPasse() ne cumule pas le noté et le facturé. */
+function joursDevis(ch) {
+  var j = 0;
+  ((ch && ch.lignes) || []).forEach(function (l) {
+    if (l.unite === 'jour') j += nb(l.quantite);
+  });
+  return arr(j, 2);
+}
+function joursPrevus(ch) {
+  var d = joursDevis(ch);
+  return d > 0 ? d : nb(ch && ch.joursEstimes);
+}
+/* Ce que l'estimation déduite ne couvre pas : les prestations chiffrées
+   autrement qu'à la journée. Les nommer évite de croire que le chiffre parle
+   de tout le chantier. */
+function travauxHorsJournees(ch) {
+  var out = [];
+  ((ch && ch.lignes) || []).forEach(function (l) {
+    if (l.unite === 'jour' || l.nature === 'vente' || l.nature === 'debours') return;
+    var n = nomTravauxLigne(l);
+    if (n && out.indexOf(n) < 0) out.push(n);
+  });
+  return out;
+}
 /* Reste à placer par rapport à l'estimation. */
 function resteAPlacer(ch) {
-  var vise = nb(ch && ch.joursEstimes) || 0;
+  var vise = joursPrevus(ch) || 0;
   if (!vise) return null;
   return arr(vise - totalPlace(ch), 2);
 }
@@ -3804,7 +3854,7 @@ function journeesPrevues(ch, cfg) {
     }
     return out;
   }
-  var n = Math.ceil(nb(ch.joursEstimes) || 0), garde2 = 0;
+  var n = Math.ceil(joursPrevus(ch) || 0), garde2 = 0;
   if (!n) return [d];
   while (out.length < n && garde2++ < 400) {
     if (!ouvresSeuls || !estWeekend(d)) out.push(d);
@@ -3954,7 +4004,7 @@ function alertes(chantiers, cfg, maintenant) {
           texte: 'aucune journée prévue — estimez et placez' });
       } else if (reste != null && reste > 0) {
         out.push({ type: 'aplacer', chantier: ch, gravite: 1, jours: reste,
-          texte: fmtJours(reste) + ' à placer sur ' + fmtJours(nb(ch.joursEstimes)) + ' estimées' });
+          texte: fmtJours(reste) + ' à placer sur ' + fmtJours(joursPrevus(ch)) + ' estimées' });
       } else if (reste == null && place > 0) {
         out.push({ type: 'encours', chantier: ch, gravite: 0,
           texte: fmtJours(place) + ' posée' + (place > 1 ? 's' : '') + ', pas d’estimation' });
@@ -4367,7 +4417,8 @@ var M = {
   dernierEvenement: dernierEvenement, rangComptable: rangComptable,
   rangFacture: rangFacture,
   jourCle: jourCle, minuit: minuit, ajouteJours: ajouteJours, estWeekend: estWeekend,
-  journeesPlacees: journeesPlacees, placerJour: placerJour, resteAPlacer: resteAPlacer,
+  journeesPlacees: journeesPlacees, placerJour: placerJour, resteAPlacer: resteAPlacer, joursPrevus: joursPrevus, joursDevis: joursDevis,
+  travauxHorsJournees: travauxHorsJournees,
   totalPlace: totalPlace, partDuJour: partDuJour,
   journeesFaites: journeesFaites, journeesAVenir: journeesAVenir,
   totalFait: totalFait, totalAVenir: totalAVenir,
@@ -7254,6 +7305,13 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.66', quoi: [
+    { t: 'Un seul bloc pour les travaux : devis, puis facture', vue: 'chantier' },
+    { t: 'Ce qui a change depuis le devis est marque sur la ligne', vue: 'chantier' },
+    { t: 'Les journees se deduisent des lignes libellees en journees', vue: 'chantier' },
+    { t: 'Le numero se compose : vous ne tapez que le chiffre', vue: 'chantier' },
+    { t: 'Facture remplie ou devis signe : le statut suit tout seul', vue: 'chantier' }
+  ] },
   { v: '4.65', quoi: [
     { t: 'Le cout au kilometre etait faux : le carburant est enfin juste', vue: 'coutsv' },
     { t: 'Le prix du litre se calcule sur vos pleins, si vous notez les litres', vue: 'depenses' },
@@ -7273,11 +7331,6 @@ var NOTES_MAJ = [
   { v: '4.62', quoi: [
     { t: 'Restaurer un fichier annonce vraiment ce qu’il contient' },
     { t: 'Fusionner ajoute sans toucher au reste — c’est vérifié', vue: 'carnetv' }
-  ] },
-  { v: '4.61', quoi: [
-    { t: 'Le carnet du véhicule s’importe depuis une sauvegarde', vue: 'carnetv' },
-    { t: 'Le pont arrière Dangel est suivi comme les autres postes', vue: 'echeancesv' },
-    { t: 'Les cotisations disent sur quelle base elles sont calculées', vue: 'analyses' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -10111,13 +10164,120 @@ function paireFiche(nom, valeur) {
    mots changent avec l'étape. Avant, c'est une intention ; après, un constat.
    L'estimation reste donc lisible tout du long — c'est elle qui dit si la
    journée a tenu ce qu'elle promettait. */
+/* Ses numéros ont toujours la même forme : « F-2026-0016 », « D-2026-0042 ».
+   Il ne doit taper que le chiffre — 16 — et l'application met les zéros.
+   L'année reste modifiable : une facture se saisit parfois après le
+   31 décembre. Le préfixe, lui, ne bouge pas : devis et facture, ça ne
+   change pas de nom. */
+var LARGEUR_RANG = 4;
+function decomposerNumero(v) {
+  var s = String(v || '').trim();
+  var m = s.match(/(\d{4})\D+(\d+)\s*$/);
+  if (m) return { an: m[1], rang: String(Number(m[2])) };
+  /* Un numéro d'une autre forme n'est pas perdu : on en garde les derniers
+     chiffres et on lui rend l'année en cours. */
+  m = s.match(/(\d+)\s*$/);
+  return { an: String(new Date().getFullYear()), rang: m ? String(Number(m[1])) : '' };
+}
+function composerNumero(prefixe, an, rang) {
+  var r = String(rang == null ? '' : rang).replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+  if (!r) return '';
+  while (r.length < LARGEUR_RANG) r = '0' + r;
+  var a = String(an == null ? '' : an).replace(/\D/g, '');
+  return prefixe + '-' + (a || new Date().getFullYear()) + '-' + r;
+}
+/* Le suivant, d'après ce qui existe déjà pour cette année-là. Proposé quand
+   le champ est vide, jamais imposé : il numérote parfois hors séquence. */
+function prochainRang(prefixe, an, sauf) {
+  var champ = prefixe === 'D' ? 'numeroDevis' : 'numeroFacture';
+  var max = 0;
+  (A.chantiers || []).forEach(function (c) {
+    if (sauf && c.id === sauf) return;
+    if (!c[champ]) return;
+    var d = decomposerNumero(c[champ]);
+    if (d.an !== String(an)) return;
+    var r = Number(d.rang) || 0;
+    if (r > max) max = r;
+  });
+  return max + 1;
+}
+function champNumero(prefixe, base, valeur, intitule) {
+  var d = decomposerNumero(valeur);
+  return '<div class="champ"><label class="eyebrow" for="' + base + '-rg">' + esc(intitule) + '</label>' +
+    '<div class="numcomp">' +
+    '<span class="pref">' + prefixe + '</span><span class="pref">–</span>' +
+    '<input type="text" class="an num" id="' + base + '-an" inputmode="numeric" ' +
+    'autocomplete="off" value="' + esc(d.an) + '">' +
+    '<span class="pref">–</span>' +
+    '<input type="text" class="rg num" id="' + base + '-rg" inputmode="numeric" ' +
+    'autocomplete="off" value="' + esc(d.rang) + '">' +
+    '</div><p class="apercu-num" id="' + base + '-vu"></p></div>';
+}
+function brancherNumero(prefixe, base, chantierId) {
+  var an = $('#' + base + '-an'), rg = $('#' + base + '-rg'), vu = $('#' + base + '-vu');
+  if (!an || !rg || !vu) return;
+  var propose = null;
+  if (!rg.value.trim()) {
+    propose = prochainRang(prefixe, an.value.trim(), chantierId);
+    rg.value = String(propose);
+  }
+  var maj = function () {
+    var n = composerNumero(prefixe, an.value, rg.value);
+    vu.innerHTML = n
+      ? 'Ce sera <b>' + esc(n) + '</b>' + (propose != null
+        ? '<span class="muted"> — proposé d’après vos numéros de ' + esc(an.value.trim()) + '.</span>' : '')
+      : '<span class="muted">Tapez votre numéro : les zéros se mettent tout seuls.</span>';
+  };
+  [an, rg].forEach(function (x) { x.addEventListener('input', function () { propose = null; maj(); }); });
+  maj();
+}
+function lireNumero(prefixe, base) {
+  var an = $('#' + base + '-an'), rg = $('#' + base + '-rg');
+  return (an && rg) ? composerNumero(prefixe, an.value, rg.value) : '';
+}
+
+/* Le devis signé ne bouge plus. Au moment où le chantier bascule en facturé,
+   on garde une photo de ses lignes : c'est elle qui permet de dire, plus
+   tard, laquelle a été ajoutée ou modifiée — sans jamais tenir deux listes.
+   « On ne comprend pas à quel endroit il y a eu le changement. »
+   La photo n'est prise qu'au passage, jamais sur un chantier déjà facturé :
+   figer l'existant appellerait « devis » ce qui n'en a jamais été un. */
+function figerDevis(c) {
+  if (!c || c.devisFige || !C.aDevis(c)) return false;
+  (c.lignes || []).forEach(function (l) { if (!l.uid) l.uid = uid(); });
+  c.devisFige = { date: Date.now(), total: C.montant(c),
+    lignes: (c.lignes || []).map(function (l) {
+      return { uid: l.uid, montant: C.montantLigne(l), quantite: C.nb(l.quantite),
+        prix: C.nb(l.prix), unite: l.unite, titre: l.note || C.nomTravauxLigne(l) };
+    }) };
+  return true;
+}
+/* Une ligne apparue après la photo n'a pas d'identifiant dedans : c'est ce
+   qui la désigne comme ajoutée, sans avoir à la marquer à la saisie. */
+function changementLigne(c, l) {
+  if (!c.devisFige) return null;
+  var av = null;
+  (c.devisFige.lignes || []).forEach(function (x) {
+    if (x.uid && l.uid && x.uid === l.uid) av = x;
+  });
+  if (!av) return { quoi: 'ajout' };
+  if (C.arr(C.montantLigne(l), 2) !== C.arr(av.montant, 2)) return { quoi: 'chg', avant: av };
+  return null;
+}
+function lignesRetirees(c) {
+  if (!c.devisFige) return [];
+  var vus = {};
+  (c.lignes || []).forEach(function (l) { if (l.uid) vus[l.uid] = 1; });
+  return (c.devisFige.lignes || []).filter(function (x) { return x.uid && !vus[x.uid]; });
+}
+
 function blocValeur(c, m, pj, vise) {
   var solde = ['termine', 'facture', 'paye'].indexOf(c.statut) >= 0;
   /* Le temps saisi, pas les journées posées à l'agenda : celles-ci disent
      qu'on y était, pas combien de temps on y a passé. Le bloc affichait les
      secondes pendant que les rendements lisaient le premier. */
   var saisi = C.tempsMoi(c, A.cfg);
-  var fait = C.tempsPasse(c, A.cfg), est = C.nb(c.joursEstimes);
+  var fait = C.tempsPasse(c, A.cfg), est = C.joursPrevus(c);
   var jours = solde ? fait : est;
   var parJour = jours > 0 ? m / jours : 0;
   /* Dire d'où sort le chiffre : « faites » quand il vient du temps noté,
@@ -10125,9 +10285,9 @@ function blocValeur(c, m, pj, vise) {
      chantiers repris du carnet. */
   var motJours = solde ? (saisi > 0 ? 'journées faites' : 'journées facturées')
     : 'journées estimées';
-  return '<div class="carte">' +
-    teteBloc(solde ? 'Ce que ça a rapporté' : 'Ce que ça vaut', 'f-estim',
-      solde ? 'modifier' : 'estimer') +
+  return '<div class="carte"><h2>' + (solde ? 'Ce que ça a rapporté' : 'Ce que ça vaut') +
+    '</h2><p class="sous-titre-bloc">Rien à saisir ici : tout vient du bloc des travaux, ' +
+    'plus bas. Ce bloc ne fait que le lire.</p>' +
     '<div class="kpi">' +
     '<div class="carte2"><b class="num">' + (m ? eur(m) : '—') + '</b><small>' +
     (solde ? (c.statut === 'paye' ? 'encaissé' : 'facturé') : 'proposé') + '</small></div>' +
@@ -10150,49 +10310,170 @@ function blocValeur(c, m, pj, vise) {
           'sans elle, rien ne dit ce que la journée doit rapporter.</p>'
         : '')) + '</div>';
 }
-/* Le devis, quand il y en a un. Sinon le bloc reste, en retrait, pour dire
-   qu'on peut en attacher un. */
-function blocDevis(c) {
-  if (!C.aDevis(c)) {
-    return '<div class="carte avenir">' + teteBloc('Le devis', 'f-devis', 'attacher') +
-      '<p class="muted" style="font-size:13px;margin:0">Ce chantier n’a pas de devis. ' +
-      'Les étapes de devis ne figurent donc pas dans son statut.</p></div>';
+/* Un seul bloc pour les travaux, et il change de nom avec l'étape — comme
+   « Ce que ça vaut » change de mot. Il n'y a jamais deux listes de lignes à
+   tenir : « les travaux sont liés au devis ou à la facture, c'est net ».
+   Le devis n'est pas perdu quand la facture arrive : il se replie en bas,
+   avec son numéro et ce qu'il disait. */
+function etapeTravaux(c) {
+  if (C.rangStatut(c.statut) >= C.rangStatut('facture') || c.numeroFacture || c.dateFacture) {
+    return 'facture';
   }
-  var fin = C.finValiditeDevis(c);
-  var vide = !c.numeroDevis && !c.dateDevis;
-  return '<div class="carte' + (vide ? ' avenir' : '') + '">' +
-    teteBloc('Le devis', 'f-devis', 'modifier') +
-    (vide
-      ? '<p class="muted" style="font-size:13px;margin:0">Devis annoncé, rien de saisi ' +
-        'encore : numéro, date et validité restent à mettre.</p>'
-      : paireFiche('Numéro', c.numeroDevis || '—') +
-        paireFiche('Édité le', c.dateDevis ? dateCourte(c.dateDevis) : '—') +
-        (c.validiteDevis ? paireFiche('Valable', c.validiteDevis + ' mois' +
-          (fin ? ' — jusqu’au ' + dateCourte(fin) : '')) : '') +
-        (c.dateEnvoi ? paireFiche('Envoyé le', dateCourte(c.dateEnvoi)) : '')) +
-    '</div>';
+  return C.aDevis(c) ? 'devis' : 'todo';
 }
-/* La facture ferme le chantier : c'est elle qui fait foi de ce qui a été
-   fait. Tant qu'elle n'existe pas, le bloc annonce l'étape à venir. */
-function blocFacture(c) {
-  var attendue = C.rangStatut(c.statut) < C.rangStatut('facture');
-  if (attendue && !c.numeroFacture && !c.dateFacture) {
-    return '<div class="carte avenir">' + teteBloc('La facture', 'f-facture', 'saisir') +
-      '<p class="muted" style="font-size:13px;margin:0">Pas encore facturé.</p></div>';
+function ligneTravaux(c, l, i) {
+  /* Quand la ligne porte une précision, c'est elle le titre : c'est le texte
+     qui figure sur la facture du client. Le travail reste dessous — il sert au
+     taux de TVA et aux rendements — sans masquer ce qui a été vendu.
+     Un forfait groupé porte plusieurs travaux : « détourage + élagage ». */
+  var titre = l.note ? l.note : C.nomTravauxLigne(l);
+  var q = l.unite === 'forfait' ? 'forfait'
+    : E.fmt(C.nb(l.quantite), C.nb(l.quantite) % 1 ? 2 : 0) + ' ' + C.courtUnite(l.unite) +
+      ' × ' + E.fmt(C.nb(l.prix), 2) + ' €';
+  var chg = changementLigne(c, l);
+  return '<div class="ligne-trav"><div><b>' + esc(titre) + '</b>' +
+    (chg ? ' <span class="marque-l ' + chg.quoi + '">' +
+      (chg.quoi === 'ajout' ? 'ajoutée' : 'modifiée') + '</span>' : '') +
+    '<div class="muted" style="font-size:12px">' +
+    (l.note ? esc(C.nomTravauxLigne(l)) + ' · ' : '') + esc(q) +
+    ' · TVA ' + String(C.tauxLigne(l, c)).replace('.', ',') + ' %' +
+    (l.nature === 'vente' ? ' · fourniture' : '') +
+    /* Un débours ne se distinguait en rien d'une prestation : impossible de
+       vérifier qu'il était bien écarté du chiffre d'affaires. */
+    (l.nature === 'debours' ? ' · <b>débours</b>, hors chiffre d’affaires' : '') +
+    (l.tva != null && l.tva !== '' ? ' (forcé)' : '') +
+    (l.difficulte ? ' · difficulté ' + C.nb(l.difficulte) + '/5' : '') + '</div>' +
+    (chg && chg.quoi === 'chg'
+      ? '<div class="dit-avant">Le devis disait ' + eur(chg.avant.montant) + '.</div>' : '') +
+    '</div>' +
+    '<div style="text-align:right"><b class="num">' + eur(C.montantLigne(l)) + '</b><br>' +
+    '<button class="btn-min" data-lmod="' + i + '">Modifier</button> ' +
+    '<button class="btn-min" data-lsup="' + i + '">✕</button></div></div>';
+}
+function blocTravaux(c) {
+  var e = etapeTravaux(c);
+  var titre = e === 'facture' ? 'La facture' : e === 'devis' ? 'Le devis' : 'Ce qu’il y a à faire';
+  var fin = C.finValiditeDevis(c);
+  var mFacture = C.montant(c), deb = C.montantDebours(c);
+  var prevus = C.joursPrevus(c), deduit = C.joursDevis(c);
+  var muets = C.travauxHorsJournees(c);
+  var vise = C.prixJourVise(c, A.cfg);
+  var retirees = lignesRetirees(c);
+
+  var entete = '';
+  if (e === 'devis') {
+    entete = paireFiche('Numéro', c.numeroDevis || '—') +
+      paireFiche('Édité le', c.dateDevis ? dateCourte(c.dateDevis) : '—') +
+      (c.validiteDevis ? paireFiche('Valable', c.validiteDevis + ' mois' +
+        (fin ? ' — jusqu’au ' + dateCourte(fin) : '')) : '') +
+      (c.dateEnvoi ? paireFiche('Envoyé le', dateCourte(c.dateEnvoi)) : '') +
+      (c.dateSignature ? paireFiche('Signé le', dateCourte(c.dateSignature)) : '');
+  } else if (e === 'facture') {
+    var retard = C.retardPaiement(c, Date.now()), delai = C.delaiPaiement(c);
+    entete = paireFiche('Numéro', c.numeroFacture || '—') +
+      paireFiche('Facturé le', c.dateFacture ? dateCourte(c.dateFacture) : '—') +
+      (c.echeancePaiement ? paireFiche('À payer avant le', dateCourte(c.echeancePaiement)) : '') +
+      (c.datePaiement ? paireFiche('Payé le', dateCourte(c.datePaiement)) : '') +
+      (delai != null
+        ? '<p class="muted" style="font-size:12px;margin:6px 0 0">Réglé en ' + delai +
+          ' jour' + (delai > 1 ? 's' : '') + '.</p>'
+        : retard
+          ? '<p class="retard" style="margin:6px 0 0">Échéance dépassée de ' + retard +
+            ' jour' + (retard > 1 ? 's' : '') + '.</p>'
+          : '');
   }
-  var retard = C.retardPaiement(c, Date.now()), delai = C.delaiPaiement(c);
-  return '<div class="carte">' + teteBloc('La facture', 'f-facture', 'modifier') +
-    paireFiche('Numéro', c.numeroFacture || '—') +
-    paireFiche('Facturé le', c.dateFacture ? dateCourte(c.dateFacture) : '—') +
-    (c.echeancePaiement ? paireFiche('À payer avant le', dateCourte(c.echeancePaiement)) : '') +
-    (c.datePaiement ? paireFiche('Payé le', dateCourte(c.datePaiement)) : '') +
-    (delai != null
-      ? '<p class="muted" style="font-size:12px;margin:8px 0 0">Réglé en ' + delai +
-        ' jour' + (delai > 1 ? 's' : '') + '.</p>'
-      : retard
-        ? '<p class="retard" style="margin:8px 0 0">Échéance dépassée de ' + retard +
-          ' jour' + (retard > 1 ? 's' : '') + '.</p>'
-        : '') + '</div>';
+
+  /* Le pied dit ce que le devis annonçait. Il ne réapparaît qu'une fois la
+     facture là : avant, le bloc EST le devis. */
+  var pied = '';
+  if (e === 'facture' && c.devisFige) {
+    var ecart = C.arr(mFacture - C.nb(c.devisFige.total), 2);
+    var nAj = 0, nCh = 0;
+    (c.lignes || []).forEach(function (l) {
+      var g = changementLigne(c, l);
+      if (!g) return;
+      if (g.quoi === 'ajout') nAj++; else nCh++;
+    });
+    pied = '<div class="pied-devis">' +
+      '<div class="l"><span>Le devis' + (c.numeroDevis ? ' ' + esc(c.numeroDevis) : '') +
+      ' disait</span><b class="num">' + eur(C.nb(c.devisFige.total)) + '</b></div>' +
+      '<div class="l"><span>Facturé</span><b class="num">' + eur(mFacture) + '</b></div>' +
+      (ecart || nAj || nCh || retirees.length
+        ? '<p style="font-size:12.5px;margin:7px 0 0;color:var(--tiede)">' +
+          [nAj ? nAj + ' ligne' + (nAj > 1 ? 's' : '') + ' ajoutée' + (nAj > 1 ? 's' : '') : '',
+            nCh ? nCh + ' modifiée' + (nCh > 1 ? 's' : '') : '',
+            retirees.length ? retirees.length + ' retirée' + (retirees.length > 1 ? 's' : '') : ''
+          ].filter(Boolean).join(', ') +
+          (ecart ? ' — <b>' + eur(Math.abs(ecart)) + (ecart > 0 ? ' de plus' : ' de moins') +
+            '</b> que le devis signé.' : '.') + '</p>'
+        : '<p style="font-size:12.5px;margin:7px 0 0;color:var(--vert-marque)">' +
+          '<b>Facturé à l’identique.</b> Rien n’a bougé depuis le devis signé.</p>') +
+      '</div>';
+  } else if (e === 'facture' && C.aDevis(c) && c.numeroDevis) {
+    pied = '<div class="pied-devis"><div class="l"><span>Devis</span>' +
+      '<b class="num">' + esc(c.numeroDevis) + '</b></div></div>';
+  } else if (e === 'todo') {
+    pied = '<div class="pied-devis"><p class="muted" style="font-size:12.5px;margin:0">' +
+      'Pas de devis sur ce chantier. Ces lignes deviendront la facture telles ' +
+      'quelles — le crayon en attache un si besoin.</p></div>';
+  }
+  /* Le crayon du bloc ouvre le devis tant qu'on n'a pas facturé : sans cette
+     porte-là, la facture ne serait plus joignable que par le statut, et un
+     numéro saisi d'avance n'aurait aucun chemin. */
+  if (e !== 'facture') {
+    pied += '<div class="btn-rang" style="margin-top:11px">' +
+      '<button class="btn btn-min" id="f-facture">Saisir la facture</button></div>';
+  }
+
+  return '<div class="carte">' +
+    teteBloc(titre, e === 'facture' ? 'f-facture' : 'f-devis',
+      e === 'todo' ? 'attacher un devis' : 'modifier') +
+    entete +
+    '<div class="carte-titre" style="margin:' + (entete ? '14px' : '0') + ' 0 4px">' +
+    '<h2 style="margin:0">' +
+    (e === 'facture' ? 'Ce qui est facturé' : e === 'devis' ? 'Ce que le devis contient'
+      : 'Les travaux prévus') + '</h2>' +
+    '<button class="btn primaire btn-min" id="f-ligne">+ Ligne</button></div>' +
+    ((c.lignes || []).map(function (l, i) { return ligneTravaux(c, l, i); }).join('') ||
+      '<div class="vide"><p>Aucune ligne. Ajoutez les travaux et leur chiffrage.</p></div>') +
+    /* Une ligne du devis qui n'a pas été facturée : elle ne se voit nulle
+       part si on se contente de la retirer, et l'écart devient inexplicable. */
+    retirees.map(function (x) {
+      return '<div class="ligne-trav ligne-retiree"><div><b>' + esc(x.titre || 'Ligne') + '</b> ' +
+        '<span class="marque-l ret">retirée</span>' +
+        '<div class="muted" style="font-size:12px">Au devis, pas sur la facture.</div></div>' +
+        '<div style="text-align:right"><b class="num muted">' + eur(x.montant) + '</b></div></div>';
+    }).join('') +
+    /* Le total de la facture garde le débours — c'est ce que le client paie —
+       et la part qu'il représente est dite juste en dessous. */
+    (mFacture ? '<div style="display:flex;justify-content:space-between;margin-top:11px;padding-top:9px;border-top:2px solid var(--encre)">' +
+      '<b>Total HT</b><b class="num" style="font-size:19px">' + eur(mFacture) + '</b></div>' +
+      (deb ? '<div style="display:flex;justify-content:space-between;font-size:13px" class="muted">' +
+        '<span>dont débours, hors chiffre d’affaires</span><span class="num">' +
+        eur(deb) + '</span></div>' : '') +
+      '<div style="display:flex;justify-content:space-between;font-size:13px" class="muted">' +
+      '<span>TVA ' + C.tauxPresents(c).map(function (t) { return String(t).replace('.', ','); }).join(' et ') + ' %</span><span class="num">' +
+      eur((c.lignes || []).reduce(function (s, l) { return s + C.montantLigne(l) * C.tauxLigne(l, c) / 100; }, 0)) +
+      '</span></div>' : '') +
+
+    /* Le temps que ça demande vit ici, avec ce qui le chiffre. Il était deux
+       blocs plus haut, dans un formulaire à part : deux endroits pour une
+       même idée. */
+    '<div style="margin-top:13px;padding-top:11px;border-top:1px solid var(--trait)">' +
+    '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">' +
+    '<button class="modif-bloc" id="f-estim" style="font-size:10.5px;font-weight:700;' +
+    'letter-spacing:.10em;text-transform:uppercase;color:var(--gris)">Le temps que ça demande ✎</button>' +
+    '<b class="num" style="font-size:17px">' +
+    (prevus ? E.fmt(prevus, prevus % 1 ? 1 : 0) + ' j' : '—') + '</b></div>' +
+    '<p class="muted" style="font-size:12px;margin:5px 0 0">' +
+    (deduit > 0
+      ? 'Déduit des lignes en journées : rien à ressaisir.' +
+        (muets.length ? ' <b>Attention</b> : ne tient pas compte de ' +
+          esc(muets.join(', ').toLowerCase()) + '.' : '')
+      : (prevus ? 'Votre estimation. Aucune ligne n’est libellée en journées.'
+        : 'Aucune journée estimée : sans elle, rien ne dit ce que la journée doit rapporter.')) +
+    (vise ? ' Objectif ' + eur(vise) + ' la journée.' : '') + '</p></div>' +
+    pied + '</div>';
 }
 
 function renderFiche() {
@@ -10205,30 +10486,6 @@ function renderFiche() {
   var j = C.tempsTotal(c, A.cfg), pj = C.prixJour(c, A.cfg);
   var vise = C.prixJourVise(c, A.cfg);
   var bil = C.bilanJournees(c, A.cfg);
-  var lignes = (c.lignes || []).map(function (l, i) {
-    var q = l.unite === 'forfait' ? 'forfait'
-      : E.fmt(C.nb(l.quantite), C.nb(l.quantite) % 1 ? 2 : 0) + ' ' + C.courtUnite(l.unite) +
-        ' × ' + E.fmt(C.nb(l.prix), 2) + ' €';
-    /* Quand la ligne porte une précision, c'est elle le titre : c'est le
-       texte qui figure sur la facture du client. Le travail reste dessous —
-       il sert au taux de TVA et aux rendements — mais il ne doit plus
-       masquer ce qui a réellement été vendu. */
-    /* Un forfait groupé porte plusieurs travaux : « détourage + élagage ». */
-    var titre = l.note ? l.note : C.nomTravauxLigne(l);
-    return '<div class="ligne-trav"><div><b>' + esc(titre) + '</b>' +
-      '<div class="muted" style="font-size:12px">' +
-      (l.note ? esc(C.nomTravauxLigne(l)) + ' · ' : '') + esc(q) +
-      ' · TVA ' + String(C.tauxLigne(l, c)).replace('.', ',') + ' %' +
-      (l.nature === 'vente' ? ' · fourniture' : '') +
-      /* Un débours ne se distinguait en rien d'une prestation : impossible de
-         vérifier qu'il était bien écarté du chiffre d'affaires. */
-      (l.nature === 'debours' ? ' · <b>débours</b>, hors chiffre d’affaires' : '') +
-      (l.tva != null && l.tva !== '' ? ' (forcé)' : '') +
-      (l.difficulte ? ' · difficulté ' + C.nb(l.difficulte) + '/5' : '') + '</div></div>' +
-      '<div style="text-align:right"><b class="num">' + eur(C.montantLigne(l)) + '</b><br>' +
-      '<button class="btn-min" data-lmod="' + i + '">Modifier</button> ' +
-      '<button class="btn-min" data-lsup="' + i + '">✕</button></div></div>';
-  }).join('');
 
   var temps = (c.temps || []).slice().sort(function (a, b) { return (b.date || 0) - (a.date || 0); })
     .map(function (t, i) {
@@ -10295,26 +10552,7 @@ function renderFiche() {
     '</div>' +
 
     blocValeur(c, m, pj, vise) +
-    blocDevis(c) +
-
-    '<div class="carte"><div class="carte-titre"><h2>Travaux</h2>' +
-    '<button class="btn primaire btn-min" id="f-ligne">+ Ligne</button></div>' +
-    '<p class="sous-titre-bloc">Ce que vous facturez : une ligne par prestation, ' +
-    'avec sa quantité, son prix et sa TVA. C’est la matière de votre devis.</p>' +
-    (lignes || '<div class="vide"><p>Aucune ligne. Ajoutez les travaux et leur chiffrage.</p></div>') +
-    /* Le total de la facture garde le débours — c'est ce que le client paie —
-       et la part qu'il représente est dite juste en dessous, pour qu'on sache
-       ce qui, là-dedans, ne rapporte rien. */
-    (mFacture ? '<div style="display:flex;justify-content:space-between;margin-top:11px;padding-top:9px;border-top:2px solid var(--encre)">' +
-      '<b>Total HT</b><b class="num" style="font-size:19px">' + eur(mFacture) + '</b></div>' +
-      (deb ? '<div style="display:flex;justify-content:space-between;font-size:13px" class="muted">' +
-        '<span>dont débours, hors chiffre d’affaires</span><span class="num">' +
-        eur(deb) + '</span></div>' : '') +
-      '<div style="display:flex;justify-content:space-between;font-size:13px" class="muted">' +
-      '<span>TVA ' + C.tauxPresents(c).map(function (t) { return String(t).replace('.', ','); }).join(' et ') + ' %</span><span class="num">' +
-      eur((c.lignes || []).reduce(function (s, l) { return s + C.montantLigne(l) * C.tauxLigne(l, c) / 100; }, 0)) +
-      '</span></div>' : '') +
-    '</div>' +
+    blocTravaux(c) +
 
     '<div class="carte">' + teteBloc('Les journées', 'f-jours', 'modifier') +
     '<div class="carte-titre" style="margin:0 0 4px">' +
@@ -10328,7 +10566,7 @@ function renderFiche() {
     'Ils y sont bloqués provisoirement tant que le chantier n’est pas signé. ' +
     'Ces jours disent <b>quand</b> vous y étiez ; le temps réellement passé se note plus bas.</p>' +
     (function () {
-      var pl = C.journeesPlacees(c), est = C.nb(c.joursEstimes), tot = C.totalPlace(c);
+      var pl = C.journeesPlacees(c), est = C.joursPrevus(c), tot = C.totalPlace(c);
       if (!pl.length) {
         return '<p class="muted" style="font-size:12.5px;margin:0">' +
           (est ? E.fmt(est, est % 1 ? 1 : 0) + ' journée' + (est > 1 ? 's' : '') + ' estimée' +
@@ -10399,7 +10637,6 @@ function renderFiche() {
         'précisez l’activité dans chaque saisie de temps pour obtenir les rendements.</p>' : '') : '') +
     '</div>' +
 
-    blocFacture(c) +
 
     (function () {
       var conso = ST.consommationChantier(A.articles, c.id);
@@ -10470,9 +10707,6 @@ var VALIDITES_DEVIS = [
 function champsDevisCh(c) {
   var v = C.nb(c.validiteDevis);
   return '<div class="grille g2" style="margin-top:9px">' +
-    '<div class="champ"><label class="eyebrow" for="ce-numdevis">N° du devis</label>' +
-    '<input type="text" id="ce-numdevis" autocomplete="off" placeholder="plus tard si besoin" value="' +
-    esc(c.numeroDevis || '') + '"></div>' +
     '<div class="champ"><label class="eyebrow" for="ce-datedevis">Édité le</label>' +
     '<input type="date" id="ce-datedevis" value="' + versChamp(c.dateDevis) + '"></div>' +
     '<div class="champ"><label class="eyebrow" for="ce-validite">Validité</label>' +
@@ -10480,7 +10714,15 @@ function champsDevisCh(c) {
     VALIDITES_DEVIS.map(function (x) {
       return '<option value="' + x.m + '"' + (v === x.m ? ' selected' : '') + '>' + x.n + '</option>';
     }).join('') + '</select></div></div>' +
-    '<p class="muted" id="ce-validite-fin" style="font-size:12px;margin:7px 0 0"></p>';
+    champNumero('D', 'ce-numdevis', c.numeroDevis, 'N° du devis') +
+    '<p class="muted" id="ce-validite-fin" style="font-size:12px;margin:7px 0 0"></p>' +
+    /* Il l'a demandée expressément : la signature est ce qui fait basculer le
+       chantier, et sans sa date on ne sait plus quand l'engagement a été pris. */
+    '<div class="champ" style="margin-top:11px">' +
+    '<label class="eyebrow" for="ce-signe">Signé le</label>' +
+    '<input type="date" id="ce-signe" value="' + versChamp(c.dateSignature) + '">' +
+    '<p class="muted" style="font-size:11.5px;margin:5px 0 0">Renseignée, elle fait passer ' +
+    'le chantier en « ' + esc(C.nomStatut('accepte', { aDevis: true })) + ' ».</p></div>';
 }
 /* La liste des étapes dépend de la case : on lui donne de quoi répondre sans
    avoir le chantier enregistré sous la main. */
@@ -10778,8 +11020,14 @@ function brancherOffreListe(champId, cle) {
    les petits formulaires passent par là : c'est ce qui garantit qu'aucun
    n'oublie de rafraîchir le carnet ou l'accueil. */
 function majChantier(c, champs, message) {
+  var avant = c.statut;
   Object.keys(champs).forEach(function (k) { c[k] = champs[k]; });
   c.maj = Date.now();
+  /* La photo du devis se prend au passage, jamais après : sur un chantier
+     déjà facturé — les trente-deux repris du carnet — figer l'existant
+     appellerait « devis » ce qui n'en a jamais été un, et toutes les lignes
+     paraîtraient conformes à un devis qui n'a pas existé. */
+  if (avant !== c.statut && ['facture', 'paye'].indexOf(c.statut) >= 0) figerDevis(c);
   horodaterStatut(c);
   return sauverChantiers().then(function () {
     fermerModale(); renderFiche(); renderCarnet(); renderCalendrier();
@@ -10899,17 +11147,29 @@ function ouvrirDevisCh(id) {
   ['#ce-datedevis', '#ce-validite'].forEach(function (x) {
     if ($(x)) $(x).addEventListener('change', majFinValidite);
   });
+  brancherNumero('D', 'ce-numdevis', c.id);
   maj();
   $('#dv-ok').addEventListener('click', function () {
     var coche = $('#dv-a').checked;
+    var signe = coche ? versDate($('#ce-signe').value) : null;
     var champs = { aDevis: coche,
-      numeroDevis: coche ? $('#ce-numdevis').value.trim() : '',
+      numeroDevis: coche ? lireNumero('D', 'ce-numdevis') : '',
       dateDevis: coche ? versDate($('#ce-datedevis').value) : null,
+      dateSignature: signe,
       validiteDevis: coche ? (C.nb($('#ce-validite').value) || null) : null };
     /* Sans devis, les deux premières étapes n'existent plus : on avance le
        chantier à celle où il en est réellement. */
     if (!coche && (c.statut === 'devis' || c.statut === 'envoye')) champs.statut = 'accepte';
-    majChantier(c, champs, 'Devis enregistré.');
+    /* Un devis signé fait avancer le chantier tout seul : c'est ce qu'il a
+       demandé, et le geste en moins est un oubli en moins. On n'avance
+       jamais vers l'arrière — un chantier déjà en cours ne redevient pas
+       « à planifier ». */
+    var dit = 'Devis enregistré.';
+    if (coche && signe && C.rangStatut(c.statut) < C.rangStatut('accepte')) {
+      champs.statut = 'accepte';
+      dit = 'Devis signé — chantier « ' + C.nomStatut('accepte', c) + ' ».';
+    }
+    majChantier(c, champs, dit);
   });
 }
 
@@ -10917,10 +11177,8 @@ function ouvrirDevisCh(id) {
 function ouvrirFactureCh(id) {
   var c = chantier(id); if (!c) return;
   modale('La facture',
+    champNumero('F', 'fc-num', c.numeroFacture, 'N° de facture') +
     '<div class="grille g2">' +
-    '<div class="champ"><label class="eyebrow" for="fc-num">N° de facture</label>' +
-    '<input type="text" id="fc-num" class="gros" autocomplete="off" ' +
-    'placeholder="celui de votre logiciel" value="' + esc(c.numeroFacture || '') + '"></div>' +
     '<div class="champ"><label class="eyebrow" for="fc-date">Facturé le</label>' +
     '<input type="date" id="fc-date" value="' + versChamp(c.dateFacture) + '"></div>' +
     '<div class="champ"><label class="eyebrow" for="fc-ech">À payer avant le</label>' +
@@ -10949,24 +11207,27 @@ function ouvrirFactureCh(id) {
     var base = versDate($('#fc-date').value) || C.minuit(Date.now());
     $('#fc-ech').value = versChamp(base + Number(r.dataset.fcech) * C.JOUR);
   });
+  brancherNumero('F', 'fc-num', c.id);
   $('#fc-ok').addEventListener('click', function () {
-    var maj = { numeroFacture: $('#fc-num').value.trim(),
+    var maj = { numeroFacture: lireNumero('F', 'fc-num'),
       dateFacture: versDate($('#fc-date').value),
       echeancePaiement: versDate($('#fc-ech').value),
       datePaiement: versDate($('#fc-paie').value),
       moyenPaiement: $('#fc-moyen').value || null };
-    /* Remplir une facture sur un chantier qui n'est pas encore « Facturé »,
-       c'est presque toujours qu'il vient de l'émettre. Sylve le propose, il ne
-       le décide pas : le statut ne doit jamais partir tout seul.
-       Un paiement déjà saisi va plus loin que la facture : on propose alors
+    /* « Une facture remplie bascule automatiquement le chantier en facturé. »
+       C'était une question posée depuis longtemps, tranchée le 31 août : la
+       fenêtre de confirmation ne faisait qu'ajouter un geste à un choix déjà
+       fait en remplissant les champs.
+       Un paiement saisi va plus loin que la facture : on va alors jusqu'à
        « Payé », sinon on reviendrait en arrière. */
     var vise = maj.datePaiement ? 'paye' : 'facture';
-    if (maj.numeroFacture && maj.dateFacture && c.statut !== vise &&
-      ['facture', 'paye'].indexOf(c.statut) < 0) {
-      if (confirm('Ce chantier est encore « ' + C.nomStatut(c.statut, c) + ' ».\n\n' +
-        'Le passer en « ' + C.nomStatut(vise, c) + ' » ?')) maj.statut = vise;
+    var dit = 'Facture enregistrée.';
+    if (maj.numeroFacture && maj.dateFacture &&
+      C.rangStatut(c.statut) < C.rangStatut(vise)) {
+      maj.statut = vise;
+      dit = 'Facture enregistrée — chantier « ' + C.nomStatut(vise, c) + ' ».';
     }
-    majChantier(c, maj, 'Facture enregistrée.');
+    majChantier(c, maj, dit);
   });
 }
 
@@ -11404,7 +11665,9 @@ function ouvrirStatut(id) {
       'Cochez la case dans le bloc « Le devis » pour les faire apparaître.</p>'));
   $('#modale-corps').addEventListener('click', function (e) {
     var b = e.target.closest('[data-setstatut]'); if (!b) return;
+    var avant = c.statut;
     c.statut = b.dataset.setstatut;
+    if (avant !== c.statut && ['facture', 'paye'].indexOf(c.statut) >= 0) figerDevis(c);
     horodaterStatut(c);
     c.maj = Date.now();
     if (c.statut === 'sansuite') { demanderMotifRefus(c); return; }
@@ -11591,7 +11854,7 @@ function renderBandeauPlanif() {
     '<div class="muted" style="font-size:12.5px;margin-top:2px">' +
     (reste == null
       ? placees + ' journée' + (placees > 1 ? 's' : '') + ' placée' + (placees > 1 ? 's' : '')
-      : placees + ' / ' + Math.ceil(C.nb(c.joursEstimes)) + ' journées placées' +
+      : placees + ' / ' + Math.ceil(C.joursPrevus(c)) + ' journées placées' +
         (reste > 0 ? ' — encore ' + reste : (reste < 0 ? ' — ' + (-reste) + ' de trop' : ' — compte atteint'))) +
     '. Appuyez sur les jours voulus — ils passent en noir. Une seconde ' +
     'pression donne une demi-journée, une troisième retire le jour.</div>' +
@@ -15123,10 +15386,8 @@ function renderCarteChantiers() {
    remplit vraiment. Jamais imposé : la facture n'est pas toujours éditée. */
 function demanderNumeroFacture(c) {
   modale('Facturé — ' + (c.nom || 'chantier'),
+    champNumero('F', 'nf-num', c.numeroFacture, 'N° de facture') +
     '<div class="grille g2">' +
-    '<div class="champ"><label class="eyebrow" for="nf-num">N° de facture</label>' +
-    '<input type="text" id="nf-num" class="gros" autocomplete="off" ' +
-    'placeholder="celui de votre logiciel" value="' + esc(c.numeroFacture || '') + '"></div>' +
     '<div class="champ"><label class="eyebrow" for="nf-date">Facturé le</label>' +
     '<input type="date" id="nf-date" value="' + versChamp(c.dateFacture) + '"></div>' +
     /* L'échéance écrite sur la facture vaut mieux qu'un délai général : c'est
@@ -15142,9 +15403,10 @@ function demanderNumeroFacture(c) {
     '<div class="btn-rang" style="margin-top:11px">' +
     '<button class="btn btn-min" id="nf-passer">Plus tard</button>' +
     '<button class="btn primaire" id="nf-ok">Valider</button></div>');
+  brancherNumero('F', 'nf-num', c.id);
   var finir = function (avecNumero) {
     if (avecNumero) {
-      c.numeroFacture = $('#nf-num').value.trim();
+      c.numeroFacture = lireNumero('F', 'nf-num');
       var d = versDate($('#nf-date').value);
       if (d) c.dateFacture = d;
       c.echeancePaiement = versDate($('#nf-ech').value);
@@ -16975,7 +17237,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.65.0-20260831-2110';
+var VERSION = '4.66.0-20260831-2340';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
