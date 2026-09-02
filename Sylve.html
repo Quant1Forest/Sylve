@@ -208,9 +208,13 @@ body:not(.m-ent) .mod-ent{display:none}
 .ligne-trav{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center;padding:7px 0;border-bottom:1px solid var(--trait)}
 .ligne-trav:last-child{border-bottom:none}
 .fiche-tete{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
-.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px;margin-top:11px}
-.kpi .carte2{padding:9px 11px}
-.kpi b{font-size:19px;display:block}
+/* Des tuiles un peu plus larges et un chiffre un cran plus bas : « 130 000 € »
+   ne tenait pas en 19 px dans 96 px, et le symbole passait à la ligne. Le
+   nombre ne se coupe jamais — mieux vaut une tuile qui s'étire qu'un « € »
+   tout seul en dessous. */
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(102px,1fr));gap:8px;margin-top:11px}
+.kpi .carte2{padding:9px 8px;min-width:0}
+.kpi b{font-size:17px;display:block;white-space:nowrap;letter-spacing:-.01em}
 
 .lien-regl{
   font:inherit;font-size:12px;color:var(--gris);border:none;background:none;padding:0;
@@ -415,7 +419,7 @@ input.mini{padding:6px 7px;border:1px solid var(--trait);border-radius:7px;font-
   background:var(--carte2);border:1px solid var(--trait);border-radius:var(--r);
   padding:9px 10px;text-align:left;display:block;font:inherit;color:inherit;
 }
-.bulle .v{font-size:19px;display:block;line-height:1.1}
+.bulle .v{font-size:17px;display:block;line-height:1.1;white-space:nowrap;letter-spacing:-.01em}
 .bulle .e{
   display:block;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;
   color:var(--doux);margin-top:3px;
@@ -1358,7 +1362,7 @@ if (froid && s > 0) montrer(s);
           <button class="tuile" data-module="entreprise">
             <span class="ic"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><path d="M8.6 4H6.6A1.6 1.6 0 0 0 5 5.6v13.8A1.6 1.6 0 0 0 6.6 21h10.8a1.6 1.6 0 0 0 1.6-1.6V5.6A1.6 1.6 0 0 0 17.4 4h-2"/><rect x="8.6" y="2.4" width="6.8" height="3.4" rx="1.1"/><path d="M8.7 10.6h6.6M8.7 14h6.6M8.7 17.4h3.8"/></svg></span>
             <span><b>Mon entreprise</b><small>Chantiers, devis, rendements, finances</small></span>
-            <span class="chiffre"><b id="a-ent-n">—</b><span>chantiers</span></span>
+            <span class="chiffre"><b id="a-ent-n">—</b><span>chantiers ouverts</span></span>
           </button>
         </div>
         <div id="a-journee"></div>
@@ -3013,7 +3017,7 @@ function etat(p, maintenant, cfg) {
   var mois = p && p.empile ? Math.max(0, Math.floor((maintenant - p.empile) / MOIS)) : null;
   if (m) {
     var cl = classe(nb(m.taux), s);
-    var e = { statut: cl, mesure: true, taux: nb(m.taux), mois: mois, texte: LIBELLE[cl] + ' — ' + arr(nb(m.taux), 1) + ' %' };
+    var e = { statut: cl, mesure: true, taux: nb(m.taux), mois: mois, texte: LIBELLE[cl] + ' — ' + arr(nb(m.taux), 1) + ' %' };
     if (cl === 'sec' || cl === 'tressec') { e.sec = true; return e; }
     var t = tendance(p.mesures, s.sec);
     if (t && t.secheVers) {
@@ -4590,9 +4594,14 @@ function nomCategorie(c) { var x = trouve(CATEGORIES, c); return x ? x.n : (c ||
    il faut que je les garde en mémoire. » L'objet est de savoir ce qui
    l'attend en dépenses, pas de tenir un budget : il saisit le TTC — c'est
    ce qu'il lit sur une étiquette — et le hors taxes se déduit. */
+/* Des horizons glissants, jamais un millésime : « cette année » ne veut
+   plus rien dire au mois de décembre. Les codes ne bougent pas — « annee »
+   reste « dans l'année » — pour ne décrocher aucune ligne déjà saisie. */
 var PRIORITES_ACHAT = [
   { c: 'urgent', n: 'Dès que possible', coul: '#B4231F' },
-  { c: 'annee', n: 'Cette année', coul: '#C4611B' },
+  { c: 'trois', n: 'Dans les 3 mois', coul: '#C4611B' },
+  { c: 'six', n: 'Dans les 6 mois', coul: '#B98A00' },
+  { c: 'annee', n: 'Dans l’année', coul: '#2E7D46' },
   { c: 'unjour', n: 'Un jour', coul: '#6F6A5C' }
 ];
 function nomPriorite(c) { var x = trouve(PRIORITES_ACHAT, c); return x ? x.n : ''; }
@@ -6300,7 +6309,7 @@ function tblSynthese() {
       l.cells.forEach(function (c) {
         h += td(c.nb || '', 'num') + td(c.vol ? E.fmt(c.vol) : '', 'num');
       });
-      h += td(E.fmt(l.volQual), 'num') + td(E.fmt(l.pct * 100, 1) + ' %', 'num') + td('', 'num') + td('', 'num') + '</tr>';
+      h += td(E.fmt(l.volQual), 'num') + td(E.fmt(l.pct * 100, 1) + ' %', 'num') + td('', 'num') + td('', 'num') + '</tr>';
     } else {
       h += '<tr class="tot">' + td('Total ' + l.ess, 'g') + td(E.fmt(l.nbGrumes, 0), 'num') + td(E.fmt(l.nbBillons, 0), 'num') +
         td('', 'g') + Array(E.CLASSES_DIAM.length * 2 + 1).join('<td></td>') + '<td></td><td></td>' +
@@ -6652,7 +6661,7 @@ function renderReglages() {
     A.cfg.essences.map(function (e, i) {
       return '<tr>' + td(e.code, 'g') + '<td class="g"><input type="text" data-ess-nom="' + i + '" value="' + esc(e.nom) + '" style="padding:3px 6px"></td>' +
         '<td><input type="text" inputmode="decimal" data-ess-tx="' + i + '" value="' + esc(String(Math.round(e.tx * 100)).replace('.', ',')) +
-        '" style="width:58px;padding:3px 6px;text-align:right"> %</td>' +
+        '" style="width:58px;padding:3px 6px;text-align:right"> %</td>' +
         '<td><button class="btn-min" data-ess-fav="' + i + '">' + ((A.cfg.favoris || []).indexOf(e.code) >= 0 ? '★' : '☆') + '</button></td>' +
         '<td class="act"><button class="btn-min" data-ess-sup="' + i + '">Suppr.</button></td></tr>';
     }).join('') + '</tbody>';
@@ -7476,6 +7485,14 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.70', quoi: [
+    { t: 'Une facture recente attend : elle n est plus dite impayee', vue: 'carnet' },
+    { t: 'Ma journee ne propose plus les chantiers factures' },
+    { t: 'Et le chantier choisi remplit lieu, prestation et kilometres' },
+    { t: 'Le jour qui vient dit pour qui vous travaillez', vue: 'calendrier' },
+    { t: 'Les achats se rangent par horizon : 3 mois, 6 mois, l annee', vue: 'achats' },
+    { t: 'Les chiffres ne debordent plus, le % ne saute plus la ligne' }
+  ] },
   { v: '4.69', quoi: [
     { t: 'Un module « Achats a venir » : ce que vous comptez acheter', vue: 'achats' },
     { t: 'Range par ce qui presse, avec le montant estime', vue: 'achats' },
@@ -7502,13 +7519,6 @@ var NOTES_MAJ = [
     { t: 'Les journees se deduisent des lignes libellees en journees', vue: 'chantier' },
     { t: 'Le numero se compose : vous ne tapez que le chiffre', vue: 'chantier' },
     { t: 'Facture remplie ou devis signe : le statut suit tout seul', vue: 'chantier' }
-  ] },
-  { v: '4.65', quoi: [
-    { t: 'Le cout au kilometre etait faux : le carburant est enfin juste', vue: 'coutsv' },
-    { t: 'Le prix du litre se calcule sur vos pleins, si vous notez les litres', vue: 'depenses' },
-    { t: 'Une categorie « Frais vehicule » : garage, carte grise, pieces', vue: 'depenses' },
-    { t: 'L achat du vehicule se repartit sur ce qu il reste a rouler', vue: 'carnetv' },
-    { t: 'Une facture de garage se verse dans le carnet d une case', vue: 'depenses' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -8703,7 +8713,7 @@ function choisirEssence() {
       return !f || e.code.toLowerCase().indexOf(f) >= 0 || e.nom.toLowerCase().indexOf(f) >= 0;
     }).map(function (e) {
       return '<button class="liste-item" data-ce="' + esc(e.code) + '"><div class="li-c"><b>' + esc(e.code) +
-        ' — ' + esc(e.nom) + '</b><small>écorce ' + E.fmt(e.tx * 100, 0) + ' %</small></div></button>';
+        ' — ' + esc(e.nom) + '</b><small>écorce ' + E.fmt(e.tx * 100, 0) + ' %</small></div></button>';
     }).join('') || '<p class="muted">Aucune essence.</p>';
   };
   rend('');
@@ -9368,7 +9378,7 @@ function renderPourcents() {
   z.innerHTML = '<div class="carte2" style="margin-top:9px">' +
     '<div class="eyebrow" style="margin-bottom:7px">Proportions ' +
     '<span data-pcttot style="float:right;font-family:var(--mono);color:' +
-    (ok ? 'var(--doux)' : '#B4231F') + '">' + Math.round(tot) + ' %</span></div>' +
+    (ok ? 'var(--doux)' : '#B4231F') + '">' + Math.round(tot) + ' %</span></div>' +
     pEss.map(function (c) {
       var v = pPct[c] != null ? pPct[c] : '';
       return '<div style="display:flex;align-items:center;gap:9px;margin:6px 0">' +
@@ -9386,7 +9396,7 @@ function majTotalPourcents() {
   var ok = Math.round(tot) === 100;
   var e = z.querySelector('[data-pcttot]');
   if (e) {
-    e.textContent = Math.round(tot) + ' %';
+    e.textContent = Math.round(tot) + ' %';
     e.style.color = ok ? 'var(--doux)' : '#B4231F';
   }
   var av = z.querySelector('[data-pctav]');
@@ -9405,8 +9415,8 @@ function renderBois() {
   var pv = pEtat === 'mixte'
     ? '<div class="carte2" style="margin:9px 0;padding:10px 11px">' +
       '<div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:6px">' +
-      '<span>Vert <b class="num" id="p-partvert-n">' + Math.round(pPartVert) + ' %</b></span>' +
-      '<span>Mort <b class="num" id="p-partsec-n">' + Math.round(100 - pPartVert) + ' %</b></span></div>' +
+      '<span>Vert <b class="num" id="p-partvert-n">' + Math.round(pPartVert) + ' %</b></span>' +
+      '<span>Mort <b class="num" id="p-partsec-n">' + Math.round(100 - pPartVert) + ' %</b></span></div>' +
       '<input type="range" id="p-partvert" min="0" max="100" step="5" value="' +
       Math.round(pPartVert) + '" style="width:100%"></div>'
     : '';
@@ -9608,8 +9618,8 @@ function ouvrirPile(id) {
     var pv = e.target.closest('#p-partvert');
     if (pv) {
       pPartVert = H.nb(pv.value);
-      var n = $('#p-partvert-n'); if (n) n.textContent = Math.round(pPartVert) + ' %';
-      var m = $('#p-partsec-n'); if (m) m.textContent = Math.round(100 - pPartVert) + ' %';
+      var n = $('#p-partvert-n'); if (n) n.textContent = Math.round(pPartVert) + ' %';
+      var m = $('#p-partsec-n'); if (m) m.textContent = Math.round(100 - pPartVert) + ' %';
     }
     apercuPile();
   });
@@ -9688,7 +9698,7 @@ function ouvrirMesure(id) {
     '<div class="btn-rang"><button class="btn primaire" id="m-ok">Enregistrer</button></div>' +
     (h.length ? '<p class="muted" style="font-size:12px;margin:14px 0 5px">Relevés (' + h.length + ')</p>' +
       '<div id="m-liste">' + h.map(function (m) {
-        return '<div class="liste-item"><div class="li-c"><b>' + E.fmt(m.taux, 1) + ' %</b>' +
+        return '<div class="liste-item"><div class="li-c"><b>' + E.fmt(m.taux, 1) + ' %</b>' +
           '<small>' + new Date(m.date).toLocaleDateString('fr-FR') + '</small></div>' +
           '<button class="btn-min" data-medit="' + m.date + '">Modifier</button>' +
           '<button class="btn-min" data-mdel="' + m.date + '">Supprimer</button></div>';
@@ -10568,7 +10578,7 @@ function ligneTravaux(c, l, i) {
       (chg.quoi === 'ajout' ? 'ajoutée' : 'modifiée') + '</span>' : '') +
     '<div class="muted" style="font-size:12px">' +
     (l.note ? esc(C.nomTravauxLigne(l)) + ' · ' : '') + esc(q) +
-    ' · TVA ' + String(C.tauxLigne(l, c)).replace('.', ',') + ' %' +
+    ' · TVA ' + String(C.tauxLigne(l, c)).replace('.', ',') + ' %' +
     (l.nature === 'vente' ? ' · fourniture' : '') +
     /* Un débours ne se distinguait en rien d'une prestation : impossible de
        vérifier qu'il était bien écarté du chiffre d'affaires. */
@@ -10714,7 +10724,7 @@ function blocTravaux(c) {
         '<span>dont débours, hors chiffre d’affaires</span><span class="num">' +
         eur(deb) + '</span></div>' : '') +
       '<div style="display:flex;justify-content:space-between;font-size:13px" class="muted">' +
-      '<span>TVA ' + C.tauxPresents(c).map(function (t) { return String(t).replace('.', ','); }).join(' et ') + ' %</span><span class="num">' +
+      '<span>TVA ' + C.tauxPresents(c).map(function (t) { return String(t).replace('.', ','); }).join(' et ') + ' %</span><span class="num">' +
       eur((c.lignes || []).reduce(function (s, l) { return s + C.montantLigne(l) * C.tauxLigne(l, c) / 100; }, 0)) +
       '</span></div>' : '') +
 
@@ -10943,7 +10953,7 @@ function renderFiche() {
           '<div class="carte2"><b class="num">' + eur(mg.vendu) + '</b><small>refacturé</small></div>' +
           '<div class="carte2"><b class="num">' + eur(mg.cout) + '</b><small>coût du stock</small></div>' +
           '<div class="carte2" style="border-color:' + (mg.marge >= 0 ? '#2E7D46' : '#B4231F') + '">' +
-          '<b class="num">' + eur(mg.marge) + '</b><small>marge' + (mg.taux != null ? ' · ' + mg.taux + ' %' : '') + '</small></div></div>' : '') +
+          '<b class="num">' + eur(mg.marge) + '</b><small>marge' + (mg.taux != null ? ' · ' + mg.taux + ' %' : '') + '</small></div></div>' : '') +
         '</div>';
     })() +
     (function () {
@@ -11696,7 +11706,7 @@ function ouvrirLigne(id, idx) {
     [0, 5.5, 10, 20].map(function (t) {
       var pose = l.tva != null && l.tva !== '';
       return '<option value="' + t + '"' + (pose && C.nb(l.tva) === t ? ' selected' : '') +
-        '>forcer à ' + String(t).replace('.', ',') + ' %</option>';
+        '>forcer à ' + String(t).replace('.', ',') + ' %</option>';
     }).join('') + '</select></div>' +
     '<div class="carte2" id="cl-apercu" style="margin:11px 0"></div>' +
     '<label class="eyebrow" style="display:block">Difficulté <span class="muted" ' +
@@ -11828,7 +11838,7 @@ function ouvrirLigne(id, idx) {
     if (melange) {
       expl = 'ces travaux ne portent pas le même taux (' +
         C.tauxDesTravaux(x, c.siren).map(function (t) {
-          return String(t).replace('.', ',') + ' %';
+          return String(t).replace('.', ',') + ' %';
         }).join(' et ') + ') — choisissez celui de la ligne';
     }
     $('#cl-apercu').innerHTML = m
@@ -13002,7 +13012,7 @@ function ouvrirAchat(id) {
     '<select id="ac-taux">' + FIN.TAUX_TVA.map(function (x) {
       return '<option value="' + x + '"' +
         ((a ? FIN.nb(a.taux) : 20) === x ? ' selected' : '') + '>' +
-        (x ? String(x).replace('.', ',') + ' %' : 'sans') + '</option>';
+        (x ? String(x).replace('.', ',') + ' %' : 'sans') + '</option>';
     }).join('') + '</select></div>' +
     '<div class="champ"><label class="eyebrow" for="ac-cat">Catégorie</label>' +
     '<select id="ac-cat">' + FIN.CATEGORIES.map(function (c2) {
@@ -13173,6 +13183,10 @@ function renderEntBilan() {
     if (c.statut === 'encours') encours++;
     if (c.statut === 'facture') { impayes++; impayesM += C.montant(c); }
   });
+  /* La bulle ne chauffe que s'il y a un vrai retard d'échéance : c'est
+     l'alerte de « À traiter » qui fait foi, pas le simple fait d'attendre. */
+  var enRetard = C.alertes(A.chantiers, A.cfg, Date.now())
+    .filter(function (a) { return a.type === 'impaye'; }).length;
   var ca = FIN.chiffreAffaires(A.chantiers, b);
   var bal = FIN.balanceTva(A.chantiers, A.depenses, b, C.tauxLigne);
   var bulle = function (val, etiquette, sous, cible, chaud) {
@@ -13187,7 +13201,9 @@ function renderEntBilan() {
       aPlanifier ? 'devis et chantiers' : 'rien en attente', 'calendrier') +
     bulle(signes || '—', 'devis signés', signes ? eur(signesM) : 'à planifier', 'accepte') +
     bulle(encours || '—', 'chantiers en cours', '&nbsp;', 'encours') +
-    bulle(impayes || '—', 'impayés', impayes ? eur(impayesM) : 'rien en retard', 'facture', impayes > 0) +
+    bulle(impayes || '—', 'factures en attente',
+      impayes ? eur(impayesM) + (enRetard ? ' · ' + enRetard + ' en retard' : '') : 'tout est réglé',
+      'facture', enRetard > 0) +
     bulle(ca.total ? eurCourt(ca.total) : '—', 'chiffre d’affaires', String(an), 'finances') +
     bulle(bal.deductible.total ? eurCourt(bal.deductible.total) : '—', 'TVA déductible',
       'cette année', 'depenses') +
@@ -13212,7 +13228,10 @@ function prochaineJourneeHtml() {
     '<svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><rect x="4" y="5.6" width="16" ' +
     'height="14" rx="2"/><path d="M4 10.2h16M8.6 3.6v3.8M15.4 3.6v3.8"/></svg>' +
     '<span><b>' + quand + '</b> — ' + esc(trouve.ch.nom || 'chantier') + ', ' +
-    esc(C.fmtJours(trouve.p)) + '</span></button>';
+    esc(C.fmtJours(trouve.p)) +
+    /* Pour qui je travaille : c'est ce qu'on veut savoir la veille. */
+    (trouve.ch.donneur ? '<small>pour ' + esc(trouve.ch.donneur) + '</small>' : '') +
+    '</span></button>';
 }
 
 /* « À traiter » porte deux choses de nature différente, dans cet ordre.
@@ -13490,8 +13509,8 @@ function renderFinances() {
       (ca.aEncaisser ? '<div class="carte2"><b class="num">' + eur(ca.aEncaisser) + '</b><small>en attente</small></div>' : '') +
       '</div>' +
       '<div style="margin-top:13px">' +
-      ligneCA('Prestation de service', ca.prestation, ca.prestationApres, '50 %') +
-      ligneCA('Vente de fournitures', ca.vente, ca.venteApres, '71 %') +
+      ligneCA('Prestation de service', ca.prestation, ca.prestationApres, '50 %') +
+      ligneCA('Vente de fournitures', ca.vente, ca.venteApres, '71 %') +
       '<div style="display:flex;justify-content:space-between;padding-top:9px;margin-top:5px;border-top:2px solid var(--encre)">' +
       '<b>Base après abattement</b><b class="num" style="font-size:18px">' + eur(ca.totalApres) + '</b></div></div>' +
       '<p class="muted" style="font-size:11.5px;margin:10px 0 0">Abattements du micro-BIC. ' +
@@ -13508,9 +13527,9 @@ function renderFinances() {
     (bal.sens === 'a_payer' ? 'à reverser' : (bal.sens === 'a_recuperer' ? 'à récupérer' : 'équilibre')) + '</small></div>' +
     '</div>' +
     (tauxCol.length ? '<p class="muted" style="font-size:12px;margin:11px 0 3px">Collectée : ' +
-      tauxCol.map(function (t) { return eur(bal.collectee.parTaux[t]) + ' à ' + t + ' %'; }).join(' · ') + '</p>' : '') +
+      tauxCol.map(function (t) { return eur(bal.collectee.parTaux[t]) + ' à ' + t + ' %'; }).join(' · ') + '</p>' : '') +
     (tauxDed.length ? '<p class="muted" style="font-size:12px;margin:0">Déductible : ' +
-      tauxDed.map(function (t) { return eur(bal.deductible.parTaux[t]) + ' à ' + t + ' %'; }).join(' · ') + '</p>' : '') +
+      tauxDed.map(function (t) { return eur(bal.deductible.parTaux[t]) + ' à ' + t + ' %'; }).join(' · ') + '</p>' : '') +
     (bal.deductible.immobilisations ? '<p class="muted" style="font-size:12px;margin:6px 0 0">' +
       'Dont ' + eur(bal.deductible.immobilisations) + ' sur immobilisations — un achat exceptionnel ' +
       'gonfle la TVA déductible d’un seul trimestre.</p>' : '') +
@@ -13542,7 +13561,7 @@ function renderFinances() {
         (refus.total ? '<p class="eyebrow" style="margin:14px 0 6px">Pourquoi les devis n’aboutissent pas</p>' +
           refus.motifs.map(function (m) {
             return '<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13px">' +
-              '<span>' + esc(m.nom) + '</span><span class="muted">' + m.n + ' · ' + m.part + ' %</span></div>';
+              '<span>' + esc(m.nom) + '</span><span class="muted">' + m.n + ' · ' + m.part + ' %</span></div>';
           }).join('') : '') + '</div>';
     })() +
     (function () {
@@ -13556,7 +13575,7 @@ function renderFinances() {
             '<span>' + esc(x.donneur) + ' <span class="muted" style="font-size:11.5px">' + x.n +
             ' chantier' + (x.n > 1 ? 's' : '') + '</span></span>' +
             '<span><b class="num">' + eur(x.ht) + '</b>' +
-            '<span class="muted" style="font-size:11.5px"> · ' + FIN.arr(totalD ? x.ht / totalD * 100 : 0, 0) + ' %</span></span></div>';
+            '<span class="muted" style="font-size:11.5px"> · ' + FIN.arr(totalD ? x.ht / totalD * 100 : 0, 0) + ' %</span></span></div>';
         }).join('') : '<p class="muted" style="font-size:12.5px">Aucune facture sur la période.</p>') +
         '<p class="eyebrow" style="margin:14px 0 6px">Tous chantiers confondus</p>' +
         pg.slice(0, 6).map(function (x) {
@@ -13581,7 +13600,7 @@ function renderFinances() {
         }).join('') + '</div>';
     })() +
     (tr.proposes ? '<div class="carte"><h2>Devis</h2><div class="kpi">' +
-      (tr.taux != null ? '<div class="carte2"><b class="num">' + tr.taux + ' %</b><small>acceptés</small></div>' : '') +
+      (tr.taux != null ? '<div class="carte2"><b class="num">' + tr.taux + ' %</b><small>acceptés</small></div>' : '') +
       '<div class="carte2"><b class="num">' + tr.gagnes + '</b><small>gagnés</small></div>' +
       '<div class="carte2"><b class="num">' + tr.perdus + '</b><small>sans suite</small></div>' +
       '<div class="carte2"><b class="num">' + tr.enAttente + '</b><small>en attente</small></div>' +
@@ -13703,7 +13722,7 @@ function renderDepLignes() {
       '<div class="champ"><label class="eyebrow">TVA</label>' +
       '<select data-dltaux="' + i + '">' + FIN.TAUX_TVA.map(function (t) {
         return '<option value="' + t + '"' + (FIN.nb(l.taux) === t ? ' selected' : '') + '>' +
-          (t ? String(t).replace('.', ',') + ' %' : 'sans') + '</option>';
+          (t ? String(t).replace('.', ',') + ' %' : 'sans') + '</option>';
       }).join('') + '</select></div>' +
       '<div class="champ"><label class="eyebrow">Catégorie</label>' +
       '<select data-dlcat="' + i + '">' + FIN.CATEGORIES.map(function (c2) {
@@ -14031,7 +14050,7 @@ function renderListesReglages() {
       var u = usagesTravail(x.c);
       return '<div class="liste-item' + (x.retire ? ' epuise' : '') + '">' +
         '<div class="li-c"><b>' + esc(x.n) + '</b><small>' +
-        esc(C.nomUnite(x.u, 2)) + ' · TVA ' + String(x.tvaAvec).replace('.', ',') + ' %' +
+        esc(C.nomUnite(x.u, 2)) + ' · TVA ' + String(x.tvaAvec).replace('.', ',') + ' %' +
         (u.total ? ' · utilisée ' + u.total + ' fois' : ' · jamais utilisée') +
         (x.retire ? ' · retirée des listes' : '') + '</small></div>' +
         '<button class="btn-min" data-lmodif="' + esc(x.c) + '">Modifier</button></div>';
@@ -14092,7 +14111,7 @@ function ouvrirTravailRegle(code) {
     (code ? '' : '<div class="champ"><label class="eyebrow" for="tr-tva">TVA (%)</label>' +
       '<select id="tr-tva">' + [20, 10, 5.5, 0].map(function (x) {
         return '<option value="' + x + '"' + (x === 20 ? ' selected' : '') + '>' +
-          String(x).replace('.', ',') + ' %</option>';
+          String(x).replace('.', ',') + ' %</option>';
       }).join('') + '</select></div>') +
     '</div>' +
     (code && u.total
@@ -14366,7 +14385,15 @@ function ouvrirJournee(id, modele) {
       })
     : [{ travaux: '', heures: '', quantite: '' }];
 
-  var chs = A.chantiers.slice().sort(function (a, b) { return (b.maj || 0) - (a.maj || 0); });
+  /* Les chantiers qui peuvent encore recevoir une journée, du plus récemment
+     travaillé au plus ancien. Un chantier facturé n'en reçoit plus — sauf
+     celui qu'on est en train de corriger, sinon son propre chantier
+     disparaîtrait du sélecteur. */
+  var vise = src && src.chantier;
+  var chs = A.chantiers.filter(function (c) {
+    return c.id === vise || ['devis', 'envoye', 'accepte', 'encours', 'termine']
+      .indexOf(c.statut) >= 0;
+  }).sort(function (a, b) { return C.dateChantier(b) - C.dateChantier(a); });
   var dj = derniereJournee();
   modale(id ? 'Modifier la journée' : 'Ma journée',
     (!id && dj ? '<button class="btn btn-min" id="mj-hier" style="margin-bottom:11px">' +
@@ -14460,7 +14487,35 @@ function ouvrirJournee(id, modele) {
   $('#mj-nonfact').addEventListener('change', apercu);
   $('#mj-ch').addEventListener('change', function () {
     var c = $('#mj-ch').value ? chantier($('#mj-ch').value) : null;
-    if (c && c.lieu && !$('#mj-lieu').value) $('#mj-lieu').value = c.lieu;
+    if (!c) { apercu(); return; }
+    /* On ne remplit que ce qui est vide : ce qu'il a déjà tapé est à lui.
+       Le champ s'appelait « lieu » et le chantier porte « foret » : la
+       reprise ne marchait donc jamais. */
+    if (c.foret && !$('#mj-lieu').value) $('#mj-lieu').value = c.foret;
+    if (c.commune && !$('#mj-commune').value) $('#mj-commune').value = c.commune;
+    /* Les kilomètres du dernier trajet vers ce chantier : c'est la même
+       route. Estimer une distance entre deux communes demanderait une carte,
+       que l'application n'a pas — mais elle a sa propre mémoire. */
+    if (!$('#mj-km').value) {
+      var km = kmHabituels(c.id);
+      if (km) $('#mj-km').value = km;
+    }
+    /* Les prestations du chantier ouvrent les postes, sans heures : il ne
+       remplit plus que ce qu'il a fait. */
+    lirePostes();
+    var vides = pst.every(function (p) { return !p.travaux && !C.nb(p.heures); });
+    if (vides) {
+      var vus = [];
+      (c.lignes || []).forEach(function (l) {
+        if (l.travail && vus.indexOf(l.travail) < 0 && !C.estFourniture(l.travail)) {
+          vus.push(l.travail);
+        }
+      });
+      if (vus.length) {
+        pst = vus.map(function (tv) { return { travaux: tv, heures: '', quantite: '' }; });
+        renderPostes();
+      }
+    }
     apercu();
   });
   if ($('#mj-hier')) $('#mj-hier').addEventListener('click', function () {
@@ -14513,6 +14568,28 @@ function ouvrirJournee(id, modele) {
 }
 
 /* Le raccourci de l'accueil : la saisie du soir doit être à un pouce. */
+/* « C'est pénible d'aller chercher les kilomètres. Est-ce qu'il n'y aurait
+   pas un moyen de mettre deux communes et que ça les estime ? » Pas sans une
+   carte, et l'application n'en a aucune : elle tourne hors ligne, sans
+   dépendance. Mais elle a mieux — sa propre mémoire. C'est la même route à
+   chaque fois : on propose ce qui a été noté la dernière fois pour ce
+   chantier-là. Le plus récent fait foi, et il reste libre de corriger. */
+function kmHabituels(idChantier) {
+  var vu = 0, quand = 0;
+  (A.journees || []).forEach(function (j) {
+    if (j.chantier !== idChantier || !C.nb(j.km)) return;
+    if (C.nb(j.date) >= quand) { quand = C.nb(j.date); vu = C.nb(j.km); }
+  });
+  if (vu) return vu;
+  /* À défaut, le temps saisi sur la fiche du chantier porte parfois ses
+     kilomètres : c'est la même route. */
+  var c = chantier(idChantier);
+  ((c && c.temps) || []).forEach(function (t) {
+    if (!C.nb(t.km)) return;
+    if (C.nb(t.date) >= quand) { quand = C.nb(t.date); vu = C.nb(t.km); }
+  });
+  return vu;
+}
 function renderMaJournee() {
   var z = $('#a-journee'); if (!z) return;
   var auj = B.jour(Date.now());
@@ -15097,7 +15174,7 @@ function ouvrirFicheArticle(id) {
       '<span>' + E.fmt(ST.quantiteVendue(a), 0) + ' ' + esc(u) + ' vendus</span><b class="num">' + eur(ca) + '</b></div>' +
       '<div style="display:flex;justify-content:space-between;font-size:13.5px;margin-top:3px">' +
       '<span class="muted">marge brute</span><b class="num">' + eur(ST.arr(ca - coutV, 2)) +
-      (ca > 0 ? ' · ' + E.fmt((ca - coutV) / ca * 100, 1) + ' %' : '') + '</b></div></div>' : '') +
+      (ca > 0 ? ' · ' + E.fmt((ca - coutV) / ca * 100, 1) + ' %' : '') + '</b></div></div>' : '') +
     (ST.quantiteDebours(a) ? '<p class="muted" style="font-size:12.5px;margin:0 0 9px">' +
       E.fmt(ST.quantiteDebours(a), 0) + ' ' + esc(u) + ' refacturés en débours pour ' +
       eur(ST.caDebours(a)) + ', hors chiffre d’affaires.</p>' : '') +
@@ -15444,7 +15521,7 @@ function renderCharges() {
         '<span class="charge-p">' + esc(FIN.nomCategorie(c.categorie)) +
         (c.beneficiaire ? ' · payé à ' + esc(c.beneficiaire) : '') +
         (FIN.sansTvaDe(c.categorie) ? ' · sans TVA'
-          : ' · TVA ' + String(C.nb(c.taux)).replace('.', ',') + ' %') +
+          : ' · TVA ' + String(C.nb(c.taux)).replace('.', ',') + ' %') +
         (chargeDansDepenses(c) ? ' · portée en dépense' : '') +
         (c.arretee ? ' · arrêtée' : '') + '</span></div>' +
         '<div style="text-align:right"><span class="charge-m num">' + eur(C.nb(c.ttc)) + '</span>' +
@@ -15545,7 +15622,7 @@ function detailMoisCharges(mois, m) {
   var parts = ordreCategories(o).sort(function (a, b) { return o[b] - o[a]; })
     .map(function (k) {
       return esc(FIN.nomCategorie(k).toLowerCase()) + ' ' +
-        Math.round(o[k] / tot * 100) + ' %';
+        Math.round(o[k] / tot * 100) + ' %';
     });
   return '<b>' + MOIS_NOMS[m] + ' — ' + eur(FIN.arr(tot, 2)) + '</b> : ' + parts.join(', ') + '.';
 }
@@ -15659,7 +15736,7 @@ function ouvrirCharge(id) {
     '<input type="date" id="cg-debut" value="' + versChamp(debutCharge(c)) + '"></div>' +
     '<div class="champ"><label class="eyebrow" for="cg-taux">TVA</label>' +
     '<select id="cg-taux">' + FIN.TAUX_TVA.map(function (t) {
-      return '<option value="' + t + '"' + (C.nb(c.taux) === t ? ' selected' : '') + '>' + (t ? t + ' %' : 'sans TVA') + '</option>';
+      return '<option value="' + t + '"' + (C.nb(c.taux) === t ? ' selected' : '') + '>' + (t ? t + ' %' : 'sans TVA') + '</option>';
     }).join('') + '</select></div>' +
     '<div class="champ"><label class="eyebrow" for="cg-cat">Catégorie</label>' +
     '<select id="cg-cat">' + FIN.categoriesFixes(c.categorie).map(function (x) {
@@ -16053,7 +16130,7 @@ function barres(lignes, couleur) {
     return '<div style="margin-bottom:8px">' +
       '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px">' +
       '<span>' + esc(l.nom) + (l.detail ? ' <span class="muted" style="font-size:11.5px">' + esc(l.detail) + '</span>' : '') + '</span>' +
-      '<span class="num">' + eur(l.valeur) + (l.part != null ? ' <span class="muted" style="font-size:11.5px">' + l.part + ' %</span>' : '') + '</span></div>' +
+      '<span class="num">' + eur(l.valeur) + (l.part != null ? ' <span class="muted" style="font-size:11.5px">' + l.part + ' %</span>' : '') + '</span></div>' +
       '<div style="height:7px;background:var(--trait);border-radius:4px;overflow:hidden">' +
       '<i style="display:block;height:100%;width:' + pc + '%;background:' + (l.couleur || couleur || '#2E4A3C') + '"></i></div></div>';
   }).join('');
@@ -16126,7 +16203,7 @@ function htmlEnsemble(an, b) {
       '<div class="carte2"><b class="num">' + eur(mgFourn.vendu) + '</b><small>refacturé</small></div>' +
       '<div class="carte2"><b class="num">' + eur(mgFourn.cout) + '</b><small>coût du stock</small></div>' +
       '<div class="carte2"><b class="num">' + eur(mgFourn.marge) + '</b><small>marge' +
-      (mgFourn.taux != null ? ' · ' + mgFourn.taux + ' %' : '') + '</small></div></div></div>' : '') +
+      (mgFourn.taux != null ? ' · ' + mgFourn.taux + ' %' : '') + '</small></div></div></div>' : '') +
 
     (km ? '<div class="carte"><h2>Déplacements</h2><div class="kpi">' +
       '<div class="carte2"><b class="num">' + E.fmt(km, 0) + '</b><small>km</small></div>' +
@@ -16197,8 +16274,8 @@ function htmlDeclarations() {
     'déclaration, puis après l’abattement forfaitaire, pour savoir sur quoi portent ' +
     'cotisations et impôt.</p>' +
     '<div style="margin-top:4px">' +
-    ligneCA('Prestations de services', ca.prestation, ca.prestationApres, '50 %') +
-    ligneCA('Ventes de fournitures', ca.vente, ca.venteApres, '71 %') +
+    ligneCA('Prestations de services', ca.prestation, ca.prestationApres, '50 %') +
+    ligneCA('Ventes de fournitures', ca.vente, ca.venteApres, '71 %') +
     '<div style="display:flex;justify-content:space-between;padding-top:9px;margin-top:5px;border-top:2px solid var(--encre)">' +
     '<b>À déclarer</b><b class="num" style="font-size:18px">' + eur(ca.total) + '</b></div>' +
     (ca.debours ? '<p class="muted" style="font-size:11.5px;margin:6px 0 0">Le débours (' +
@@ -16217,7 +16294,7 @@ function htmlDeclarations() {
     '<p class="muted" style="font-size:12px;margin:0 0 8px">Sur l’année entière, quelle que ' +
     'soit la période choisie en haut : c’est ainsi qu’elle se déclare.</p>' +
     (taux.length ? taux.map(function (tx) {
-      return ligneT('Collectée à ' + esc(String(tx).replace('.', ',')) + ' %', eur(bal.collectee.parTaux[tx]));
+      return ligneT('Collectée à ' + esc(String(tx).replace('.', ',')) + ' %', eur(bal.collectee.parTaux[tx]));
     }).join('') : '<p class="muted" style="font-size:12.5px;margin:0 0 3px">Rien de facturé sur ' + an + '.</p>') +
     ligneT('Déductible sur vos achats', '− ' + eur(bal.deductible.total)) +
     '<div style="display:flex;justify-content:space-between;padding-top:9px;margin-top:5px;border-top:2px solid var(--encre)">' +
@@ -16385,8 +16462,8 @@ function htmlRecettes(an, b) {
       '</b><small>en attente</small></div>' : '') +
     '</div>' +
     '<div style="margin-top:13px">' +
-    ligneCA('Prestation de service', ca.prestation, ca.prestationApres, '50 %') +
-    ligneCA('Vente de fournitures', ca.vente, ca.venteApres, '71 %') +
+    ligneCA('Prestation de service', ca.prestation, ca.prestationApres, '50 %') +
+    ligneCA('Vente de fournitures', ca.vente, ca.venteApres, '71 %') +
     '<div style="display:flex;justify-content:space-between;padding-top:9px;margin-top:5px;border-top:2px solid var(--encre)">' +
     '<b>Base après abattement</b><b class="num" style="font-size:18px">' + eur(ca.totalApres) + '</b></div>' +
     /* Le débours traverse le compte sans être une recette. Il était écarté du
@@ -16424,7 +16501,7 @@ function htmlRecettes(an, b) {
     }), '#1D6FB8') + '</div>' +
 
     (tr.proposes ? '<div class="carte"><h2>Devis</h2><div class="kpi">' +
-      (tr.taux != null ? '<div class="carte2"><b class="num">' + tr.taux + ' %</b><small>acceptés</small></div>' : '') +
+      (tr.taux != null ? '<div class="carte2"><b class="num">' + tr.taux + ' %</b><small>acceptés</small></div>' : '') +
       '<div class="carte2"><b class="num">' + tr.gagnes + '</b><small>gagnés</small></div>' +
       '<div class="carte2"><b class="num">' + tr.perdus + '</b><small>sans suite</small></div>' +
       '<div class="carte2"><b class="num">' + tr.enAttente + '</b><small>en attente</small></div></div>' +
@@ -16688,7 +16765,7 @@ function ouvrirCommande(id, artPref) {
         '<label class="eyebrow" for="cm-tva">TVA</label>' +
         '<select id="cm-tva">' + FIN.TAUX_TVA.map(function (t) {
           return '<option value="' + t + '"' + (t === taux ? ' selected' : '') + '>' +
-            (t ? t + ' %' : 'sans TVA') + '</option>';
+            (t ? t + ' %' : 'sans TVA') + '</option>';
         }).join('') + '</select></div></div>' +
         '<p class="muted" style="font-size:11.5px;margin:5px 0 0" id="cm-dep-aide"></p>';
     })() +
@@ -16748,7 +16825,7 @@ function ouvrirCommande(id, artPref) {
     var tvaAvant = $('#cm-tva').value;
     $('#cm-tva').addEventListener('change', function () {
       if (!id || !depenseDeCommande(id) || this.value === tvaAvant) { tvaAvant = this.value; return; }
-      var mot = function (v) { return ST.nb(v) ? String(v).replace('.', ',') + ' %' : 'sans TVA'; };
+      var mot = function (v) { return ST.nb(v) ? String(v).replace('.', ',') + ' %' : 'sans TVA'; };
       if (!confirm('La TVA de la dépense passera de ' + mot(tvaAvant) + ' à ' + mot(this.value) +
         '.\n\nConfirmer ?')) { this.value = tvaAvant; return; }
       tvaAvant = this.value;
@@ -17005,7 +17082,7 @@ function anneau(parts, options) {
       svg += '<path d="M' + pt(R, ang) + ' A' + R + ' ' + R + ' 0 ' + g + ' 1 ' + pt(R, b) +
         ' L' + pt(r, b) + ' A' + r + ' ' + r + ' 0 ' + g + ' 0 ' + pt(r, ang) + ' Z" fill="' +
         p.couleur + '" stroke="var(--carte)" stroke-width="1"><title>' +
-        xmlEsc(p.nom + ' : ' + E.fmt(p.valeur / tot * 100, 1) + ' %') + '</title></path>';
+        xmlEsc(p.nom + ' : ' + E.fmt(p.valeur / tot * 100, 1) + ' %') + '</title></path>';
       ang = b;
     });
   }
@@ -17023,7 +17100,7 @@ function anneau(parts, options) {
         '<span><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:' +
         p.couleur + ';margin-right:7px"></i>' + esc(p.nom) + '</span>' +
         '<span style="white-space:nowrap"><b class="num">' + esc(p.texte || E.fmt(p.valeur, 4)) + '</b>' +
-        '<span class="muted" style="font-size:11.5px"> · ' + E.fmt(p.valeur / tot * 100, 1) + ' %</span></span></div>';
+        '<span class="muted" style="font-size:11.5px"> · ' + E.fmt(p.valeur / tot * 100, 1) + ' %</span></span></div>';
     }).join('') + '</div></div>';
 }
 
@@ -17100,7 +17177,7 @@ function batonsPrix(lignes, cible) {
   }).concat([0]));
   if (!(max > 0)) return '<p class="muted" style="font-size:12.5px">Aucune vente.</p>';
   var COUL = [['cout', '#8A5A2B', 'coût réel'],
-    ['mini', '#B98A00', 'minimum à ' + E.fmt(cible, 0) + ' %'],
+    ['mini', '#B98A00', 'minimum à ' + E.fmt(cible, 0) + ' %'],
     ['vendu', '#2E7D46', 'prix pratiqué']];
   var corps = lignes.map(function (l) {
     var sousLaBarre = l.vendu < l.mini;
@@ -17153,7 +17230,7 @@ function barresObjectif(lignes, objectif, o) {
       '%;border-left:2px dashed var(--doux);pointer-events:none"></div>' : '') +
     '</div>' +
     (pcObj != null ? '<p class="muted" style="font-size:11.5px;margin:2px 0 0">' +
-      'Trait pointillé : votre objectif de ' + esc(o.libObjectif || (E.fmt(objectif, 0) + ' %')) + '.</p>' : '');
+      'Trait pointillé : votre objectif de ' + esc(o.libObjectif || (E.fmt(objectif, 0) + ' %')) + '.</p>' : '');
 }
 
 /* ---------------------------------------------------- prix de revient */
@@ -17301,16 +17378,16 @@ function blocRepartition(art, pv, cout, f, e) {
     (A.revient.mode === 'moyen' ? '<p class="muted" style="font-size:12px;margin:-4px 0 10px">' +
       'Prix moyen effectivement pratiqué sur vos sorties, débours exclus.</p>' : '') +
     (d.viable
-      ? anneau(parts, { centre: E.fmt(d.partBenefice, 1) + ' %', sous: 'de bénéfice' })
+      ? anneau(parts, { centre: E.fmt(d.partBenefice, 1) + ' %', sous: 'de bénéfice' })
       : '<div class="retard" style="margin-bottom:10px">À ce prix vous perdez ' +
         eur(-d.benefice) + ' par unité.</div>' +
         anneau(parts.filter(function (p) { return p.valeur > 0; }), {})) +
     '<div class="kpi" style="margin-top:12px">' +
     '<div class="carte2" style="border-color:' + (d.viable ? '#2E7D46' : '#B4231F') + '">' +
     '<b class="num">' + E.fmt(d.benefice, 4) + ' €</b><small>bénéfice net / ' + esc(e.nom) + '</small></div>' +
-    '<div class="carte2"><b class="num">' + E.fmt(d.partBenefice, 1) + ' %</b><small>taux de bénéfice net</small></div>' +
+    '<div class="carte2"><b class="num">' + E.fmt(d.partBenefice, 1) + ' %</b><small>taux de bénéfice net</small></div>' +
     '<div class="carte2"><b class="num">' + E.fmt(d.marge, 4) + ' €</b><small>marge brute / ' + esc(e.nom) + '</small></div>' +
-    '<div class="carte2"><b class="num">' + E.fmt(d.tauxMarge, 1) + ' %</b><small>taux de marge brute</small></div>' +
+    '<div class="carte2"><b class="num">' + E.fmt(d.tauxMarge, 1) + ' %</b><small>taux de marge brute</small></div>' +
     '</div>' +
     '<p class="muted" style="font-size:11.5px;margin:10px 0 0">Charges totales ' +
     E.fmt(d.charges, 4) + ' € par ' + esc(e.nom) + ', soit ' + E.fmt(ST.tauxCharges(f) * 100, 2) +
@@ -17466,7 +17543,7 @@ function tableauAnnee() {
     '<div class="carte2"><b class="num">' + eur(marge) + '</b><small>de marge brute</small></div>' +
     (evo != null
       ? '<div class="carte2"><b class="num" style="color:' + (evo >= 0 ? '#2E7D46' : '#B4231F') +
-        '">' + (evo >= 0 ? '+' : '') + E.fmt(evo, 0) + ' %</b><small>sur ' + (an - 1) + '</small></div>'
+        '">' + (evo >= 0 ? '+' : '') + E.fmt(evo, 0) + ' %</b><small>sur ' + (an - 1) + '</small></div>'
       : '') +
     '</div>' +
     (evo != null
@@ -17533,11 +17610,11 @@ function tableauPerformance() {
       '<td class="num">' + E.fmt(pv, 4) + '</td>' +
       '<td class="num">' + E.fmt(cu, 4) + '</td>' +
       '<td class="num">' + E.fmt(marge, 4) + '</td>' +
-      '<td class="num">' + (pv > 0 ? E.fmt(marge / pv * 100, 1) + ' %' : '—') + '</td>' +
+      '<td class="num">' + (pv > 0 ? E.fmt(marge / pv * 100, 1) + ' %' : '—') + '</td>' +
       '<td class="num muted">' + E.fmt(charge, 4) + '</td>' +
       '<td class="num">' + E.fmt(benef, 4) + '</td>' +
       '<td class="num"' + (pv > 0 && benef < 0 ? ' style="color:#B4231F"' : '') + '>' +
-      (pv > 0 ? E.fmt(benef / pv * 100, 1) + ' %' : '—') + '</td></tr>';
+      (pv > 0 ? E.fmt(benef / pv * 100, 1) + ' %' : '—') + '</td></tr>';
   }).join('');
   var pvm = tot.q > 0 ? tot.ca / tot.q : 0, cum = tot.q > 0 ? tot.cout / tot.q : 0;
 
@@ -17547,7 +17624,7 @@ function tableauPerformance() {
   var gMarge = l.map(function (a) {
     var pv = ST.prixVenteMoyen(a), cu = ST.pmp(a);
     var t = pv > 0 ? (pv - cu - (nette ? pv * tc : 0)) / pv * 100 : 0;
-    return { nom: a.nom || '', valeur: t, texte: E.fmt(t, 1) + ' %' };
+    return { nom: a.nom || '', valeur: t, texte: E.fmt(t, 1) + ' %' };
   }).sort(function (a, b) { return b.valeur - a.valeur; });
   var gCa = l.map(function (a) {
     return { nom: a.nom || '', valeur: ST.caVendu(a),
@@ -17565,10 +17642,10 @@ function tableauPerformance() {
   return '<div class="carte"><h2>Sur l’ensemble de vos ventes</h2>' +
     '<div class="kpi">' +
     '<div class="carte2"><b class="num" style="font-size:23px' +
-    (brutTot < cm ? ';color:#B4231F' : '') + '">' + E.fmt(brutTot, 1) + ' %</b>' +
+    (brutTot < cm ? ';color:#B4231F' : '') + '">' + E.fmt(brutTot, 1) + ' %</b>' +
     '<small>marge brute</small></div>' +
-    '<div class="carte2"><b class="num">' + E.fmt(cm, 0) + ' %</b><small>votre objectif</small></div>' +
-    '<div class="carte2"><b class="num">' + E.fmt(netTot, 1) + ' %</b><small>net, après charges</small></div>' +
+    '<div class="carte2"><b class="num">' + E.fmt(cm, 0) + ' %</b><small>votre objectif</small></div>' +
+    '<div class="carte2"><b class="num">' + E.fmt(netTot, 1) + ' %</b><small>net, après charges</small></div>' +
     '</div>' +
     '<p class="muted" style="font-size:12.5px;margin:10px 0 0">' +
     (tot.ca <= 0 ? 'Aucune vente à mesurer.'
@@ -17589,10 +17666,10 @@ function tableauPerformance() {
     '<td class="num">' + E.fmt(pvm, 4) + '</td>' +
     '<td class="num">' + E.fmt(cum, 4) + '</td>' +
     '<td class="num">' + E.fmt(pvm - cum, 4) + '</td>' +
-    '<td class="num">' + (pvm > 0 ? E.fmt((pvm - cum) / pvm * 100, 1) + ' %' : '—') + '</td>' +
+    '<td class="num">' + (pvm > 0 ? E.fmt((pvm - cum) / pvm * 100, 1) + ' %' : '—') + '</td>' +
     '<td class="num muted">' + E.fmt(pvm * tc, 4) + '</td>' +
     '<td class="num">' + E.fmt(pvm - cum - pvm * tc, 4) + '</td>' +
-    '<td class="num">' + (pvm > 0 ? E.fmt((pvm - cum - pvm * tc) / pvm * 100, 1) + ' %' : '—') + '</td></tr>' +
+    '<td class="num">' + (pvm > 0 ? E.fmt((pvm - cum - pvm * tc) / pvm * 100, 1) + ' %' : '—') + '</td></tr>' +
     '</tbody></table></div>' +
     '<p class="muted" style="font-size:11.5px;margin:9px 0 0">Bénéfice net : après cotisations et ' +
     'impôt calculés sur le chiffre d’affaires après abattement, aux taux de vos hypothèses.' +
@@ -17606,7 +17683,7 @@ function tableauPerformance() {
        l'abattement forfaitaire se compare. Garder le trait sur la vue nette
        ferait croire à un objectif qui n'existe pas. */
     (nette ? barres(gMarge, '#2E7D46')
-      : barresObjectif(gMarge, cm, { libObjectif: E.fmt(cm, 0) + ' %' })) + '</div>' +
+      : barresObjectif(gMarge, cm, { libObjectif: E.fmt(cm, 0) + ' %' })) + '</div>' +
     '<p class="muted" style="font-size:11.5px;margin:8px 0 0">' +
     (nette ? 'Nette : la brute moins ' + E.fmt(tc * 100, 1) + ' % de charges, prélevés sur le ' +
       'prix de vente. Un produit à faible marge y perd proportionnellement bien plus qu’un ' +
@@ -17651,7 +17728,7 @@ function ouvrirHypotheses() {
     });
     $('#hy-apercu').innerHTML = '<div style="display:flex;justify-content:space-between;font-size:13.5px">' +
       '<span>Taux de charges sur le chiffre d’affaires</span><b class="num">' +
-      E.fmt(t * 100, 2) + ' %</b></div>' +
+      E.fmt(t * 100, 2) + ' %</b></div>' +
       '<div class="muted" style="font-size:11.5px;margin-top:4px">Sur 100 € vendus, ' +
       eur(ST.arr(t * 100, 2)) + ' de cotisations et d’impôt.</div>';
   };
@@ -17755,7 +17832,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.69.0-20260902-1120';
+var VERSION = '4.70.0-20260902-1520';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

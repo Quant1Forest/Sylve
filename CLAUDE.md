@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.69.0-20260902-1120**
+Version courante : **4.70.0-20260902-1520**
 
 ---
 
@@ -1362,6 +1362,92 @@ franchie, l'autre le rang comptable.
 masquée hors d'une partie — le bouton d'accueil y faisait déjà le trajet. Il
 l'a voulue partout : « comme ça j'ai les deux possibilités. » Hors partie, elle
 vise l'accueil.
+
+## Une facture qui attend n’est pas un impayé
+
+*« C’est compliqué de les mettre en impayé si je viens à peine de les
+envoyer. »* La bulle comptait tous les chantiers au statut `facture` et les
+appelait **impayés**, en rouge. Elle dit maintenant **« factures en
+attente »**, et elle ne chauffe que si `C.alertes()` remonte un vrai
+dépassement d’échéance.
+
+**La bulle compte, l’alerte accuse.** C’est la même règle que pour la bulle et
+l’alerte d’impayé notées plus haut : elles ne font pas doublon, elles ne
+répondent pas à la même question.
+
+## Ma journée doit se remplir toute seule
+
+*« En fin de journée je suis crevé, j’ai la flemme d’aller chercher des
+infos. Il faut que ce soit le plus efficace possible. »*
+
+- **Un chantier facturé ne reçoit plus de journée** : il sort du sélecteur.
+  *« Une fois que c’est facturé, j’ai fini mes journées. »* Sauf celui qu’on
+  est en train de corriger, sinon son propre chantier disparaîtrait.
+- Le reste est rangé par **dernier jour travaillé**, pas par `maj` : ouvrir
+  une fiche pour la relire ne doit pas la faire remonter.
+- **Choisir le chantier remplit ce qu’il sait** : forêt, commune, et un poste
+  par prestation du chantier — sans heures. **Jamais par-dessus ce qui est
+  déjà tapé.** Le code visait `c.lieu`, un champ qui n’existe pas : le
+  chantier porte `foret`. La reprise ne marchait donc jamais.
+- **Les fournitures n’ouvrent pas de poste** : elles n’ont pas d’option dans
+  ce sélecteur, la ligne ressortirait vide. Le scénario le vérifie sur le
+  **nombre de lignes**, pas sur les valeurs — une comparaison de valeurs ne
+  voyait rien.
+
+**`kmHabituels()` répond à une demande impossible.** *« Est-ce qu’il n’y aurait
+pas un moyen de mettre deux communes et que ça estime les kilomètres ? »*
+Pas sans une carte, et l’application n’en a aucune — elle tourne hors ligne,
+sans dépendance. Mais elle a sa propre mémoire : c’est la même route à chaque
+fois, donc on propose ce qui a été noté la dernière fois pour ce chantier-là.
+À défaut, les kilomètres d’un temps saisi sur sa fiche.
+
+## Le pourcentage se colle, comme l’euro
+
+*« Le logo pourcentage va à la ligne parce que le chiffre est trop gros, et
+les logos euros touchent presque les chiffres. »* Deux causes distinctes :
+
+- **Le « % » était séparé par une espace ordinaire**, donc sécable. `eur()`
+  pose une insécable devant le « € » depuis longtemps, pour exactement cette
+  raison ; le pourcentage l’avait oublié. Cent huit espaces converties.
+  **Corollaire connu : une regex écrite avec une espace ordinaire ne matche
+  plus.** C’est le piège jumeau de celui de l’euro, et il a fait rougir un
+  scénario d’analyses.
+- **Les nombres tenaient en 19 px dans des tuiles de 96 px.** « 130 000 € »
+  n’y entre pas. Tuiles à 102 px, chiffre à 17 px, et `white-space: nowrap` :
+  mieux vaut une tuile qui s’étire qu’un « € » tout seul en dessous.
+
+## Les priorités d’achat sont des horizons
+
+*« Cette année, ça ne veut rien dire si on est à la fin de l’année. »* Les
+cinq crans sont désormais glissants : *Dès que possible*, *Dans les 3 mois*,
+*Dans les 6 mois*, *Dans l’année*, *Un jour*. **Les codes ne bougent pas** —
+`annee` reste, il change seulement de mot — pour ne décrocher aucune ligne
+déjà saisie.
+
+## Ce qu’il a signalé et qui n’est pas fait
+
+Tournée du 2 septembre, par ordre de maturité :
+
+- **L’écran Entreprise est lourd.** *« Je voulais un truc épuré et je me
+  retrouve avec six bulles, le jour qui vient, À traiter, mes notes, et après
+  il faut que je descende pour aller dans Chantiers. »* Et les alertes se
+  **répètent** : « À traiter » réapparaît dans le module Chantiers, et un
+  chantier « en retard » y figure alors que l’accueil réclame déjà ses
+  journées non notées. **Une même chose doit s’afficher une fois.** À
+  reprendre sur maquette, avec la question suivante.
+- **Où vivent les notes.** Il tourne autour depuis trois séances : *« il
+  faudrait que je puisse me noter des notes, mais que je choisisse si ça
+  l’affiche dans À traiter ou pas »*. Une case sur la note réglerait la
+  moitié du problème ; l’autre moitié est celle de l’écran ci-dessus.
+- **Le prix de revient par travaux.** *« On le fera plus tard, mais tu peux le
+  garder en note. »* Savoir ce que coûte réellement une journée de dégagement :
+  amortissement de la débroussailleuse, mélange, huile, déplacement. De quoi
+  situer un type de travaux par rapport à un autre. Le module Véhicule fait
+  déjà ce raisonnement pour l’utilitaire — c’est le même, étendu au matériel.
+- **Le mot « en retard »** reste mauvais : il dit que toutes les journées
+  posées sont derrière, pas qu’une échéance est manquée. Il s’y est trompé
+  deux fois.
+- **Le carnet et la carte du Calendrier**, toujours sans réponse.
 
 ## Les achats à venir
 

@@ -1900,7 +1900,7 @@ scenario('Entreprise : le bilan est au-dessus des tuiles, et chaque bulle mène 
     bilan.querySelector('[data-bulle="calendrier"] .v').textContent);
   verifierVrai('les devis signés', /devis signés/.test(bilan.textContent));
   verifierVrai('les chantiers en cours', /chantiers en cours/.test(bilan.textContent));
-  verifierVrai('les impayés', /impayés/.test(bilan.textContent));
+  verifierVrai('les factures en attente', /factures en attente/.test(bilan.textContent));
   verifierVrai('le chiffre d’affaires', /chiffre d’affaires/.test(bilan.textContent));
   verifierVrai('la TVA déductible', /TVA déductible/.test(bilan.textContent));
 
@@ -3025,7 +3025,7 @@ scenario('Rentabilité : les ventes année par année, et quand elles tombent', 
   verifierVrai('le chiffre de l’année est là',
     z.textContent.indexOf('2 000') >= 0);
   verifierVrai('la comparaison avec l’an d’avant aussi', /sur 2025/.test(z.textContent));
-  verifierVrai('avec l’évolution en pourcentage', /\+ ?100 %/.test(z.textContent));
+  verifierVrai('avec l’évolution en pourcentage', /\+ ?100\u00A0%/.test(z.textContent));
   verifierVrai('la courbe des mois est dessinée', z.querySelector('svg path'));
   /* Vérifier qu'une courbe existe ne prouve rien : mélanger les années la
      laisserait intacte. On lit ce qu'elle raconte, mois par mois. Les ventes
@@ -5423,7 +5423,7 @@ scenario('Achats : la liste se range par ce qui presse, et le coché passe à la
     ['Débroussailleuse', 'Pantalon anti-coupure', 'Remorque'], noms);
   const txt = t.texte('#ach-liste');
   verifierVrai('chaque groupe est nommé',
-    /Dès que possible/.test(txt) && /Cette année/.test(txt) && /Un jour/.test(txt));
+    /Dès que possible/.test(txt) && /Dans l’année/.test(txt) && /Un jour/.test(txt));
   /* 2 400 + 600 + 180 = 3 180 € TTC. */
   verifierVrai('le total à prévoir est annoncé', /3 180 €à prévoir, TTC/.test(txt));
   verifierVrai('et ce à quoi ça sert se lit', /pour ne plus louer/.test(txt));
@@ -5539,6 +5539,179 @@ scenario('Achats : la liste part dans les sauvegardes', async () => {
   const relu = B.lireSauvegarde({ format: sauv.format, achats: sauv.achats });
   verifierVrai('un fichier qui n’a que des achats se relit', !!relu);
   verifier('et il les rend', 'Remorque', relu.achats[0].quoi);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Bilan : une facture récente attend, elle n’est pas impayée', async () => {
+  /* « C'est compliqué de les mettre en impayé si je viens à peine de les
+     envoyer. » La bulle compte ce qui attend ; seule l'échéance dépassée
+     mérite l'alerte, et elle existe déjà dans « À traiter ». */
+  const JOUR = 86400000;
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'entreprise',
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'facture', aDevis: false, temps: [], jours: [],
+      maj: Date.now(), numeroFacture: 'F-2026-0001',
+      dateFacture: Date.now() - 3 * JOUR, echeancePaiement: Date.now() + 27 * JOUR,
+      lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 2, prix: 500, nature: 'prestation' }] }]
+  }));
+  await t.pause(300);
+  const bilan = t.texte('#ent-bilan');
+  verifierVrai('la bulle parle d’attente, pas d’impayé', /factures en attente/.test(bilan));
+  verifierVrai('le mot « impayés » a disparu de la bulle', !/impayés/.test(bilan));
+  verifierVrai('elle chiffre ce qui attend', /1 000 €/.test(bilan));
+  /* Facturé il y a trois jours, échéance dans vingt-sept : rien ne chauffe. */
+  const chaude = t.$$('#ent-bilan .bulle.chaud')
+    .filter(b => /attente/.test(b.textContent))[0];
+  verifierVrai('et elle ne chauffe pas pour si peu', !chaude);
+  verifierVrai('« À traiter » ne réclame rien non plus',
+    !/Facture impayée/.test(t.texte('#ent-alertes')));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Bilan : passé l’échéance, la bulle chauffe et l’alerte le nomme', async () => {
+  const JOUR = 86400000;
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'entreprise',
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'facture', aDevis: false, temps: [], jours: [],
+      maj: Date.now(), numeroFacture: 'F-2026-0001',
+      dateFacture: Date.now() - 60 * JOUR, echeancePaiement: Date.now() - 12 * JOUR,
+      lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 2, prix: 500, nature: 'prestation' }] }]
+  }));
+  await t.pause(300);
+  const chaude = t.$$('#ent-bilan .bulle.chaud')
+    .filter(b => /attente/.test(b.textContent))[0];
+  verifierVrai('la bulle chauffe', !!chaude);
+  verifierVrai('et dit combien sont en retard', /1 en retard/.test(t.texte('#ent-bilan')));
+  verifierVrai('« À traiter » le nomme', /Facture impayée/.test(t.texte('#ent-alertes')));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Ma journée : le chantier facturé ne se propose plus, et remplit ce qu’il sait', async () => {
+  /* « Une fois que c'est facturé, j'ai fini mes journées : ça n'a plus de
+     sens de l'afficher. » Et : « en fin de journée je suis crevé, il faut que
+     ce soit le plus efficace possible ». */
+  const JOUR = 86400000;
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'entreprise', cfg: { heuresJour: 8 },
+    chantiers: [
+      { id: 'c1', nom: 'Dégagement Martin', statut: 'encours', maj: Date.now(),
+        foret: 'Forêt de la Côte', commune: 'Levier', donneur: 'Cabinet Dubois',
+        temps: [{ date: Date.now() - 5 * JOUR, duree: 7, unite: 'h', personnes: 1, km: 64 }],
+        jours: [{ d: Date.now() - 5 * JOUR, p: 1 }],
+        lignes: [
+          { travail: 'DEGAG', unite: 'ha', quantite: 3, prix: 700, nature: 'prestation' },
+          /* Une fourniture n'est pas un poste de travail : elle n'ouvre rien. */
+          { travail: 'F_PROTEC', unite: 'unite', quantite: 50, prix: 3, nature: 'vente' }
+        ] },
+      { id: 'c2', nom: 'Déjà facturé', statut: 'paye', maj: Date.now(), temps: [], jours: [],
+        numeroFacture: 'F-2026-0002', datePaiement: Date.now(), lignes: [] }
+    ]
+  }));
+  await t.pause(300);
+  t.clic('#a-jour'); await t.pause(450);
+
+  const offerts = [...t.$('#mj-ch').options].map(o => o.value).filter(Boolean);
+  verifierVrai('le chantier en cours est proposé', offerts.indexOf('c1') >= 0);
+  verifierVrai('le chantier payé ne l’est plus', offerts.indexOf('c2') < 0);
+
+  /* Choisir le chantier remplit ce qu'il sait déjà. */
+  t.choisir('#mj-ch', 'c1'); await t.pause(300);
+  verifier('la forêt est reprise', 'Forêt de la Côte', t.$('#mj-lieu').value);
+  verifier('la commune aussi', 'Levier', t.$('#mj-commune').value);
+  /* Les kilomètres du dernier trajet vers ce chantier : c'est la même route. */
+  verifier('et les kilomètres habituels', '64', t.$('#mj-km').value);
+  /* Le formulaire garde toujours une ligne vierge en dernier : on ne
+     compare que les postes réellement ouverts. */
+  const postes = t.$$('#mj-postes [data-pstt]').map(sel => sel.value).filter(Boolean);
+  verifier('la prestation du chantier ouvre son poste', ['DEGAG'], postes);
+  /* Une fourniture n'est pas un poste de travail. Elle n'a pas d'option
+     dans ce sélecteur : ouvrir un poste pour elle ne se verrait pas sur les
+     valeurs — la ligne ressortirait vide. C'est le nombre de lignes qui le
+     trahit : une seule, celle du dégagement. */
+  verifier('la fourniture n’ouvre aucun poste fantôme', 1,
+    t.$$('#mj-postes [data-pstt]').length);
+  verifierVrai('les heures restent à lui', !t.$('[data-psth="0"]').value);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Ma journée : ce qui est déjà tapé n’est jamais écrasé', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'entreprise',
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'encours', maj: Date.now(),
+      foret: 'Forêt de la Côte', commune: 'Levier', temps: [], jours: [],
+      lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 3, prix: 700, nature: 'prestation' }] }]
+  }));
+  await t.pause(300);
+  t.clic('#a-jour'); await t.pause(450);
+  t.saisir('#mj-lieu', 'Bois du Haut');
+  t.choisir('#mj-ch', 'c1'); await t.pause(300);
+  verifier('la forêt tapée reste la sienne', 'Bois du Haut', t.$('#mj-lieu').value);
+  verifier('mais la commune vide se remplit', 'Levier', t.$('#mj-commune').value);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Accueil : le jour qui vient dit pour qui on travaille', async () => {
+  /* « Il faudrait juste mettre pour qui je travaille, le donneur d'ordre. »
+     C'est ce qu'on veut savoir la veille. */
+  const JOUR = 86400000;
+  const demain = new Date(Date.now() + JOUR); demain.setHours(12, 0, 0, 0);
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'entreprise',
+    chantiers: [{ id: 'c1', nom: 'Dégagement Martin', statut: 'accepte', maj: Date.now(),
+      donneur: 'Cabinet Dubois', temps: [], lignes: [],
+      jours: [{ d: demain.getTime(), p: 1 }] }]
+  }));
+  await t.pause(300);
+  const dit = t.texte('#ent-bilan');
+  verifierVrai('le jour est annoncé', /Demain/.test(dit));
+  verifierVrai('avec le chantier', /Dégagement Martin/.test(dit));
+  verifierVrai('et pour qui', /pour Cabinet Dubois/.test(dit));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Achats : les priorités sont des horizons, pas un millésime', async () => {
+  /* « Cette année, ça ne veut rien dire si on est à la fin de l'année. Il
+     faudrait un entre-deux : dans les trois mois, dans les six mois, dans
+     les douze mois, et puis un jour. » */
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'achats' }));
+  await t.pause(300);
+  t.clic('#ach-plus'); await t.pause(400);
+  const crans = t.$$('#ac-pri [data-acpri]').map(b => b.textContent);
+  verifier('cinq horizons',
+    ['Dès que possible', 'Dans les 3 mois', 'Dans les 6 mois', 'Dans l’année', 'Un jour'], crans);
+  verifierVrai('« Cette année » a disparu', crans.indexOf('Cette année') < 0);
+
+  t.saisir('#ac-quoi', 'Remorque');
+  t.saisir('#ac-ttc', '2400');
+  t.clic('[data-acpri="six"]'); await t.pause(150);
+  t.clic('#ac-ok'); await t.pause(500);
+  verifier('l’horizon choisi est retenu', 'six', (t.stock('achats') || [])[0].priorite);
+  verifierVrai('et la liste le nomme', /Dans les 6 mois/.test(t.texte('#ach-liste')));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Typographie : le pourcentage ne se sépare pas de son nombre', async () => {
+  /* « Le logo pourcentage va à la ligne parce que le chiffre est trop gros. »
+     eur() pose déjà une insécable devant le « € » pour cette raison ; le
+     pourcentage l'avait oubliée. Une regex écrite avec une espace ordinaire
+     ne matche donc plus — c'est le piège jumeau de celui de l'euro. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'encours', temps: [], jours: [], maj: Date.now(),
+      lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 2, prix: 500, nature: 'prestation' }] }]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+  const brut = t.$('#vue-chantier').textContent;
+  verifierVrai('le taux porte une insécable', /20\u00A0%/.test(brut));
+  verifierVrai('et jamais une espace ordinaire', !/20 %/.test(brut));
   verifier('aucune erreur', [], t.erreurs);
 });
 
