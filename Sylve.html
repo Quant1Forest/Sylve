@@ -109,6 +109,29 @@ button{cursor:pointer;background:none;border:none}
 .jrang .jv{font-family:var(--mono);font-size:14px;font-weight:600}
 .jrang .jv.vide{color:var(--gris-clair);font-weight:400}
 .jrang.avenir .jd{color:var(--gris)}
+/* Un achat à prévoir : la case à gauche, ce que c'est au milieu, le prix à
+   droite. Coché, il pâlit et se barre — il reste lisible, il ne se mélange
+   plus à ce qui attend. */
+.achat{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:start;
+  padding:9px 0;border-bottom:1px solid var(--trait)}
+.ach-case{flex:none;width:26px;height:26px;border:1.5px solid var(--trait-fort);
+  border-radius:7px;background:var(--carte2);font-size:15px;font-weight:700;
+  line-height:1;color:var(--accent-texte);margin-top:1px}
+.ach-case[aria-pressed=true]{background:var(--accent);border-color:var(--accent)}
+.ach-corps{text-align:left;padding:0;background:none;border:0;min-width:0}
+.ach-corps b{display:block;font-size:14px;line-height:1.3}
+.ach-corps small{display:block;font-size:11.5px;color:var(--gris);margin-top:1px}
+.ach-note{font-style:italic}
+.ach-prix{text-align:right;white-space:nowrap}
+.ach-prix b{display:block;font-size:15px}
+.ach-prix small{display:block;font-size:11px;color:var(--gris)}
+.achat.fait{opacity:.55}
+.achat.fait .ach-corps b{text-decoration:line-through}
+/* La part d'un poste dans ce qui l'attend : une barre vaut mieux qu'un
+   pourcentage à relire. */
+.ach-jauge{height:7px;border-radius:99px;background:var(--carte2);
+  border:1px solid var(--trait);margin-top:4px;overflow:hidden}
+.ach-jauge i{display:block;height:100%;border-radius:99px}
 .dit-avant{font-size:12px;color:var(--tiede);margin-top:3px}
 /* Sous-titre d'un bloc de la fiche : dit à quoi le bloc sert, pour qu'on
    ne confonde plus le prévu (Journées) et le réel (Temps passé). */
@@ -1385,6 +1408,9 @@ if (froid && s > 0) montrer(s);
           <button class="tuile" data-module="finances"><span class="ic rond"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><path d="M16.4 7.6a5.7 5.7 0 0 0-8.5 4.5 5.7 5.7 0 0 0 8.5 4.5"/><path d="M6.3 10.6h6.8M6.3 13.6h6.8"/></svg></span>
             <span><b>Finances</b><small id="e-fi-s">Bilan, recettes, dépenses, analyses</small></span>
             <span class="chiffre"><b id="e-fi-n">—</b><span>facturé</span></span></button>
+          <button class="tuile" data-module="achats"><span class="ic rond"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><path d="M4.4 8.4h15.2l-1.5 9.1a1.6 1.6 0 0 1-1.6 1.3H7.5a1.6 1.6 0 0 1-1.6-1.3z"/><path d="M8.9 8.4V6.6a3.1 3.1 0 0 1 6.2 0v1.8"/></svg></span>
+            <span><b>Achats à venir</b><small id="e-ac-s">Ce que vous comptez acheter</small></span>
+            <span class="chiffre"><b id="e-ac-n">—</b><span>à prévoir</span></span></button>
           <button class="tuile" data-module="vehicule"><span class="ic rond"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><path d="M3.5 15.6V9.4h9.6l3.3 3h4.1v3.2"/><path d="M9.6 16.2h4.6"/><circle cx="7.3" cy="16.2" r="1.8"/><circle cx="16.6" cy="16.2" r="1.8"/></svg></span>
             <span><b>Véhicule</b><small id="e-vh-s">Carnet d'entretien, échéances</small></span>
             <span class="chiffre"><b id="e-vh-n">—</b><span>km</span></span></button>
@@ -1595,6 +1621,10 @@ if (froid && s > 0) montrer(s);
     <section class="vue" id="vue-carnetv" role="tabpanel"><div id="veh-carnet"></div></section>
     <section class="vue" id="vue-echeancesv" role="tabpanel"><div id="veh-echeances"></div></section>
     <section class="vue" id="vue-coutsv" role="tabpanel"><div id="veh-couts"></div></section>
+
+    <!-- ================================================ achats à venir -->
+    <section class="vue" id="vue-achats" role="tabpanel"><div id="ach-liste"></div></section>
+    <section class="vue" id="vue-budget" role="tabpanel"><div id="ach-budget"></div></section>
 
     <!-- ============================================== bois de chauffage -->
     <section class="vue" id="vue-stock" role="tabpanel">
@@ -4556,6 +4586,58 @@ var NATURES = [
 
 function trouve(l, c) { for (var i = 0; i < l.length; i++) if (l[i].c === c) return l[i]; return null; }
 function nomCategorie(c) { var x = trouve(CATEGORIES, c); return x ? x.n : (c || ''); }
+/* Ce qu'il compte acheter, rangé par ce qui presse. « Des fois j'oublie, et
+   il faut que je les garde en mémoire. » L'objet est de savoir ce qui
+   l'attend en dépenses, pas de tenir un budget : il saisit le TTC — c'est
+   ce qu'il lit sur une étiquette — et le hors taxes se déduit. */
+var PRIORITES_ACHAT = [
+  { c: 'urgent', n: 'Dès que possible', coul: '#B4231F' },
+  { c: 'annee', n: 'Cette année', coul: '#C4611B' },
+  { c: 'unjour', n: 'Un jour', coul: '#6F6A5C' }
+];
+function nomPriorite(c) { var x = trouve(PRIORITES_ACHAT, c); return x ? x.n : ''; }
+function coulPriorite(c) { var x = trouve(PRIORITES_ACHAT, c); return x ? x.coul : '#6F6A5C'; }
+function rangPriorite(c) {
+  for (var i = 0; i < PRIORITES_ACHAT.length; i++) if (PRIORITES_ACHAT[i].c === c) return i;
+  return PRIORITES_ACHAT.length;
+}
+/* Ce qui reste à acheter d'abord, du plus pressé au moins ; ce qui est fait
+   glisse à la suite, comme il l'a demandé — il reste visible, il ne se
+   mélange plus. */
+function achatsRanges(achats) {
+  return (achats || []).slice().sort(function (a, b) {
+    if (!!a.fait !== !!b.fait) return a.fait ? 1 : -1;
+    if (a.fait) return nb(b.dateFait) - nb(a.dateFait);
+    var r = rangPriorite(a.priorite) - rangPriorite(b.priorite);
+    return r || nb(b.ttc) - nb(a.ttc);
+  });
+}
+/* Ce que ça pèse : le TTC qu'il sortira, le hors taxes qui entre dans ses
+   charges, et la TVA qu'il récupérera. Séparé par priorité, parce que « un
+   jour » et « dès que possible » ne se additionnent pas dans sa tête. */
+function totauxAchats(achats) {
+  var out = { ttc: 0, ht: 0, tva: 0, n: 0, parPriorite: [], parCategorie: [],
+    faitTtc: 0, faitN: 0 };
+  var pri = {}, cat = {};
+  (achats || []).forEach(function (a) {
+    var ttc = nb(a.ttc), ht = arr(ttc / (1 + nb(a.taux) / 100), 2);
+    if (a.fait) { out.faitTtc += ttc; out.faitN++; return; }
+    out.ttc += ttc; out.ht += ht; out.tva += ttc - ht; out.n++;
+    var p = a.priorite || 'unjour';
+    pri[p] = pri[p] || { c: p, ttc: 0, n: 0 };
+    pri[p].ttc += ttc; pri[p].n++;
+    var k = a.categorie || 'AUTRE';
+    cat[k] = cat[k] || { c: k, ttc: 0, n: 0 };
+    cat[k].ttc += ttc; cat[k].n++;
+  });
+  PRIORITES_ACHAT.forEach(function (p) { if (pri[p.c]) out.parPriorite.push(pri[p.c]); });
+  out.parCategorie = Object.keys(cat).map(function (k) { return cat[k]; })
+    .sort(function (a, b) { return b.ttc - a.ttc; });
+  ['ttc', 'ht', 'tva', 'faitTtc'].forEach(function (k) { out[k] = arr(out[k], 2); });
+  out.parPriorite.forEach(function (x) { x.ttc = arr(x.ttc, 2); });
+  out.parCategorie.forEach(function (x) { x.ttc = arr(x.ttc, 2); });
+  return out;
+}
 function estImmo(c) { var x = trouve(CATEGORIES, c); return !!(x && x.immo); }
 /* Les deux carburants : celui de l'utilitaire et celui du véhicule personnel.
    Ce sont eux, et eux seuls, qui portent un nombre de litres. */
@@ -5054,6 +5136,8 @@ var M = {
   nb: nb, arr: arr, htDe: htDe, tvaDe: tvaDe, ttcDe: ttcDe,
   lignesDepense: lignesDepense, htLigne: htLigne, tvaLigne: tvaLigne,
   estCarburant: estCarburant, prixLitreMoyen: prixLitreMoyen,
+  PRIORITES_ACHAT: PRIORITES_ACHAT, nomPriorite: nomPriorite, coulPriorite: coulPriorite,
+  achatsRanges: achatsRanges, totauxAchats: totauxAchats,
   bornes: bornes, dansPeriode: dansPeriode,
   dateRecette: dateRecette, lignesFacturees: lignesFacturees, chiffreAffaires: chiffreAffaires,
   tvaCollectee: tvaCollectee, tvaDeductible: tvaDeductible, balanceTva: balanceTva,
@@ -5715,10 +5799,10 @@ function aPurger(entrees, maintenant, jours) {
 
 var FORMAT_SAUVEGARDE = 'bordcub-sauvegarde-1';
 
-function construireSauvegarde(cfg, bordereaux, piles, chantiers, depenses, clients, articles, charges, proprios, fournisseurs, commandes, sorties, journees, versements, vehicule) {
+function construireSauvegarde(cfg, bordereaux, piles, chantiers, depenses, clients, articles, charges, proprios, fournisseurs, commandes, sorties, journees, versements, vehicule, achats) {
   return {
     format: FORMAT_SAUVEGARDE,
-    version: 8,
+    version: 9,
     date: new Date().toISOString(),
     config: cfg || null,
     bordereaux: (bordereaux || []).filter(Boolean),
@@ -5734,7 +5818,8 @@ function construireSauvegarde(cfg, bordereaux, piles, chantiers, depenses, clien
     sorties: (sorties || []).filter(Boolean),
     journees: (journees || []).filter(Boolean),
     versements: (versements || []).filter(Boolean),
-    vehicule: vehicule || null
+    vehicule: vehicule || null,
+    achats: (achats || []).filter(Boolean)
   };
 }
 
@@ -5756,6 +5841,7 @@ function lireSauvegarde(o) {
       sorties: (o.sorties || []).filter(Boolean),
       journees: (o.journees || []).filter(Boolean),
       versements: (o.versements || []).filter(Boolean),
+      achats: (o.achats || []).filter(Boolean),
       vehicule: o.vehicule || null, complete: true };
     /* Une sauvegarde peut ne contenir que du stock ou que des dépenses : la
        refuser faute de bordereau revenait à interdire l'import à qui ne fait
@@ -5763,7 +5849,7 @@ function lireSauvegarde(o) {
     var vide = true;
     ['bordereaux', 'piles', 'chantiers', 'depenses', 'clients', 'articles',
       'charges', 'proprios', 'fournisseurs', 'commandes', 'sorties', 'journees',
-      'versements'].forEach(function (k) {
+      'versements', 'achats'].forEach(function (k) {
         if (r[k].length) vide = false;
       });
     /* Le carnet du véhicule est un objet, pas une liste : oublié de ce compte,
@@ -5847,6 +5933,7 @@ var A = {
   cfg: null, index: [], bord: null, piles: [], chantiers: [], module: 'cubage', ici: null,
   vuePiles: 'stock', filtreCh: 'ouverts', rechCh: '', triAncien: false, chOuvert: null, clients: [], proprios: [], estim: null, imp: null, articles: [], charges: [], fournisseurs: [], commandes: [], sorties: [], mvt: 'achats', journees: [], lieuxRegles: [], listeReglee: 'clients', revient: null, calMois: null, calJour: null, nbAlertes: 0, planifie: null,
   depenses: [], periode: null, filtreDep: 'tous', vueAna: 'ensemble', secReglages: 'general',
+  achats: [],
   versements: [], vehicule: null,
   vue: 'saisie', sousVue: 'synthese', edition: null,
   memeGrume: false, classementRegl: 'Class. Comt', filtre: ''
@@ -5885,6 +5972,7 @@ function sauver() {
 function sauverCfg() { return ecrire('bordcub.cfg', A.cfg); }
 function sauverVersements() { return ecrire('bordcub.versements', A.versements); }
 function sauverVehicule() { return ecrire('bordcub.vehicule', A.vehicule); }
+function sauverAchats() { return ecrire('bordcub.achats', A.achats); }
 
 /* Les quatre classes de l'ABCD s'intitulaient « Actba », « Bctba » : du
    vocabulaire de tableur que personne ne lit sous la pluie. Les listes de
@@ -6645,7 +6733,7 @@ function sauvegarderTout() {
   if (!c.length) { toast('Rien à sauvegarder.'); return Promise.resolve(); }
   var poids = '';
   return tousLesBordereaux().then(function (bs) {
-    var txt = JSON.stringify(B.construireSauvegarde(A.cfg, bs, A.piles, A.chantiers, A.depenses, A.clients, A.articles, A.charges, A.proprios, A.fournisseurs, A.commandes, A.sorties, A.journees, A.versements, A.vehicule), null, 1);
+    var txt = JSON.stringify(B.construireSauvegarde(A.cfg, bs, A.piles, A.chantiers, A.depenses, A.clients, A.articles, A.charges, A.proprios, A.fournisseurs, A.commandes, A.sorties, A.journees, A.versements, A.vehicule, A.achats), null, 1);
     try { poids = B.octets(new Blob([txt]).size); } catch (e) { poids = B.octets(txt.length); }
     return partager('Sylve-' + B.jour(Date.now()) + '.json', txt, 'application/json');
   }).then(marquerExport).then(function () {
@@ -6674,7 +6762,7 @@ function instantaneDuJour() {
       if (!aDesDonnees()) return;
       return Store.set(cle, JSON.stringify(B.construireSauvegarde(A.cfg, bs, sansPhotos(A.piles),
         A.chantiers, A.depenses, A.clients, A.articles, A.charges, A.proprios, A.fournisseurs,
-        A.commandes, A.sorties, A.journees, A.versements, A.vehicule)));
+        A.commandes, A.sorties, A.journees, A.versements, A.vehicule, A.achats)));
     });
   }).then(function () {
     return Store.keys();
@@ -6851,6 +6939,12 @@ function integrer(objet, source, remplace) {
       if (A.versements.some(function (x) { return x.id === vv.id; })) return;
       A.versements.push(vv); nm++;
     });
+    A.achats = A.achats || [];
+    (s.achats || []).forEach(function (ac) {
+      if (!ac || !ac.quoi) return;
+      if (A.achats.some(function (x) { return x.id === ac.id; })) return;
+      A.achats.push(ac); nm++;
+    });
     /* Le carnet du véhicule est un objet unique : on fusionne ses listes.
        Les postes se dédoublonnent par le nom — les semés d'origine portent
        un identifiant différent sur chaque téléphone. */
@@ -6892,7 +6986,7 @@ function integrer(objet, source, remplace) {
     return Promise.all([np ? sauverPiles() : null, nc ? sauverChantiers() : null,
       nd ? sauverDepenses() : null, na ? sauverArticles() : null, ng ? sauverCharges() : null,
       nf ? sauverFournisseurs() : null, nm ? sauverCommandes() : null, nm ? sauverSorties() : null,
-      nm ? sauverJournees() : null, sauverVersements(), sauverVehicule()]);
+      nm ? sauverJournees() : null, sauverVersements(), sauverVehicule(), sauverAchats()]);
   }).then(function () {
     if (dernier) { A.bord = dernier; return ecrire('bordcub.actif', dernier.id); }
   }).then(function () {
@@ -7270,7 +7364,7 @@ function exportStockXlsx() {
 var SEC_DE_MODULE = {
   cubage: 'cubage', bois: 'bois',
   chantiers: 'journee', calendrier: 'alertes', rendements: 'journee',
-  finances: 'fin', stock: 'stock', vehicule: 'vehicule'
+  finances: 'fin', stock: 'stock', vehicule: 'vehicule', achats: 'fin'
 };
 var RACCOURCIS_REGLAGES = {
   maj: ['general', 'maj'],
@@ -7382,6 +7476,13 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.69', quoi: [
+    { t: 'Un module « Achats a venir » : ce que vous comptez acheter', vue: 'achats' },
+    { t: 'Range par ce qui presse, avec le montant estime', vue: 'achats' },
+    { t: 'Vous tapez le TTC, le hors taxes et la TVA se deduisent', vue: 'achats' },
+    { t: 'Coche, l achat passe a la suite sans disparaitre', vue: 'achats' },
+    { t: 'Et « Ce que ca pese » dit ce qui vous attend', vue: 'budget' }
+  ] },
   { v: '4.68', quoi: [
     { t: 'Une journee passee sans temps note vous est reclamee au lancement' },
     { t: 'Un devis s attache a un chantier deja facture', vue: 'chantier' },
@@ -7408,11 +7509,6 @@ var NOTES_MAJ = [
     { t: 'Une categorie « Frais vehicule » : garage, carte grise, pieces', vue: 'depenses' },
     { t: 'L achat du vehicule se repartit sur ce qu il reste a rouler', vue: 'carnetv' },
     { t: 'Une facture de garage se verse dans le carnet d une case', vue: 'depenses' }
-  ] },
-  { v: '4.64', quoi: [
-    { t: 'Ce que votre vehicule coute, au kilometre', vue: 'coutsv' },
-    { t: 'Le carburant pro y entre seul ; le reste se coche sur la depense', vue: 'coutsv' },
-    { t: 'Et ce qui a coute le plus cher, en tete de liste', vue: 'coutsv' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -7595,7 +7691,8 @@ function instantaneForce() {
   return tousLesBordereaux().then(function (bs) {
     return Store.set(B.cleInstantane(Date.now()), JSON.stringify(
       B.construireSauvegarde(A.cfg, bs, sansPhotos(A.piles), A.chantiers, A.depenses, A.clients,
-        A.articles, A.charges, A.proprios, A.fournisseurs, A.commandes, A.sorties, A.journees)));
+        A.articles, A.charges, A.proprios, A.fournisseurs, A.commandes, A.sorties, A.journees,
+        A.versements, A.vehicule, A.achats)));
   });
 }
 function viderTout() {
@@ -8082,6 +8179,27 @@ function brancher() {
     A.cfg.baseCotisations = $('#sim-base').value === 'brut' ? 'brut' : 'abattu';
     A.cfg.baseImpot = A.cfg.baseCotisations;
     sauverCfg(); renderAnalyses();
+  });
+
+  /* --- achats à venir --- */
+  $('#ach-liste').addEventListener('click', function (e) {
+    if (e.target.closest('#ach-plus')) { ouvrirAchat(null); return; }
+    var coche = e.target.closest('[data-achfait]');
+    if (coche) {
+      var a = achat(coche.dataset.achfait); if (!a) return;
+      /* Cocher ne supprime rien : la ligne glisse à la suite, et se décoche
+         d'un second appui — un achat repoussé n'est pas un achat perdu. */
+      a.fait = !a.fait;
+      a.dateFait = a.fait ? Date.now() : null;
+      a.maj = Date.now();
+      sauverAchats().then(function () {
+        renderAchats(); renderBudgetAchats(); renderEntreprise();
+        toast(a.fait ? 'Acheté — la ligne passe à la suite.' : 'Remis dans la liste.');
+      });
+      return;
+    }
+    var mod = e.target.closest('[data-achmod]');
+    if (mod) ouvrirAchat(mod.dataset.achmod);
   });
 
   /* --- véhicule --- */
@@ -8648,7 +8766,8 @@ function init() {
       lire('bordcub.articles', []), lire('bordcub.charges', []), lire('bordcub.fournisseurs', []),
       lire('bordcub.commandes', []), lire('bordcub.sorties', []),
       lire('bordcub.journees', []), lire('bordcub.lieux', []),
-      lire('bordcub.versements', []), lire('bordcub.vehicule', null)]);
+      lire('bordcub.versements', []), lire('bordcub.vehicule', null),
+      lire('bordcub.achats', [])]);
   })
     .then(function (res) {
       A.export = res[3] || 0;
@@ -8675,6 +8794,7 @@ function init() {
          Une fois écrit, un carnet vidé volontairement de ses postes le reste. */
       A.vehicule = res[18] || vehiculeDefaut();
       if (!res[18]) sauverVehicule();
+      A.achats = res[19] || [];
       A.cfg = res[0] || E.configDefaut();
       var d = E.configDefaut();
       ['essences', 'qualites', 'favoris'].forEach(function (k) { if (!A.cfg[k]) A.cfg[k] = d[k]; });
@@ -8733,7 +8853,8 @@ function init() {
           carnet: 'chantiers', chantier: 'chantiers', calendrier: 'calendrier',
           rendements: 'rendements', estimer: 'rendements', finances: 'finances', depenses: 'finances',
           charges: 'finances', stock2: 'stock', commandes: 'stock', revient: 'stock', carte: 'calendrier', analyses: 'finances',
-          carnetv: 'vehicule', echeancesv: 'vehicule', coutsv: 'vehicule' };
+          carnetv: 'vehicule', echeancesv: 'vehicule', coutsv: 'vehicule',
+          achats: 'achats', budget: 'achats' };
         var mod = MOD_DE_VUE[vd] || 'cubage';
         renderReglages();
         if (actif && A.index.some(function (x) { return x.id === actif; })) {
@@ -8820,6 +8941,13 @@ PICTOS.echeancesv = '<path d="M4.6 15.8a7.4 7.4 0 1 1 14.8 0"/><path d="m12 15.8
   '<circle cx="12" cy="15.8" r="1"/>';
 PICTOS.coutsv = '<path d="M4.6 19.4h14.8"/><path d="M7.7 19.4v-4.6M12 19.4v-8.2M16.3 19.4v-6"/>' +
   '<path d="M5.4 7.6h4.2M7.5 5.5v4.2"/>';      /* « Où ? » et « Carte », même repère */
+/* Un panier, et le « + » de ce qui reste à y mettre. */
+PICTOS.achats = '<path d="M4.4 8.4h15.2l-1.5 9.1a1.6 1.6 0 0 1-1.6 1.3H7.5a1.6 1.6 0 0 1-1.6-1.3z"/>' +
+  '<path d="M8.9 8.4V6.6a3.1 3.1 0 0 1 6.2 0v1.8"/>';
+/* Trois piles de hauteurs différentes : ce que ça pèse, par priorité. */
+PICTOS.budget = '<path d="M4.6 19.4h14.8"/><rect x="5.6" y="11.2" width="3.6" height="5.4" rx=".8"/>' +
+  '<rect x="10.2" y="8" width="3.6" height="8.6" rx=".8"/>' +
+  '<rect x="14.8" y="13.4" width="3.6" height="3.2" rx=".8"/>';
 
 var MODULES = {
   cubage: {
@@ -8860,6 +8988,13 @@ var MODULES = {
        de la rentabilité. */
     vues: [['stock2', 'Inventaire'], ['commandes', 'Entrées / sorties'],
     ['revient', 'Rentabilité']]
+  },
+  /* « Il faudrait qu'on crée ce truc pour les achats et les priorités, parce
+     que là ce n'est pas une chose en tête, mais des fois j'oublie. » Un
+     module, pas un onglet enfoui : ce qu'on oublie doit se voir en arrivant. */
+  achats: {
+    nom: 'Achats à venir', defaut: 'achats', groupe: 'entreprise',
+    vues: [['achats', 'Ma liste'], ['budget', 'Ce que ça pèse']]
   },
   vehicule: {
     /* Le carnet d'entretien de l'utilitaire. Deux vues, jamais une seule :
@@ -9035,6 +9170,7 @@ function renderAccueil() {
     ? A.piles.length + (A.piles.length > 1 ? ' piles' : ' pile')
     : 'Aucune pile enregistrée';
   renderNudgeSauvegarde(); renderNudgeEcheances(); renderNudgeDevis(); renderNudgeJournees(); renderMaJournee();
+  renderAchats(); renderBudgetAchats();
   renderEntreprise();
 }
 
@@ -12758,7 +12894,187 @@ function ouvrirPosteV(id) {
   }
 }
 
+/* ------------------------------------------------------ achats à venir */
+function achat(id) {
+  return (A.achats || []).filter(function (x) { return x.id === id; })[0] || null;
+}
+function renderAchats() {
+  var z = $('#ach-liste'); if (!z) return;
+  var l = FIN.achatsRanges(A.achats);
+  var t = FIN.totauxAchats(A.achats);
+  var pris = null;
+  var lignes = l.map(function (a) {
+    var ht = C.arr(C.nb(a.ttc) / (1 + C.nb(a.taux) / 100), 2);
+    /* Un intertitre à chaque changement de priorité : la liste se lit du
+       plus pressé au moins, et on voit où on passe de l'un à l'autre. */
+    var groupe = a.fait ? 'fait' : (a.priorite || 'unjour');
+    var tete = '';
+    if (groupe !== pris) {
+      pris = groupe;
+      tete = '<p class="eyebrow" style="margin:16px 0 6px">' +
+        (a.fait ? 'Déjà achetés' : esc(FIN.nomPriorite(groupe))) + '</p>';
+    }
+    return tete + '<div class="achat' + (a.fait ? ' fait' : '') + '">' +
+      '<button type="button" class="ach-case" data-achfait="' + esc(a.id) + '" ' +
+      'aria-pressed="' + (a.fait ? 'true' : 'false') + '" ' +
+      'title="' + (a.fait ? 'Remettre dans la liste' : 'Marquer comme acheté') + '" ' +
+      'aria-label="' + (a.fait ? 'Remettre dans la liste' : 'Marquer comme acheté') + '">' +
+      (a.fait ? '✓' : '') + '</button>' +
+      '<button type="button" class="ach-corps" data-achmod="' + esc(a.id) + '">' +
+      '<b>' + esc(a.quoi || 'Achat') + '</b>' +
+      '<small>' + esc(FIN.nomCategorie(a.categorie)) +
+      (a.fait && a.dateFait ? ' · acheté le ' + dateCourte(a.dateFait)
+        : ' · ' + esc(FIN.nomPriorite(a.priorite))) + '</small>' +
+      (a.note ? '<small class="ach-note">' + esc(a.note) + '</small>' : '') +
+      '</button>' +
+      '<span class="ach-prix"><b class="num">' + eur(C.nb(a.ttc)) + '</b>' +
+      '<small>' + eur(ht) + ' HT</small></span>' +
+      '</div>';
+  }).join('');
+
+  z.innerHTML =
+    '<div class="carte"><div class="carte-titre"><h2>Ce que je compte acheter</h2>' +
+    '<button class="btn primaire btn-min" id="ach-plus">+ Achat</button></div>' +
+    '<p class="sous-titre-bloc">Rangé par ce qui presse. Cochez ce qui est acheté : la ligne passe à la suite, elle ne disparaît pas.</p>' +
+    (t.n ? '<div class="kpi" style="margin-top:0">' +
+      '<div class="carte2"><b class="num">' + eur(t.ttc) + '</b><small>à prévoir, TTC</small></div>' +
+      '<div class="carte2"><b class="num">' + t.n + '</b><small>achat' + (t.n > 1 ? 's' : '') +
+      ' en attente</small></div></div>' : '') +
+    (lignes || '<div class="vide"><p>Rien de prévu. « + Achat » pour noter ce qui vous trotte dans la tête.</p></div>') +
+    '</div>';
+}
+
+function renderBudgetAchats() {
+  var z = $('#ach-budget'); if (!z) return;
+  var t = FIN.totauxAchats(A.achats);
+  if (!t.n && !t.faitN) {
+    z.innerHTML = '<div class="carte"><h2>Ce que ça pèse</h2>' +
+      '<div class="vide"><p>Rien à chiffrer tant que la liste est vide.</p></div></div>';
+    return;
+  }
+  var barre = function (nom, montant, coul) {
+    var part = t.ttc > 0 ? Math.round(montant / t.ttc * 100) : 0;
+    return '<div style="margin-bottom:9px">' +
+      '<div style="display:flex;justify-content:space-between;font-size:13.5px">' +
+      '<span>' + esc(nom) + '</span><b class="num">' + eur(montant) + '</b></div>' +
+      '<div class="ach-jauge"><i style="width:' + part + '%;background:' + coul + '"></i></div>' +
+      '</div>';
+  };
+  z.innerHTML =
+    '<div class="carte"><h2>Ce que ça pèse</h2>' +
+    '<div class="kpi" style="margin-top:0">' +
+    '<div class="carte2"><b class="num">' + eur(t.ttc) + '</b><small>à sortir, TTC</small></div>' +
+    '<div class="carte2"><b class="num">' + eur(t.ht) + '</b><small>hors taxes</small></div>' +
+    '<div class="carte2"><b class="num">' + eur(t.tva) + '</b><small>TVA récupérable</small></div>' +
+    '</div>' +
+    '<p class="muted" style="font-size:11.5px;margin:10px 0 0">Des montants estimés : ils disent ce qui vous attend, ils ne remplacent pas vos dépenses.</p></div>' +
+
+    (t.parPriorite.length ? '<div class="carte"><h2>Par ce qui presse</h2>' +
+      t.parPriorite.map(function (p) {
+        return barre(FIN.nomPriorite(p.c) + ' · ' + p.n, p.ttc, FIN.coulPriorite(p.c));
+      }).join('') + '</div>' : '') +
+
+    (t.parCategorie.length ? '<div class="carte"><h2>Par catégorie</h2>' +
+      t.parCategorie.map(function (c2) {
+        return barre(FIN.nomCategorie(c2.c) + ' · ' + c2.n, c2.ttc, 'var(--accent)');
+      }).join('') + '</div>' : '') +
+
+    (t.faitN ? '<div class="carte"><h2>Déjà achetés</h2>' +
+      '<div class="kpi" style="margin-top:0">' +
+      '<div class="carte2"><b class="num">' + eur(t.faitTtc) + '</b><small>dépensés</small></div>' +
+      '<div class="carte2"><b class="num">' + t.faitN + '</b><small>ligne' +
+      (t.faitN > 1 ? 's' : '') + ' cochée' + (t.faitN > 1 ? 's' : '') + '</small></div></div></div>' : '');
+}
+
+function ouvrirAchat(id) {
+  var a = id ? achat(id) : null;
+  if (id && !a) return;
+  var pri = (a && a.priorite) || 'annee';
+  modale(a ? 'Modifier l’achat' : 'Un achat à prévoir',
+    '<div class="champ"><label class="eyebrow" for="ac-quoi">Ce que c’est</label>' +
+    '<input type="text" id="ac-quoi" class="gros" autocomplete="off" ' +
+    'placeholder="débroussailleuse, remorque…" value="' + esc(a ? a.quoi || '' : '') + '"></div>' +
+    '<div class="grille g3">' +
+    '<div class="champ"><label class="eyebrow" for="ac-ttc">Montant TTC</label>' +
+    '<input type="text" id="ac-ttc" class="gros" inputmode="decimal" value="' +
+    (a && a.ttc != null ? esc(String(a.ttc).replace('.', ',')) : '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="ac-taux">TVA</label>' +
+    '<select id="ac-taux">' + FIN.TAUX_TVA.map(function (x) {
+      return '<option value="' + x + '"' +
+        ((a ? FIN.nb(a.taux) : 20) === x ? ' selected' : '') + '>' +
+        (x ? String(x).replace('.', ',') + ' %' : 'sans') + '</option>';
+    }).join('') + '</select></div>' +
+    '<div class="champ"><label class="eyebrow" for="ac-cat">Catégorie</label>' +
+    '<select id="ac-cat">' + FIN.CATEGORIES.map(function (c2) {
+      return '<option value="' + c2.c + '"' +
+        ((a && a.categorie) === c2.c ? ' selected' : '') + '>' + esc(c2.n) + '</option>';
+    }).join('') + '</select></div></div>' +
+    '<p class="muted" style="font-size:11.5px;margin:0 0 12px" id="ac-ht"></p>' +
+    '<p class="eyebrow" style="margin:4px 0 6px">Ça presse ?</p>' +
+    '<div class="chips" id="ac-pri">' + FIN.PRIORITES_ACHAT.map(function (p) {
+      return '<button type="button" class="chip" data-acpri="' + p.c + '" aria-pressed="' +
+        (pri === p.c ? 'true' : 'false') + '">' + esc(p.n) + '</button>';
+    }).join('') + '</div>' +
+    '<div class="champ" style="margin-top:13px"><label class="eyebrow" for="ac-note">' +
+    'À quoi ça va servir</label>' +
+    '<textarea id="ac-note" placeholder="pour ne plus louer à chaque plantation">' +
+    esc(a ? a.note || '' : '') + '</textarea></div>' +
+    '<div class="btn-rang" style="margin-top:11px">' +
+    (a ? '<button class="btn danger btn-min" id="ac-sup">Retirer</button>' : '') +
+    '<button class="btn primaire" id="ac-ok">Enregistrer</button></div>');
+
+  /* Il saisit le TTC — c'est ce qu'il lit sur une étiquette — et le hors
+     taxes se déduit sous ses yeux. */
+  var majHt = function () {
+    var ttc = C.nb($('#ac-ttc').value), taux = C.nb($('#ac-taux').value);
+    $('#ac-ht').innerHTML = ttc > 0
+      ? 'Soit <b>' + eur(C.arr(ttc / (1 + taux / 100), 2)) + '</b> hors taxes, et ' +
+        eur(C.arr(ttc - ttc / (1 + taux / 100), 2)) + ' de TVA à récupérer.'
+      : 'Le hors taxes se déduit du TTC.';
+  };
+  $('#ac-ttc').addEventListener('input', majHt);
+  $('#ac-taux').addEventListener('change', majHt);
+  majHt();
+  $('#ac-pri').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-acpri]'); if (!b) return;
+    pri = b.dataset.acpri;
+    $$('#ac-pri [data-acpri]').forEach(function (x) {
+      x.setAttribute('aria-pressed', String(x.dataset.acpri === pri));
+    });
+  });
+  var fini = function (message) {
+    sauverAchats().then(function () {
+      fermerModale(); renderAchats(); renderBudgetAchats(); renderEntreprise();
+      toast(message);
+    });
+  };
+  $('#ac-ok').addEventListener('click', function () {
+    var quoi = $('#ac-quoi').value.trim();
+    if (!quoi) { toast('Dites ce que c’est.'); return; }
+    var maj = { quoi: quoi, ttc: C.nb($('#ac-ttc').value) || 0,
+      taux: C.nb($('#ac-taux').value), categorie: $('#ac-cat').value,
+      priorite: pri, note: $('#ac-note').value.trim(), maj: Date.now() };
+    if (a) { Object.keys(maj).forEach(function (k) { a[k] = maj[k]; }); }
+    else { maj.id = uid(); maj.cree = Date.now(); maj.fait = false; A.achats.push(maj); }
+    fini(a ? 'Achat modifié.' : 'Achat noté.');
+  });
+  if (a) {
+    $('#ac-sup').addEventListener('click', function () {
+      if (!confirm('Retirer « ' + (a.quoi || 'cet achat') + ' » de la liste ?')) return;
+      A.achats = A.achats.filter(function (x) { return x.id !== id; });
+      fini('Achat retiré.');
+    });
+  }
+}
+
 function renderEntreprise() {
+  var ta = FIN.totauxAchats(A.achats);
+  if ($('#e-ac-n')) $('#e-ac-n').textContent = ta.n ? eurCourt(ta.ttc) : '—';
+  if ($('#e-ac-s')) {
+    $('#e-ac-s').textContent = ta.n
+      ? ta.n + ' achat' + (ta.n > 1 ? 's' : '') + ' en attente'
+      : 'Ce que vous comptez acheter';
+  }
   var ouv = C.filtre(A.chantiers, 'ouverts').length;
   var t = C.totaux(A.chantiers, A.cfg);
   if ($('#a-ent-n')) $('#a-ent-n').textContent = ouv || '—';
@@ -17439,7 +17755,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.68.0-20260901-1610';
+var VERSION = '4.69.0-20260902-1120';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

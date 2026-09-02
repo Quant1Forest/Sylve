@@ -2049,7 +2049,16 @@ scenario('Modules : Devis disparaît, Analyses devient un onglet de Finances', a
   const t = await ouvrir(Object.assign({}, VIDE, { module: 'entreprise' }));
   const tuiles = t.$$('#vue-entreprise .tuiles .tuile')
     .map(b => b.dataset.module);
-  verifier('six tuiles restent — Véhicule est arrivé depuis', 6, tuiles.length);
+  /* Une tuile par module de la partie, ni plus ni moins. Le compte était
+     écrit en dur : il cassait à chaque module ajouté sans rien apprendre.
+     On le croise maintenant avec le sélecteur de module du bandeau, qui
+     porte la même liste, écrit pour une autre raison — naviguer. Une tuile
+     oubliée comme une tuile fantôme font crier ce contrôle. */
+  t.clic('[data-module="chantiers"]'); await t.pause(300);
+  const parBandeau = [...t.$('#b-module [label="Entreprise"]').children]
+    .map(o => o.value).sort();
+  t.clic('#b-retour'); await t.pause(300);
+  verifier('une tuile par module de la partie', parBandeau, tuiles.slice().sort());
   verifierVrai('plus de tuile Devis', tuiles.indexOf('devis') < 0);
   verifierVrai('plus de tuile Analyses', tuiles.indexOf('analyses') < 0);
   verifierVrai('Chantiers, Calendrier, Rendements, Stock et Finances sont là',
@@ -5388,6 +5397,148 @@ scenario('Devis : on peut en attacher un à un chantier déjà facturé', async 
      « Savoir, à partir du moment où le devis est signé, sous combien de temps
      je réalise les travaux. » */
   verifierVrai('et dit en combien de temps il a été réalisé', /Réalisé en10 jours/.test(f));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Achats : la liste se range par ce qui presse, et le coché passe à la suite', async () => {
+  /* « Des fois j'oublie, et il faut que je les garde en mémoire. » Un module
+     à lui, pas un onglet enfoui : ce qu'on oublie doit se voir en arrivant. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'achats',
+    achats: [
+      { id: 'a1', quoi: 'Remorque', categorie: 'IMMO', ttc: 2400, taux: 20,
+        priorite: 'unjour', note: 'pour ne plus louer', cree: 1 },
+      { id: 'a2', quoi: 'Débroussailleuse', categorie: 'PETITMAT', ttc: 600, taux: 20,
+        priorite: 'urgent', cree: 2 },
+      { id: 'a3', quoi: 'Pantalon anti-coupure', categorie: 'EPI', ttc: 180, taux: 20,
+        priorite: 'annee', cree: 3 }
+    ]
+  }));
+  await t.pause(300);
+
+  /* Le plus pressé d'abord, le « un jour » en dernier. */
+  const noms = t.$$('#ach-liste .ach-corps b').map(e => e.textContent);
+  verifier('rangé du plus pressé au moins',
+    ['Débroussailleuse', 'Pantalon anti-coupure', 'Remorque'], noms);
+  const txt = t.texte('#ach-liste');
+  verifierVrai('chaque groupe est nommé',
+    /Dès que possible/.test(txt) && /Cette année/.test(txt) && /Un jour/.test(txt));
+  /* 2 400 + 600 + 180 = 3 180 € TTC. */
+  verifierVrai('le total à prévoir est annoncé', /3 180 €à prévoir, TTC/.test(txt));
+  verifierVrai('et ce à quoi ça sert se lit', /pour ne plus louer/.test(txt));
+  /* 600 TTC à 20 % font 500 HT. */
+  verifierVrai('le hors taxes se lit sous le TTC', /500 € HT/.test(txt));
+
+  /* Cocher : « dès que je le coche, ça va à la suite ». */
+  t.clic('[data-achfait="a2"]'); await t.pause(450);
+  const apres = t.$$('#ach-liste .ach-corps b').map(e => e.textContent);
+  verifier('le coché passe en dernier',
+    ['Pantalon anti-coupure', 'Remorque', 'Débroussailleuse'], apres);
+  verifierVrai('mais il reste visible', apres.indexOf('Débroussailleuse') >= 0);
+  verifierVrai('sous son propre intertitre', /Déjà achetés/.test(t.texte('#ach-liste')));
+  const a2 = (t.stock('achats') || []).filter(x => x.id === 'a2')[0];
+  verifier('il est marqué acheté', true, a2.fait);
+  verifierVrai('et daté', a2.dateFait > 0);
+  /* Le total ne compte plus que ce qui reste : 2 400 + 180 = 2 580 €. */
+  verifierVrai('le total ne retient plus que ce qui attend',
+    /2 580 €à prévoir, TTC/.test(t.texte('#ach-liste')));
+
+  /* Un achat repoussé n'est pas un achat perdu : on le décoche. */
+  t.clic('[data-achfait="a2"]'); await t.pause(450);
+  verifier('décocher le remet dans la liste', false,
+    (t.stock('achats') || []).filter(x => x.id === 'a2')[0].fait);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Achats : le TTC se saisit, le hors taxes se déduit', async () => {
+  /* « Je rentre juste le TTC, puis ça me calcule le hors taxes. » C'est ce
+     qu'il lit sur une étiquette. */
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'achats' }));
+  await t.pause(300);
+  t.clic('#ach-plus'); await t.pause(400);
+  t.saisir('#ac-quoi', 'Remorque');
+  t.saisir('#ac-ttc', '2400'); await t.pause(200);
+  /* 2 400 TTC à 20 % : 2 000 HT et 400 € de TVA. */
+  const aide = t.texte('#ac-ht');
+  verifierVrai('le hors taxes s’écrit sous le champ', /2 000 €/.test(aide));
+  verifierVrai('et la TVA récupérable aussi', /400 € de TVA/.test(aide));
+  t.choisir('#ac-taux', '10'); await t.pause(200);
+  verifierVrai('changer le taux refait le compte',
+    /2 181,82 €/.test(t.texte('#ac-ht')));
+
+  t.choisir('#ac-cat', 'IMMO');
+  t.clic('[data-acpri="urgent"]'); await t.pause(150);
+  t.saisir('#ac-note', 'pour ne plus louer à chaque plantation');
+  t.clic('#ac-ok'); await t.pause(500);
+
+  const a = (t.stock('achats') || [])[0];
+  verifierVrai('l’achat est enregistré', !!a);
+  verifier('avec ce que c’est', 'Remorque', a.quoi);
+  verifier('sa catégorie', 'IMMO', a.categorie);
+  verifier('son montant TTC', 2400, a.ttc);
+  verifier('son taux', 10, a.taux);
+  verifier('sa priorité', 'urgent', a.priorite);
+  verifier('et à quoi ça va servir', 'pour ne plus louer à chaque plantation', a.note);
+  verifier('il n’est pas acheté', false, a.fait);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Achats : ce que ça pèse se lit par priorité et par catégorie', async () => {
+  /* « Juste pour savoir ce que je vais devoir dépenser prochainement. » */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'achats',
+    achats: [
+      { id: 'a1', quoi: 'Remorque', categorie: 'IMMO', ttc: 2400, taux: 20, priorite: 'unjour' },
+      { id: 'a2', quoi: 'Débroussailleuse', categorie: 'IMMO', ttc: 600, taux: 20, priorite: 'urgent' },
+      { id: 'a3', quoi: 'Pantalon', categorie: 'EPI', ttc: 180, taux: 20, priorite: 'urgent' },
+      /* Déjà acheté : il ne pèse plus sur ce qui attend. */
+      { id: 'a4', quoi: 'Casque', categorie: 'EPI', ttc: 90, taux: 20, priorite: 'urgent',
+        fait: true, dateFait: Date.now() }
+    ]
+  }));
+  await t.pause(300);
+  t.clic('[data-vue="budget"]'); await t.pause(400);
+  const txt = t.texte('#ach-budget');
+
+  /* 2 400 + 600 + 180 = 3 180 TTC, soit 2 650 HT et 530 € de TVA. */
+  verifierVrai('le TTC à sortir', /3 180 €à sortir, TTC/.test(txt));
+  verifierVrai('le hors taxes', /2 650 €hors taxes/.test(txt));
+  verifierVrai('et la TVA récupérable', /530 €TVA récupérable/.test(txt));
+  /* Le casque acheté est écarté du total et compté à part. */
+  verifierVrai('l’acheté est compté à part', /90 €dépensés/.test(txt));
+
+  /* 600 + 180 = 780 € sur les deux achats pressés, et 2 400 sur le « un
+     jour ». Viser la ligne entière : « · 2 » se retrouve partout. */
+  verifierVrai('le pressé est chiffré', /Dès que possible · 2780 €/.test(txt));
+  verifierVrai('et le « un jour » aussi', /Un jour · 12 400 €/.test(txt));
+  verifierVrai('les catégories sont rangées par poids',
+    txt.indexOf('Immobilisation') < txt.indexOf('EPI ou équipement'));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Achats : la liste part dans les sauvegardes', async () => {
+  /* Une liste qu'il tient parce qu'il oublie n'a aucun sens si elle
+     disparaît au premier changement de téléphone. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'achats',
+    achats: [{ id: 'a1', quoi: 'Remorque', categorie: 'IMMO', ttc: 2400, taux: 20,
+      priorite: 'unjour', note: 'pour ne plus louer' }]
+  }));
+  await t.pause(300);
+  const B = t.w.BCB;
+  const sauv = B.construireSauvegarde(null, [], [], [], [], [], [], [], [], [], [], [], [],
+    [], null, t.stock('achats'));
+  verifier('le format monte de version', 9, sauv.version);
+  verifier('la liste y est', 1, sauv.achats.length);
+  /* Un fichier qui ne porte que des achats doit être lisible : le refuser
+     faute de bordereau reviendrait à interdire l'import à qui n'a que ça. */
+  const relu = B.lireSauvegarde({ format: sauv.format, achats: sauv.achats });
+  verifierVrai('un fichier qui n’a que des achats se relit', !!relu);
+  verifier('et il les rend', 'Remorque', relu.achats[0].quoi);
   verifier('aucune erreur', [], t.erreurs);
 });
 
