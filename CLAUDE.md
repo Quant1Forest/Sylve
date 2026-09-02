@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.68.0-20260901-1610**
+Version courante : **4.69.0-20260902-1120**
 
 ---
 
@@ -1363,6 +1363,52 @@ masquée hors d'une partie — le bouton d'accueil y faisait déjà le trajet. I
 l'a voulue partout : « comme ça j'ai les deux possibilités. » Hors partie, elle
 vise l'accueil.
 
+## Les achats à venir
+
+*« Ce n’est pas une chose en tête, mais des fois j’oublie et il faut que je
+les garde en mémoire. »* Un **module**, pas un onglet enfoui : ce qu’on oublie
+doit se voir en arrivant. C’était la question laissée ouverte le 31 août, il
+l’a tranchée lui-même.
+
+`A.achats` — `quoi`, `categorie`, `ttc`, `taux`, `priorite`, `note`, `fait`.
+Clé `bordcub.achats`, format de sauvegarde **version 9**.
+
+- **Il saisit le TTC**, c’est ce qu’il lit sur une étiquette ; le hors taxes
+  et la TVA récupérable se déduisent sous le champ, à chaque frappe.
+- **Les catégories sont celles des dépenses.** Pas de seconde liste : elles
+  finiront par se rejoindre le jour où un achat coché deviendra une dépense.
+- **Trois priorités**, nommées et non numérotées : *Dès que possible*,
+  *Cette année*, *Un jour*. La liste s’ouvre sur ce qui presse.
+- **Cocher ne supprime rien** : *« dès que je le coche, ça va à la suite »*.
+  La ligne glisse en bas, barrée, sous son propre intertitre, et se décoche
+  d’un second appui — un achat repoussé n’est pas un achat perdu.
+
+**Ce n’est pas un budget, et l’écran le dit.** *« Juste pour savoir le coût,
+ce que je vais devoir dépenser prochainement. »* Les montants sont estimés ;
+ils ne deviennent pas des dépenses. **Le lien vers les dépenses n’a pas été
+fait** — il ne l’a pas demandé, et créer une dépense fantôme depuis une
+estimation coûterait plus cher que de la ressaisir.
+
+**Deux vues, jamais une.** Un module réduit à un onglet solitaire est interdit
+par un scénario. *Ma liste* porte la liste et le total ; *Ce que ça pèse*
+répartit par priorité et par catégorie, et isole la TVA récupérable.
+
+## Deux pièges retrouvés en écrivant ce module
+
+**`String.replace` mange les `$$`.** Le projet le note depuis longtemps pour
+les sélecteurs `t.$$()` des tests ; j’y suis tombé dans `index.html`, où un
+`$$(...)` inséré par `s.replace(ancre, bloc + ancre)` est ressorti en `$(...)`.
+La liste des priorités ne se cochait plus. **Tout script de retouche passe par
+`split().join()`**, jamais par `String.replace`, dès que le texte inséré peut
+contenir un `$`.
+
+**Un compte écrit en dur ne garde rien.** Le scénario des tuiles vérifiait
+« six tuiles » : il a cassé à l’arrivée du septième module sans rien apprendre.
+Il croise maintenant les tuiles avec **le sélecteur de module du bandeau**,
+qui porte la même liste, écrit pour une autre raison — naviguer. Deux sources
+indépendantes qui doivent dire la même chose : c’est la règle du projet, et
+elle attrape aussi bien la tuile oubliée que la tuile fantôme.
+
 ## La journée qui passe sans être notée
 
 *« Imaginons que j’enregistre, je me dis aujourd’hui je vais travailler à tel
@@ -1711,12 +1757,6 @@ phrases plus loin il demandait *plus* de détail sur cet impayé. Les deux
 
 **Proposé, en attente de sa réponse :**
 
-- **Les achats futurs envisagés.** Une liste de ce qu’il compte acheter —
-  petit ou gros matériel, toutes catégories — rangée **par priorité**, avec un
-  montant estimé. Il saisit le **TTC**, le hors taxes se déduit. L’objet est de
-  savoir ce qui l’attend en dépenses, pas de tenir un budget. Dicté le 31 août,
-  à cadrer : où ça vit (Finances ? Stock ?), et si une ligne devient une
-  dépense d’un geste une fois l’achat fait.
 - **Les notes existent déjà, mais il ne les trouve pas.** Il a demandé « un
   endroit où mettre des notes, comme l’application Notes du téléphone, avec des
   titres et des couleurs » — puis s’est interrompu : « ah mais si je peux le
