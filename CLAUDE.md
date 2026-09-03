@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.70.0-20260902-1520**
+Version courante : **4.71.0-20260902-1815**
 
 ---
 
@@ -1546,6 +1546,68 @@ qu’au passage en facturé — et **ne fait jamais reculer le statut**.
 est signé, sous combien de temps je réalise les travaux »*. De
 `dateSignature` à `dateChantier()`, en **jours de calendrier** — `minuit()`
 des deux côtés, pas une soustraction de millisecondes.
+
+## Un jour, un statut, une pastille
+
+*« Une case-jour peut porter plusieurs statuts en même temps, plusieurs
+pastilles superposées sur le même jour, ce qui n’a pas de sens. »* La case en
+empilait jusqu’à trois : un chantier provisoire, un chantier ferme et du
+temps saisi pouvaient s’y superposer.
+
+Cinq statuts, dans cet ordre de priorité :
+
+| Statut | D’où il vient |
+|---|---|
+| **Travaillé** | du temps saisi ce jour-là |
+| **Non travaillé** | `A.cfg.absences` — la seule pièce nouvelle |
+| **Confirmé** | un jour posé sur un chantier engagé (`fermeteDe`) |
+| **Prévu** | un jour posé sur un devis encore en attente |
+| **Libre** | rien de posé |
+
+**Le statut ne se stocke pas, il se déduit.** Un statut écrit en base aurait
+fait deux endroits pour une même idée, qu’il aurait fallu tenir d’accord —
+l’erreur que ce projet a déjà payée plusieurs fois. **Conséquence directe :
+aucune migration.** La demande en prévoyait une ; les données existantes
+rendent leur statut telles quelles, il n’y a rien à réécrire et donc rien à
+risquer.
+
+**Un jour peut toujours porter deux chantiers** — une demi-journée de chaque
+côté, le projet le défend depuis longtemps. C’est le *statut* qui est unique,
+pas le contenu : la fiche du jour liste tout ce qui s’y rattache.
+
+**L’absence l’emporte sur le planning, jamais sur ce qui a eu lieu.** Marquer
+un jour non travaillé est un geste délibéré ; s’il reste un chantier posé ce
+jour-là, la fiche du jour le montre et propose de le retirer.
+
+## La fiche du jour, et l’écran qui force à trancher
+
+*« Aujourd’hui la saisie ne se fait que depuis la fiche chantier ; il faut
+pouvoir le faire aussi depuis le calendrier. »* Cliquer un jour ouvre
+`ouvrirFicheJour()` : son statut, ce qui s’y rattache, et de quoi le changer.
+
+- **« Travaillé » ne se coche pas**, il se saisit : le bouton ouvre « Ma
+  journée » à cette date, et c’est elle qui porte le chantier, les prestations
+  et le temps.
+- **Corriger après coup n’a pas de fonction à part.** Prévu jeudi, fait
+  mercredi : on ouvre mercredi, on y note sa journée, et on retire le chantier
+  de jeudi depuis la fiche de jeudi. C’est la même fiche.
+- **`joursAResoudre()`** liste les jours prévus ou confirmés que la date a
+  dépassés. Le rappel de l’accueil — qui ne proposait qu’une issue depuis la
+  4.68 — ouvre maintenant `ouvrirResolutionJour()` : **j’y ai travaillé**,
+  **c’était un autre jour**, **je n’y étais pas**. Il se chasse toujours d’un
+  doigt : forcer sans échappatoire, c’est se faire ignorer.
+
+**Deux gardes qui se couvraient l’une l’autre.** La fenêtre de
+`joursAResoudre` s’arrêtait la veille *et* une condition écartait ensuite tout
+ce qui n’était pas passé. Casser l’une laissait l’autre tenir : aucune
+n’était éprouvable. Il n’en reste qu’une, porteuse. **Une garde redondante
+qu’aucun sabotage n’atteint est du poids mort, pas de la sécurité.**
+
+**Et un défaut latent révélé au passage.** `jourIso()` répondait par
+`toISOString()`, donc en heure de Greenwich : minuit à Paris y est 22 h la
+veille. Les dates de l’application passent d’ordinaire par midi, ce qui
+masquait le défaut ; la fiche du jour travaille en minuit et l’a fait sortir.
+Elle passe par `C.jourCle`, comme `versChamp` depuis la 4.x.
 
 ## Le Calendrier, resté sans revue
 
