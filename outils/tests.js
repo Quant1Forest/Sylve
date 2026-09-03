@@ -5320,16 +5320,18 @@ scenario('Journées : une journée passée sans temps noté se réclame au lance
   verifierVrai('ni celle du jour même', dit.indexOf(jourFR(j(0))) < 0);
   verifierVrai('ni celle qui est déjà notée', dit.indexOf(jourFR(j(-2))) < 0);
 
-  /* Le rappel ouvre la saisie, sa date déjà posée : c'est le geste demandé,
-     pas un renvoi vers un écran où il faudrait retrouver le jour. */
+  /* Le rappel ouvre l'écran de résolution : trois issues, jamais une seule.
+     « Pas de jour prévu qui reste indéfiniment dans le passé. » */
   t.clic('[data-journeenudge]'); await t.pause(600);
-  verifierVrai('il ouvre la saisie du temps', t.$('#ct-duree'));
-  verifier('à la date de la journée manquante', jourISO(j(-3)), t.$('#ct-date').value);
-  t.saisir('#ct-duree', '6');
-  t.clic('#ct-ok'); await t.pause(600);
-  verifier('la journée est notée', 2, (t.stock('chantiers') || [])[0].temps.length);
-  verifier('plus rien à réclamer', 0,
-    t.w.BCC.journeesANoter(t.stock('chantiers'), Date.now()).length);
+  verifierVrai('il ouvre l’écran de résolution', t.$('#rj-oui'));
+  verifierVrai('avec les trois issues', t.$('#rj-deplacer') && t.$('#rj-non'));
+  verifierVrai('il nomme le jour et le chantier',
+    /Dégagement Martin/.test(t.texte('#modale')));
+
+  /* « J'y ai travaillé » ouvre Ma journée à cette date-là. */
+  t.clic('#rj-oui'); await t.pause(600);
+  verifierVrai('« j’y ai travaillé » ouvre Ma journée', t.$('#mj-date'));
+  verifier('à la date restée sans réponse', jourISO(j(-3)), t.$('#mj-date').value);
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -5712,6 +5714,170 @@ scenario('Typographie : le pourcentage ne se sépare pas de son nombre', async (
   const brut = t.$('#vue-chantier').textContent;
   verifierVrai('le taux porte une insécable', /20\u00A0%/.test(brut));
   verifierVrai('et jamais une espace ordinaire', !/20 %/.test(brut));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+/* Un jour du calendrier, à trois jours d'ici, à midi : les dates de
+   l'application passent par midi, et un test qui poserait minuit dépendrait
+   du fuseau. */
+const JCAL = n => { const d = new Date(Date.now() + n * 86400000); d.setHours(12, 0, 0, 0); return d.getTime(); };
+
+scenario('Calendrier : un jour porte exactement un statut', async () => {
+  /* « Une case-jour peut porter plusieurs statuts en même temps, plusieurs
+     pastilles superposées, ce qui n'a pas de sens. » La case en empilait
+     jusqu'à trois : provisoire, ferme, et du temps saisi. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'calendrier', cfg: { heuresJour: 8 },
+    chantiers: [
+      /* Un devis en attente pose un jour provisoire sur le même jour qu'un
+         chantier accepté, et du temps y est saisi : trois pastilles avant. */
+      { id: 'c1', nom: 'Devis en attente', statut: 'envoye', aDevis: true, temps: [],
+        maj: Date.now(), lignes: [], jours: [{ d: JCAL(-2), p: 1 }] },
+      { id: 'c2', nom: 'Chantier signé', statut: 'accepte', aDevis: true, maj: Date.now(),
+        lignes: [], jours: [{ d: JCAL(-2), p: 1 }],
+        temps: [{ date: JCAL(-2), duree: 7, unite: 'h', personnes: 1 }] }
+    ]
+  }));
+  await t.pause(300);
+  const case2 = t.$('[data-jour="' + t.w.BCC.minuit(JCAL(-2)) + '"]');
+  verifierVrai('la case existe', !!case2);
+  verifier('une seule pastille, jamais trois', 1, case2.querySelectorAll('.pts i').length);
+  /* Ce qui a eu lieu l'emporte sur ce qui était prévu. */
+  verifierVrai('et c’est celle du travaillé', /st-travaille/.test(case2.className));
+
+  /* Un jour seulement prévu reste prévu ; un jour seulement signé, confirmé. */
+  const C0 = t.w.BCC;
+  const occ = j => C0.occupation(t.stock('chantiers'), j, j, { heuresJour: 8 })[C0.jourCle(j)];
+  verifier('un jour vide est libre', 'libre', C0.statutJour(occ(JCAL(5)), [], JCAL(5)));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Calendrier : l’ordre des statuts ne laisse jamais d’ambiguïté', async () => {
+  /* Le fait l'emporte sur le prévu, et une absence posée à la main l'emporte
+     sur un chantier resté au planning — c'est un geste délibéré. */
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'calendrier' }));
+  const C0 = t.w.BCC;
+  const abs = [{ d: C0.minuit(JCAL(-1)), note: 'pluie' }];
+  const prevu = { prevus: [{ fermete: 'provisoire' }], reels: [] };
+  const ferme = { prevus: [{ fermete: 'ferme' }], reels: [] };
+  const fait = { prevus: [{ fermete: 'ferme' }], reels: [{}] };
+  verifier('un devis en attente donne « prévu »', 'prevu', C0.statutJour(prevu, [], JCAL(-1)));
+  verifier('un devis signé donne « confirmé »', 'confirme', C0.statutJour(ferme, [], JCAL(-1)));
+  verifier('du temps saisi donne « travaillé »', 'travaille', C0.statutJour(fait, [], JCAL(-1)));
+  verifier('une absence l’emporte sur le planning', 'absent',
+    C0.statutJour(ferme, abs, JCAL(-1)));
+  /* Mais jamais sur ce qui a réellement eu lieu. */
+  verifier('jamais sur ce qui a eu lieu', 'travaille', C0.statutJour(fait, abs, JCAL(-1)));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Calendrier : cliquer un jour ouvre sa fiche, et on peut y poser un chantier', async () => {
+  /* « Aujourd'hui la saisie ne se fait que depuis la fiche chantier ; il faut
+     pouvoir le faire aussi depuis le calendrier. » */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'calendrier',
+    chantiers: [{ id: 'c1', nom: 'Dégagement Martin', statut: 'accepte', aDevis: true,
+      maj: Date.now(), lignes: [], temps: [], jours: [] }]
+  }));
+  await t.pause(300);
+  const cible = t.w.BCC.minuit(JCAL(3));
+  t.clic('[data-jour="' + cible + '"]'); await t.pause(450);
+  verifierVrai('la fiche du jour s’ouvre', /Libre/.test(t.texte('#modale')));
+  verifierVrai('elle propose de poser un chantier', t.$('#fj-poser'));
+  /* Un jour à venir ne propose pas d'y avoir travaillé. */
+  verifier('mais pas d’y avoir déjà travaillé', null, t.$('#fj-travaille'));
+
+  t.clic('#fj-poser'); await t.pause(400);
+  t.choisir('#pj-ch', 'c1');
+  t.clic('#pj-ok'); await t.pause(500);
+  const c = (t.stock('chantiers') || [])[0];
+  verifier('le chantier est posé sur ce jour', 1, (c.jours || []).length);
+  verifier('à la bonne date', t.w.BCC.jourCle(cible), t.w.BCC.jourCle(c.jours[0].d));
+  const apres = t.$('[data-jour="' + cible + '"]');
+  verifierVrai('et la case passe en confirmé', /st-confirme/.test(apres.className));
+  verifier('une seule pastille', 1, apres.querySelectorAll('.pts i').length);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Calendrier : un jour non travaillé se pose, se note et se reprend', async () => {
+  /* Le cinquième statut : congé, arrêt, intempérie. C'est la seule pièce du
+     modèle qui n'était écrite nulle part. */
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'calendrier' }));
+  await t.pause(300);
+  const cible = t.w.BCC.minuit(JCAL(-1));
+  t.clic('[data-jour="' + cible + '"]'); await t.pause(450);
+  t.clic('#fj-absent'); await t.pause(400);
+  t.saisir('#ab-note', 'pluie toute la journée');
+  t.clic('#ab-ok'); await t.pause(500);
+
+  const cfg = t.stock('cfg') || {};
+  verifier('l’absence est enregistrée', 1, (cfg.absences || []).length);
+  verifier('avec sa note', 'pluie toute la journée', cfg.absences[0].note);
+  const casse = t.$('[data-jour="' + cible + '"]');
+  verifierVrai('la case est grisée', /st-absent/.test(casse.className));
+  verifier('et porte une seule pastille', 1, casse.querySelectorAll('.pts i').length);
+
+  /* On peut revenir dessus. */
+  t.clic('[data-jour="' + cible + '"]'); await t.pause(450);
+  verifierVrai('la fiche dit pourquoi', /pluie toute la journée/.test(t.texte('#modale')));
+  t.clic('#fj-libre'); await t.pause(500);
+  verifier('le jour est rendu au planning', 0,
+    ((t.stock('cfg') || {}).absences || []).length);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Calendrier : un jour passé resté au planning doit être tranché', async () => {
+  /* « Pas de jour prévu/confirmé qui reste indéfiniment dans le passé sans
+     statut final. » Trois issues, et le jour même n'en fait pas partie : il
+     n'est pas fini. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'calendrier', cfg: { heuresJour: 8 },
+    chantiers: [{ id: 'c1', nom: 'Dégagement Martin', statut: 'accepte', aDevis: true,
+      maj: Date.now(), lignes: [], temps: [],
+      jours: [{ d: JCAL(-4), p: 1 }, { d: JCAL(0), p: 1 }, { d: JCAL(3), p: 1 }] }]
+  }));
+  await t.pause(300);
+  const C0 = t.w.BCC;
+  const l = C0.joursAResoudre(t.stock('chantiers'), { heuresJour: 8 }, [], Date.now());
+  verifier('un seul jour à trancher', 1, l.length);
+  verifier('celui d’il y a quatre jours', C0.jourCle(JCAL(-4)), C0.jourCle(l[0].d));
+
+  /* Le déplacer : « prévu jeudi mais chantier fait mercredi ». */
+  t.clic('[data-journeenudge]'); await t.pause(600);
+  t.clic('#rj-deplacer'); await t.pause(400);
+  t.choisir('#dj-date', jourISO(JCAL(-5))); await t.pause(150);
+  t.clic('#dj-ok'); await t.pause(600);
+  const c = (t.stock('chantiers') || [])[0];
+  const cles = (c.jours || []).map(j => C0.jourCle(j.d));
+  verifierVrai('le jour d’origine est libéré', cles.indexOf(C0.jourCle(JCAL(-4))) < 0);
+  verifierVrai('et le vrai jour est posé', cles.indexOf(C0.jourCle(JCAL(-5))) >= 0);
+  verifier('rien n’a été perdu', 3, cles.length);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Calendrier : « je n’y étais pas » clôt le jour pour de bon', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'calendrier', cfg: { heuresJour: 8 },
+    chantiers: [{ id: 'c1', nom: 'Dégagement Martin', statut: 'accepte', aDevis: true,
+      maj: Date.now(), lignes: [], temps: [], jours: [{ d: JCAL(-4), p: 1 }] }]
+  }));
+  await t.pause(300);
+  t.clic('[data-journeenudge]'); await t.pause(600);
+  t.clic('#rj-non'); await t.pause(400);
+  t.saisir('#ab-note', 'arrêt');
+  t.clic('#ab-ok'); await t.pause(600);
+
+  const C0 = t.w.BCC;
+  verifier('plus rien à trancher', 0,
+    C0.joursAResoudre(t.stock('chantiers'), { heuresJour: 8 },
+      (t.stock('cfg') || {}).absences || [], Date.now()).length);
+  verifierVrai('et le rappel s’efface', !t.$('[data-journeenudge]'));
   verifier('aucune erreur', [], t.erreurs);
 });
 
