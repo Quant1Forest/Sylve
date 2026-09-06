@@ -7724,6 +7724,14 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.74', quoi: [
+    { t: 'Une journee prevue se valide d un seul geste : c etait comme prevu', vue: 'calendrier' },
+    { t: 'La fiche du jour dit enfin combien d heures etaient prevues', vue: 'calendrier' },
+    { t: 'Le meme bouton sur l ecran qui demande de trancher', vue: 'calendrier' },
+    { t: 'Fiche de chantier : les risques se reprennent d un chantier de la meme foret', vue: 'fichech' },
+    { t: 'Le telephone du proprietaire n est plus reclame en rouge', vue: 'fichech' },
+    { t: 'Et un plan joint libere le cadre du croquis', vue: 'fichech' }
+  ] },
   { v: '4.73', quoi: [
     { t: 'Un temps note ne disparait plus tout seul — il comptait pour rien', vue: 'chantier' },
     { t: 'Retirer une saisie n en retire qu une, et pour de bon', vue: 'calendrier' },
@@ -7752,13 +7760,6 @@ var NOTES_MAJ = [
     { t: 'Le jour qui vient dit pour qui vous travaillez', vue: 'calendrier' },
     { t: 'Les achats se rangent par horizon : 3 mois, 6 mois, l annee', vue: 'achats' },
     { t: 'Les chiffres ne debordent plus, le % ne saute plus la ligne' }
-  ] },
-  { v: '4.69', quoi: [
-    { t: 'Un module « Achats a venir » : ce que vous comptez acheter', vue: 'achats' },
-    { t: 'Range par ce qui presse, avec le montant estime', vue: 'achats' },
-    { t: 'Vous tapez le TTC, le hors taxes et la TVA se deduisent', vue: 'achats' },
-    { t: 'Coche, l achat passe a la suite sans disparaitre', vue: 'achats' },
-    { t: 'Et « Ce que ca pese » dit ce qui vous attend', vue: 'budget' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -8474,6 +8475,27 @@ function brancher() {
         x.setAttribute('aria-pressed', String(x === res));
       });
       enregistrerFiche();
+      return;
+    }
+    if (e.target.closest('#fch-reprendre')) {
+      var c2 = chantierFiche(), jum = memeForet(c2);
+      if (!c2 || !jum) return;
+      var src = jum.fiche || {};
+      /* On ne reprend que ce qui décrit le lieu : les risques, leurs
+         consignes et l'accès. Ni la période, ni le point de rencontre —
+         celui-là dépend du chantier, pas de la forêt. */
+      c2.fiche = c2.fiche || {};
+      c2.fiche.risques = (src.risques || []).slice();
+      c2.fiche.consignes = JSON.parse(JSON.stringify(src.consignes || {}));
+      c2.fiche.proportion = src.proportion || '';
+      if (!c2.fiche.acces) c2.fiche.acces = src.acces || '';
+      if (!c2.fiche.reseau) c2.fiche.reseau = src.reseau || '';
+      if (!c2.fiche.pointReseau) c2.fiche.pointReseau = src.pointReseau || '';
+      c2.maj = Date.now();
+      sauverChantiers().then(function () {
+        renderFicheChantier();
+        toast('Risques repris de « ' + (jum.nom || 'chantier') + ' ».');
+      });
       return;
     }
     if (e.target.closest('#fch-identite')) {
@@ -12636,6 +12658,8 @@ function ouvrirFicheJour(ts) {
         return '<div class="liste-item"><span class="pastille" style="background:' +
           (p.fermete === 'ferme' ? '#2E7D46' : '#B98A00') + '"></span>' +
           '<div class="li-c"><b>' + esc(p.chantier.nom || 'Chantier') + '</b><small>' +
+          C.ditDuree(C.nb(p.part != null ? p.part : 1) * C.HEURES_JOUR(A.cfg), A.cfg) +
+          ' prévues · ' +
           esc([p.chantier.donneur, C.nomStatut(p.chantier.statut, p.chantier)]
             .filter(Boolean).join(' · ')) + '</small></div>' +
           '<button class="btn-min" data-fjouvrir="' + p.chantier.id + '">Fiche</button> ' +
@@ -12654,10 +12678,19 @@ function ouvrirFicheJour(ts) {
   /* Ce qu'on peut en faire. « Travaillé » ne se coche pas : il se saisit —
      c'est la fiche « Ma journée » qui le crée, et c'est elle qui porte le
      chantier, les prestations et le temps. */
-  var actions = '<div class="btn-rang" style="margin-top:14px">' +
+  /* Une journée posée, passée, dont rien n'est encore noté : c'est le cas
+     courant, et il se règle d'un seul geste. */
+  var validable = (passe || ts === C.minuit(Date.now())) && !o.reels.length && enAttente.length;
+  var actions = (validable
+    ? '<div class="btn-rang" style="margin-top:14px">' +
+      '<button class="btn primaire plein" id="fj-prevu">C’était comme prévu — ' +
+      C.ditDuree(heuresPrevues(enAttente), A.cfg) + '</button></div>'
+    : '') +
+    '<div class="btn-rang" style="margin-top:9px">' +
     (passe || ts === C.minuit(Date.now())
-      ? '<button class="btn primaire btn-min" id="fj-travaille">' +
-        (o.reels.length ? 'Modifier ma journée' : 'J’y ai travaillé') + '</button>'
+      ? '<button class="btn' + (validable ? '' : ' primaire') + ' btn-min" id="fj-travaille">' +
+        (o.reels.length ? 'Modifier ma journée'
+          : validable ? 'Autre chose' : 'J’y ai travaillé') + '</button>'
       : '') +
     '<button class="btn btn-min" id="fj-poser">Poser un chantier</button>' +
     (abs
@@ -12677,6 +12710,13 @@ function ouvrirFicheJour(ts) {
     renderCalendrier(); renderAccueil(); renderCarnet(); renderFiche();
     if (message) toast(message);
   };
+  if ($('#fj-prevu')) {
+    $('#fj-prevu').addEventListener('click', function () {
+      validerCommePrevu(ts, enAttente).then(function () {
+        refaire('Journée validée.');
+      });
+    });
+  }
   if ($('#fj-travaille')) {
     $('#fj-travaille').addEventListener('click', function () {
       fermerModale();
@@ -12727,6 +12767,51 @@ function ouvrirFicheJour(ts) {
     }
   });
 }
+/* Les heures que l'agenda annonçait pour ce jour-là : une demi-journée posée
+   vaut une demi-journée faite. */
+function heuresPrevues(prevus) {
+  var hj = C.HEURES_JOUR(A.cfg) || 8, h = 0;
+  (prevus || []).forEach(function (p) {
+    h += C.nb(p.part != null ? p.part : 1) * hj;
+  });
+  return C.arr(h, 2);
+}
+/* Valider une journée telle qu'elle était prévue : une journée par chantier
+   posé, avec ses heures et les prestations du chantier en postes. Aucun
+   formulaire — c'est tout l'objet. Les kilomètres habituels suivent, comme
+   dans « Ma journée » : c'est la même route.
+   Ce qui n'était pas prévu ne se valide pas d'un geste : il reste « Autre
+   chose », qui ouvre la saisie complète. */
+function validerCommePrevu(ts, prevus) {
+  var hj = C.HEURES_JOUR(A.cfg) || 8;
+  A.journees = A.journees || [];
+  (prevus || []).forEach(function (p) {
+    var c = p.chantier;
+    var h = C.arr(C.nb(p.part != null ? p.part : 1) * hj, 2);
+    if (!(h > 0)) return;
+    /* Les prestations du chantier deviennent les postes, à parts égales :
+       c'est ce qu'il aurait tapé, et il corrigera si ce n'était pas ça. */
+    var vus = [];
+    (c.lignes || []).forEach(function (l) {
+      if (l.travail && vus.indexOf(l.travail) < 0 && !C.estFourniture(l.travail)) {
+        vus.push(l.travail);
+      }
+    });
+    var postes = vus.length
+      ? vus.map(function (tv) {
+        return { travaux: tv, heures: C.arr(h / vus.length, 2), quantite: 0 };
+      })
+      : [];
+    A.journees.push({
+      id: uid(), date: C.minuit(ts) + 12 * 3600000, chantier: c.id,
+      lieu: c.foret || '', km: kmHabituels(c.id) || 0,
+      nonProd: postes.length ? 0 : h, personnes: 1, sansMoi: false, fin: false,
+      postes: postes
+    });
+  });
+  indexerJournees();
+  return Promise.all([sauverJournees(), sauverChantiers()]);
+}
 function trouveAide(st) {
   for (var i = 0; i < C.STATUTS_JOUR.length; i++) {
     if (C.STATUTS_JOUR[i].c === st) return C.STATUTS_JOUR[i].aide || '';
@@ -12759,7 +12844,9 @@ function ouvrirResolutionJour(ts) {
     esc(noms.join(', ') || 'un chantier') + ', et il est passé. Tranchez : sinon il ' +
     'reste au planning pour toujours, et vos rendements se vident en silence.</p>' +
     '<div class="btn-rang" style="flex-direction:column;gap:8px">' +
-    '<button class="btn primaire plein" id="rj-oui">J’y ai travaillé</button>' +
+    '<button class="btn primaire plein" id="rj-prevu">C’était comme prévu — ' +
+    C.ditDuree(heuresPrevues(o.prevus), A.cfg) + '</button>' +
+    '<button class="btn plein" id="rj-oui">J’y ai travaillé, mais autrement</button>' +
     '<button class="btn plein" id="rj-deplacer">C’était un autre jour</button>' +
     '<button class="btn plein" id="rj-non">Je n’y étais pas</button>' +
     '</div>' +
@@ -12772,6 +12859,13 @@ function ouvrirResolutionJour(ts) {
 
   /* Y avoir travaillé, c'est ouvrir « Ma journée » à cette date : elle porte
      le chantier, les prestations et le temps. */
+  $('#rj-prevu').addEventListener('click', function () {
+    validerCommePrevu(ts, o.prevus).then(function () {
+      fermerModale();
+      renderCalendrier(); renderAccueil(); renderCarnet(); renderFiche(); renderRendements();
+      toast('Journée validée.');
+    });
+  });
   $('#rj-oui').addEventListener('click', function () {
     fermerModale();
     A.calJour = ts;
@@ -12916,6 +13010,25 @@ function poserTel(nom, tel) {
   l[k].tel = tel;
 }
 
+/* Un chantier de la même forêt, déjà renseigné : la ligne électrique et le
+   ruisseau ne bougent pas d'une année sur l'autre. La forêt se reconnaît à
+   son nom — c'est le critère qu'il a proposé, et le seul dont on dispose.
+   La commune s'y ajoute : deux « Bois du Haut » dans deux communes ne sont
+   pas la même forêt. */
+function memeForet(c) {
+  if (!c) return null;
+  var f = String(c.foret || '').trim().toLowerCase();
+  if (!f) return null;
+  var com = String(c.commune || '').trim().toLowerCase();
+  var candidats = (A.chantiers || []).filter(function (x) {
+    if (x.id === c.id) return false;
+    if (String(x.foret || '').trim().toLowerCase() !== f) return false;
+    if (com && String(x.commune || '').trim().toLowerCase() !== com) return false;
+    return ((x.fiche || {}).risques || []).length > 0;
+  });
+  candidats.sort(function (a, b) { return C.dateChantier(b) - C.dateChantier(a); });
+  return candidats[0] || null;
+}
 function chantierFiche() {
   return A.fch ? chantier(A.fch) : null;
 }
@@ -12982,7 +13095,8 @@ function renderFicheChantier() {
       ? C.arr(c.gps.lat, 5) + ', ' + C.arr(c.gps.lon, 5) : '—') +
     '<div class="grille g2" style="margin-top:11px">' +
     '<div class="champ" style="margin:0"><label class="eyebrow" for="fch-telp">' +
-    'Téléphone du propriétaire</label>' +
+    'Téléphone du propriétaire <span class="muted" style="text-transform:none;' +
+    'letter-spacing:0;font-weight:400">(facultatif)</span></label>' +
     '<input type="text" id="fch-telp" inputmode="tel" value="' +
     esc(telDe(c.proprietaire)) + '"></div>' +
     '<div class="champ" style="margin:0"><label class="eyebrow" for="fch-teld">' +
@@ -13001,6 +13115,18 @@ function renderFicheChantier() {
     '<div class="champ" style="margin:0"><label class="eyebrow" for="fch-fin">Au</label>' +
     '<input type="date" id="fch-fin" value="' + versChamp(fi.fin) + '"></div></div></div>' +
 
+    (function () {
+      if (coches.length) return '';
+      var jum = memeForet(c);
+      if (!jum) return '';
+      var n = ((jum.fiche || {}).risques || []).length;
+      return '<div class="carte"><h2>Déjà connu ici</h2>' +
+        '<p class="sous-titre-bloc">« ' + esc(jum.nom || 'Chantier') + ' » est dans la ' +
+        'même forêt et porte ' + n + ' risque' + (n > 1 ? 's' : '') + ' coché' +
+        (n > 1 ? 's' : '') + '. La ligne électrique et le ruisseau n’ont pas bougé.</p>' +
+        '<div class="btn-rang"><button class="btn btn-min" id="fch-reprendre">' +
+        'Reprendre ses risques et ses consignes</button></div></div>';
+    })() +
     C.RISQUES_FICHE.map(function (g) {
       return '<div class="carte"><h2>' + esc(g.n) + '</h2>' +
         '<div class="chips">' + g.l.map(function (r) {
@@ -13165,7 +13291,9 @@ function htmlFeuilleFiche(c) {
 
     '<div class="fs"><h2>Propriétaire et donneur d’ordre</h2><div class="fg">' +
     l('Propriétaire', c.proprietaire) +
-    l('Téléphone', telDe(c.proprietaire)) +
+    /* Facultatif : l'arrêté demande ses coordonnées, pas son téléphone. */
+    '<div class="fl"><span class="k">Téléphone</span><span class="v">' +
+    esc(telDe(c.proprietaire) || '—') + '</span></div>' +
     l('Donneur d’ordre', c.donneur || c.client) +
     l('Téléphone', telDe(c.donneur || c.client)) +
     '</div></div>' +
@@ -13207,11 +13335,11 @@ function htmlFeuilleFiche(c) {
     '</div></div>' +
 
     '<div class="fs"><h2>Croquis du chantier</h2>' +
-    '<div class="fv"><span>' +
     (f.planJoint
-      ? 'Voir plan joint'
-      : 'Accès (A) · point de rencontre (PR) · zones à risque, avec leur numéro') +
-    '</span></div></div>' +
+      ? '<div class="fb"><b>Voir le plan joint à la présente fiche.</b> ' +
+        'Il porte les accès, le point de rencontre et les zones à risque.</div>'
+      : '<div class="fv"><span>Accès (A) · point de rencontre (PR) · zones à ' +
+        'risque, avec leur numéro</span></div>') + '</div>' +
 
     '<div class="fs"><h2>Observations</h2><div class="fb" style="min-height:14mm">' +
     esc(f.observations || '') + '</div></div>' +
@@ -18869,7 +18997,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.73.0-20260906-2210';
+var VERSION = '4.74.0-20260906-2355';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

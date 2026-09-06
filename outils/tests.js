@@ -5801,6 +5801,13 @@ scenario('Calendrier : cliquer un jour ouvre sa fiche, et on peut y poser un cha
   const apres = t.$('[data-jour="' + cible + '"]');
   verifierVrai('et la case passe en confirmé', /st-confirme/.test(apres.className));
   verifier('une seule pastille', 1, apres.querySelectorAll('.pts i').length);
+
+  /* Et une fois le chantier posé, on ne valide toujours pas d'un doigt une
+     journée qui n'a pas eu lieu. Le jour vide ne prouvait rien : il n'avait
+     rien en attente, donc une autre garde le retenait déjà. */
+  t.clic('[data-jour="' + cible + '"]'); await t.pause(450);
+  verifierVrai('la fiche annonce ce qui est posé', /Dégagement Martin/.test(t.texte('#modale')));
+  verifier('mais pas de validation d’un doigt', null, t.$('#fj-prevu'));
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -5880,6 +5887,102 @@ scenario('Calendrier : « je n’y étais pas » clôt le jour pour de bon', asy
     C0.joursAResoudre(t.stock('chantiers'), { heuresJour: 8 },
       (t.stock('cfg') || {}).absences || [], Date.now()).length);
   verifierVrai('et le rappel s’efface', !t.$('[data-journeenudge]'));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Calendrier : une journée prévue se valide d’un seul geste', async () => {
+  /* « Il faudrait juste un endroit où je puisse dire : valider, c'est bon
+     j'ai travaillé, ça l'enregistre. Comme ça je ne me pose pas de
+     questions. C'est rapide et c'est efficace. » Le cas courant est
+     celui-là : posé, fait, comme prévu. Ouvrir « Ma journée » pour retaper
+     ce que l'agenda sait déjà, c'est cinq gestes pour rien.
+
+     Deux portes mènent au même geste, et les deux sont éprouvées ici : la
+     fiche du jour, et l'écran qui force à trancher. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'calendrier', cfg: { heuresJour: 8, journeesMigrees: true },
+    chantiers: [
+      { id: 'c1', nom: 'Dégagement Martin', statut: 'accepte', aDevis: true,
+        maj: Date.now(), foret: 'Forêt de la Côte', commune: 'Levier', temps: [],
+        jours: [{ d: JCAL(0), p: 1 }],
+        lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 3, prix: 700, nature: 'prestation' }] },
+      /* Une demi-journée, sur un chantier qui ne dit pas ce qu'on y fait. */
+      { id: 'c2', nom: 'Vaux', statut: 'accepte', aDevis: true, maj: Date.now(),
+        temps: [], jours: [{ d: JCAL(-2), p: 0.5 }], lignes: [] }
+    ]
+  }));
+  await t.pause(300);
+
+  /* --- par la fiche du jour, sur aujourd'hui --------------------------- */
+  t.clic('[data-jour="' + t.w.BCC.minuit(Date.now()) + '"]'); await t.pause(450);
+  verifierVrai('la fiche dit ce qui était prévu', /1 j prévues/.test(t.texte('#modale')));
+  const bouton = t.$('#fj-prevu');
+  verifierVrai('le geste est proposé', !!bouton);
+  /* Valider un chiffre qu'on ne voit pas ne serait pas une validation. */
+  verifierVrai('et il annonce la durée', /1 j/.test(bouton.textContent));
+  bouton.click(); await t.pause(700);
+
+  const j1 = (t.stock('journees') || [])[0];
+  verifierVrai('une journée est née', !!j1);
+  verifier('sur le bon chantier', 'c1', j1.chantier);
+  verifier('avec les heures prévues', 8, (j1.postes || [])[0].heures);
+  verifier('et la prestation du chantier en poste', 'DEGAG', (j1.postes || [])[0].travaux);
+  verifier('le chantier porte enfin son temps', 1,
+    ((t.stock('chantiers') || []).filter(c => c.id === 'c1')[0].temps || []).length);
+  const casse = t.$('[data-jour="' + t.w.BCC.minuit(Date.now()) + '"]');
+  verifierVrai('la case passe en travaillé', /st-travaille/.test(casse.className));
+
+  /* --- par l'écran qui force à trancher, sur un jour passé ------------- */
+  verifierVrai('le jour passé reste à trancher', t.$('#cal-trancher-btn'));
+  t.clic('#cal-trancher-btn'); await t.pause(500);
+  /* Une demi-journée posée vaut une demi-journée faite : le geste reprend
+     ce qui a été posé, il n'invente pas la journée entière. */
+  verifierVrai('le même geste y est', t.$('#rj-prevu'));
+  verifierVrai('pour quatre heures', /4 h/.test(t.$('#rj-prevu').textContent));
+  t.clic('#rj-prevu'); await t.pause(700);
+
+  const j2 = (t.stock('journees') || []).filter(x => x.chantier === 'c2')[0];
+  verifierVrai('la seconde journée est née', !!j2);
+  /* Sans prestation au chantier, les heures entrent en temps non productif :
+     elles comptent dans la journée, jamais dans un rendement. */
+  verifier('quatre heures enregistrées', 4, j2.nonProd);
+  verifier('plus rien à trancher', 0,
+    t.w.BCC.joursAResoudre(t.stock('chantiers'), { heuresJour: 8 }, [], Date.now()).length);
+  verifier('et le rappel s’efface', null, t.$('#cal-trancher-btn'));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Calendrier : ce qui est déjà noté ne se valide plus d’un geste', async () => {
+  /* Le geste d'un doigt ne vaut que pour une journée dont rien n'est écrit.
+     Le cas qui compte est celui du jour à moitié noté : sept heures sur un
+     chantier, un second posé sans temps. Ajouter d'un doigt les quatre
+     heures du second gonflerait la journée à onze sans rien dire — c'est
+     « Ma journée » qui tranche, pas un bouton.
+
+     Attention : deux gardes se couvrent ici. Un jour dont TOUT est noté sort
+     déjà par « rien en attente » ; seul ce jour-là éprouve « rien n'est
+     encore noté ». */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'calendrier', cfg: { heuresJour: 8, journeesMigrees: true },
+    chantiers: [
+      { id: 'c1', nom: 'Vaux', statut: 'accepte', aDevis: true, maj: Date.now(),
+        temps: [], jours: [{ d: JCAL(0), p: 0.5 }], lignes: [] },
+      { id: 'c2', nom: 'Les Combes', statut: 'accepte', aDevis: true, maj: Date.now(),
+        temps: [], jours: [{ d: JCAL(0), p: 0.5 }], lignes: [] }
+    ],
+    journees: [{ id: 'j1', date: JCAL(0), chantier: 'c1', personnes: 1, nonProd: 7, postes: [] }]
+  }));
+  await t.pause(300);
+  t.clic('[data-jour="' + t.w.BCC.minuit(Date.now()) + '"]'); await t.pause(450);
+  const dit = t.texte('#modale');
+  verifierVrai('la journée notée est là', /Ce que vous y avez fait/.test(dit));
+  verifierVrai('et le chantier resté sans temps aussi',
+    /sans temps noté/.test(dit) && /Les Combes/.test(dit));
+  verifier('le geste n’est plus proposé', null, t.$('#fj-prevu'));
+  verifierVrai('mais la journée se modifie', t.$('#fj-travaille'));
+  verifier('et le bouton le dit', 'Modifier ma journée', t.$('#fj-travaille').textContent);
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -6061,6 +6164,88 @@ scenario('Fiche de chantier : des coordonnées se collent depuis une carte', asy
   await t.pause(450);
   verifier('un texte quelconque ne l’écrase pas', 46.89512,
     (((t.stock('chantiers') || [])[0].fiche || {}).gpsRencontre || {}).lat);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Fiche de chantier : les risques se reprennent d’un chantier de la même forêt', async () => {
+  /* « Comment savoir que c'est la même forêt ? Si c'est le même nom, ça
+     pourrait être le cas. » C'est lui qui a proposé le critère, et c'est le
+     seul dont Sylve dispose. La commune s'y ajoute : deux « Bois du Haut »
+     dans deux communes ne sont pas la même forêt. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    cfg: { nomEntreprise: 'Mon entreprise', siret: '1', telEntreprise: '06' },
+    chantiers: [
+      { id: 'c0', nom: 'Dégagement 2024', statut: 'paye', aDevis: false, temps: [], jours: [],
+        maj: Date.now() - 400 * 86400000, foret: 'Forêt de la Côte', commune: 'Levier',
+        lignes: [], fiche: { risques: [22] } },
+      { id: 'c1', nom: 'Dégagement 2025', statut: 'paye', aDevis: false, temps: [], jours: [],
+        maj: Date.now() - 86400000, foret: 'Forêt de la Côte', commune: 'Levier', lignes: [],
+        fiche: { risques: [1, 9, 30], consignes: { terrain: 'Pente en haut de parcelle.' },
+          acces: 'Chemin après le calvaire', pointRencontre: 'Au calvaire' } },
+      /* Même nom de forêt, autre commune : ce n'est pas la même forêt. */
+      { id: 'c2', nom: 'Ailleurs', statut: 'paye', aDevis: false, temps: [], jours: [],
+        maj: Date.now(), foret: 'Forêt de la Côte', commune: 'Autre commune',
+        lignes: [], fiche: { risques: [7] } },
+      { id: 'c3', nom: 'Dégagement 2026', statut: 'accepte', aDevis: true, temps: [], jours: [],
+        maj: Date.now(), foret: 'Forêt de la Côte', commune: 'Levier', lignes: [] }
+    ]
+  }));
+  t.clic('[data-vue="fichech"]'); await t.pause(400);
+  t.choisir('#fch-ch', 'c3'); await t.pause(450);
+
+  const dit = t.texte('#fch-corps');
+  verifierVrai('un chantier jumeau est proposé', /Déjà connu ici/.test(dit));
+  /* Le plus récent des deux de la même commune, et jamais celui d'ailleurs. */
+  verifierVrai('le plus récent de la même forêt', /Dégagement 2025/.test(dit));
+  verifierVrai('pas le plus ancien', !/Dégagement 2024/.test(dit));
+  verifierVrai('ni celui d’une autre commune', !/Ailleurs/.test(dit));
+
+  t.clic('#fch-reprendre'); await t.pause(600);
+  const c3 = (t.stock('chantiers') || []).filter(x => x.id === 'c3')[0];
+  verifier('les risques sont repris', [1, 9, 30], (c3.fiche || {}).risques);
+  verifier('les consignes aussi', 'Pente en haut de parcelle.',
+    ((c3.fiche || {}).consignes || {}).terrain);
+  verifier('et l’accès', 'Chemin après le calvaire', (c3.fiche || {}).acces);
+  /* Le point de rencontre dépend du chantier, pas de la forêt : il ne suit pas. */
+  verifierVrai('mais pas le point de rencontre', !(c3.fiche || {}).pointRencontre);
+  /* Une fois coché, l'offre disparaît : proposer de tout remplacer quand il a
+     déjà travaillé serait un piège. */
+  verifier('l’offre ne revient pas', null, t.$('#fch-reprendre'));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Fiche de chantier : le téléphone du propriétaire n’est pas exigé', async () => {
+  /* L'arrêté demande « nom et coordonnées » du propriétaire, mais nomme
+     explicitement le « téléphone du donneur d'ordre ». Réclamer les deux en
+     rouge, c'était inventer une obligation.
+
+     Et « la carte est en A4, alors que l'emplacement du croquis c'est une
+     zone restreinte » : quand un plan accompagne la fiche, le cadre vide
+     n'a plus lieu d'être. */
+  const t = await ouvrir(Object.assign({}, VIDE, CH_FICHE()));
+  t.clic('[data-vue="fichech"]'); await t.pause(400);
+  t.choisir('#fch-ch', 'c1'); await t.pause(450);
+  verifierVrai('le champ le dit', /facultatif/.test(t.texte('#fch-corps')));
+
+  t.clic('#fch-voir'); await t.pause(600);
+  const f = t.texte('#modale');
+  verifierVrai('celui du propriétaire tient un tiret',
+    /PropriétaireMartinTéléphone—/.test(f));
+  verifierVrai('celui du donneur d’ordre reste réclamé',
+    /Donneur d’ordreCabinet DuboisTéléphoneà compléter/.test(f));
+  verifier('un seul téléphone est réclamé', 1,
+    (f.match(/Téléphoneà compléter/g) || []).length);
+  verifierVrai('sans plan, le cadre du croquis est là', t.$('#modale .fv'));
+  t.clic('#modale-fermer'); await t.pause(300);
+
+  cocher(t, '#fch-plan', true); await t.pause(300);
+  t.clic('#fch-voir'); await t.pause(600);
+  verifier('avec un plan, le cadre cède la place', null, t.$('#modale .fv'));
+  verifierVrai('et la fiche renvoie au plan',
+    /Voir le plan joint/.test(t.texte('#modale')));
   verifier('aucune erreur', [], t.erreurs);
 });
 
