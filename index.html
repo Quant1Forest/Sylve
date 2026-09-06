@@ -308,8 +308,12 @@ body:not(.m-ent) .mod-ent{display:none}
   max-height:58vh;overflow:auto}
 .cal button.sel.we{background:var(--encre)}
 .cal .n{font-size:13px;font-family:var(--mono)}
-.cal .pts{display:flex;gap:2px;height:5px}
-.cal .pts i{width:5px;height:5px;border-radius:50%;display:block}
+.cal .pts{display:flex;gap:2px;height:9px}
+/* Un cerne clair détache la pastille du fond de la case : sans lui, le vert
+   et le bleu se ressemblent au soleil. */
+.cal .pts i{width:9px;height:9px;border-radius:50%;display:block;
+  box-shadow:0 0 0 1.5px var(--carte)}
+.cal button.sel .pts i{box-shadow:0 0 0 1.5px var(--encre)}
 .alerte{
   display:flex;align-items:flex-start;gap:9px;padding:10px 12px;border-radius:11px;
   border:1px solid var(--trait);background:var(--carte);margin-bottom:7px;cursor:pointer;
@@ -1650,6 +1654,7 @@ if (froid && s > 0) montrer(s);
           </div>
         </div>
         <div id="cal-planif"></div>
+        <div id="cal-trancher"></div>
         <div id="cal-grille"></div>
         <div class="legende" style="margin-top:10px">
           <span><i style="background:#2E7D46"></i>confirmé</span>
@@ -7719,6 +7724,13 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.73', quoi: [
+    { t: 'Un temps note ne disparait plus tout seul — il comptait pour rien', vue: 'chantier' },
+    { t: 'Retirer une saisie n en retire qu une, et pour de bon', vue: 'calendrier' },
+    { t: 'Le SIREN se demande a la creation et se retient par proprietaire', vue: 'carnet' },
+    { t: 'Les journees a trancher s annoncent aussi dans l agenda', vue: 'calendrier' },
+    { t: 'Un seul « j ai travaille », et des pastilles qui se voient', vue: 'calendrier' }
+  ] },
   { v: '4.72', quoi: [
     { t: 'La fiche de chantier obligatoire, prete a imprimer', vue: 'fichech' },
     { t: 'Sylve reprend le lieu, les travaux, la position ; vous cochez les risques', vue: 'fichech' },
@@ -7747,11 +7759,6 @@ var NOTES_MAJ = [
     { t: 'Vous tapez le TTC, le hors taxes et la TVA se deduisent', vue: 'achats' },
     { t: 'Coche, l achat passe a la suite sans disparaitre', vue: 'achats' },
     { t: 'Et « Ce que ca pese » dit ce qui vous attend', vue: 'budget' }
-  ] },
-  { v: '4.68', quoi: [
-    { t: 'Une journee passee sans temps note vous est reclamee au lancement' },
-    { t: 'Un devis s attache a un chantier deja facture', vue: 'chantier' },
-    { t: 'Et la fiche dit en combien de temps il a ete realise', vue: 'chantier' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -8329,9 +8336,14 @@ function brancher() {
     }
     if (ts) {
       if (!confirm('Retirer cette saisie de temps ?')) return;
-      var dd = Number(ts.dataset.tsup);
-      c.temps = c.temps.filter(function (x) { return x.date !== dd; }); c.maj = Date.now();
-      sauverChantiers().then(function () { renderFiche(); renderCarnet(); });
+      var t3 = (c.temps || [])[Number(ts.dataset.tsup)];
+      if (!t3) return;
+      if (!retirerSaisie(t3)) { toast('Cette saisie ne se retire pas d’ici.'); return; }
+      indexerJournees();
+      c.maj = Date.now();
+      Promise.all([sauverJournees(), sauverChantiers()]).then(function () {
+        renderFiche(); renderCarnet(); renderRendements(); renderCalendrier(); renderAccueil();
+      });
       return;
     }
     if (e.target.closest('#f-sup')) {
@@ -8715,7 +8727,13 @@ function brancher() {
       if (c) ouvrirChantier(c.id);
     }
   });
-  $('#cal-saisir').addEventListener('click', ouvrirSaisieJour);
+  $('#cal-trancher').addEventListener('click', function () {
+    var l = C.joursAResoudre(A.chantiers, A.cfg, absences(), Date.now());
+    if (l.length) ouvrirResolutionJour(l[0].d);
+  });
+  $('#cal-saisir').addEventListener('click', function () {
+    ouvrirFicheJour(A.calJour || Date.now());
+  });
   $('#cal-detail').addEventListener('click', function (e) {
     var o = e.target.closest('[data-caljour-ouvrir]'), s = e.target.closest('[data-caljour-sup]');
     if (o) { ouvrirChantier(o.dataset.caljourOuvrir); return; }
@@ -11176,7 +11194,7 @@ function renderFiche() {
         '<small>' + dateCourte(t.date) + ' · ' + E.fmt(C.nb(t.duree), 1) + (t.unite === 'h' ? ' h' : ' j') +
         (C.nb(t.personnes) > 1 ? ' × ' + C.nb(t.personnes) + ' pers.' : '') +
         (t.activite ? ' · ' + esc(C.nomTravail(t.activite)) : '') + '</small></div>' +
-        '<button class="btn-min" data-tsup="' + t.date + '">✕</button></div>';
+        '<button class="btn-min" data-tsup="' + (c.temps || []).indexOf(t) + '">✕</button></div>';
     }).join('');
 
   var travauxUniq = [];
@@ -11565,6 +11583,13 @@ function ouvrirEnteteCh() {
     '<select id="ce-trav">' + optionsTravaux('', { vide: true }) + '</select>' +
     '<p class="muted" style="font-size:11.5px;margin:5px 0 0">Une première ligne sera ' +
     'ouverte dans les travaux, sans quantité ni prix : vous la chiffrerez ensuite.</p></div>' +
+    /* Le taux réduit dépend du propriétaire, pas du chantier : sans cette
+       case à la création, tout chantier neuf partait à 20 %. */
+    '<label class="ligne-check" style="display:flex;align-items:flex-start;gap:8px;' +
+    'font-size:13.5px;margin:0 0 13px"><input type="checkbox" id="ce-siren" ' +
+    'style="margin-top:2px"><span>Propriétaire identifié producteur agricole (n° SIREN)' +
+    '<span class="muted" style="display:block;font-size:11.5px">Ouvre le taux réduit de ' +
+    'TVA sur les travaux qui y donnent droit. Retenu pour ce propriétaire.</span></span></label>' +
     '<div class="champ"><label class="eyebrow" for="ce-nom">Nom du chantier</label>' +
     '<input type="text" id="ce-nom" class="gros" autocomplete="off">' +
     '<p class="muted" style="font-size:11.5px;margin:5px 0 0" id="ce-nom-aide">Proposé ' +
@@ -11584,6 +11609,14 @@ function ouvrirEnteteCh() {
   ['#ce-proprio', '#ce-com'].forEach(function (x) {
     $(x).addEventListener('input', recomposer);
   });
+  /* Un propriétaire déjà connu rapporte sa réponse : on ne repose pas la
+     question à chaque chantier. */
+  var reprendreSiren = function () {
+    var n = $('#ce-proprio').value.trim();
+    if (n && contacts()[n] && contacts()[n].siren != null) $('#ce-siren').checked = sirenDe(n);
+  };
+  $('#ce-proprio').addEventListener('change', reprendreSiren);
+  $('#ce-proprio').addEventListener('blur', reprendreSiren);
   $('#ce-trav').addEventListener('change', recomposer);
   $('#ce-nom').addEventListener('input', function () { nomTouche = true; });
   recomposer();
@@ -11594,6 +11627,7 @@ function ouvrirEnteteCh() {
     var trav = $('#ce-trav').value;
     var c = {
       id: uid(), cree: Date.now(), maj: Date.now(), statut: 'devis', aDevis: true,
+      siren: $('#ce-siren').checked,
       nom: nom, donneur: $('#ce-donneur').value.trim(),
       proprietaire: $('#ce-proprio').value.trim(),
       commune: $('#ce-com').value.trim(), foret: $('#ce-foret').value.trim(),
@@ -11602,6 +11636,8 @@ function ouvrirEnteteCh() {
       temps: [], jours: []
     };
     A.chantiers.push(c);
+    poserSiren(c.proprietaire, c.siren);
+    Promise.resolve(sauverCfg());
     horodaterStatut(c);
     sauverChantiers().then(function () {
       fermerModale(); renderCarnet(); renderAccueil(); renderRendements(); renderCalendrier();
@@ -11726,6 +11762,8 @@ function ouvrirIdentiteCh(id) {
       parcelles: $('#ic-parc').value.trim(), commune: $('#ic-com').value.trim(),
       departement: $('#ic-dep').value.trim(), cadastre: $('#ic-cad').value.trim(),
       siren: $('#ic-siren').checked, gps: gps }, 'Chantier modifié.');
+    poserSiren($('#ic-proprio').value.trim(), $('#ic-siren').checked);
+    Promise.resolve(sauverCfg());
   });
 }
 
@@ -12298,15 +12336,22 @@ function ouvrirTemps(id, quand) {
   $('#ct-ok').addEventListener('click', function () {
     var d = C.nb($('#ct-duree').value);
     if (d <= 0) { toast('Durée attendue.'); return; }
-    c.temps = c.temps || [];
-    c.temps.push({ date: versDate($('#ct-date').value) || dateParDefautTemps(c), duree: d,
-      unite: 'h', personnes: C.nb($('#ct-pers').value) || 1,
-      sansMoi: $('#ct-sansmoi').checked || undefined,
-      km: C.nb($('#ct-km').value) || undefined,
-      activite: $('#ct-act').value || null });
+    /* Une saisie de temps est une journée : la pousser dans c.temps la
+       faisait disparaître à la prochaine indexation. */
+    var quand = versDate($('#ct-date').value) || dateParDefautTemps(c);
+    var act = $('#ct-act').value || null;
+    var jr = { id: uid(), date: quand, chantier: c.id, lieu: c.foret || '',
+      km: C.nb($('#ct-km').value) || 0, nonProd: act ? 0 : d,
+      personnes: C.nb($('#ct-pers').value) || 1,
+      sansMoi: $('#ct-sansmoi').checked || false, fin: false,
+      postes: act ? [{ travaux: act, heures: d, quantite: 0 }] : [] };
+    A.journees = A.journees || [];
+    A.journees.push(jr);
+    indexerJournees();
     c.maj = Date.now();
-    sauverChantiers().then(function () {
-      fermerModale(); renderFiche(); renderCarnet(); renderRendements(); renderAccueil();
+    Promise.all([sauverJournees(), sauverChantiers()]).then(function () {
+      fermerModale(); renderFiche(); renderCarnet(); renderRendements();
+      renderCalendrier(); renderAccueil();
       toast('Temps enregistré.');
     });
   });
@@ -12576,14 +12621,18 @@ function ouvrirFicheJour(ts) {
           C.ditDuree(C.heuresSaisie(r.temps, A.cfg), A.cfg) +
           (C.nb(r.temps.personnes) > 1 ? ' × ' + C.nb(r.temps.personnes) + ' pers.' : '') +
           (r.temps.activite ? ' · ' + esc(C.nomTravail(r.temps.activite)) : '') + '</small></div>' +
-          '<button class="btn-min" data-fjsup="' + r.chantier.id + '_' + r.temps.date + '">✕</button>' +
+          '<button class="btn-min" data-fjsup="' + r.chantier.id + '_' +
+          (r.chantier.temps || []).indexOf(r.temps) + '">✕</button>' +
           '</div>';
       }).join('');
   }
-  if (o.prevus.length) {
+  var faits = {};
+  o.reels.forEach(function (r) { faits[r.chantier.id] = 1; });
+  var enAttente = o.prevus.filter(function (p) { return !faits[p.chantier.id]; });
+  if (enAttente.length) {
     corps += '<p class="eyebrow" style="margin:14px 0 6px">' +
-      (o.reels.length ? 'Également posé ce jour-là' : 'Ce qui est posé ce jour-là') + '</p>' +
-      o.prevus.map(function (p) {
+      (o.reels.length ? 'Posé ce jour-là, sans temps noté' : 'Ce qui est posé ce jour-là') + '</p>' +
+      enAttente.map(function (p) {
         return '<div class="liste-item"><span class="pastille" style="background:' +
           (p.fermete === 'ferme' ? '#2E7D46' : '#B98A00') + '"></span>' +
           '<div class="li-c"><b>' + esc(p.chantier.nom || 'Chantier') + '</b><small>' +
@@ -12666,9 +12715,15 @@ function ouvrirFicheJour(ts) {
     if (sup) {
       var p = sup.dataset.fjsup.split('_');
       var c2 = chantier(p[0]); if (!c2) return;
-      c2.temps = (c2.temps || []).filter(function (t) { return String(t.date) !== p[1]; });
+      var rang = Number(p[1]);
+      var t2 = (c2.temps || [])[rang];
+      if (!t2) return;
+      if (!retirerSaisie(t2)) { toast('Cette saisie ne se retire pas d’ici.'); return; }
+      indexerJournees();
       c2.maj = Date.now();
-      sauverChantiers().then(function () { refaire('Temps retiré.'); });
+      Promise.all([sauverJournees(), sauverChantiers()]).then(function () {
+        refaire('Temps retiré.');
+      });
     }
   });
 }
@@ -12840,6 +12895,17 @@ function contacts() {
 function telDe(nom) {
   var c = contacts()[String(nom || '').trim()];
   return (c && c.tel) || '';
+}
+function sirenDe(nom) {
+  var c = contacts()[String(nom || '').trim()];
+  return !!(c && c.siren);
+}
+function poserSiren(nom, oui) {
+  var k = String(nom || '').trim();
+  if (!k) return;
+  var l = contacts();
+  l[k] = l[k] || {};
+  l[k].siren = !!oui;
 }
 function poserTel(nom, tel) {
   var k = String(nom || '').trim();
@@ -13240,6 +13306,7 @@ function renderCalendrier() {
   h += '</div>';
   g.innerHTML = h;
 
+  renderResteATrancher();
   var cm = C.chargeMois(A.chantiers, an, mo, A.cfg);
   $('#cal-charge').innerHTML = '<div class="kpi" style="margin-top:11px">' +
     '<div class="carte2"><b class="num">' + cm.fermes + '</b><small>jours confirmés</small></div>' +
@@ -13258,6 +13325,24 @@ function renderCalendrier() {
   renderJourDetail();
 }
 
+/* Les jours passés restés au planning, annoncés en tête de l'agenda. Le
+   rappel de l'accueil ne suffisait pas : c'est ici qu'il travaille, et un
+   jour non tranché ne se voit nulle part sur la grille — sa pastille dit
+   « confirmé » comme un jour à venir. */
+function renderResteATrancher() {
+  var z = $('#cal-trancher'); if (!z) return;
+  var l = C.joursAResoudre(A.chantiers, A.cfg, absences(), Date.now());
+  if (!l.length) { z.innerHTML = ''; return; }
+  var p = l[0];
+  var nom = ((p.chantiers[0] || {}).nom) || 'chantier';
+  z.innerHTML = '<button class="alerte" id="cal-trancher-btn" style="width:100%">' +
+    '<span class="ic" style="background:#B98A00"></span>' +
+    '<span><b>' + (l.length === 1
+      ? 'Le ' + dateCourte(p.d) + ' reste à trancher'
+      : l.length + ' journées passées restent à trancher') + '</b>' +
+    '<small>' + esc(nom) + (l.length > 1 ? ', et ' + (l.length - 1) + ' autre' +
+      (l.length > 2 ? 's' : '') : '') + ' — y avez-vous travaillé ?</small></span></button>';
+}
 function renderJourDetail() {
   var z = $('#cal-detail'); if (!z) return;
   var ts = C.minuit(A.calJour || Date.now());
@@ -13288,83 +13373,6 @@ function renderJourDetail() {
     }).join('');
   }
   z.innerHTML = h || '<div class="vide"><p>Rien de prévu ni de saisi ce jour-là.</p></div>';
-}
-
-/* Saisie du soir : quel chantier, combien de temps. Propose d'abord ce qui
-   était prévu ce jour-là, puis les chantiers ouverts. */
-function ouvrirSaisieJour() {
-  var ts = C.minuit(A.calJour || Date.now());
-  var ouverts = C.filtre(A.chantiers, 'ouverts');
-  if (!ouverts.length) { toast('Aucun chantier ouvert à pointer.'); return; }
-  var occ = C.occupation(A.chantiers, ts, ts, A.cfg)[C.jourCle(ts)] || { prevus: [] };
-  var prevus = occ.prevus.map(function (p) { return p.chantier.id; });
-  var ordonnes = ouverts.slice().sort(function (a, b) {
-    var pa = prevus.indexOf(a.id) >= 0 ? 0 : 1, pb = prevus.indexOf(b.id) >= 0 ? 0 : 1;
-    return pa - pb;
-  });
-  var d = new Date(ts);
-  modale('Journée du ' + d.toLocaleDateString('fr-FR'),
-    '<div class="champ"><label class="eyebrow" for="sj-ch">Chantier</label>' +
-    '<select id="sj-ch">' + ordonnes.map(function (c) {
-      return '<option value="' + c.id + '">' + esc(c.nom || 'Chantier') +
-        (prevus.indexOf(c.id) >= 0 ? ' — prévu' : '') + '</option>';
-    }).join('') + '</select></div>' +
-    '<div class="grille g3">' +
-    '<div class="champ"><label class="eyebrow" for="sj-duree">Durée</label>' +
-    '<input type="text" id="sj-duree" class="gros" inputmode="decimal" value="1"></div>' +
-    '<div class="champ"><label class="eyebrow" for="sj-unite">En</label>' +
-    '<select id="sj-unite"><option value="j">journées</option><option value="h">heures</option></select></div>' +
-    '<div class="champ"><label class="eyebrow" for="sj-pers">Personnes</label>' +
-    '<input type="text" id="sj-pers" inputmode="numeric" value="1"></div></div>' +
-    '<div class="grille g2">' +
-    '<div class="champ"><label class="eyebrow" for="sj-act">Activité</label>' +
-    '<select id="sj-act"></select></div>' +
-    '<div class="champ"><label class="eyebrow" for="sj-km">Kilomètres (aller-retour)</label>' +
-    '<input type="text" id="sj-km" inputmode="decimal" placeholder="facultatif"></div></div>' +
-    '<div class="carte2" id="sj-apercu" style="margin:11px 0"></div>' +
-    '<div class="btn-rang"><button class="btn primaire" id="sj-ok">Enregistrer</button>' +
-    '<button class="btn" id="sj-fini">Enregistrer et clore le chantier</button></div>');
-
-  var majAct = function () {
-    var c = chantier($('#sj-ch').value);
-    var l = (c && c.lignes) || [];
-    var vus = [];
-    $('#sj-act').innerHTML = '<option value="">— non précisée —</option>' + l.filter(function (x) {
-      if (vus.indexOf(x.travail) >= 0) return false; vus.push(x.travail); return true;
-    }).map(function (x) { return '<option value="' + x.travail + '">' + C.nomTravail(x.travail) + '</option>'; }).join('');
-    if (l.length === 1) $('#sj-act').value = l[0].travail;
-  };
-  var apercu = function () {
-    var jh = C.joursSaisie({ duree: C.nb($('#sj-duree').value), unite: $('#sj-unite').value,
-      personnes: C.nb($('#sj-pers').value) }, A.cfg);
-    $('#sj-apercu').innerHTML = jh
-      ? '<b class="num" style="font-size:20px">' + E.fmt(jh, 2) + '</b> jours-homme'
-      : '<span class="muted">Indiquez une durée.</span>';
-  };
-  $('#sj-ch').addEventListener('change', function () { majAct(); });
-  ['#sj-duree', '#sj-pers'].forEach(function (s) { $(s).addEventListener('input', apercu); });
-  $('#sj-unite').addEventListener('change', apercu);
-  majAct(); apercu();
-
-  var noter = function (clore) {
-    var c = chantier($('#sj-ch').value);
-    if (!c) return;
-    var duree = C.nb($('#sj-duree').value);
-    if (duree <= 0) { toast('Durée attendue.'); return; }
-    c.temps = c.temps || [];
-    c.temps.push({ date: ts + 43200000, duree: duree, unite: $('#sj-unite').value,
-      personnes: C.nb($('#sj-pers').value) || 1, activite: $('#sj-act').value || null,
-      km: C.nb($('#sj-km').value) || undefined });
-    if (clore) { c.statut = 'termine'; c.dateFin = ts; }
-    else if (c.statut === 'accepte') c.statut = 'encours';
-    c.maj = Date.now();
-    sauverChantiers().then(function () {
-      fermerModale(); renderCalendrier(); renderCarnet(); renderRendements(); renderAccueil();
-      toast(clore ? 'Journée notée, chantier terminé.' : 'Journée notée.');
-    });
-  };
-  $('#sj-ok').addEventListener('click', function () { noter(false); });
-  $('#sj-fini').addEventListener('click', function () { noter(true); });
 }
 
 /* ------------------------------------------------------------- alertes */
@@ -15297,6 +15305,28 @@ function migrerJournees() {
 /* Le temps porté par chaque chantier n'est qu'une lecture des journées :
    tout le calcul de rendement et de prix de journée continue de marcher
    sans savoir d'où le temps vient. */
+/* Retirer une saisie de temps, c'est retirer le poste de journée qui la
+   produit — et la journée elle-même s'il n'en reste rien. Filtrer c.temps
+   ne faisait rien de durable : la liste est refaite à l'indexation. */
+function retirerSaisie(t) {
+  if (!t || !t.jrn) return false;
+  var j = journee(t.jrn); if (!j) return false;
+  if (t.activite) {
+    var ote = false;
+    j.postes = (j.postes || []).filter(function (p) {
+      if (ote || p.travaux !== t.activite || C.arr(C.nb(p.heures), 2) !== C.arr(C.nb(t.duree), 2)) return true;
+      ote = true; return false;
+    });
+    if (!ote) return false;
+  } else {
+    j.nonProd = 0;
+  }
+  /* Une journée sans poste ni temps mort ne dit plus rien : elle s'en va. */
+  if (!(j.postes || []).length && !C.nb(j.nonProd)) {
+    A.journees = (A.journees || []).filter(function (x) { return x.id !== j.id; });
+  }
+  return true;
+}
 function indexerJournees() {
   (A.chantiers || []).forEach(function (c) { c.temps = []; });
   (A.journees || []).forEach(function (j) {
@@ -18839,7 +18869,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.72.0-20260906-1740';
+var VERSION = '4.73.0-20260906-2210';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.72.0-20260906-1740**
+Version courante : **4.73.0-20260906-2210**
 
 ---
 
@@ -1649,6 +1649,73 @@ pas le contenu : la fiche du jour liste tout ce qui s’y rattache.
 **L’absence l’emporte sur le planning, jamais sur ce qui a eu lieu.** Marquer
 un jour non travaillé est un geste délibéré ; s’il reste un chantier posé ce
 jour-là, la fiche du jour le montre et propose de le retirer.
+
+## Le temps ne se stocke pas deux fois
+
+**Le défaut derrière trois de ses symptômes du 6 septembre.** `c.temps`
+n’est pas une donnée : c’est une **lecture** de `A.journees`, que
+`indexerJournees()` refait de zéro à chaque ouverture et à chaque
+modification de journée. Or trois endroits y écrivaient ou y supprimaient
+directement :
+
+- **« + Temps » de la fiche poussait dans `c.temps`.** La saisie tenait
+  jusqu’à la prochaine indexation, puis **disparaissait sans bruit**. D’où des
+  jours qu’il avait faits et qui ne comptaient pas dans les rendements — et
+  un chantier qui finissait « en retard » sans qu’il sache pourquoi. Elle
+  crée maintenant une **journée**.
+- **Les deux croix filtraient `c.temps` par date.** Deux saisies d’un même
+  jour portent la même : *« j’avais mis sept heures et deux heures, ça a
+  supprimé les deux »*. Et de toute façon elles revenaient à l’indexation
+  suivante. `retirerSaisie()` ôte le **poste de journée** qui les produit, et
+  la journée elle-même s’il n’en reste rien.
+
+**Règle : on n’écrit jamais dans une liste dérivée, et on n’y supprime
+jamais rien.** Le commentaire d’`indexerJournees` le disait déjà — « le temps
+porté par chaque chantier n’est qu’une lecture des journées » — mais rien ne
+l’empêchait, et trois endroits l’ont fait.
+
+**Et un second formulaire de saisie a disparu.** `ouvrirSaisieJour()` — le
+bouton « J’ai travaillé » du bas du calendrier — ouvrait un autre écran que
+la fiche du jour, avec son propre `#sj-unite` journées/heures qu’on croyait
+retiré partout. *« Je n’ai pas la même chose qui s’ouvre. »* Le bouton ouvre
+désormais la fiche du jour ; les 77 lignes de l’autre sont parties.
+
+## Fait ou prévu, jamais les deux
+
+*« Ce que j’ai fait, il est forcément prévu. C’est soit une journée prévue,
+soit elle est faite, pas les deux en même temps, sinon ça se mélange. »* La
+fiche du jour listait le chantier une fois dans « ce que vous y avez fait »
+et une seconde dans « également posé ce jour-là ». Un chantier dont le temps
+est noté ce jour-là ne reparaît plus comme en attente ; l’intitulé du bloc
+restant dit **« posé ce jour-là, sans temps noté »**.
+
+## Le SIREN se demande une fois par propriétaire
+
+*« Quand je crée un nouveau chantier et un nouveau propriétaire, il ne me
+demande pas s’il a un numéro de SIREN. »* Le formulaire de création raccourci
+en 4.55 avait perdu la case : **tout chantier neuf partait à 20 % de TVA** là
+où le taux réduit s’applique. Défaut d’argent, silencieux.
+
+**Et la question ne porte pas sur le chantier, elle porte sur le
+propriétaire.** Elle rejoint donc le téléphone dans `A.cfg.contacts`, indexée
+par le nom, et se reporte dès qu’il retape le même — une fois par
+propriétaire, pas une fois par chantier.
+
+## Le rappel entre aussi dans le calendrier
+
+Sa spécification disait *« à l’ouverture de l’app **ou à l’accès au
+calendrier** »*. Seul le premier avait été fait, et c’est dans le calendrier
+qu’il passe son temps — où un jour non tranché porte la même pastille qu’un
+jour à venir. `#cal-trancher` l’annonce en tête de l’agenda et ouvre les
+trois issues.
+
+**Vérifié avant de corriger** : une sonde a montré que le rappel de l’accueil
+fonctionne. Le manque était bien celui du second endroit, pas une panne du
+premier — chercher la panne aurait coûté une soirée pour rien.
+
+**Les pastilles font neuf pixels**, avec un cerne clair : *« la différence
+entre le vert et le bleu n’est pas flagrante, surtout qu’elles sont
+petites »*. Cinq pixels au soleil, avec des mains sales.
 
 ## La fiche du jour, et l’écran qui force à trancher
 

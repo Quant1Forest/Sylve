@@ -6065,6 +6065,189 @@ scenario('Fiche de chantier : des coordonnées se collent depuis une carte', asy
 });
 
 /* --------------------------------------------------------------------- */
+scenario('Temps : une saisie survit à la réindexation', async () => {
+  /* Le défaut derrière trois de ses symptômes. « c.temps » n'est pas une
+     donnée : c'est une lecture de « A.journees », refaite de zéro à chaque
+     ouverture. « + Temps » y poussait directement — la saisie tenait jusqu'à
+     la prochaine indexation, puis disparaissait sans bruit. D'où des jours
+     faits qui ne comptaient pas dans les rendements, et un chantier qui
+     finissait « en retard » sans qu'il sache pourquoi. */
+  const JOUR = 86400000;
+  const hier = new Date(Date.now() - JOUR); hier.setHours(12, 0, 0, 0);
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers', cfg: { heuresJour: 8, journeesMigrees: true },
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'encours', aDevis: false, maj: Date.now(),
+      temps: [], jours: [{ d: hier.getTime(), p: 1 }],
+      lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 2, prix: 500, nature: 'prestation' }] }]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+  t.clic('#f-temps'); await t.pause(400);
+  t.choisir('#ct-date', jourISO(hier.getTime()));
+  t.saisir('#ct-duree', '7');
+  t.choisir('#ct-act', 'DEGAG');
+  t.clic('#ct-ok'); await t.pause(600);
+
+  /* Elle a créé une journée, pas une ligne de lecture. */
+  verifier('une journée est née de la saisie', 1, (t.stock('journees') || []).length);
+  verifier('avec son poste', 7, ((t.stock('journees') || [])[0].postes || [])[0].heures);
+  verifier('le chantier la porte', 1, ((t.stock('chantiers') || [])[0].temps || []).length);
+
+  /* Et elle survit à ce qui reconstruit la lecture : c'est tout l'objet. */
+  const t2 = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers', cfg: { heuresJour: 8, journeesMigrees: true },
+    chantiers: t.stock('chantiers'), journees: t.stock('journees')
+  }));
+  await t2.pause(300);
+  verifier('elle est toujours là au lancement suivant', 1,
+    ((t2.stock('chantiers') || [])[0].temps || []).length);
+  verifier('et le rendement la compte', 7,
+    t2.w.BCC.heuresSaisie((t2.stock('chantiers')[0].temps || [])[0], { heuresJour: 8 }));
+  verifier('aucune erreur', [], t.erreurs.concat(t2.erreurs));
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Calendrier : retirer un temps n’en retire qu’un, et pour de bon', async () => {
+  /* « J'avais mis une fois sept heures et une fois deux heures. Quand j'ai
+     fait retirer, ça a supprimé les deux. » La croix visait la date — deux
+     saisies d'un même jour portent la même — et elle filtrait la lecture,
+     qui se refaisait juste après. */
+  const JOUR = 86400000;
+  const hier = new Date(Date.now() - JOUR); hier.setHours(12, 0, 0, 0);
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'calendrier', cfg: { heuresJour: 8, journeesMigrees: true },
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'accepte', aDevis: true, maj: Date.now(),
+      lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 2, prix: 500, nature: 'prestation' }],
+      temps: [], jours: [{ d: hier.getTime(), p: 1 }] }],
+    journees: [
+      { id: 'j1', date: hier.getTime(), chantier: 'c1', personnes: 1, nonProd: 0,
+        postes: [{ travaux: 'DEGAG', heures: 7, quantite: 0 }] },
+      { id: 'j2', date: hier.getTime(), chantier: 'c1', personnes: 1, nonProd: 0,
+        postes: [{ travaux: 'PLANT', heures: 2, quantite: 0 }] }
+    ]
+  }));
+  await t.pause(300);
+  t.clic('[data-jour="' + t.w.BCC.minuit(hier.getTime()) + '"]'); await t.pause(450);
+  const croix = t.$$('#modale [data-fjsup]');
+  verifier('les deux saisies sont listées', 2, croix.length);
+  croix[1].click(); await t.pause(600);
+
+  const c = (t.stock('chantiers') || [])[0];
+  verifier('une seule est retirée', 1, (c.temps || []).length);
+  verifier('et c’est la bonne', 7, c.temps[0].duree);
+  /* Retirée à la source : elle ne revient pas à l'indexation suivante. */
+  verifier('la journée qui la portait est partie', 1, (t.stock('journees') || []).length);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+
+/* --------------------------------------------------------------------- */
+scenario('Calendrier : un chantier fait ne se redit pas « posé »', async () => {
+  /* « Ce que j'ai fait, il est forcément prévu. C'est soit une journée prévue,
+     soit elle est faite, pas les deux en même temps, sinon ça se mélange. » */
+  const JOUR = 86400000;
+  const hier = new Date(Date.now() - JOUR); hier.setHours(12, 0, 0, 0);
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'calendrier', cfg: { heuresJour: 8 },
+    chantiers: [
+      { id: 'c1', nom: 'Dégagement Martin', statut: 'accepte', aDevis: true, maj: Date.now(),
+        lignes: [], jours: [{ d: hier.getTime(), p: 1 }],
+        temps: [{ date: hier.getTime(), duree: 7, unite: 'h', personnes: 1 }] },
+      /* Un second chantier posé le même jour, sans temps : lui reste en
+         attente, et c'est bien ce qu'on veut voir. */
+      { id: 'c2', nom: 'Plantation Bernard', statut: 'accepte', aDevis: true, maj: Date.now(),
+        lignes: [], temps: [], jours: [{ d: hier.getTime(), p: 1 }] }
+    ]
+  }));
+  await t.pause(300);
+  t.clic('[data-jour="' + t.w.BCC.minuit(hier.getTime()) + '"]'); await t.pause(450);
+  const f = t.texte('#modale');
+  verifierVrai('le chantier fait est dans « ce que vous y avez fait »',
+    /Ce que vous y avez fait/.test(f));
+  /* Il ne doit pas reparaître comme en attente. */
+  const enAttente = t.$$('#modale [data-fjretirer]').map(b => b.dataset.fjretirer);
+  verifier('seul celui sans temps reste posé', ['c2'], enAttente);
+  verifierVrai('et l’intitulé le dit', /sans temps noté/.test(f));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Calendrier : un seul chemin pour dire qu’on a travaillé', async () => {
+  /* « Si je clique sur un jour et que je fais j'ai travaillé, je n'ai pas la
+     même chose qui s'ouvre que quand en bas j'appuie sur j'ai travaillé. »
+     Deux formulaires écrivaient le temps par deux chemins qui s'ignoraient. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'calendrier',
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'accepte', aDevis: true, maj: Date.now(),
+      lignes: [], temps: [], jours: [] }]
+  }));
+  await t.pause(300);
+  t.clic('#cal-saisir'); await t.pause(450);
+  /* Le bouton du bas ouvre la même fiche du jour que la case du calendrier. */
+  verifierVrai('le bouton du bas ouvre la fiche du jour', t.$('#fj-poser'));
+  verifierVrai('avec le même bouton de saisie', t.$('#fj-travaille'));
+  /* Et l'ancien formulaire n'existe plus. */
+  verifier('l’ancien formulaire a disparu', null, t.$('#sj-duree'));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Calendrier : les jours restés à trancher s’annoncent dans l’agenda', async () => {
+  /* « À l'ouverture de l'app OU à l'accès au calendrier. » Seul le premier
+     avait été fait, et c'est dans le calendrier qu'il passe son temps — où un
+     jour non tranché porte la même pastille qu'un jour à venir. */
+  const JOUR = 86400000;
+  const j = n => { const d = new Date(Date.now() + n * JOUR); d.setHours(12, 0, 0, 0); return d.getTime(); };
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'calendrier', cfg: { heuresJour: 8 },
+    chantiers: [{ id: 'c1', nom: 'Dégagement Martin', statut: 'accepte', aDevis: true,
+      maj: Date.now(), lignes: [], temps: [],
+      jours: [{ d: j(-5), p: 1 }, { d: j(-3), p: 1 }, { d: j(4), p: 1 }] }]
+  }));
+  await t.pause(400);
+  const dit = t.texte('#cal-trancher');
+  verifierVrai('l’agenda l’annonce', /restent à trancher/.test(dit));
+  verifierVrai('il en compte deux', /2 journées/.test(dit));
+  verifierVrai('et nomme le chantier', /Dégagement Martin/.test(dit));
+
+  /* Et il ouvre l'écran de résolution. */
+  t.clic('#cal-trancher-btn'); await t.pause(500);
+  verifierVrai('il ouvre les trois issues',
+    t.$('#rj-oui') && t.$('#rj-deplacer') && t.$('#rj-non'));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Chantier : le SIREN se demande à la création et se retient', async () => {
+  /* « Quand je crée un nouveau chantier et un nouveau propriétaire, il ne me
+     demande pas s'il a un numéro de SIREN. » Sans la case, tout chantier neuf
+     partait à 20 % de TVA là où le taux réduit s'applique. */
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'chantiers' }));
+  t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.clic('#c-nouveau'); await t.pause(450);
+  verifierVrai('la case est là', t.$('#ce-siren'));
+  verifier('décochée par défaut', false, t.$('#ce-siren').checked);
+
+  t.saisir('#ce-proprio', 'Martin');
+  t.saisir('#ce-com', 'Levier');
+  cocher(t, '#ce-siren', true);
+  t.clic('#ce-ok'); await t.pause(600);
+  const c = (t.stock('chantiers') || [])[0];
+  verifier('le chantier la porte', true, c.siren);
+  verifier('et elle est retenue pour ce propriétaire', true,
+    (((t.stock('cfg') || {}).contacts || {})['Martin'] || {}).siren);
+
+  /* Le chantier suivant pour le même propriétaire ne repose pas la question. */
+  t.clic('[data-chretour]'); await t.pause(300);
+  t.clic('#c-nouveau'); await t.pause(450);
+  t.saisir('#ce-proprio', 'Martin');
+  t.$('#ce-proprio').dispatchEvent(new t.w.Event('change', { bubbles: true }));
+  await t.pause(250);
+  verifier('la réponse est reprise', true, t.$('#ce-siren').checked);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
 /* Un troisième argument ne joue que les scénarios dont le nom le contient.
    Sert à éprouver un contrôle en le cassant exprès : rejouer les quarante
    autres pour vérifier qu'un seul crie coûte deux minutes pour rien.
