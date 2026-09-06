@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.73.0-20260906-2210**
+Version courante : **4.74.0-20260906-2355**
 
 ---
 
@@ -51,7 +51,7 @@ npm run controle   # vérificateur + service worker + tests + reconstruction + c
 ```
 
 Doit afficher **« Bon pour livraison »**, puis **« le service worker tient »**
-(24 vérifications), puis la suite au vert — 777 à ce jour — puis
+(24 vérifications), puis la suite au vert — 1493 à ce jour — puis
 **« Sylve.html est conforme »**.
 
 Compter **moins de deux minutes**. Ça a été dix, et deux choses l'expliquaient :
@@ -1578,6 +1578,35 @@ seuil qu’il ne rencontrera pas n’aurait fait que du bruit. Le rappel vit **s
 la fiche du chantier**, là où il chiffre, pas dans un écran qu’il ouvrirait
 après coup.
 
+## Ce que la fiche de chantier n'exige pas
+
+**Le téléphone du propriétaire est facultatif.** *« Est-ce que c'est vraiment
+obligatoire, le téléphone du propriétaire ? Limite le donneur d'ordre, ok,
+mais le propriétaire… »* L'arrêté demande « nom et coordonnées » du
+propriétaire, et nomme explicitement le « téléphone du donneur d'ordre ».
+Réclamer les deux en rouge, c'était inventer une obligation. La feuille écrit
+donc un tiret à cette ligne, et le champ porte « (facultatif) ». Celui du
+donneur d'ordre reste réclamé.
+
+**Un plan joint libère le cadre du croquis.** *« La carte est en A4, alors que
+l'emplacement du croquis c'est une zone restreinte — alors comment on fait à
+ce moment-là ? »* On ne serre pas un A4 dans 52 mm : quand `f.planJoint` est
+coché, le cadre cède la place à une mention — *« Voir le plan joint à la
+présente fiche »* — et le plan vit à côté, entier, comme il le fait déjà.
+
+**Les risques se reprennent d'un chantier de la même forêt.** *« Si c'est le
+même nom, ça pourrait être le cas. Pourquoi pas. »* C'est lui qui a proposé le
+critère, et c'est le seul dont Sylve dispose. `memeForet(c)` retient le
+chantier **le plus récent** qui porte le même nom de forêt **et la même
+commune** — deux « Bois du Haut » dans deux communes ne sont pas la même forêt
+— et qui a déjà des risques cochés.
+
+- **Ne se reprend que ce qui décrit le lieu** : les risques, leurs consignes,
+  la proportion, et l'accès et le réseau s'ils sont vides. **Pas le point de
+  rencontre** : il dépend du chantier, pas de la forêt.
+- **L'offre disparaît dès qu'un risque est coché.** Proposer de tout remplacer
+  quand il a déjà travaillé serait un piège.
+
 ## Le téléphone d’un client sans toucher à ses listes
 
 La fiche exige un téléphone pour le propriétaire et le donneur d’ordre. Ses
@@ -1610,9 +1639,10 @@ existent à la place, et ils couvrent le besoin :
 possible de l’automatiser ? »* Non. Une vue aérienne, ce sont des tuiles
 d’image servies par l’IGN ou Google : il faut du réseau et une dépendance,
 les deux choses que Sylve refuse — et c’est ce refus qui la fait marcher au
-fond d’une parcelle. Le cadre du croquis reste donc à remplir au stylo, avec
-une case **« un plan est joint »** qui y écrit « voir plan joint » : c’est ce
-qu’il fait déjà, il imprime le plan qu’on lui donne et l’agrafe.
+fond d’une parcelle. Le cadre du croquis reste donc à remplir au stylo — sauf
+quand la case **« un plan est joint »** est cochée : il cède alors la place à
+une mention, parce qu’un A4 ne se serre pas dans 52 mm. C’est ce qu’il fait
+déjà, il imprime le plan qu’on lui donne et l’agrafe.
 
 **Reste ouvert** : joindre une photo au chantier — capture d’écran d’une carte
 faite à la maison, ou photo du plan papier. `reduireImage()` sait déjà le
@@ -1746,6 +1776,47 @@ qu’aucun sabotage n’atteint est du poids mort, pas de la sécurité.**
 veille. Les dates de l’application passent d’ordinaire par midi, ce qui
 masquait le défaut ; la fiche du jour travaille en minuit et l’a fait sortir.
 Elle passe par `C.jourCle`, comme `versChamp` depuis la 4.x.
+
+## Valider une journée d'un seul geste
+
+*« Il faudrait juste un endroit où je puisse dire : valider, c'est bon j'ai
+travaillé, ça l'enregistre. Comme ça je ne me pose pas de questions. J'ai
+prévu une journée et j'ai fait une journée, je peux juste enregistrer. C'est
+rapide et c'est efficace. »*
+
+Le cas courant est celui-là : posé, fait, comme prévu. Ouvrir « Ma journée »
+pour retaper ce que l'agenda sait déjà, c'est cinq gestes pour une information
+nulle. `validerCommePrevu(ts, prevus)` crée **une journée par chantier posé**,
+avec les heures de l'agenda et les prestations du chantier en postes, à parts
+égales — c'est ce qu'il aurait tapé, et il corrigera si ce n'était pas ça.
+
+- **Deux portes, un seul geste** : `#fj-prevu` sur la fiche du jour et
+  `#rj-prevu` sur l'écran qui force à trancher. Ce qui n'était pas prévu garde
+  l'ancien chemin, renommé — *« Autre chose »*, *« J'y ai travaillé, mais
+  autrement »* — qui ouvre la saisie complète.
+- **Le bouton annonce ce qu'il va écrire** : *« C'était comme prévu — 1 j »*.
+  Valider un chiffre qu'on ne voit pas ne serait pas une validation. Et la
+  ligne du jour dit enfin *« 1 j prévues »* : il avait relevé que la fiche du
+  jour ne montrait pas ce qui était posé.
+- **Une demi-journée posée vaut une demi-journée faite.** Le geste reprend la
+  part de l'agenda, il n'invente pas la journée entière.
+- **Sans prestation au chantier**, les heures entrent en temps non productif :
+  elles comptent dans la journée, jamais dans un rendement.
+- Les kilomètres suivent par `kmHabituels()`, comme dans « Ma journée » :
+  c'est la même route.
+
+**Et une garde qui n'était pas éprouvable telle qu'elle était écrite.** Le
+geste ne s'offre que si **rien n'est encore noté ce jour-là**. Le premier
+scénario semait un jour dont *tout* était noté — mais un tel jour n'a plus
+rien « en attente », donc l'autre condition le retenait déjà, et casser la
+première ne faisait rien crier. Le cas qui compte est celui du **jour à moitié
+noté** : sept heures sur un chantier, un second posé sans temps. Sans la
+garde, un doigt y ajouterait quatre heures et la journée passerait à onze sans
+rien dire.
+
+C'est la troisième fois que ce projet rencontre deux gardes qui se couvrent
+l'une l'autre. **Le sabotage ne suffit pas : il faut aussi que le scénario
+place le cas où une seule des deux tient.**
 
 ## Le Calendrier, resté sans revue
 
