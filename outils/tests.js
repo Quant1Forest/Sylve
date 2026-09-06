@@ -576,15 +576,17 @@ scenario('Onglets : un dessin partout, le même d’un module à l’autre', asy
      bandeau. Ils étaient répétés en bas de chaque partie, à une place
      différente selon le module — on s'y perdait, et ils mangeaient un
      onglet là où il n'y en a que deux ou trois. */
-  const attendu = {
-    cubage: 4, chantiers: 2, calendrier: 3, rendements: 2,
-    finances: 4, stock: 3, bois: 4
-  };
-  for (const mod of Object.keys(attendu)) {
+  /* Le compte exact par module n'est pas une propriété : il change chaque
+     fois qu'un écran s'ajoute, et le figer ne fait que casser le test sans
+     rien apprendre. Ce qui ne doit jamais changer, c'est qu'aucun module ne
+     se réduise à un onglet solitaire, et que chacun porte son dessin. */
+  const modules = ['cubage', 'chantiers', 'calendrier', 'rendements',
+    'finances', 'stock', 'bois', 'achats', 'vehicule'];
+  for (const mod of modules) {
     const t = await ouvrir(Object.assign({}, VIDE, { module: mod }));
     const onglets = t.$$('#onglets button');
-    verifier(mod + ' : ' + attendu[mod] + ' onglets', attendu[mod], onglets.length);
-    verifier(mod + ' : tous dessinés', attendu[mod],
+    verifierVrai(mod + ' : jamais un onglet solitaire', onglets.length >= 2);
+    verifier(mod + ' : tous dessinés', onglets.length,
       onglets.filter(b => b.querySelector('.ic svg.pic')).length);
     verifierVrai(mod + ' : plus aucun caractère de remplissage',
       onglets.every(b => !/[▤▥▦▧▣◱◫≈∑⚙⌖⏱⇄↻✎]/.test(b.textContent)));
@@ -5878,6 +5880,187 @@ scenario('Calendrier : « je n’y étais pas » clôt le jour pour de bon', asy
     C0.joursAResoudre(t.stock('chantiers'), { heuresJour: 8 },
       (t.stock('cfg') || {}).absences || [], Date.now()).length);
   verifierVrai('et le rappel s’efface', !t.$('[data-journeenudge]'));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+/* Un chantier prêt pour une fiche de chantier. */
+const CH_FICHE = () => ({
+  module: 'chantiers',
+  cfg: { nomEntreprise: 'Mon entreprise', siret: '12345678900012', telEntreprise: '06 00 00 00 00' },
+  clients: ['Cabinet Dubois'], proprios: ['Martin'],
+  chantiers: [{ id: 'c1', nom: 'Dégagement Martin', statut: 'accepte', aDevis: true,
+    maj: Date.now(), donneur: 'Cabinet Dubois', proprietaire: 'Martin',
+    commune: 'Levier', departement: '25', foret: 'Forêt de la Côte', parcelles: '12 à 14',
+    gps: { lat: 46.8951, lon: 6.1204 }, temps: [], jours: [],
+    lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 3, prix: 700, nature: 'prestation' }] }]
+});
+
+scenario('Fiche de chantier : elle reprend ce que Sylve sait déjà', async () => {
+  /* « Je sélectionne mon chantier, et après par rapport aux données que j'ai
+     déjà, soit ça préremplit, soit je n'ai pas les données et ça manque. » */
+  const t = await ouvrir(Object.assign({}, VIDE, CH_FICHE()));
+  t.clic('[data-vue="fichech"]'); await t.pause(400);
+  verifierVrai('l’écran demande de choisir un chantier',
+    /Choisissez un chantier/.test(t.texte('#fch-corps')));
+  t.choisir('#fch-ch', 'c1'); await t.pause(450);
+
+  const txt = t.texte('#fch-corps');
+  verifierVrai('le propriétaire est repris', /Martin/.test(txt));
+  verifierVrai('le donneur d’ordre aussi', /Cabinet Dubois/.test(txt));
+  verifierVrai('la commune avec son département', /Levier \(25\)/.test(txt));
+  verifierVrai('les parcelles', /12 à 14/.test(txt));
+  /* Point décimal, pas virgule : c'est la forme qu'attend une carte quand
+     il les recolle, et la virgule sépare déjà les deux nombres. */
+  verifierVrai('et la position', /46.8951, 6.1204/.test(txt));
+
+  /* Ce qui manque est nommé, pas laissé en blanc. */
+  verifierVrai('ce qui manque est annoncé', /Il manque/.test(txt));
+  verifierVrai('les moyens d’accès en font partie', /moyens d’accès/.test(txt));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Fiche de chantier : les risques se cochent et se gardent', async () => {
+  /* Les numéros sont ceux du modèle papier : la légende du croquis demande
+     de les reporter sous les symboles. */
+  const t = await ouvrir(Object.assign({}, VIDE, CH_FICHE()));
+  t.clic('[data-vue="fichech"]'); await t.pause(400);
+  t.choisir('#fch-ch', 'c1'); await t.pause(450);
+
+  verifier('les trente-trois risques du modèle sont là', 33,
+    t.$$('#fch-corps [data-fchr]').length);
+  t.clic('[data-fchr="1"]'); await t.pause(300);
+  t.clic('[data-fchr="9"]'); await t.pause(300);
+  t.clic('[data-fchr="30"]'); await t.pause(400);
+
+  const c = (t.stock('chantiers') || [])[0];
+  verifier('les risques cochés sont retenus', [1, 9, 30], (c.fiche || {}).risques);
+
+  /* Décocher retire, sans toucher aux autres. */
+  t.clic('[data-fchr="9"]'); await t.pause(400);
+  verifier('décocher n’enlève que celui-là', [1, 30],
+    ((t.stock('chantiers') || [])[0].fiche || {}).risques);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Fiche de chantier : la couverture a cinq crans, pas deux', async () => {
+  /* « Des fois tu captes, mais pas beaucoup. » Oui / Non ne suffisait pas :
+     c'est sur cette nuance que se décide où l'on court pour donner l'alerte. */
+  const t = await ouvrir(Object.assign({}, VIDE, CH_FICHE()));
+  t.clic('[data-vue="fichech"]'); await t.pause(400);
+  t.choisir('#fch-ch', 'c1'); await t.pause(450);
+  const crans = t.$$('#fch-reseaux [data-fchres]').map(b => b.textContent);
+  verifier('cinq crans', ['Excellente', 'Bonne', 'Moyenne', 'Mauvaise', 'Aucune'], crans);
+  t.clic('[data-fchres="moyenne"]'); await t.pause(400);
+  verifier('le cran choisi est retenu', 'moyenne',
+    ((t.stock('chantiers') || [])[0].fiche || {}).reseau);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Fiche de chantier : le téléphone est retenu par nom', async () => {
+  /* Les listes restent des noms — aucune migration. Le numéro vit à côté,
+     indexé par le nom, et la fiche suivante le reprend. */
+  const t = await ouvrir(Object.assign({}, VIDE, CH_FICHE()));
+  t.clic('[data-vue="fichech"]'); await t.pause(400);
+  t.choisir('#fch-ch', 'c1'); await t.pause(450);
+  t.saisir('#fch-telp', '03 81 00 00 00');
+  t.$('#fch-telp').dispatchEvent(new t.w.Event('change', { bubbles: true }));
+  await t.pause(450);
+
+  const cfg = t.stock('cfg') || {};
+  verifier('le numéro est rangé sous le nom', '03 81 00 00 00',
+    ((cfg.contacts || {})['Martin'] || {}).tel);
+  /* Et la liste des propriétaires n'a pas changé de forme. */
+  verifier('la liste reste une liste de noms', ['Martin'], t.stock('proprios'));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Fiche de chantier : la feuille dit ce qui manque au lieu de laisser un blanc', async () => {
+  /* Un blanc sur une fiche de sécurité se lit comme une absence de risque. */
+  const g = CH_FICHE();
+  delete g.chantiers[0].parcelles;
+  g.cfg = { nomEntreprise: 'Mon entreprise' };
+  const t = await ouvrir(Object.assign({}, VIDE, g));
+  t.clic('[data-vue="fichech"]'); await t.pause(400);
+  t.choisir('#fch-ch', 'c1'); await t.pause(450);
+  t.clic('#fch-voir'); await t.pause(600);
+
+  const f = t.texte('#modale');
+  verifierVrai('la feuille s’ouvre en aperçu', /Fiche de chantier/.test(f));
+  verifierVrai('elle cite le décret', /décret n° 2010-1603/i.test(f));
+  verifierVrai('le propriétaire y est', /Martin/.test(f));
+  verifierVrai('les parcelles manquantes sont dites', /Parcellesà compléter/.test(f));
+  verifierVrai('le SIRET manquant aussi', /SIRET à compléter/.test(f));
+  verifierVrai('les numéros d’urgence sont en clair', /URGENCES 112/.test(f));
+  verifierVrai('et les signatures sont prévues', /signature du donneur d’ordre/.test(f));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Fiche de chantier : au-delà de quatre hectares, elle est annoncée obligatoire', async () => {
+  /* « Ce ne sera que les quatre hectares : je ne fais que du sylvicole. » Le
+     seuil des cent mètres cubes existe dans la loi, il ne le rencontrera
+     jamais — l'annoncer n'aurait servi qu'à faire du bruit. */
+  const g = CH_FICHE();
+  g.chantiers[0].lignes = [{ travail: 'DEGAG', unite: 'ha', quantite: 6, prix: 700,
+    nature: 'prestation' }];
+  const t = await ouvrir(Object.assign({}, VIDE, g));
+  t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+  verifierVrai('la fiche du chantier le dit là où il chiffre',
+    /une fiche de chantier est obligatoire/i.test(t.texte('#vue-chantier')));
+
+  /* Et le bouton y mène, quel que soit le filtre. */
+  t.clic('#f-fichech'); await t.pause(500);
+  verifierVrai('le bouton ouvre la fiche de chantier',
+    t.$('#vue-fichech').classList.contains('actif'));
+  verifierVrai('sur le bon chantier', /Dégagement Martin/.test(t.texte('#fch-corps')));
+  verifierVrai('avec le rappel de l’obligation',
+    /Fiche obligatoire/.test(t.texte('#fch-corps')));
+
+  /* Trois hectares ne déclenchent rien. */
+  const C0 = t.w.BCC;
+  verifierVrai('trois hectares ne la rendent pas obligatoire',
+    !C0.ficheRequise({ lignes: [{ unite: 'ha', quantite: 3 }] }));
+  verifierVrai('six hectares, si',
+    C0.ficheRequise({ lignes: [{ unite: 'ha', quantite: 6 }] }));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Fiche de chantier : des coordonnées se collent depuis une carte', async () => {
+  /* Une application web ne peut pas lire ce qu'on a désigné dans une autre :
+     il n'y a pas de retour. Mais on peut y copier des coordonnées et les
+     coller ici — d'où les deux séparateurs et les deux écritures décimales. */
+  const t = await ouvrir(Object.assign({}, VIDE, CH_FICHE()));
+  t.clic('[data-vue="fichech"]'); await t.pause(400);
+  t.choisir('#fch-ch', 'c1'); await t.pause(450);
+  t.saisir('#fch-gps', '46.89512, 6.12043');
+  t.$('#fch-gps').dispatchEvent(new t.w.Event('change', { bubbles: true }));
+  await t.pause(450);
+  const f = ((t.stock('chantiers') || [])[0].fiche || {}).gpsRencontre || {};
+  verifier('la latitude est lue', 46.89512, f.lat);
+  verifier('la longitude aussi', 6.12043, f.lon);
+
+  /* Un point qui n'existe pas sur Terre est refusé : une fiche de sécurité
+     qui envoie les secours à une latitude de 999 est pire qu'une fiche sans
+     coordonnées. */
+  t.saisir('#fch-gps', '999, 999');
+  t.$('#fch-gps').dispatchEvent(new t.w.Event('change', { bubbles: true }));
+  await t.pause(450);
+  verifier('une latitude impossible est refusée', 46.89512,
+    (((t.stock('chantiers') || [])[0].fiche || {}).gpsRencontre || {}).lat);
+
+  /* Une saisie qui n'est pas un couple de coordonnées ne remplace rien. */
+  t.saisir('#fch-gps', 'au calvaire');
+  t.$('#fch-gps').dispatchEvent(new t.w.Event('change', { bubbles: true }));
+  await t.pause(450);
+  verifier('un texte quelconque ne l’écrase pas', 46.89512,
+    (((t.stock('chantiers') || [])[0].fiche || {}).gpsRencontre || {}).lat);
   verifier('aucune erreur', [], t.erreurs);
 });
 

@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.71.0-20260902-1815**
+Version courante : **4.72.0-20260906-1740**
 
 ---
 
@@ -1546,6 +1546,77 @@ qu’au passage en facturé — et **ne fait jamais reculer le statut**.
 est signé, sous combien de temps je réalise les travaux »*. De
 `dateSignature` à `dateChantier()`, en **jours de calendrier** — `minuit()`
 des deux côtés, pas une soustraction de millisecondes.
+
+## La fiche de chantier
+
+Document **obligatoire** — décret n° 2010-1603 du 17 décembre 2010, arrêté du
+31 mars 2011. Il en a passé quatre modèles ; celui qu’il retient est **celui
+de Pro ETF** (`proetfbfc.fr`), qui numérote les risques de 1 à 33. **Le
+numérotage est repris tel quel** : la légende du croquis demande de reporter
+le numéro sous chaque symbole, un ordre à nous n’aurait servi personne.
+
+`RISQUES_FICHE` porte les six groupes du modèle, `RESEAUX_FICHE` les cinq
+crans de couverture téléphonique — *« des fois tu captes, mais pas beaucoup »*,
+et c’est sur cette nuance que se décide où l’on court pour donner l’alerte.
+
+**La fiche vit sur le chantier** (`c.fiche`), donc elle part dans les
+sauvegardes sans nouveau format. Une troisième vue du module Chantiers, avec
+un **filtre** sur la liste : *« je filtre chantier ouvert, comme ça je n’ai
+pas à chercher dans une liste assez grande »* — trente-cinq chantiers dont
+trente et un payés.
+
+**Ce que Sylve ignore s’écrit « à compléter », jamais un blanc.** Un blanc sur
+une fiche de sécurité se lit comme une absence de risque. La fiche s’imprime
+quand même — une fiche incomplète sur le chantier vaut mieux qu’aucune fiche —
+mais `manquesFiche()` énumère ce qui manque à l’écran, et la feuille le dit en
+rouge à sa place.
+
+**Le seuil est celui des quatre hectares, et lui seul.** La loi en pose trois
+— 100 m³ manuel, 500 m³ mécanisé, 4 ha sylvicole. *« Ça n’arrivera jamais de
+faire cent mètres cubes, je ne fais que des travaux sylvicoles. »* Annoncer un
+seuil qu’il ne rencontrera pas n’aurait fait que du bruit. Le rappel vit **sur
+la fiche du chantier**, là où il chiffre, pas dans un écran qu’il ouvrirait
+après coup.
+
+## Le téléphone d’un client sans toucher à ses listes
+
+La fiche exige un téléphone pour le propriétaire et le donneur d’ordre. Ses
+listes ne sont que des **noms**, et les transformer en fiches aurait été une
+migration sur des données qu’il a déjà saisies.
+
+**`A.cfg.contacts` range le numéro à côté, indexé par le nom.** Les listes ne
+changent pas de forme, les datalists continuent d’y puiser, **zéro migration
+donc zéro risque** — et il ne remplit un téléphone que le jour où il en a
+besoin, depuis la fiche, là où le manque se voit. La fiche suivante pour le
+même nom le reprend.
+
+Limite connue : renommer un client orpheline son numéro. Rare, et le jour où
+ça gêne, l’écran des listes éditera les deux ensemble.
+
+## Deux choses qu’on ne peut pas faire, et pourquoi
+
+**Récupérer un point désigné dans Google Maps.** *« Je clique sur l’endroit
+exact et ça enregistre les coordonnées. »* Une application web ne peut pas
+lire ce qu’on a désigné dans une autre : il n’y a pas de retour. Deux chemins
+existent à la place, et ils couvrent le besoin :
+
+- **sur place**, `releverPosition()` — le GPS du téléphone, sans réseau ;
+- **collées**, depuis n’importe quelle carte : `lireCoordonnees()` accepte les
+  deux séparateurs et les deux écritures décimales, et **refuse un point qui
+  n’existe pas sur Terre**. Une fiche qui envoie les secours à une latitude de
+  999 est pire qu’une fiche sans coordonnées.
+
+**Une photo aérienne avec le chantier détouré.** *« Est-ce que ce serait
+possible de l’automatiser ? »* Non. Une vue aérienne, ce sont des tuiles
+d’image servies par l’IGN ou Google : il faut du réseau et une dépendance,
+les deux choses que Sylve refuse — et c’est ce refus qui la fait marcher au
+fond d’une parcelle. Le cadre du croquis reste donc à remplir au stylo, avec
+une case **« un plan est joint »** qui y écrit « voir plan joint » : c’est ce
+qu’il fait déjà, il imprime le plan qu’on lui donne et l’agrafe.
+
+**Reste ouvert** : joindre une photo au chantier — capture d’écran d’une carte
+faite à la maison, ou photo du plan papier. `reduireImage()` sait déjà le
+faire pour le logo. Proposé, pas demandé.
 
 ## Un jour, un statut, une pastille
 

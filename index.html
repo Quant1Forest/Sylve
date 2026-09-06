@@ -265,6 +265,47 @@ body:not(.m-ent) .mod-ent{display:none}
   background:var(--carte2)}
 .fj-etat b{display:block;font-size:14.5px}
 .fj-etat small{display:block;font-size:11.5px;color:var(--gris)}
+/* La fiche de chantier. Le même dessin sert à l'aperçu et à l'impression :
+   deux feuilles de style auraient fini par diverger, et c'est justement
+   l'aperçu qui doit dire la vérité sur ce qui sortira. */
+.feuille{background:#fff;color:#111;padding:9mm 8mm;font-size:9.4pt;line-height:1.32;
+  border:1px solid var(--trait-fort);border-radius:var(--r-s);margin-bottom:12px}
+.feuille h1{font-size:15pt;margin:0;text-transform:uppercase;letter-spacing:.02em}
+.feuille .lg{font-size:7.2pt;color:#555;margin:2px 0 0}
+.ft{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;
+  border-bottom:2px solid #111;padding-bottom:7px;margin-bottom:9px}
+.fm{text-align:right;font-size:8pt;line-height:1.35}
+.fm b{display:block;font-size:10.5pt}
+.fm span{display:block}
+.fs{margin-top:9px;break-inside:avoid}
+.fs > h2{font-size:8.4pt;letter-spacing:.09em;text-transform:uppercase;margin:0 0 5px;
+  background:#111;color:#fff;padding:2.5px 7px}
+.fs > h3{font-size:8.2pt;letter-spacing:.06em;text-transform:uppercase;margin:7px 0 3px;
+  color:#111;border-bottom:1px solid #111;padding-bottom:2px}
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:2px 16px}
+.fl{display:flex;gap:6px;border-bottom:1px dotted #aaa;padding:2.5px 0;align-items:baseline}
+.fl .k{font-size:7.8pt;color:#555;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+.fl .v{flex:1;font-weight:600}
+.feuille .manque{color:#B4231F;font-style:italic;font-weight:600}
+.fr{display:grid;grid-template-columns:repeat(3,1fr);gap:1px 12px;margin-top:3px}
+.fc{font-size:8.2pt;display:flex;gap:5px;align-items:baseline}
+.fc i{display:inline-block;width:8px;height:8px;border:1px solid #111;flex:none;position:relative;top:1px}
+.fc.on{font-weight:700}
+.fc.on i{background:#111;box-shadow:inset 0 0 0 1.5px #fff}
+.fb{border:1px solid #111;padding:5px 7px;margin-top:5px;font-size:8.6pt;min-height:22px}
+.fb .k{font-size:7.4pt;color:#555;text-transform:uppercase;display:block;margin-bottom:2px}
+.fv{border:1px solid #111;height:52mm;margin-top:4px;position:relative}
+.fv span{position:absolute;left:6px;top:5px;font-size:7.6pt;color:#777}
+.fsg{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px}
+.fsg div{border:1px solid #111;height:20mm;padding:4px 6px;font-size:7.8pt;color:#555}
+.fn{font-size:7.6pt;color:#555;margin:6px 0 0}
+.fu{background:#111;color:#fff;text-align:center;padding:4px;font-weight:700;
+  font-size:10pt;letter-spacing:.06em}
+.fp{display:flex;justify-content:space-between;font-size:7.2pt;color:#666;
+  border-top:1px solid #999;margin-top:10px;padding-top:4px}
+/* L'aperçu tient dans la fenêtre : la feuille y est réduite, pas retaillée. */
+.apercu-feuille{background:var(--carte2);padding:8px;border-radius:var(--r-s);
+  max-height:58vh;overflow:auto}
 .cal button.sel.we{background:var(--encre)}
 .cal .n{font-size:13px;font-family:var(--mono)}
 .cal .pts{display:flex;gap:2px;height:5px}
@@ -709,6 +750,13 @@ td.act{width:1%;padding:3px 6px}
   tbody tr.tot,tbody tr.tot-gen{background:#efefef !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .tab-boite{overflow:visible}
   .saut{page-break-before:always}
+  /* Les intitulés de la fiche sont blancs sur noir : sans cette consigne le
+     navigateur retire les aplats et ils deviennent illisibles. */
+  .fiche-ch .feuille{border:0;border-radius:0;margin:0;padding:0}
+  .fiche-ch .fs > h2,.fiche-ch .fu{background:#111 !important;color:#fff !important;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .fiche-ch .fc.on i{background:#111 !important;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact}
   .imp-tete{margin-bottom:8px}
   .imp-tete h1{font-size:15px;margin:0 0 3px}
   .imp-tete dl{display:grid;grid-template-columns:auto 1fr auto 1fr;gap:1px 8px;margin:0;font-size:10px}
@@ -1145,6 +1193,15 @@ if (froid && s > 0) montrer(s);
       <div class="carte" data-sec="general" data-sous="marque" id="c-marque">
         <div class="champ"><label class="eyebrow" for="r-ent-nom">Nom de l’entreprise</label>
           <input type="text" id="r-ent-nom" autocomplete="off" placeholder="Mon entreprise"></div>
+        <div class="grille g2">
+          <div class="champ"><label class="eyebrow" for="r-ent-siret">SIRET</label>
+            <input type="text" id="r-ent-siret" inputmode="numeric" autocomplete="off"></div>
+          <div class="champ"><label class="eyebrow" for="r-ent-tel">Téléphone</label>
+            <input type="text" id="r-ent-tel" inputmode="tel" autocomplete="off"></div>
+        </div>
+        <div class="champ"><label class="eyebrow" for="r-ent-adr">Adresse</label>
+          <input type="text" id="r-ent-adr" autocomplete="off"></div>
+        <p class="muted" style="font-size:11.5px;margin:-4px 0 12px">Repris sur la fiche de chantier, où l’entreprise intervenante doit être identifiée.</p>
         <p class="eyebrow" style="margin:14px 0 7px">Logo</p>
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
           <span class="logo-ent" id="r-ent-apercu" hidden></span>
@@ -1641,6 +1698,7 @@ if (froid && s > 0) montrer(s);
     <section class="vue" id="vue-coutsv" role="tabpanel"><div id="veh-couts"></div></section>
 
     <!-- ================================================ achats à venir -->
+    <section class="vue" id="vue-fichech" role="tabpanel"><div id="fch-corps"></div></section>
     <section class="vue" id="vue-achats" role="tabpanel"><div id="ach-liste"></div></section>
     <section class="vue" id="vue-budget" role="tabpanel"><div id="ach-budget"></div></section>
 
@@ -3989,6 +4047,90 @@ function occupation(chantiers, debut, fin, cfg) {
   });
   return jours;
 }
+/* La fiche de chantier est obligatoire — décret n° 2010-1603 du 17 décembre
+   2010, arrêté du 31 mars 2011. Les risques sont numérotés comme sur le
+   modèle papier : la légende du croquis demande de reporter le numéro sous
+   chaque symbole, un ordre à nous n'aurait servi personne. */
+var RISQUES_FICHE = [
+  { g: 'terrain', n: 'Caractéristiques du terrain', l: [
+    [1, 'Déclivité'], [2, 'Précipices'], [3, 'Failles'], [4, 'Barres rocheuses'],
+    [5, 'Zones humides'], [6, 'Plans d’eau'], [7, 'Cours d’eau'], [8, 'Sources']] },
+  { g: 'ouvrages', n: 'Ouvrages', l: [
+    [9, 'Lignes électriques aériennes'], [10, 'Lignes électriques enterrées'],
+    [11, 'Conduites d’eau ou d’autres fluides'], [12, 'Pièces d’eau'],
+    [13, 'Fossés d’irrigation'], [14, 'Gazoducs'], [15, 'Oléoducs'],
+    [16, 'Conduites forcées de centrales hydroélectriques']] },
+  { g: 'voies', n: 'Voies de circulation', l: [
+    [17, 'Voies accessibles aux véhicules motorisés'], [18, 'Chemins balisés'],
+    [19, 'Canaux'], [20, 'Pistes et installations de ski'], [21, 'Voies ferrées']] },
+  { g: 'divers', n: 'Ouvrages divers', l: [
+    [22, 'Bâtiments'], [23, 'Puits et ouvrages divers'], [24, 'Carrières'],
+    [25, 'Vestiges miniers ou militaires'],
+    [26, 'Restes de conflits armés, chasse, zones piégées']] },
+  { g: 'sanitaire', n: 'État sanitaire du peuplement', l: [
+    [27, 'Chablis massifs, arbres perchés'], [28, 'Arbres morts ou dépérissants'],
+    [29, 'Arbres atteints d’affections dangereuses']] },
+  { g: 'bio', n: 'Risques biologiques', l: [
+    [30, 'Tiques (Lyme, hantavirose, encéphalite)'],
+    [31, 'Rongeurs et mammifères (leptospirose)'],
+    [32, 'Chiens, renards (échinococcose, rage)'],
+    [33, 'Chenilles, frelons, guêpes, abeilles']] }
+];
+/* « Des fois tu captes, mais pas beaucoup. » Oui / Non ne suffisait pas :
+   c'est sur cette nuance que se décide où l'on court pour donner l'alerte. */
+var RESEAUX_FICHE = [
+  { c: 'excellente', n: 'Excellente' }, { c: 'bonne', n: 'Bonne' },
+  { c: 'moyenne', n: 'Moyenne' }, { c: 'mauvaise', n: 'Mauvaise' },
+  { c: 'aucune', n: 'Aucune' }
+];
+function nomReseau(c) { var x = trouve(RESEAUX_FICHE, c); return x ? x.n : ''; }
+function nomRisque(num) {
+  for (var i = 0; i < RISQUES_FICHE.length; i++) {
+    var l = RISQUES_FICHE[i].l;
+    for (var j = 0; j < l.length; j++) if (l[j][0] === Number(num)) return l[j][1];
+  }
+  return '';
+}
+function fiche(ch) { return (ch && ch.fiche) || {}; }
+function risquesCoches(ch, groupe) {
+  var f = fiche(ch), out = [];
+  RISQUES_FICHE.forEach(function (g) {
+    if (groupe && g.g !== groupe) return;
+    g.l.forEach(function (r) {
+      if ((f.risques || []).indexOf(r[0]) >= 0) out.push({ num: r[0], nom: r[1], g: g.g });
+    });
+  });
+  return out;
+}
+/* Ce qui manque pour que la fiche soit valable. Elle s'imprime quand même —
+   une fiche incomplète sur le chantier vaut mieux qu'aucune fiche — mais
+   elle dit ce qui manque, en clair, à la place du blanc. */
+var CHAMPS_FICHE_CH = [
+  { c: 'proprietaire', n: 'le propriétaire' },
+  { c: 'commune', n: 'la commune' },
+  { c: 'departement', n: 'le département' },
+  { c: 'foret', n: 'le lieu-dit ou la forêt' },
+  { c: 'parcelles', n: 'les parcelles' }
+];
+function manquesFiche(ch, cfg) {
+  var out = [];
+  CHAMPS_FICHE_CH.forEach(function (x) {
+    if (!String((ch && ch[x.c]) || '').trim()) out.push(x.n);
+  });
+  var f = fiche(ch);
+  if (!f.debut) out.push('la période d’intervention');
+  if (!String(f.acces || '').trim()) out.push('les moyens d’accès');
+  if (!String(f.pointRencontre || '').trim()) out.push('le point de rencontre');
+  if (!String((cfg && cfg.siret) || '').trim()) out.push('votre SIRET');
+  if (!String((cfg && cfg.telEntreprise) || '').trim()) out.push('votre téléphone');
+  return out;
+}
+/* « Ce ne sera que les quatre hectares : je ne fais que du sylvicole. » Le
+   seuil des cent mètres cubes existe dans la loi, il ne le rencontrera
+   jamais. Sylve annonce donc celui qu'il peut atteindre, et rien d'autre. */
+var SEUIL_FICHE_HA = 4;
+function ficheRequise(ch) { return quantite(ch, 'ha') > SEUIL_FICHE_HA; }
+
 /* Un jour porte exactement UN statut. La case du calendrier en empilait
    jusqu'à trois : un chantier provisoire, un chantier ferme et du temps
    saisi pouvaient s'y superposer, et trois pastilles ne disent plus rien.
@@ -4584,6 +4726,9 @@ var M = {
   delaiPaiement: delaiPaiement, retardPaiement: retardPaiement,
   CHAMPS_FICHE: CHAMPS_FICHE, champsManquants: champsManquants, ficheComplete: ficheComplete,
   journeesPrevues: journeesPrevues, fermeteDe: fermeteDe, occupation: occupation,
+  RISQUES_FICHE: RISQUES_FICHE, RESEAUX_FICHE: RESEAUX_FICHE, nomReseau: nomReseau,
+  nomRisque: nomRisque, risquesCoches: risquesCoches, manquesFiche: manquesFiche,
+  ficheRequise: ficheRequise, SEUIL_FICHE_HA: SEUIL_FICHE_HA,
   STATUTS_JOUR: STATUTS_JOUR, nomStatutJour: nomStatutJour, coulStatutJour: coulStatutJour,
   statutJour: statutJour, estAbsent: estAbsent, joursAResoudre: joursAResoudre,
   chargeMois: chargeMois, alertes: alertes, fmtJours: fmtJours,
@@ -6018,7 +6163,7 @@ var A = {
   cfg: null, index: [], bord: null, piles: [], chantiers: [], module: 'cubage', ici: null,
   vuePiles: 'stock', filtreCh: 'ouverts', rechCh: '', triAncien: false, chOuvert: null, clients: [], proprios: [], estim: null, imp: null, articles: [], charges: [], fournisseurs: [], commandes: [], sorties: [], mvt: 'achats', journees: [], lieuxRegles: [], listeReglee: 'clients', revient: null, calMois: null, calJour: null, nbAlertes: 0, planifie: null,
   depenses: [], periode: null, filtreDep: 'tous', vueAna: 'ensemble', secReglages: 'general',
-  achats: [],
+  achats: [], fch: null, fchFiltre: 'ouverts',
   versements: [], vehicule: null,
   vue: 'saisie', sousVue: 'synthese', edition: null,
   memeGrume: false, classementRegl: 'Class. Comt', filtre: ''
@@ -7524,6 +7669,9 @@ function renderReglagesMarque() {
   var nom = $('#r-ent-nom'); if (!nom) return;
   A.cfg = A.cfg || {};
   nom.value = A.cfg.nomEntreprise || '';
+  if ($('#r-ent-siret')) $('#r-ent-siret').value = A.cfg.siret || '';
+  if ($('#r-ent-tel')) $('#r-ent-tel').value = A.cfg.telEntreprise || '';
+  if ($('#r-ent-adr')) $('#r-ent-adr').value = A.cfg.adresseEntreprise || '';
   var z = $('#r-ent-apercu'), logo = A.cfg.logoEntreprise || '';
   z.hidden = !logo;
   z.innerHTML = logo ? '<img alt="">' : '';
@@ -7535,6 +7683,14 @@ function brancherReglagesMarque() {
   nom.addEventListener('change', function () {
     A.cfg.nomEntreprise = this.value.trim();
     sauverCfg().then(function () { renderAccueil(); toast('Nom enregistré.'); });
+  });
+  [['#r-ent-siret', 'siret'], ['#r-ent-tel', 'telEntreprise'],
+    ['#r-ent-adr', 'adresseEntreprise']].forEach(function (p) {
+    var e = $(p[0]); if (!e) return;
+    e.addEventListener('change', function () {
+      A.cfg[p[1]] = this.value.trim();
+      sauverCfg().then(function () { toast('Enregistré.'); });
+    });
   });
   $('#r-ent-fichier').addEventListener('change', function () {
     var fic = this.files && this.files[0];
@@ -7563,6 +7719,13 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.72', quoi: [
+    { t: 'La fiche de chantier obligatoire, prete a imprimer', vue: 'fichech' },
+    { t: 'Sylve reprend le lieu, les travaux, la position ; vous cochez les risques', vue: 'fichech' },
+    { t: 'Ce qu elle ignore s ecrit « a completer », jamais un blanc', vue: 'fichech' },
+    { t: 'Au-dela de 4 ha, le chantier annonce qu une fiche est exigee', vue: 'chantier' },
+    { t: 'SIRET, telephone et adresse de l entreprise', vue: 'reglages' }
+  ] },
   { v: '4.71', quoi: [
     { t: 'Un jour du calendrier porte un seul statut, une seule pastille', vue: 'calendrier' },
     { t: 'Cliquer un jour ouvre sa fiche : statut, chantiers, temps', vue: 'calendrier' },
@@ -7589,14 +7752,6 @@ var NOTES_MAJ = [
     { t: 'Une journee passee sans temps note vous est reclamee au lancement' },
     { t: 'Un devis s attache a un chantier deja facture', vue: 'chantier' },
     { t: 'Et la fiche dit en combien de temps il a ete realise', vue: 'chantier' }
-  ] },
-  { v: '4.67', quoi: [
-    { t: 'Les journees et le temps passe ne font plus qu un bloc', vue: 'chantier' },
-    { t: 'Ce qui est fait a gauche ; une journee passee sort du reste a faire', vue: 'chantier' },
-    { t: 'Tout se note en heures : plus de quarts ni de demi-journees', vue: 'chantier' },
-    { t: 'Une duree se lit « 2 j 4 h », plus jamais en virgule', vue: 'chantier' },
-    { t: 'Un jour deja pris propose le suivant au lieu de constater', vue: 'chantier' },
-    { t: 'Une echeance qui tombe aujourd hui entre le jour meme', vue: 'depenses' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -8143,6 +8298,15 @@ function brancher() {
     if (e.target.closest('#f-note')) { ouvrirNoteCh(id); return; }
     if (e.target.closest('#f-jours')) { ouvrirJourneesCh(id); return; }
     if (e.target.closest('#f-statut')) { ouvrirStatut(id); return; }
+    if (e.target.closest('#f-fichech')) {
+      A.fch = id;
+      /* Le filtre doit pouvoir montrer ce chantier-là, quel que soit son
+         statut : on ouvre donc sur « tous » plutôt que sur les ouverts. */
+      A.fchFiltre = 'tous';
+      renderFicheChantier();
+      allerModule('chantiers', 'fichech');
+      return;
+    }
     if (e.target.closest('#f-ligne')) { ouvrirLigne(id, null); return; }
     if (e.target.closest('#f-temps')) { ouvrirTemps(id); return; }
     if (e.target.closest('#f-planifier')) {
@@ -8267,6 +8431,61 @@ function brancher() {
     A.cfg.baseCotisations = $('#sim-base').value === 'brut' ? 'brut' : 'abattu';
     A.cfg.baseImpot = A.cfg.baseCotisations;
     sauverCfg(); renderAnalyses();
+  });
+
+  /* --- fiche de chantier --- */
+  $('#fch-corps').addEventListener('change', function (e) {
+    if (e.target.id === 'fch-filtre') {
+      A.fchFiltre = e.target.value; renderFicheChantier(); return;
+    }
+    if (e.target.id === 'fch-ch') {
+      /* On enregistre avant de changer de chantier : sinon ce qui vient
+         d'être coché part avec l'écran. */
+      var suivant = e.target.value;
+      Promise.resolve(chantierFiche() ? enregistrerFiche() : null).then(function () {
+        A.fch = suivant || null; renderFicheChantier();
+      });
+      return;
+    }
+    if (chantierFiche()) enregistrerFiche();
+  });
+  $('#fch-corps').addEventListener('click', function (e) {
+    var r = e.target.closest('[data-fchr]');
+    if (r) {
+      r.setAttribute('aria-pressed', r.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
+      enregistrerFiche();
+      return;
+    }
+    var res = e.target.closest('[data-fchres]');
+    if (res) {
+      $$('#fch-reseaux [data-fchres]').forEach(function (x) {
+        x.setAttribute('aria-pressed', String(x === res));
+      });
+      enregistrerFiche();
+      return;
+    }
+    if (e.target.closest('#fch-identite')) {
+      var c0 = chantierFiche();
+      if (c0) { enregistrerFiche(); ouvrirIdentiteCh(c0.id); }
+      return;
+    }
+    /* Le point de rencontre se prend sur place : c'est le geste le plus sûr,
+       et le seul qui marche sans réseau. Le même relevé que sur le chantier. */
+    var ici = e.target.closest('#fch-ici');
+    if (ici) {
+      releverPosition(ici, function (pt) {
+        $('#fch-gps').value = C.arr(pt.lat, 5) + ', ' + C.arr(pt.lon, 5);
+        enregistrerFiche('Point de rencontre enregistré.');
+      });
+      return;
+    }
+    if (e.target.closest('#fch-voir')) {
+      enregistrerFiche().then(function (c1) { apercuFiche(c1); });
+      return;
+    }
+    if (e.target.closest('#fch-imprimer')) {
+      enregistrerFiche().then(function () { imprimerFiche(); });
+    }
   });
 
   /* --- achats à venir --- */
@@ -8944,7 +9163,7 @@ function init() {
           rendements: 'rendements', estimer: 'rendements', finances: 'finances', depenses: 'finances',
           charges: 'finances', stock2: 'stock', commandes: 'stock', revient: 'stock', carte: 'calendrier', analyses: 'finances',
           carnetv: 'vehicule', echeancesv: 'vehicule', coutsv: 'vehicule',
-          achats: 'achats', budget: 'achats' };
+          achats: 'achats', budget: 'achats', fichech: 'chantiers' };
         var mod = MOD_DE_VUE[vd] || 'cubage';
         renderReglages();
         if (actif && A.index.some(function (x) { return x.id === actif; })) {
@@ -9032,6 +9251,8 @@ PICTOS.echeancesv = '<path d="M4.6 15.8a7.4 7.4 0 1 1 14.8 0"/><path d="m12 15.8
 PICTOS.coutsv = '<path d="M4.6 19.4h14.8"/><path d="M7.7 19.4v-4.6M12 19.4v-8.2M16.3 19.4v-6"/>' +
   '<path d="M5.4 7.6h4.2M7.5 5.5v4.2"/>';      /* « Où ? » et « Carte », même repère */
 /* Un panier, et le « + » de ce qui reste à y mettre. */
+PICTOS.fichech = '<path d="M6.4 3.6h7.4l4.2 4.2v12.6H6.4z"/><path d="M13.4 3.8v4.2h4.4"/>' +
+  '<path d="M9.2 12.4h5.6M9.2 15.4h5.6"/>';
 PICTOS.achats = '<path d="M4.4 8.4h15.2l-1.5 9.1a1.6 1.6 0 0 1-1.6 1.3H7.5a1.6 1.6 0 0 1-1.6-1.3z"/>' +
   '<path d="M8.9 8.4V6.6a3.1 3.1 0 0 1 6.2 0v1.8"/>';
 /* Trois piles de hauteurs différentes : ce que ça pèse, par priorité. */
@@ -9050,7 +9271,7 @@ var MODULES = {
   },
   chantiers: {
     nom: 'Chantiers', defaut: 'carnet', groupe: 'entreprise',
-    vues: [['carnet', 'Carnet'], ['chantier', 'Fiche']]
+    vues: [['carnet', 'Carnet'], ['chantier', 'Fiche'], ['fichech', 'Fiche de chantier']]
   },
   calendrier: {
     nom: 'Calendrier', defaut: 'calendrier', groupe: 'entreprise',
@@ -9260,7 +9481,7 @@ function renderAccueil() {
     ? A.piles.length + (A.piles.length > 1 ? ' piles' : ' pile')
     : 'Aucune pile enregistrée';
   renderNudgeSauvegarde(); renderNudgeEcheances(); renderNudgeDevis(); renderNudgeJournees(); renderMaJournee();
-  renderAchats(); renderBudgetAchats();
+  renderAchats(); renderBudgetAchats(); renderFicheChantier();
   renderEntreprise();
 }
 
@@ -11008,9 +11229,17 @@ function renderFiche() {
       return '<p class="acompleter-bloc">Il manque : ' + esc(manque.join(', ')) + '.</p>';
     })() +
     '</div>' +
+    /* La fiche de chantier est obligatoire au-delà de quatre hectares. C'est
+       ici qu'il chiffre, donc ici qu'il faut le dire — pas dans un écran
+       qu'il ouvrirait après coup. */
+    (C.ficheRequise(c)
+      ? '<p class="acompleter-bloc">Plus de ' + C.SEUIL_FICHE_HA + ' ha : une fiche de ' +
+        'chantier est obligatoire.</p>'
+      : '') +
     '<div class="btn-rang" style="margin-top:11px">' +
     '<button class="btn btn-min" data-chretour="1">← Carnet</button>' +
-    '<button class="btn btn-min" id="f-statut">Changer le statut</button></div>' +
+    '<button class="btn btn-min" id="f-statut">Changer le statut</button>' +
+    '<button class="btn btn-min" id="f-fichech">Fiche de chantier</button></div>' +
     '</div>' +
 
     blocValeur(c, m, pj, vise) +
@@ -11465,6 +11694,14 @@ function ouvrirIdentiteCh(id) {
     '<input type="text" id="ic-parc" autocomplete="off" value="' + esc(c.parcelles || '') + '"></div>' +
     '<div class="champ"><label class="eyebrow" for="ic-com">Commune</label>' +
     '<input type="text" id="ic-com" autocomplete="off" value="' + esc(c.commune || '') + '"></div>' +
+    /* Deux champs que la fiche de chantier réclame et que rien ne peut
+       deviner : le cadastre ne se déduit pas de la commune. */
+    '<div class="champ"><label class="eyebrow" for="ic-dep">Département</label>' +
+    '<input type="text" id="ic-dep" inputmode="numeric" placeholder="25" value="' +
+    esc(c.departement || '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="ic-cad">Réf. cadastrale</label>' +
+    '<input type="text" id="ic-cad" autocomplete="off" placeholder="section et numéro" value="' +
+    esc(c.cadastre || '') + '"></div>' +
     '</div>' +
     '<label class="ligne-check" style="display:flex;align-items:flex-start;gap:8px;font-size:13.5px;margin:10px 0 0">' +
     '<input type="checkbox" id="ic-siren"' + (c.siren ? ' checked' : '') + ' style="margin-top:2px">' +
@@ -11487,6 +11724,7 @@ function ouvrirIdentiteCh(id) {
     majChantier(c, { nom: nom, donneur: $('#ic-donneur').value.trim(),
       proprietaire: $('#ic-proprio').value.trim(), foret: $('#ic-foret').value.trim(),
       parcelles: $('#ic-parc').value.trim(), commune: $('#ic-com').value.trim(),
+      departement: $('#ic-dep').value.trim(), cadastre: $('#ic-cad').value.trim(),
       siren: $('#ic-siren').checked, gps: gps }, 'Chantier modifié.');
   });
 }
@@ -12587,6 +12825,377 @@ function ouvrirPoserChantier(ts) {
       toast('Chantier posé sur ce jour.');
     });
   });
+}
+
+/* ------------------------------------------------ fiche de chantier */
+/* Le téléphone d'un donneur d'ordre ne change pas la forme de ses listes :
+   elles restent des noms, et les datalists continuent d'y puiser. Le numéro
+   vit à côté, indexé par le nom. Zéro migration, donc zéro risque sur ce
+   qu'il a déjà saisi — et il ne le remplit que le jour où il en a besoin. */
+function contacts() {
+  A.cfg = A.cfg || {};
+  A.cfg.contacts = A.cfg.contacts || {};
+  return A.cfg.contacts;
+}
+function telDe(nom) {
+  var c = contacts()[String(nom || '').trim()];
+  return (c && c.tel) || '';
+}
+function poserTel(nom, tel) {
+  var k = String(nom || '').trim();
+  if (!k) return;
+  var l = contacts();
+  if (!tel) { if (l[k]) delete l[k].tel; return; }
+  l[k] = l[k] || {};
+  l[k].tel = tel;
+}
+
+function chantierFiche() {
+  return A.fch ? chantier(A.fch) : null;
+}
+function renderFicheChantier() {
+  var z = $('#fch-corps'); if (!z) return;
+  /* « Je filtre chantier ouvert, comme ça je n'ai pas à chercher dans une
+     liste assez grande. » Trente-cinq chantiers dont trente et un payés. */
+  var f = A.fchFiltre || 'ouverts';
+  var liste = C.tri(C.filtre(A.chantiers, f));
+  var c = chantierFiche();
+  if (c && liste.indexOf(c) < 0) liste = [c].concat(liste);
+
+  var tete = '<div class="carte">' +
+    '<div class="champ"><label class="eyebrow" for="fch-filtre">Parmi</label>' +
+    '<select id="fch-filtre">' +
+    [['ouverts', 'Chantiers ouverts'], ['encours', 'En cours'], ['accepte', 'À planifier'],
+      ['envoye', 'Devis envoyés'], ['tous', 'Tous']].map(function (o) {
+      return '<option value="' + o[0] + '"' + (f === o[0] ? ' selected' : '') + '>' +
+        esc(o[1]) + '</option>';
+    }).join('') + '</select></div>' +
+    '<div class="champ" style="margin:0"><label class="eyebrow" for="fch-ch">Chantier</label>' +
+    '<select id="fch-ch"><option value="">— choisir —</option>' +
+    liste.map(function (x) {
+      return '<option value="' + x.id + '"' + (c && c.id === x.id ? ' selected' : '') + '>' +
+        esc(x.nom || 'Chantier') + '</option>';
+    }).join('') + '</select></div></div>';
+
+  if (!c) {
+    z.innerHTML = tete + '<div class="carte"><div class="vide"><p>Choisissez un chantier. ' +
+      'Sylve reprendra le propriétaire, le donneur d’ordre, le lieu et les travaux ; ' +
+      'vous ne cocherez que les risques.</p></div></div>';
+    return;
+  }
+
+  var fi = c.fiche || {};
+  var coches = fi.risques || [];
+  var manques = C.manquesFiche(c, A.cfg);
+
+  z.innerHTML = tete +
+    (C.ficheRequise(c)
+      ? '<div class="carte" style="border-color:#D9BCAE;background:#F7E6D9">' +
+        '<p style="font-size:13px;margin:0;color:#7A2F14"><b>Fiche obligatoire.</b> ' +
+        'Ce chantier dépasse ' + C.SEUIL_FICHE_HA + ' hectares — la fiche est exigée ' +
+        'par le décret du 17 décembre 2010.</p></div>'
+      : '') +
+    (manques.length
+      ? '<div class="carte"><h2>Il manque</h2><p class="acompleter-bloc" style="margin:0">' +
+        esc(manques.join(', ')) + '.</p>' +
+        '<p class="muted" style="font-size:11.5px;margin:9px 0 0">La fiche s’imprime quand ' +
+        'même — une fiche incomplète sur le chantier vaut mieux qu’aucune fiche — mais elle ' +
+        'écrit « à compléter » là où le blanc serait trompeur.</p>' +
+        '<div class="btn-rang" style="margin-top:11px">' +
+        '<button class="btn btn-min" id="fch-identite">Compléter le chantier</button></div></div>'
+      : '') +
+
+    '<div class="carte"><h2>Qui, où, quoi</h2>' +
+    paireFiche('Propriétaire', c.proprietaire || '—') +
+    paireFiche('Donneur d’ordre', c.donneur || c.client || '—') +
+    paireFiche('Commune', (c.commune || '—') + (c.departement ? ' (' + c.departement + ')' : '')) +
+    paireFiche('Lieu-dit', c.foret || '—') +
+    paireFiche('Parcelles', c.parcelles || '—') +
+    (c.cadastre ? paireFiche('Cadastre', c.cadastre) : '') +
+    paireFiche('Position', c.gps && c.gps.lat != null
+      ? C.arr(c.gps.lat, 5) + ', ' + C.arr(c.gps.lon, 5) : '—') +
+    '<div class="grille g2" style="margin-top:11px">' +
+    '<div class="champ" style="margin:0"><label class="eyebrow" for="fch-telp">' +
+    'Téléphone du propriétaire</label>' +
+    '<input type="text" id="fch-telp" inputmode="tel" value="' +
+    esc(telDe(c.proprietaire)) + '"></div>' +
+    '<div class="champ" style="margin:0"><label class="eyebrow" for="fch-teld">' +
+    'Téléphone du donneur d’ordre</label>' +
+    '<input type="text" id="fch-teld" inputmode="tel" value="' +
+    esc(telDe(c.donneur || c.client)) + '"></div></div>' +
+    '<p class="muted" style="font-size:11.5px;margin:9px 0 0">Retenus pour ce nom : ' +
+    'la prochaine fiche les reprendra.</p></div>' +
+
+    '<div class="carte"><h2>Période d’intervention</h2>' +
+    '<p class="sous-titre-bloc">Au moment d’imprimer vous ne savez pas tous les jours ' +
+    'où vous irez. La fiche annonce donc une période, pas une liste de dates.</p>' +
+    '<div class="grille g2">' +
+    '<div class="champ" style="margin:0"><label class="eyebrow" for="fch-debut">Du</label>' +
+    '<input type="date" id="fch-debut" value="' + versChamp(fi.debut || premierJourPose(c)) + '"></div>' +
+    '<div class="champ" style="margin:0"><label class="eyebrow" for="fch-fin">Au</label>' +
+    '<input type="date" id="fch-fin" value="' + versChamp(fi.fin) + '"></div></div></div>' +
+
+    C.RISQUES_FICHE.map(function (g) {
+      return '<div class="carte"><h2>' + esc(g.n) + '</h2>' +
+        '<div class="chips">' + g.l.map(function (r) {
+          return '<button type="button" class="chip" data-fchr="' + r[0] + '" aria-pressed="' +
+            (coches.indexOf(r[0]) >= 0 ? 'true' : 'false') + '">' +
+            '<b class="num" style="font-weight:700">' + r[0] + '</b> ' + esc(r[1]) + '</button>';
+        }).join('') + '</div>' +
+        (g.g === 'sanitaire'
+          ? '<div class="champ" style="margin:11px 0 0;width:11em">' +
+            '<label class="eyebrow" for="fch-prop">Proportion (%)</label>' +
+            '<input type="text" id="fch-prop" inputmode="decimal" value="' +
+            esc(fi.proportion || '') + '"></div>'
+          : '') +
+        '<div class="champ" style="margin:11px 0 0">' +
+        '<label class="eyebrow" for="fch-c-' + g.g + '">Consignes à respecter</label>' +
+        '<textarea id="fch-c-' + g.g + '" rows="2" data-fchc="' + g.g + '">' +
+        esc((fi.consignes || {})[g.g] || '') + '</textarea></div></div>';
+    }).join('') +
+
+    '<div class="carte"><h2>Secours</h2>' +
+    '<div class="champ"><label class="eyebrow" for="fch-acces">Moyens d’accès au chantier</label>' +
+    '<textarea id="fch-acces" rows="2">' + esc(fi.acces || '') + '</textarea></div>' +
+    '<p class="eyebrow" style="margin:4px 0 6px">Couverture téléphonique</p>' +
+    '<div class="chips" id="fch-reseaux">' + C.RESEAUX_FICHE.map(function (r) {
+      return '<button type="button" class="chip" data-fchres="' + r.c + '" aria-pressed="' +
+        ((fi.reseau || 'bonne') === r.c ? 'true' : 'false') + '">' + esc(r.n) + '</button>';
+    }).join('') + '</div>' +
+    '<div class="champ" style="margin-top:11px"><label class="eyebrow" for="fch-ptres">' +
+    'Point de réseau le plus proche</label>' +
+    '<input type="text" id="fch-ptres" value="' + esc(fi.pointReseau || '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="fch-ptr">Point de rencontre avec les secours</label>' +
+    '<input type="text" id="fch-ptr" value="' + esc(fi.pointRencontre || '') + '"></div>' +
+    '<div class="btn-rang">' +
+    '<button class="btn btn-min" id="fch-ici">Sa position, je suis dessus</button>' +
+    '</div>' +
+    '<div class="champ" style="margin-top:11px"><label class="eyebrow" for="fch-gps">' +
+    'Ou ses coordonnées, collées depuis une carte</label>' +
+    '<input type="text" id="fch-gps" placeholder="46.89512, 6.12043" value="' +
+    (fi.gpsRencontre && fi.gpsRencontre.lat != null
+      ? C.arr(fi.gpsRencontre.lat, 5) + ', ' + C.arr(fi.gpsRencontre.lon, 5) : '') + '"></div>' +
+    '</div>' +
+
+    '<div class="carte"><h2>Co-activité et croquis</h2>' +
+    '<div class="champ"><label class="eyebrow" for="fch-coact">Interventions simultanées ou successives</label>' +
+    '<textarea id="fch-coact" rows="2" placeholder="aucune autre entreprise prévue">' +
+    esc(fi.coactivite || '') + '</textarea></div>' +
+    '<label class="ligne-check" style="display:flex;align-items:flex-start;gap:8px;' +
+    'font-size:13.5px;margin:0 0 11px"><input type="checkbox" id="fch-plan"' +
+    (fi.planJoint ? ' checked' : '') + ' style="margin-top:2px"><span>Un plan est joint ' +
+    'à la fiche<span class="muted" style="display:block;font-size:11.5px">Le cadre du ' +
+    'croquis portera « voir plan joint » au lieu de rester vide.</span></span></label>' +
+    '<div class="champ"><label class="eyebrow" for="fch-obs">Observations</label>' +
+    '<textarea id="fch-obs" rows="2">' + esc(fi.observations || '') + '</textarea></div>' +
+    '</div>' +
+
+    '<div class="carte"><div class="btn-rang">' +
+    '<button class="btn" id="fch-voir">Aperçu</button>' +
+    '<button class="btn primaire" id="fch-imprimer">Imprimer / PDF</button></div>' +
+    '<p class="muted" style="font-size:11.5px;margin:10px 0 0">L’impression du téléphone ' +
+    'propose « Enregistrer au format PDF ». Le fichier part ensuite par mail comme ' +
+    'n’importe quel autre.</p></div>';
+}
+/* Tout l'écran se relit d'un coup, comme les autres formulaires du projet :
+   un enregistrement par champ ferait vingt écritures pour une fiche. */
+function lireFicheChantier() {
+  var c = chantierFiche(); if (!c) return null;
+  var f = c.fiche || {};
+  var risques = [];
+  $$('#fch-corps [data-fchr]').forEach(function (b) {
+    if (b.getAttribute('aria-pressed') === 'true') risques.push(Number(b.dataset.fchr));
+  });
+  var consignes = {};
+  $$('#fch-corps [data-fchc]').forEach(function (t) {
+    if (t.value.trim()) consignes[t.dataset.fchc] = t.value.trim();
+  });
+  var res = f.reseau || 'bonne';
+  $$('#fch-reseaux [data-fchres]').forEach(function (b) {
+    if (b.getAttribute('aria-pressed') === 'true') res = b.dataset.fchres;
+  });
+  c.fiche = {
+    risques: risques, consignes: consignes,
+    proportion: $('#fch-prop') ? $('#fch-prop').value.trim() : (f.proportion || ''),
+    debut: versDate($('#fch-debut').value), fin: versDate($('#fch-fin').value),
+    acces: $('#fch-acces').value.trim(), reseau: res,
+    pointReseau: $('#fch-ptres').value.trim(),
+    pointRencontre: $('#fch-ptr').value.trim(),
+    gpsRencontre: lireCoordonnees($('#fch-gps').value) || f.gpsRencontre || null,
+    coactivite: $('#fch-coact').value.trim(),
+    planJoint: $('#fch-plan').checked,
+    observations: $('#fch-obs').value.trim(),
+    maj: Date.now()
+  };
+  poserTel(c.proprietaire, $('#fch-telp').value.trim());
+  poserTel(c.donneur || c.client, $('#fch-teld').value.trim());
+  c.maj = Date.now();
+  return c;
+}
+/* « Je ne sais pas comment on peut faire pour récupérer le point de Google
+   Maps. » Une application web ne peut pas lire ce qu'on a désigné dans une
+   autre : il n'y a pas de retour. Mais on peut y copier des coordonnées —
+   appui long sur le point — et les coller ici. On accepte donc les deux
+   séparateurs et les deux écritures décimales. */
+function lireCoordonnees(txt) {
+  var t = String(txt || '').replace(/,(?=\d{1,6}\b)/g, '.').trim();
+  var m = t.match(/(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)/);
+  if (!m) return null;
+  var lat = Number(m[1]), lon = Number(m[2]);
+  if (!isFinite(lat) || !isFinite(lon)) return null;
+  if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+  return { lat: lat, lon: lon };
+}
+function enregistrerFiche(message) {
+  var c = lireFicheChantier(); if (!c) return;
+  return Promise.all([sauverChantiers(), Promise.resolve(sauverCfg())]).then(function () {
+    if (message) toast(message);
+    return c;
+  });
+}
+
+/* La feuille. Deux pages, calquées sur le modèle de Pro ETF — c'est celui
+   qu'il a désigné, et c'est celui qui cite le décret. Ce que Sylve ne sait
+   pas s'écrit « à compléter » : un blanc sur une fiche de sécurité se lit
+   comme une absence de risque. */
+function htmlFeuilleFiche(c) {
+  var f = c.fiche || {};
+  var cfg = A.cfg || {};
+  var v = function (x) {
+    return String(x || '').trim()
+      ? '<span class="v">' + esc(x) + '</span>'
+      : '<span class="v manque">à compléter</span>';
+  };
+  var l = function (k, x) { return '<div class="fl"><span class="k">' + esc(k) + '</span>' + v(x) + '</div>'; };
+  var periode = f.debut
+    ? 'du ' + dateCourte(f.debut) + (f.fin ? ' au ' + dateCourte(f.fin) : ' — fin non arrêtée')
+    : '';
+  var groupe = function (g) {
+    var pris = C.risquesCoches(c, g.g);
+    return '<div class="fs"><h3>' + esc(g.n) + '</h3>' +
+      '<div class="fr">' + g.l.map(function (r) {
+        var on = (f.risques || []).indexOf(r[0]) >= 0;
+        return '<span class="fc' + (on ? ' on' : '') + '"><i></i>' + r[0] + '. ' + esc(r[1]) + '</span>';
+      }).join('') + '</div>' +
+      (g.g === 'sanitaire' && f.proportion
+        ? '<div class="fl"><span class="k">Proportion</span><span class="v">' +
+          esc(f.proportion) + ' %</span></div>' : '') +
+      (pris.length
+        ? '<div class="fb"><span class="k">Consignes à respecter</span>' +
+          ((f.consignes || {})[g.g]
+            ? esc(f.consignes[g.g])
+            : '<span class="manque">à compléter — des risques sont cochés</span>') + '</div>'
+        : '') + '</div>';
+  };
+
+  return '<div class="feuille">' +
+    '<div class="ft"><div><h1>Fiche de chantier</h1>' +
+    '<p class="lg">Décret n° 2010-1603 du 17 décembre 2010 — arrêté du 31 mars 2011</p></div>' +
+    '<div class="fm"><b>' + esc(cfg.nomEntreprise || 'Votre entreprise') + '</b>' +
+    (cfg.siret ? '<span>SIRET ' + esc(cfg.siret) + '</span>' : '<span class="manque">SIRET à compléter</span>') +
+    (cfg.telEntreprise ? '<span>' + esc(cfg.telEntreprise) + '</span>' : '<span class="manque">téléphone à compléter</span>') +
+    (cfg.adresseEntreprise ? '<span>' + esc(cfg.adresseEntreprise) + '</span>' : '') +
+    '</div></div>' +
+
+    '<div class="fs"><h2>Propriétaire et donneur d’ordre</h2><div class="fg">' +
+    l('Propriétaire', c.proprietaire) +
+    l('Téléphone', telDe(c.proprietaire)) +
+    l('Donneur d’ordre', c.donneur || c.client) +
+    l('Téléphone', telDe(c.donneur || c.client)) +
+    '</div></div>' +
+
+    '<div class="fs"><h2>Chantier et localisation</h2><div class="fg">' +
+    l('Commune', c.commune) + l('Département', c.departement) +
+    l('Lieu-dit', c.foret) + l('Parcelles', c.parcelles) +
+    l('Réf. cadastrale', c.cadastre) +
+    l('Coordonnées GPS', c.gps && c.gps.lat != null
+      ? C.arr(c.gps.lat, 5) + ', ' + C.arr(c.gps.lon, 5) : '') +
+    '</div>' +
+    '<div class="fl"><span class="k">Nature des travaux</span>' + v(naturedesTravaux(c)) + '</div>' +
+    '<div class="fl"><span class="k">Entreprise intervenante</span>' +
+    v((cfg.nomEntreprise || '') + (periode ? ' — ' + periode : '')) + '</div>' +
+    '</div>' +
+
+    C.RISQUES_FICHE.map(groupe).join('') +
+    '<div class="fp"><span>Fiche de chantier — ' + esc(c.nom || '') + '</span>' +
+    '<span>Établie le ' + dateCourte(Date.now()) + ' · page 1 sur 2</span></div>' +
+    '</div>' +
+
+    '<div class="feuille saut">' +
+    '<div class="fs"><h2>Secours</h2>' +
+    '<div class="fu">URGENCES 112 · POMPIERS 18 · SAMU 15</div>' +
+    '<div class="fb"><span class="k">Moyens d’accès au chantier</span>' +
+    (f.acces ? esc(f.acces) : '<span class="manque">à compléter</span>') + '</div>' +
+    '<div class="fg">' +
+    l('Couverture téléphonique', C.nomReseau(f.reseau || 'bonne')) +
+    l('Point de réseau le plus proche', f.pointReseau) +
+    '</div>' +
+    '<div class="fb"><span class="k">Point de rencontre avec les secours</span>' +
+    (f.pointRencontre ? esc(f.pointRencontre) : '<span class="manque">à compléter</span>') +
+    (f.gpsRencontre && f.gpsRencontre.lat != null
+      ? ' — ' + C.arr(f.gpsRencontre.lat, 5) + ', ' + C.arr(f.gpsRencontre.lon, 5) : '') +
+    '</div></div>' +
+
+    '<div class="fs"><h2>Interventions simultanées ou successives</h2>' +
+    '<div class="fb">' + (f.coactivite ? esc(f.coactivite) : 'Aucune autre entreprise prévue.') +
+    '</div></div>' +
+
+    '<div class="fs"><h2>Croquis du chantier</h2>' +
+    '<div class="fv"><span>' +
+    (f.planJoint
+      ? 'Voir plan joint'
+      : 'Accès (A) · point de rencontre (PR) · zones à risque, avec leur numéro') +
+    '</span></div></div>' +
+
+    '<div class="fs"><h2>Observations</h2><div class="fb" style="min-height:14mm">' +
+    esc(f.observations || '') + '</div></div>' +
+
+    '<div class="fs"><h2>Signatures</h2><div class="fsg">' +
+    '<div>Date et signature du donneur d’ordre</div>' +
+    '<div>Date et signature du chef d’entreprise</div></div>' +
+    '<p class="fn">Cette fiche doit être présente sur le chantier. Tous les intervenants ' +
+    'doivent en prendre connaissance avant le début des travaux.</p></div>' +
+    '<div class="fp"><span>Fiche de chantier — ' + esc(c.nom || '') + '</span>' +
+    '<span>Établie le ' + dateCourte(Date.now()) + ' · page 2 sur 2</span></div>' +
+    '</div>';
+}
+/* Ce que la fiche appelle « nature des travaux » : les prestations du devis,
+   avec leur quantité. C'est ce que le donneur d'ordre reconnaîtra. */
+function naturedesTravaux(c) {
+  var vus = [];
+  (c.lignes || []).forEach(function (x) {
+    var n = C.nomTravauxLigne(x);
+    if (n && vus.indexOf(n) < 0) vus.push(n);
+  });
+  var ha = C.quantite(c, 'ha');
+  return vus.join(', ') + (ha ? ' — ' + E.fmt(ha, ha % 1 ? 2 : 0) + ' ha' : '');
+}
+/* « Ensuite je peux faire visionner pour voir à quoi ressemble le PDF. »
+   La même feuille, dans une fenêtre, avant d'engager l'impression. */
+function apercuFiche(c) {
+  if (!c) return;
+  modale('Aperçu — ' + (c.nom || 'chantier'),
+    '<div class="apercu-feuille">' + htmlFeuilleFiche(c) + '</div>' +
+    '<div class="btn-rang" style="margin-top:11px">' +
+    '<button class="btn primaire" id="ap-imp">Imprimer / PDF</button></div>');
+  $('#ap-imp').addEventListener('click', function () { fermerModale(); imprimerFiche(); });
+}
+function imprimerFiche() {
+  var c = chantierFiche(); if (!c) return;
+  var v = $('#vue-impression');
+  v.innerHTML = htmlFeuilleFiche(c);
+  v.classList.add('impression', 'fiche-ch');
+  window.print();
+  setTimeout(function () {
+    v.classList.remove('impression', 'fiche-ch'); v.innerHTML = '';
+  }, 800);
+}
+
+/* Le premier jour posé sert de début par défaut : c'est la date qu'il a déjà
+   arrêtée en planifiant, il n'a pas à la retaper. */
+function premierJourPose(c) {
+  var pl = C.journeesPlacees(c);
+  return pl.length ? pl[0].d : null;
 }
 
 function renderCalendrier() {
@@ -18230,7 +18839,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.71.0-20260902-1815';
+var VERSION = '4.72.0-20260906-1740';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
