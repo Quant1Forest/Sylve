@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.75.0-20260908-0910**
+Version courante : **4.76.0-20260908-1740**
 
 ---
 
@@ -1558,9 +1558,6 @@ Tournée du 2 septembre, par ordre de maturité :
   amortissement de la débroussailleuse, mélange, huile, déplacement. De quoi
   situer un type de travaux par rapport à un autre. Le module Véhicule fait
   déjà ce raisonnement pour l’utilitaire — c’est le même, étendu au matériel.
-- **Le mot « en retard »** reste mauvais : il dit que toutes les journées
-  posées sont derrière, pas qu’une échéance est manquée. Il s’y est trompé
-  deux fois.
 - **Le carnet et la carte du Calendrier**, toujours sans réponse.
 
 ## Les achats à venir
@@ -1634,10 +1631,11 @@ demandait, pas un renvoi vers un écran où il faudrait retrouver le jour. Comme
 les deux autres, il se chasse d’un doigt jusqu’au prochain lancement, et le
 chasser n’efface rien.
 
-**`enRetard()` mérite d’être relu à ce sujet.** Il ne parle pas d’une échéance
-manquée : il dit que **toutes les journées posées sont derrière** et que le
-chantier n’est pas soldé. Le mot l’a induit en erreur deux fois. Le rappel
-ci-dessus règle la cause la plus fréquente ; le mot reste à revoir.
+**`enRetard()` ne s’appelle plus « en retard » à l’écran.** Il ne parle pas
+d’une échéance manquée : il dit que **toutes les journées posées sont
+derrière** et que le chantier n’est pas soldé. Le mot l’a induit en erreur
+deux fois ; il dit désormais « jours passés ». Voir *« En retard » ne se
+disait pas d’un chantier*.
 
 ## Attacher un devis après coup
 
@@ -2035,17 +2033,113 @@ séance, pas dans le dépôt : ils ne serviront qu'une fois, au moment de la
 conversion. **Les fichiers IGN ne doivent jamais entrer dans le dépôt**, comme
 le classeur comptable.
 
+## La cadence qu'il compte lui-même
+
+*« J'ai compté qu'à peu près, dans ce contexte-là, je mettais une tige à
+élaguer toutes les dix minutes. Ça me l'enregistre et je le retiens. Après,
+une fois le chantier fini, j'aurai mon nombre de jours par rapport au nombre
+de tiges. Ça permettra d'avoir les deux côte à côte. »*
+
+Deux chiffres pour la même prestation, et ils ne disent pas la même chose : le
+**mesuré** vient des journées saisies et paie les aléas — la route, le
+matériel, la pluie ; le **compté** vient de la montre. **L'écart est
+l'information**, et il s'écrit en toutes lettres : *« 38 % plus lent sur le
+terrain »*.
+
+`A.cfg.cadences` — `{travail, unite, valeur, sens, chantier, note}`. Dans la
+configuration, comme les notes personnelles : elle part dans les sauvegardes,
+et c'est une petite liste qu'il enrichit lui-même.
+
+- **Deux sens, parce qu'une cadence ne se dit pas d'une seule façon.** « Une
+  tige toutes les dix minutes » se chronomètre ; « huit cents plants par jour »
+  se constate le soir. `cadenceParJour()` convertit, une fois, et tout ce qui
+  suit raisonne en unités par jour. La conversion s'écrit sous le champ à
+  chaque frappe : lui demander de la faire de tête serait exactement le calcul
+  qu'on lui épargne.
+- **Elle porte son unité.** Il facture l'élagage à l'hectare et le chronomètre
+  à la tige : dix minutes par hectare et dix minutes par tige ne se comparent
+  pas. Le rapprochement ne se fait qu'à unité égale, et **l'unité qui fait foi
+  est celle des chantiers**, pas celle du catalogue.
+- **Le chantier où il l'a constatée est retenu** — c'est lui qui l'a demandé,
+  et sans ça une cadence n'est qu'un chiffre sans contexte. La note libre
+  complète : « ronce épaisse », « pente ».
+- **Une prestation chronométrée mais jamais facturée garde sa ligne**, avec le
+  compté seul et « rien de mesuré encore ». C'est là que la cadence est tout ce
+  qu'on a — et c'est ce qu'il demandait en disant *« juste ajouter un rendement
+  pour quelque chose en particulier »*.
+- **La moyenne n'est pas pondérée** : ce sont des observations, pas des
+  mesures ; les pondérer donnerait à l'une d'elles une autorité qu'elle n'a pas.
+
+**Piège de vocabulaire à connaître** : `UNITES` ne contient pas de « tige ».
+Une tige se compte en `unite`, affichée « u ». Un scénario qui sème
+`unite: 'tige'` produit un rendement incalculable, sans rien dire.
+
+## « En retard » ne se disait pas d'un chantier
+
+Le mot l'a trompé deux fois, et ce fichier le signalait depuis trois versions
+sans que rien ne bouge. `enRetard()` ne parle d'aucune échéance manquée : il
+dit que **toutes les journées posées sont derrière et que le chantier n'est
+pas soldé**. Le badge dit donc **« jours passés »**, et le compte du carnet
+« 3 aux jours passés ».
+
+**Un vrai retard existe pourtant** — celui d'une facture dont l'échéance est
+dépassée (`retardPaiement`) — et lui garde son mot. Les deux se ressemblaient
+à l'écran, ce qui achevait la confusion. Un scénario tient les deux ensemble :
+il criera le jour où l'on renommera les deux d'un coup.
+
+**Et un défaut trouvé en corrigeant le mot** : l'alerte annonçait « en retard
+depuis le **Invalid Date** ». Elle lisait `ch.fin`, l'échéance de chantier
+retirée depuis longtemps. Elle date maintenant la dernière journée posée.
+
+## Le carnet dit le TTC, et qui le fait vivre
+
+*« Tu mets le montant hors taxes. Est-ce que tu pourrais mettre le taux de
+TVA, la TVA, le montant TTC, sur le côté droit ? Comme ça ça permet de voir un
+global très rapidement. »*
+
+La colonne de droite porte **le hors taxes et le TTC tous les deux en gros** —
+son choix — et la TVA dessous. Le premier fait le chiffre d'affaires et les
+déclarations, le second est ce que le client paie.
+
+- **`tvaChantier()` calcule ligne à ligne**, jamais un taux appliqué au total :
+  un chantier peut mêler 10 et 20 %, le répulsif n'ouvrant pas droit au taux
+  réduit là où le dégagement y a droit.
+- **`tauxChantier()` rend `null` quand ils sont deux.** La ligne dit alors
+  « TVA mêlée · 120 € ». Afficher l'un des deux serait un mensonge, afficher le
+  plus élevé en serait un autre.
+- **Le doublon a été supprimé au passage** : la fiche recalculait la même TVA à
+  la main, dans son coin. Deux copies d'un calcul de TVA finissent toujours par
+  diverger, et c'est la TVA — on ne la calcule pas deux fois.
+
+**Quatre carreaux, deux par ligne** (`.kpi2`), dictés par lui :
+
+| | |
+|---|---|
+| **Facturé** · N factures | **Encaissé** |
+| **Devis signés** · montant | **Premier donneur d'ordre** · son nom, sa part |
+
+- *« En attente, ça veut dire quoi ? »* Le mot ne disait rien : il cède la
+  place aux devis signés, qui sont un compte, pas une abstraction. Même
+  définition que la bulle de l'écran Entreprise (statut `accepte`) — deux
+  écrans qui comptent la même chose doivent la compter pareil.
+- **Le premier donneur d'ordre se calcule sur tout l'historique**, à sa
+  demande : ce chiffre ne bouge presque jamais, et c'est justement ce qu'il
+  dit — la dépendance réelle. **Le pourcentage est l'information** : quelqu'un
+  à quatre-vingts pour cent n'est pas un client, c'est un risque.
+- **« À facturer » a quitté le carreau, pas l'écran.** C'est le chantier qu'on
+  risque d'oublier, et il compte même sans ligne chiffrée : il rejoint la ligne
+  des chantiers ouverts. Un scénario garde sa présence — il avait déjà été
+  perdu une fois.
+
 ## Le Calendrier, resté sans revue
 
 Premier passage dessus, le 1er septembre. Rien de cassé, mais deux questions
 de sa part, **non tranchées** :
 
-- **« Pourquoi il y a un carnet dans le calendrier ? »** Le module déclare
-  trois vues — Agenda, Carte, Carnet — et `carnet` appartient d’abord aux
-  Chantiers (`moduleDeVue()` le rend à son premier propriétaire). C’est un
-  raccourci, pas un doublon de données ; il ne voit pas à quoi il sert. Le
-  retirer laisserait deux onglets, donc la garde de l’onglet solitaire ne
-  s’oppose pas. **Lui demander avant.**
+- **« Pourquoi il y a un carnet dans le calendrier ? »** Question posée trois
+  fois, **tranchée le 8 septembre : il le garde.** C’est un raccourci vers la
+  vue des Chantiers (`moduleDeVue()` la rend à son premier propriétaire), pas
+  un doublon de données. Ne plus rouvrir le sujet.
 - **La Carte** est vide : elle affiche les chantiers géolocalisés, et il n’en
   a jamais placé un seul. **Il a tranché le 8 septembre** : on lui fabrique un
   fond de communes à partir de ses fichiers IGN, pour qu’il pose un chantier
