@@ -11,6 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 
+const VOCABULAIRE = require('./vocabulaire.js');
 const racine = process.argv[2] || path.join(__dirname, '..');
 const fApp = path.join(racine, 'index.html');
 const fSw = path.join(racine, 'sw.js');
@@ -163,6 +164,49 @@ blocs.forEach((b, i) => {
   catch (e) { grave(`bloc ${i + 1} : ${e.message}`); }
 });
 if (!erreurs) bien(`${blocs.length} blocs, syntaxe valide`);
+
+/* --- 7. champs lus que rien n'écrit ----------------------------------
+   Quatre fois, le code a lu un champ inexistant et l'écran a affiché un
+   blanc ou un zéro sans que rien ne crie : `charge.nom` là où le formulaire
+   enregistre `libelle`, `c.lieu` là où le chantier porte `foret`. Le
+   scénario ne l'attrapait pas — il semait les mêmes champs faux.
+
+   On ne peut pas typer tout le fichier, mais certains accès se nomment
+   eux-mêmes : `charge.taux`, `x.charge.libelle`. Ceux-là se vérifient sans
+   ambiguïté contre le vocabulaire, qui se relève dans les formulaires.
+   Les prénoms d'une boucle (`c`, `x`, `e`) restent hors de portée : ils
+   désignent tantôt un chantier, tantôt une charge. */
+console.log('\n7. Champs inconnus');
+{
+  /* Le nom de la variable dit le magasin, et rien d'autre ne s'appelle
+     ainsi dans le fichier. */
+  const PORTES = { charge: 'charges', achat: 'achats', journee: 'journees',
+    fournisseur: 'fournisseurs', commande: 'commandes' };
+  /* Les méthodes et les propriétés du langage ne sont pas des champs. */
+  const HORS = ['forEach', 'filter', 'map', 'length', 'slice', 'indexOf',
+    'push', 'sort', 'some', 'every', 'reduce', 'join', 'concat', 'split',
+    'trim', 'replace', 'toLowerCase', 'call', 'apply', 'hasOwnProperty'];
+  let vus = 0, fautes = 0;
+  propres.forEach(code => {
+    Object.keys(PORTES).forEach(porte => {
+      const re = new RegExp('\\b' + porte + '\\.([A-Za-z_$][\\w$]*)', 'g');
+      let m;
+      while ((m = re.exec(code))) {
+        const champ = m[1];
+        if (HORS.indexOf(champ) >= 0) continue;
+        vus++;
+        if (VOCABULAIRE[PORTES[porte]].indexOf(champ) < 0) {
+          fautes++;
+          grave(`« ${porte}.${champ} » : aucun formulaire n'écrit ce champ ` +
+            `(voir outils/vocabulaire.js)`);
+        }
+      }
+    });
+  });
+  /* Un contrôle qui n'inspecte plus rien doit crier, pas rassurer. */
+  if (vus < 20) grave(`seulement ${vus} accès examinés : le contrôle ne voit plus rien`);
+  else if (!fautes) bien(`${vus} accès nommés, tous au vocabulaire`);
+}
 
 console.log('\n' + '─'.repeat(52));
 if (erreurs) {

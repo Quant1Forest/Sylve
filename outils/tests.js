@@ -11,6 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const { JSDOM } = require('jsdom');
+const VOCABULAIRE = require('./vocabulaire.js');
 
 const APP = process.argv[2] || path.join(__dirname, '..', 'index.html');
 const html = fs.readFileSync(APP, 'utf8');
@@ -40,8 +41,31 @@ const jourISO = ts => {
    « data-pret » quand ses données sont relues et ses écrans rendus ; on
    sonde jusque-là. L'attente fixe de 2,4 s dormait une seconde et demie à
    chaque fois, quarante fois par passage. */
+/* Une graine qui invente un champ ne prouve rien : c'est ainsi que quatre
+   défauts sont passés au vert, le scénario semant les mêmes champs faux que
+   le code lisait. On refuse donc tout nom hors du vocabulaire, et on dit
+   lequel — c'est le moment d'aller relire le formulaire qui enregistre. */
+function verifierGraines(graines) {
+  const fautes = [];
+  for (const magasin in graines) {
+    const connus = VOCABULAIRE[magasin];
+    if (!connus || !Array.isArray(graines[magasin])) continue;
+    for (const objet of graines[magasin]) {
+      if (!objet || typeof objet !== 'object') continue;
+      for (const champ of Object.keys(objet)) {
+        if (connus.indexOf(champ) < 0) fautes.push(magasin + '.' + champ);
+      }
+    }
+  }
+  return [...new Set(fautes)];
+}
+
 function ouvrir(graines, options) {
   options = options || {};
+  const inconnus = verifierGraines(graines);
+  if (inconnus.length) {
+    verifier('la graine n’invente aucun champ', [], inconnus);
+  }
   return new Promise(resolve => {
     const dom = new JSDOM(html, {
       runScripts: 'dangerously', pretendToBeVisual: true, url: 'https://local/',
@@ -6406,7 +6430,7 @@ scenario('Calendrier : les frais fixes se voient tomber sur leur jour', async ()
     charges: [{ id: 'ch1', libelle: 'Assurance décennale', beneficiaire: 'Groupama',
       ttc: 420, periodicite: 'annuel', jour: jour, moisReference: d.getMonth(),
       debut: new Date(d.getFullYear() - 2, d.getMonth(), jour, 12).getTime(),
-      categorie: 'ASSUR', sansTva: true }]
+      categorie: 'ASSUR', taux: 0 }]
   }));
   await t.pause(350);
 

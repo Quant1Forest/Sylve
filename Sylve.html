@@ -15824,7 +15824,8 @@ function moissonnerListes(src) {
   (src.chantiers || []).forEach(function (c) {
     if (ajouterListe('clients', c.donneur)) n++;
     if (ajouterListe('proprios', c.proprietaire)) n++;
-    if (ajouterListe('lieux', c.lieu)) n++;
+    if (ajouterListe('lieux', c.foret)) n++;
+    if (ajouterListe('lieux', c.commune)) n++;
   });
   (src.sorties || []).forEach(function (v) { if (ajouterListe('clients', v.client)) n++; });
   (src.piles || []).forEach(function (v) { if (ajouterListe('lieux', v.lieu)) n++; });
@@ -15878,7 +15879,7 @@ function migrerJournees() {
       if (t.jrn) return;
       var k = c.id + '|' + B.jour(t.date);
       if (!vues[k]) {
-        vues[k] = { id: uid(), date: t.date, chantier: c.id, lieu: c.lieu || '',
+        vues[k] = { id: uid(), date: t.date, chantier: c.id, lieu: c.foret || '',
           km: 0, nonProd: 0, personnes: C.nb(t.personnes) || 1,
           sansMoi: !!t.sansMoi, fin: false, postes: [] };
         A.journees.push(vues[k]);
@@ -15963,7 +15964,10 @@ function lieuxConnus() {
     if (j.lieu) v[j.lieu] = 1;
     if (j.commune) v[j.commune] = 1;
   });
-  (A.chantiers || []).forEach(function (c) { if (c.lieu) v[c.lieu] = 1; });
+  (A.chantiers || []).forEach(function (c) {
+    if (c.foret) v[c.foret] = 1;
+    if (c.commune) v[c.commune] = 1;
+  });
   (A.lieuxRegles || []).forEach(function (x) { if (x) v[x] = 1; });
   for (var k in v) l.push(k);
   return l.sort(function (a, b) { return a.localeCompare(b, 'fr'); });

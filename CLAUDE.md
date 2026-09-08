@@ -83,6 +83,57 @@ Une vérification doit se croiser avec une source écrite ailleurs, pour
 d'autres raisons : c'est le manifeste qui dit maintenant quelles icônes
 doivent être en cache.
 
+## Le vocabulaire : un champ que rien n'écrit ne se lit plus
+
+**Quatre fois le même défaut, et c'est lui qui a exigé qu'on le règle.**
+*« Il faut absolument que tu trouves un moyen pour que les tests puissent
+corriger ça. Trois fois ce n'est pas rien. »*
+
+La famille : **le code lit un champ que rien n'écrit**, l'écran affiche un
+blanc ou un zéro, et rien ne crie. `charge.nom` là où le formulaire enregistre
+`libelle` ; `c.lieu` là où le chantier porte `foret`. Le scénario qui aurait
+dû l'attraper **semait les mêmes champs faux** : deux erreurs qui se
+confirment l'une l'autre. Une erreur seule aurait crié ; deux erreurs
+assorties passent au vert.
+
+`outils/vocabulaire.js` liste, magasin par magasin, les champs que les
+**formulaires écrivent** — relevés dans les formulaires, jamais dans le code
+qui lit. C'est toute la différence : lire les lecteurs aurait recopié
+l'erreur.
+
+La boucle est cassée par les deux bouts :
+
+- **Le banc d'essai refuse une graine hors vocabulaire** (`verifierGraines`,
+  appelée par `ouvrir()`). Un scénario ne peut plus inventer un champ pour
+  coller à du code fautif : il échoue en le nommant.
+- **Le vérificateur refuse une lecture hors vocabulaire** (contrôle n° 7).
+  Certains accès se nomment eux-mêmes — `charge.taux`, `achat.quoi`,
+  `journee.km` — et se vérifient sans ambiguïté. Il refuse aussi de passer
+  s'il examine moins de vingt accès : **un contrôle qui n'inspecte plus rien
+  doit crier, pas rassurer**, comme celui des identifiants.
+
+**Ce que ce n'est pas.** Ni un schéma, ni une validation : rien ne contrôle
+les données de l'utilisateur, et une sauvegarde ancienne peut porter d'autres
+champs. C'est un **cliquet** sur ce que le projet écrit lui-même. Ajouter un
+champ y demande un geste délibéré — et c'est justement le moment où l'on va
+relire le formulaire qui l'enregistre.
+
+**Sa limite, à connaître.** Les prénoms de boucle (`c`, `x`, `e`) restent hors
+de portée : ils désignent tantôt un chantier, tantôt une charge. Le contrôle
+ne couvre que les accès qui portent leur nom. Élargir demanderait de typer le
+fichier ; le cliquet, lui, coûte deux cents lignes.
+
+**Il a trouvé un troisième cas en naissant.** `c.lieu` était lu à trois
+endroits, sur un objet qui n'a pas ce champ :
+
+- `lieuxConnus()` ne récupérait **jamais** les forêts des chantiers ;
+- `moissonnerListes()` non plus, à la restauration ;
+- et `migrerJournees()` donnait un lieu **vide** à toutes les journées reprises.
+
+Trois branches mortes, silencieuses depuis des mois. Elles lisent désormais
+`foret` et `commune`. **Une branche morte ne se voit pas, elle se teste** —
+et faute de pouvoir tout tester, on peut au moins refuser ce qui n'existe pas.
+
 **Un seul passage, à la fin.** Ne pas relancer la suite après chaque
 modification : écrire le code et ses scénarios, puis contrôler l'ensemble une
 fois, avant de rendre la liste de ce qui a changé. Dix passages dans une
@@ -159,7 +210,7 @@ l'ancien code. Le vérificateur refuse de passer si les deux divergent.
 | `sw.js` | Service worker. Sa constante `VERSION` doit être identique à celle de `index.html`. |
 | `manifest.webmanifest` | Nom, couleurs, icônes de la PWA. |
 | `icone-*.png` | Icônes d'installation. La version *maskable* garde toute son encre dans la zone de rognage d'Android. |
-| `outils/` | Vérificateur, tests, tests du service worker, construction, conformité du fichier autonome, reprise du carnet. |
+| `outils/` | Vérificateur, tests, tests du service worker, construction, conformité du fichier autonome, reprise du carnet, **vocabulaire des magasins**. |
 
 Les fichiers d'origine du logo ne sont pas dans le dépôt : ils sont gardés à
 part. Le dépôt étant public, il ne contient que ce qui est servi, plus de quoi
