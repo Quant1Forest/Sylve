@@ -51,7 +51,7 @@ npm run controle   # vérificateur + service worker + tests + reconstruction + c
 ```
 
 Doit afficher **« Bon pour livraison »**, puis **« le service worker tient »**
-(24 vérifications), puis la suite au vert — 1536 à ce jour — puis
+(24 vérifications), puis la suite au vert — 1573 à ce jour — puis
 **« Sylve.html est conforme »**.
 
 Compter **moins de deux minutes**. Ça a été dix, et deux choses l'expliquaient :
@@ -1493,8 +1493,10 @@ répondent pas à la même question.
 infos. Il faut que ce soit le plus efficace possible. »*
 
 - **Un chantier facturé ne reçoit plus de journée** : il sort du sélecteur.
-  *« Une fois que c’est facturé, j’ai fini mes journées. »* Sauf celui qu’on
-  est en train de corriger, sinon son propre chantier disparaîtrait.
+  *« Une fois que c’est facturé, j’ai fini mes journées. »* **Deux
+  exceptions** : celui qu’on est en train de corriger, sinon son propre
+  chantier disparaîtrait ; et celui qui est **posé sur ce jour-là**, depuis la
+  4.75 — c’est l’agenda qui dit qu’il a lieu d’y être.
 - Le reste est rangé par **dernier jour travaillé**, pas par `maj` : ouvrir
   une fiche pour la relire ne doit pas la faire remonter.
 - **Choisir le chantier remplit ce qu’il sait** : forêt, commune, et un poste
@@ -1930,6 +1932,109 @@ C'est la troisième fois que ce projet rencontre deux gardes qui se couvrent
 l'une l'autre. **Le sabotage ne suffit pas : il faut aussi que le scénario
 place le cas où une seule des deux tient.**
 
+## Reprendre copie ce qu'on a fait, jamais quand
+
+*« Quand je fais reprendre, ça me le remet sur le même jour. Depuis tout à
+l'heure je remets des jours sur le 4. »*
+
+Le bouton passait la journée modèle **en entier, sa date comprise** :
+`ouvrirJournee(null, dj)`, et le formulaire lisait `modele.date`. Ouvrir le 8
+dans le calendrier, reprendre la journée du 4, et la nouvelle journée
+retombait le 4. Il en a reposé plusieurs avant de comprendre.
+
+Le jour reste celui qu'on a choisi ; seul le contenu se copie — chantier,
+lieu, kilomètres, prestations. Les heures, non : c'est ce qu'on vient noter.
+
+**Et le libellé mentait avec.** « Reprendre 04/09 » se lit comme « aller au
+04/09 ». C'est **« Comme le 04/09 — Les Places »** : le mot dit qu'on copie,
+pas qu'on se déplace.
+
+**Un chantier posé ce jour-là reste sélectionnable, même payé.** *« Sur une
+journée déjà facturée, je ne peux plus la sélectionner : dans mes choix, j'ai
+uniquement ce qui est ouvert. »* La règle tient — un chantier facturé ne
+reçoit plus de journée — mais elle avait déjà son exception : celui qu'on est
+en train de corriger. Un chantier **posé sur ce jour précis** est le même cas,
+c'est l'agenda qui dit qu'il a lieu d'y être. Un chantier clos qui n'y est pas
+posé reste écarté.
+
+## Quarante-sept journées d'un seul geste
+
+*« Toutes les journées posées au calendrier, il faudrait que ce soit compté
+comme fait. Je considère que si j'y ai travaillé, et puis voilà. Comme un
+prompt que tu lances une fois, et après il s'oublie. Je ne veux pas que ce
+soit quelque chose qui soit entré dans le code. »*
+
+**Ce qui a été expliqué, et pourquoi le résultat est proche de ce qu'il
+voulait** : ses données vivent sur son téléphone, pas ici — aucun script ne
+peut les atteindre depuis ce poste. Le geste doit donc vivre dans
+l'application. Mais il **s'efface de lui-même** : le bouton n'apparaît que
+lorsqu'il reste plusieurs journées à trancher, et une fois pressé il n'en
+reste aucune. C'est l'équivalent le plus proche d'un script à usage unique.
+
+`validerCommePrevu()` a été coupée en deux : **`poserJourneesPrevues()`** pose
+sans enregistrer, `validerCommePrevu()` pose puis enregistre, et
+**`validerTousLesJoursPrevus()`** pose tout et n'enregistre **qu'une fois**.
+Quarante-sept jours, c'était quarante-sept écritures.
+
+- **Le geste se confirme**, et la question dit ce qu'elle va écrire : les
+  heures de l'agenda et les prestations de chaque chantier. Un refus n'écrit
+  rien — un scénario le vérifie, et le sabotage passe par `if (false && …)`,
+  parce que retirer le `return` seul ne compile pas.
+- **La part de l'agenda est respectée** : une demi-journée posée reste une
+  demi-journée faite. Le geste d'ensemble ne fait pas mieux que le geste
+  unitaire, il le répète.
+
+## Les frais fixes tombent sur leur jour
+
+*« Ce serait bien de pouvoir mettre dans le calendrier les frais fixes que
+j'ai. Comme ça je vois quand ça apparaît et quand ça arrive. »*
+
+**Une échéance n'est pas un statut de journée.** Un jour en porte exactement
+un — c'est la décision de la 4.71 et elle ne se rouvre pas. Le prélèvement se
+pose donc **à côté** : un « € » discret dans l'angle de la case, qui nomme la
+charge et son montant au survol, et le détail dans la fiche du jour.
+
+- **`prelevementsDuMois(an, mo)`** range les échéances par jour ;
+  `prelevementsDuJour(ts)` sert la fiche, qui ne sait pas de quel mois elle
+  relève.
+- **Rien ne contourne les bornes d'`echeances()`** : une charge arrêtée ou pas
+  encore souscrite ne tombe pas sur le calendrier. Le sabotage force
+  `arretee: false` et `debut: null` — sans la garde, un contrat résilié
+  continuerait de se prélever à l'écran.
+- **Un jour qui ne porte qu'un prélèvement n'est plus dit vide.** La phrase
+  « Rien de posé ni de noté ce jour-là » comptait les chantiers et l'absence,
+  pas les charges.
+
+## Les fonds de carte : ce qui est mesuré
+
+Il a des données IGN sur son poste. **Mesuré avant de promettre**, sur les
+`COMMUNE.SHP` du Parcellaire Express, simplifiés en Douglas–Peucker à 100 m et
+écrits en deltas d'entiers :
+
+| Département | Communes | Poids |
+|---|---|---|
+| 01 | 391 | 108 Ko |
+| 03 | 317 | 114 Ko |
+| 25 | 563 | 130 Ko |
+| 39 | 494 | 120 Ko |
+| 70 | 539 | 137 Ko |
+| 71 | 563 | 181 Ko |
+
+`Sylve.html` pèse environ 1 Mo : **un ou deux départements passent**, les six
+le doubleraient presque. À 200 m de tolérance on tombe à 79 Ko pour le Doubs,
+au prix des petits contours.
+
+**Ce qui reste hors de portée**, et il faut le redire chaque fois : le SCAN 25
+et les orthophotos sont des **images** (plusieurs gigas par département), le
+parcellaire cadastral fait 248 Mo pour le seul Doubs, et les WMS de
+`data.geopf.fr` demandent du réseau. Seul le **vecteur simplifié** entre dans
+un fichier hors ligne.
+
+Le lecteur de shapefile et le simplificateur vivent dans le bac à sable de la
+séance, pas dans le dépôt : ils ne serviront qu'une fois, au moment de la
+conversion. **Les fichiers IGN ne doivent jamais entrer dans le dépôt**, comme
+le classeur comptable.
+
 ## Le Calendrier, resté sans revue
 
 Premier passage dessus, le 1er septembre. Rien de cassé, mais deux questions
@@ -1942,7 +2047,10 @@ de sa part, **non tranchées** :
   retirer laisserait deux onglets, donc la garde de l’onglet solitaire ne
   s’oppose pas. **Lui demander avant.**
 - **La Carte** est vide : elle affiche les chantiers géolocalisés, et il n’en
-  a jamais placé un seul. Même question.
+  a jamais placé un seul. **Il a tranché le 8 septembre** : on lui fabrique un
+  fond de communes à partir de ses fichiers IGN, pour qu’il pose un chantier
+  d’un doigt au lieu de coller des coordonnées. Voir *Les fonds de carte : ce
+  qui est mesuré*. Reste à savoir **quels départements**.
 
 ## Le temps tient dans un seul bloc, et se compte en heures
 

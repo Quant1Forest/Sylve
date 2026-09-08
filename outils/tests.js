@@ -6236,6 +6236,211 @@ scenario('Calendrier : ce qui est déjà noté ne se valide plus d’un geste', 
 });
 
 /* --------------------------------------------------------------------- */
+scenario('Ma journée : « comme le… » reprend le contenu, jamais la date', async () => {
+  /* « Quand je fais reprendre, ça me le remet sur le même jour. Depuis tout à
+     l'heure je remets des jours sur le 4. » Le bouton passait la journée
+     entière en modèle, sa date comprise : ouvrir le 8 dans le calendrier,
+     reprendre, et la journée retombait le 4. Reprendre sert à ne pas retaper
+     le chantier et les prestations, pas à revenir en arrière. */
+  const JOUR = 86400000;
+  const vieux = new Date(Date.now() - 4 * JOUR); vieux.setHours(12, 0, 0, 0);
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'calendrier', cfg: { heuresJour: 8, journeesMigrees: true },
+    chantiers: [{ id: 'c1', proprietaire: 'Martin', commune: 'Levier', statut: 'encours',
+      aDevis: false, temps: [], jours: [], maj: Date.now(),
+      lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 2, prix: 500, nature: 'prestation' }] }],
+    journees: [{ id: 'j1', date: vieux.getTime(), chantier: 'c1', lieu: 'Les Places',
+      km: 42, personnes: 1, nonProd: 0,
+      postes: [{ travaux: 'DEGAG', heures: 7, quantite: 1 }] }]
+  }));
+  await t.pause(300);
+
+  /* On ouvre aujourd'hui, et on reprend la journée d'il y a quatre jours. */
+  t.clic('[data-jour="' + t.w.BCC.minuit(Date.now()) + '"]'); await t.pause(450);
+  t.clic('#fj-travaille'); await t.pause(500);
+  const avant = t.$('#mj-date').value;
+  verifier('la fiche s’ouvre sur le jour choisi', jourISO(Date.now()), avant);
+  /* Le bouton ne dit plus « Reprendre le 4 », qui se lisait « aller au 4 ». */
+  verifierVrai('le bouton parle du contenu', /^Comme le /.test(t.$('#mj-hier').textContent));
+
+  t.clic('#mj-hier'); await t.pause(500);
+  verifier('la date ne recule pas', avant, t.$('#mj-date').value);
+  verifier('mais le chantier est repris', 'c1', t.$('#mj-ch').value);
+  verifier('le lieu aussi', 'Les Places', t.$('#mj-lieu').value);
+  verifier('et les kilomètres', '42', t.$('#mj-km').value);
+  verifier('la prestation est reprise', 'DEGAG', t.$('#mj-postes [data-pstt="0"]').value);
+  /* Les heures, non : c'est ce qu'on vient noter. */
+  verifier('les heures restent à saisir', '', t.$('#mj-postes [data-psth="0"]').value);
+
+  t.saisir('#mj-postes [data-psth="0"]', '6');
+  t.clic('#mj-ok'); await t.pause(700);
+  const neuve = (t.stock('journees') || []).filter(x => x.id !== 'j1')[0];
+  verifierVrai('une seconde journée est née', !!neuve);
+  verifier('et elle tombe sur le jour choisi', t.w.BCC.jourCle(Date.now()),
+    t.w.BCC.jourCle(neuve.date));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Ma journée : un chantier posé ce jour-là reste sélectionnable', async () => {
+  /* « Sur une journée déjà facturée, je ne peux plus la sélectionner : dans
+     mes choix j'ai uniquement ce qui est ouvert. » La règle tient — un
+     chantier facturé ne reçoit plus de journée — mais elle avait déjà son
+     exception : celui qu'on est en train de corriger. Un chantier posé sur ce
+     jour-là est le même cas, c'est le calendrier qui dit qu'il a lieu d'y
+     être. */
+  const JOUR = 86400000;
+  const hier = new Date(Date.now() - JOUR); hier.setHours(12, 0, 0, 0);
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'calendrier', cfg: { heuresJour: 8, journeesMigrees: true },
+    chantiers: [
+      { id: 'c1', proprietaire: 'Payé', commune: 'Levier', statut: 'paye', aDevis: false,
+        temps: [], maj: Date.now(), numeroFacture: 'F-2025-0007',
+        datePaiement: Date.now(), jours: [{ d: hier.getTime(), p: 1 }],
+        lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 2, prix: 500, nature: 'prestation' }] },
+      /* Payé, mais rien de posé ce jour-là : il reste hors du sélecteur. */
+      { id: 'c2', proprietaire: 'Ailleurs', commune: 'Chaux', statut: 'paye', aDevis: false,
+        temps: [], jours: [], maj: Date.now(), numeroFacture: 'F-2025-0008',
+        datePaiement: Date.now(), lignes: [] }
+    ]
+  }));
+  await t.pause(300);
+  t.clic('[data-jour="' + t.w.BCC.minuit(hier.getTime()) + '"]'); await t.pause(450);
+  t.clic('#fj-travaille'); await t.pause(500);
+
+  const choix = options(t, '#mj-ch').join(' · ');
+  verifierVrai('le chantier posé ce jour-là est proposé', /Payé/.test(choix));
+  verifierVrai('celui qui n’y est pas reste écarté', !/Ailleurs/.test(choix));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Calendrier : toutes les journées passées se valident d’un seul geste', async () => {
+  /* « Toutes les journées posées au calendrier, il faudrait que ce soit compté
+     comme fait. Je considère que si j'y ai travaillé, et puis voilà. » Il en
+     avait quarante-sept ; les trancher une par une, c'est quarante-sept
+     fenêtres. Le bouton s'efface de lui-même : une fois pressé, il ne reste
+     plus rien à trancher. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'calendrier', cfg: { heuresJour: 8, journeesMigrees: true },
+    chantiers: [{ id: 'c1', proprietaire: 'Martin', commune: 'Levier', statut: 'accepte',
+      aDevis: true, temps: [], maj: Date.now(),
+      jours: [{ d: JCAL(-4), p: 1 }, { d: JCAL(-3), p: 0.5 }, { d: JCAL(-2), p: 1 }],
+      lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 3, prix: 700, nature: 'prestation' }] }]
+  }));
+  await t.pause(300);
+  const C0 = t.w.BCC;
+  verifier('trois journées attendent', 3,
+    C0.joursAResoudre(t.stock('chantiers'), { heuresJour: 8 }, [], Date.now()).length);
+
+  t.clic('#cal-trancher-btn'); await t.pause(500);
+  const bouton = t.$('#rj-tout');
+  verifierVrai('le geste d’ensemble est proposé', !!bouton);
+  verifierVrai('et il dit combien', /3 journées/.test(bouton.textContent));
+
+  /* On écrit trois journées d'un coup : le geste se confirme. */
+  let demande = null;
+  t.w.confirm = m => { demande = m; return true; };
+  bouton.click(); await t.pause(900);
+  verifierVrai('la question est posée', /3 journées passées/.test(demande || ''));
+
+  const js = t.stock('journees') || [];
+  verifier('trois journées sont nées', 3, js.length);
+  /* Chacune reprend la part de l'agenda : la demi-journée ne devient pas
+     entière. */
+  const heures = js.map(j => (j.postes || []).reduce((s, p) => s + p.heures, 0)).sort();
+  verifier('avec les heures de l’agenda', [4, 8, 8], heures);
+  verifierVrai('et la prestation du chantier',
+    js.every(j => (j.postes || [])[0].travaux === 'DEGAG'));
+
+  verifier('plus rien à trancher', 0,
+    C0.joursAResoudre(t.stock('chantiers'), { heuresJour: 8 }, [], Date.now()).length);
+  verifierVrai('le rappel s’efface de lui-même', !t.$('#cal-trancher-btn'));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Calendrier : un refus n’écrit aucune journée', async () => {
+  /* Quarante-sept écritures d'un coup ne se lancent pas par mégarde. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'calendrier', cfg: { heuresJour: 8, journeesMigrees: true },
+    chantiers: [{ id: 'c1', proprietaire: 'Martin', statut: 'accepte', aDevis: true,
+      temps: [], maj: Date.now(), lignes: [],
+      jours: [{ d: JCAL(-4), p: 1 }, { d: JCAL(-2), p: 1 }] }]
+  }));
+  await t.pause(300);
+  t.clic('#cal-trancher-btn'); await t.pause(500);
+  t.w.confirm = () => false;
+  t.clic('#rj-tout'); await t.pause(600);
+  verifier('rien n’est écrit', 0, (t.stock('journees') || []).length);
+  verifier('et les journées attendent toujours', 2,
+    t.w.BCC.joursAResoudre(t.stock('chantiers'), { heuresJour: 8 }, [], Date.now()).length);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Calendrier : les frais fixes se voient tomber sur leur jour', async () => {
+  /* « Ce serait bien de pouvoir mettre dans le calendrier les frais fixes que
+     j'ai, comme ça je vois quand ça arrive. » Une échéance n'est pas un
+     statut de journée : un jour en porte exactement un. Elle se pose donc à
+     côté, en repère, et se détaille dans la fiche du jour. */
+  const d = new Date(); d.setHours(12, 0, 0, 0);
+  const jour = d.getDate();
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'calendrier',
+    /* La charge est calée sur le quantième du jour, quel que soit ce jour :
+       une garde écrite « si on est le 12 » ne mordrait qu'une fois par mois. */
+    charges: [{ id: 'ch1', nom: 'Assurance décennale', beneficiaire: 'Groupama',
+      montant: 420, periodicite: 'annuel', jour: jour, moisReference: d.getMonth(),
+      debut: new Date(d.getFullYear() - 2, d.getMonth(), jour, 12).getTime(),
+      categorie: 'ASSUR', sansTva: true }]
+  }));
+  await t.pause(350);
+
+  const casse = t.$('[data-jour="' + t.w.BCC.minuit(d.getTime()) + '"]');
+  const marque = casse.querySelector('.cal-prel');
+  verifierVrai('la case porte le repère', !!marque);
+  verifierVrai('qui nomme la charge et son montant',
+    /Assurance décennale/.test(marque.getAttribute('title')) &&
+    /420/.test(marque.getAttribute('title')));
+  /* Le repère ne prend pas la place de la pastille de statut. */
+  verifier('et le statut du jour n’a pas bougé', 0,
+    casse.querySelectorAll('.pts i').length);
+
+  t.clic('[data-jour="' + t.w.BCC.minuit(d.getTime()) + '"]'); await t.pause(450);
+  const dit = t.texte('#modale');
+  verifierVrai('la fiche du jour le détaille', /Prélevé ce jour-là/.test(dit));
+  verifierVrai('avec qui est payé', /Groupama/.test(dit));
+  verifierVrai('et le montant', /420/.test(dit));
+  /* Un jour qui porte un prélèvement n'est pas « rien de posé ni de noté ». */
+  verifierVrai('il n’est plus dit vide', !/Rien de posé ni de noté/.test(dit));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Calendrier : une charge arrêtée ne tombe plus sur le calendrier', async () => {
+  /* echeances() borne déjà sur charge.debut et charge.fin : le calendrier ne
+     doit pas contourner cette borne, sinon un contrat résilié continuerait de
+     se prélever à l'écran. */
+  const d = new Date(); d.setHours(12, 0, 0, 0);
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'calendrier',
+    charges: [
+      { id: 'ch1', nom: 'Contrat résilié', montant: 90, periodicite: 'mensuel',
+        jour: d.getDate(), moisReference: 0, arretee: true,
+        debut: new Date(d.getFullYear() - 2, 0, 1, 12).getTime(), categorie: 'ABO' },
+      { id: 'ch2', nom: 'Pas encore souscrit', montant: 60, periodicite: 'mensuel',
+        jour: d.getDate(), moisReference: 0, categorie: 'ABO',
+        debut: new Date(d.getFullYear() + 2, 0, 1, 12).getTime() }
+    ]
+  }));
+  await t.pause(350);
+  const casse = t.$('[data-jour="' + t.w.BCC.minuit(d.getTime()) + '"]');
+  verifier('aucun repère sur la case', null, casse.querySelector('.cal-prel'));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
 /* Un chantier prêt pour une fiche de chantier. */
 const CH_FICHE = () => ({
   module: 'chantiers',
