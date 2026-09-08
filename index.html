@@ -1514,6 +1514,9 @@ if (froid && s > 0) montrer(s);
           <div class="champ" style="flex:1;min-width:150px;max-width:230px;margin:0">
             <select id="c-filtre"></select>
           </div>
+          <div class="champ" style="flex:1;min-width:150px;max-width:230px;margin:0">
+            <select id="c-tri"></select>
+          </div>
           <button class="btn-min" id="c-sens" style="flex:none"></button>
         </div>
         <div id="liste-chantiers"></div>
@@ -4496,6 +4499,38 @@ function dernierEvenement(c) {
    franchie et date les sorties de stock : détourner celle-là aurait re-daté
    ses mouvements. Un chantier payé la semaine dernière mais facturé il y a
    trois mois se range à sa facture, pas à son paiement. */
+/* Le jour où le chantier est entré dans Sylve. Il ne dit rien des travaux —
+   c'est l'ordre d'arrivée, et c'est ce qui range ceux qui n'ont ni devis ni
+   facture. Posée à la création, corrigeable sur la fiche : un chantier saisi
+   après coup n'est pas arrivé aujourd'hui.
+   Repli sur `cree` : les chantiers d'avant en ont un, rien à migrer. */
+function dateEntree(c) {
+  if (!c) return 0;
+  return nb(c.dateEntree) || nb(c.cree) || nb(c.maj) || 0;
+}
+
+/* « De pouvoir choisir : du plus ancien au plus récent, ok, mais de choisir
+   si c'est sur le numéro de facture, sur la date de paiement, sur la date
+   d'émission de la facture ou sur celle du devis. »
+   `auto` est l'ordre du classeur, celui d'avant : le numéro de facture quand
+   les deux en ont un, les dates comptables sinon. */
+var TRIS_CH = [
+  { c: 'auto', n: 'Ordre du classeur' },
+  { c: 'facture', n: 'N° de facture' },
+  { c: 'datefacture', n: 'Date de facture' },
+  { c: 'paiement', n: 'Date de paiement' },
+  { c: 'devis', n: 'Date du devis' },
+  { c: 'entree', n: 'Date d’entrée' }
+];
+/* La valeur du critère, ou 0 quand le chantier ne l'a pas. */
+function cleTri(c, quoi) {
+  if (quoi === 'facture') return rangFacture(c);
+  if (quoi === 'datefacture') return nb(c.dateFacture);
+  if (quoi === 'paiement') return nb(c.datePaiement);
+  if (quoi === 'devis') return nb(c.dateDevis);
+  if (quoi === 'entree') return dateEntree(c);
+  return 0;
+}
 function rangComptable(c) {
   if (!c) return 0;
   return nb(c.dateFacture) || nb(c.dateDevis) || nb(c.cree) || nb(c.maj) || 0;
@@ -4511,7 +4546,23 @@ function rangFacture(c) {
   var n = s.match(/(\d+)\s*$/);
   return n ? Number(n[1]) : 0;
 }
-function tri(chantiers, ancienDabord) {
+function tri(chantiers, ancienDabord, critere) {
+  if (critere && critere !== 'auto') {
+    /* Ceux qui portent la valeur devant, dans l'ordre demandé ; ceux qui ne
+       l'ont pas derrière, par ordre d'arrivée. Les mêler reviendrait à les
+       ranger sur une date qu'ils n'ont pas. */
+    var avec = [], sans = [];
+    (chantiers || []).forEach(function (c) {
+      (cleTri(c, critere) ? avec : sans).push(c);
+    });
+    avec.sort(function (a, b) {
+      var x = cleTri(a, critere), y = cleTri(b, critere);
+      if (x !== y) return ancienDabord ? x - y : y - x;
+      return rangStatut(a.statut) - rangStatut(b.statut);
+    });
+    sans.sort(function (a, b) { return dateEntree(b) - dateEntree(a); });
+    return avec.concat(sans);
+  }
   return (chantiers || []).slice().sort(function (a, b) {
     /* Entre deux chantiers facturés, le numéro prime sur tout : c'est l'ordre
        de ses classeurs. Dès que l'un des deux n'a pas de facture, on retombe
@@ -4531,6 +4582,10 @@ function filtre(chantiers, quoi) {
   if (!quoi || quoi === 'ouverts') return l.filter(function (c) { return statutOuvert(c.statut); });
   if (quoi === 'tous') return l.slice();
   if (quoi === 'acompleter') return l.filter(function (c) { return !ficheComplete(c); });
+  /* « Sélectionner uniquement les chantiers qui ont eu un devis. » Tous n'en
+     partent pas : un client qui rappelle pour finir une parcelle, un
+     dépannage. */
+  if (quoi === 'avecdevis') return l.filter(function (c) { return aDevis(c); });
   return l.filter(function (c) { return c.statut === quoi; });
 }
 /* Chercher un chantier par ce dont on se souvient : le nom, qui l'a donné,
@@ -4584,8 +4639,11 @@ function chercher(chantiers, q) {
   var mots = normalise(q).split(/\s+/).filter(Boolean);
   if (!mots.length) return (chantiers || []).slice();
   return (chantiers || []).filter(function (c) {
-    var foin = normalise([c.nom, c.donneur, c.client, c.proprietaire, c.foret,
-      c.parcelles, c.commune, c.numeroFacture, c.numeroDevis, c.notes]
+    /* Le nom composé et l'ancien nom : depuis que le nom se compose, celui
+       qu'il avait tapé ne s'affiche plus — mais c'est encore par ce mot-là
+       qu'il cherche un vieux chantier. Les deux sont dans la botte. */
+    var foin = normalise([nomChantier(c), c.nom, c.donneur, c.client, c.proprietaire,
+      c.foret, c.parcelles, c.commune, c.numeroFacture, c.numeroDevis, c.notes]
       .filter(Boolean).join(' '));
     return mots.every(function (m) { return foin.indexOf(m) >= 0; });
   });
@@ -4643,7 +4701,8 @@ function parDonneur(chantiers, cfg) {
 }
 
 function totaux(chantiers, cfg) {
-  var t = { propose: 0, signe: 0, aFacturer: 0, nAFacturer: 0, facture: 0, encaisse: 0,
+  var t = { propose: 0, nPropose: 0, signe: 0, aFacturer: 0, nAFacturer: 0,
+    facture: 0, encaisse: 0, caFacture: 0, nFactures: 0, attente: 0, nAttente: 0,
     jours: 0, n: 0, ouverts: 0, retard: 0 };
   var now = Date.now();
   (chantiers || []).forEach(function (c) {
@@ -4651,7 +4710,15 @@ function totaux(chantiers, cfg) {
     t.n++;
     if (statutOuvert(c.statut)) t.ouverts++;
     if (enRetard(c, now)) t.retard++;
-    if (c.statut === 'devis' || c.statut === 'envoye') t.propose += m;
+    if (c.statut === 'devis' || c.statut === 'envoye') { t.propose += m; t.nPropose++; }
+    /* Facturé : la facture est partie, réglée ou non. C'est la base que Sylve
+       emploie déjà pour les déclarations — les deux écrans doivent dire la
+       même chose. */
+    if (c.statut === 'facture' || c.statut === 'paye') { t.caFacture += m; t.nFactures++; }
+    /* En attente : engagé, pas encore facturé. Le travail qui dort. */
+    if (statutEngage(c.statut) && c.statut !== 'facture' && c.statut !== 'paye') {
+      t.attente += m; t.nAttente++;
+    }
     if (statutEngage(c.statut)) t.signe += m;
     /* Un chantier terminé compte, même sans ligne chiffrée : c'est justement
        celui-là qu'on risque d'oublier de facturer. */
@@ -4660,7 +4727,8 @@ function totaux(chantiers, cfg) {
     if (c.statut === 'paye') t.encaisse += m;
     t.jours += tempsMoi(c, cfg);
   });
-  ['propose', 'signe', 'aFacturer', 'facture', 'encaisse', 'jours'].forEach(function (k) { t[k] = arr(t[k], 2); });
+  ['propose', 'signe', 'aFacturer', 'facture', 'encaisse', 'caFacture', 'attente', 'jours']
+    .forEach(function (k) { t[k] = arr(t[k], 2); });
   return t;
 }
 
@@ -4686,9 +4754,36 @@ function nomAutoChantier(travail, proprietaire, commune) {
   return quoi || qui || '';
 }
 
+/* « Le titre, je ne devrais pas le choisir. Sinon je ne le modifie pas, ils
+   sont tous pareils, comme ça je ne me pose plus de questions. »
+
+   Le nom était écrit une fois, à la création, à partir de ce qu'on savait
+   alors. Le propriétaire et la commune se remplissent souvent après, sur la
+   fiche : le nom gardait ce qu'il avait au départ et ne rattrapait jamais.
+   D'où des titres dépareillés sans qu'aucune saisie soit fautive.
+
+   Il se compose donc à la lecture, comme le statut d'un jour du calendrier.
+   Aucune migration, aucun renommage : rien n'est réécrit, donc rien n'est
+   risqué. `c.nom` reste en base et sert de repli — un chantier sans
+   prestation, sans propriétaire et sans commune n'a rien à composer, et son
+   ancien nom vaut mieux que « Chantier ».
+
+   La prestation est celle de la première ligne qui n'est pas une fourniture :
+   « Fourniture de tuteurs — Martin, Levier » nommerait mal un dégagement qui
+   en consomme. */
+function nomChantier(c) {
+  if (!c) return '';
+  var l = (c.lignes || []).filter(function (x) {
+    return x.travail && !estFourniture(x.travail);
+  })[0] || (c.lignes || []).filter(function (x) { return x.travail; })[0];
+  var n = nomAutoChantier(l ? l.travail : '', c.proprietaire, c.commune);
+  return n || String(c.nom || '').trim() || 'Chantier';
+}
+
 var M = {
   JOUR: JOUR, TRAVAUX: TRAVAUX, UNITES: UNITES, STATUTS: STATUTS,
-  nomAutoChantier: nomAutoChantier,
+  nomAutoChantier: nomAutoChantier, nomChantier: nomChantier,
+  dateEntree: dateEntree, TRIS_CH: TRIS_CH, cleTri: cleTri,
   montantDebours: montantDebours, montantHorsDebours: montantHorsDebours,
   MOYENS_PAIEMENT: MOYENS_PAIEMENT, nomMoyenPaiement: nomMoyenPaiement,
   travauxDeLigne: travauxDeLigne, ligneGroupee: ligneGroupee,
@@ -6166,7 +6261,7 @@ function ecrire(k, o) { return Store.set(k, JSON.stringify(o)); }
 /* ---------------------------------------------------------------- état */
 var A = {
   cfg: null, index: [], bord: null, piles: [], chantiers: [], module: 'cubage', ici: null,
-  vuePiles: 'stock', filtreCh: 'ouverts', rechCh: '', triAncien: false, chOuvert: null, clients: [], proprios: [], estim: null, imp: null, articles: [], charges: [], fournisseurs: [], commandes: [], sorties: [], mvt: 'achats', journees: [], lieuxRegles: [], listeReglee: 'clients', revient: null, calMois: null, calJour: null, nbAlertes: 0, planifie: null,
+  vuePiles: 'stock', filtreCh: 'ouverts', rechCh: '', triAncien: false, triCh: 'auto', chOuvert: null, clients: [], proprios: [], estim: null, imp: null, articles: [], charges: [], fournisseurs: [], commandes: [], sorties: [], mvt: 'achats', journees: [], lieuxRegles: [], listeReglee: 'clients', revient: null, calMois: null, calJour: null, nbAlertes: 0, planifie: null,
   depenses: [], periode: null, filtreDep: 'tous', vueAna: 'ensemble', secReglages: 'general',
   achats: [], fch: null, fchFiltre: 'ouverts',
   versements: [], vehicule: null,
@@ -7469,12 +7564,12 @@ function renderNudgeDevis() {
       'aria-label="Masquer">×</button></div>';
   };
   if (al.length === 1) {
-    z.innerHTML = bouton('Devis en attente — ' + (al[0].chantier.nom || 'chantier'),
+    z.innerHTML = bouton('Devis en attente — ' + (C.nomChantier(al[0].chantier)),
       al[0].texte + (al[0].chantier.donneur ? ' · ' + al[0].chantier.donneur : ''));
     return;
   }
   z.innerHTML = bouton(al.length + ' devis en attente de réponse',
-    'le plus pressé : ' + (al[0].chantier.nom || 'chantier') + ' — ' + al[0].texte);
+    'le plus pressé : ' + (C.nomChantier(al[0].chantier)) + ' — ' + al[0].texte);
 }
 
 function renderRecup() {
@@ -7724,6 +7819,14 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.75', quoi: [
+    { t: 'Le nom du chantier se compose seul : prestation, proprietaire, commune', vue: 'carnet' },
+    { t: 'Il suit si vous corrigez l un des trois — plus de titres depareilles', vue: 'chantier' },
+    { t: 'La ligne ne redit plus le proprietaire, et porte devis, facture et paiement', vue: 'carnet' },
+    { t: 'Le tri se choisit : n° de facture, date de facture, de paiement, de devis', vue: 'carnet' },
+    { t: 'Un filtre pour les seuls chantiers qui ont eu un devis', vue: 'carnet' },
+    { t: 'En tete : facture, encaisse, ce qui attend et les devis sans reponse', vue: 'carnet' }
+  ] },
   { v: '4.74', quoi: [
     { t: 'Une journee prevue se valide d un seul geste : c etait comme prevu', vue: 'calendrier' },
     { t: 'La fiche du jour dit enfin combien d heures etaient prevues', vue: 'calendrier' },
@@ -7752,14 +7855,6 @@ var NOTES_MAJ = [
     { t: 'Un jour non travaille se pose et se note — conge, pluie, arret', vue: 'calendrier' },
     { t: 'Un jour passe reste au planning doit etre tranche', vue: 'calendrier' },
     { t: 'Et une journee se deplace du mauvais jour vers le bon', vue: 'calendrier' }
-  ] },
-  { v: '4.70', quoi: [
-    { t: 'Une facture recente attend : elle n est plus dite impayee', vue: 'carnet' },
-    { t: 'Ma journee ne propose plus les chantiers factures' },
-    { t: 'Et le chantier choisi remplit lieu, prestation et kilometres' },
-    { t: 'Le jour qui vient dit pour qui vous travaillez', vue: 'calendrier' },
-    { t: 'Les achats se rangent par horizon : 3 mois, 6 mois, l annee', vue: 'achats' },
-    { t: 'Les chiffres ne debordent plus, le % ne saute plus la ligne' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -8277,6 +8372,9 @@ function brancher() {
   $('#c-nouveau').addEventListener('click', function () { ouvrirEnteteCh(null); });
   $('#c-filtre').addEventListener('change', function () { A.filtreCh = this.value; renderListeChantiers(); });
   $('#c-rech').addEventListener('input', function () { A.rechCh = this.value; renderListeChantiers(); });
+  $('#c-tri').addEventListener('change', function () {
+    A.triCh = this.value; renderListeChantiers();
+  });
   $('#c-sens').addEventListener('click', function () {
     A.triAncien = !A.triAncien; renderListeChantiers();
   });
@@ -8348,10 +8446,10 @@ function brancher() {
       return;
     }
     if (e.target.closest('#f-sup')) {
-      if (!confirm('Supprimer « ' + (c.nom || 'ce chantier') + ' » ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Fichiers ▸ Corbeille.')) return;
+      if (!confirm('Supprimer « ' + (C.nomChantier(c)) + ' » ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Fichiers ▸ Corbeille.')) return;
       A.chantiers = A.chantiers.filter(function (x) { return x.id !== id; });
       A.chOuvert = null;
-      jeterObjet('chantier', c, c.nom || 'Chantier',
+      jeterObjet('chantier', c, C.nomChantier(c),
         C.nomStatut(c.statut, c) + (c.client ? ' · ' + c.client : ''))
         .then(sauverChantiers).then(function () {
           renderCarnet(); renderAccueil(); aller('carnet'); toast('Chantier mis à la corbeille.');
@@ -10451,6 +10549,19 @@ function dateStatut(c) {
 }
 /* Prend le chantier et non le seul code : l'intitulé dépend de la présence
    d'un devis. */
+/* Les étapes datées du chantier, dans l'ordre où elles arrivent. Toutes
+   celles qui existent, pas seulement la dernière : c'est l'écart entre la
+   facture et le paiement qu'il vient lire. */
+function datesCh(c) {
+  var d = [];
+  if (!c) return d;
+  if (c.dateDevis) d.push('devis le ' + dateCourte(c.dateDevis));
+  if (c.dateFacture) d.push('facturé le ' + dateCourte(c.dateFacture));
+  if (c.datePaiement) d.push('payé le ' + dateCourte(c.datePaiement));
+  /* Rien de daté : il reste l'ordre d'arrivée, qui range ces chantiers-là. */
+  if (!d.length && C.dateEntree(c)) d.push('entré le ' + dateCourte(C.dateEntree(c)));
+  return d;
+}
 function badgeStatut(c) {
   var st = c ? c.statut : '';
   return '<span class="st" style="background:' + (COUL_STATUT[st] || '#7A8471') + '">' +
@@ -10476,15 +10587,23 @@ function renderCarnet() {
     z.innerHTML = '<div class="vide"><p>Aucun chantier. Créez une fiche : elle sert de devis, ' +
       'puis suit le chantier jusqu’au paiement.</p></div>';
   } else {
+    /* Un seul chiffre par tuile, le compte en légende : deux nombres côte à
+       côte et on ne sait plus lequel on lit. */
+    var n = function (x, mot, invariable) {
+      return x ? ' · ' + x + ' ' + mot + (x > 1 && !invariable ? 's' : '') : '';
+    };
     z.innerHTML = '<div class="kpi">' +
-      /* « Signé » comptait tout ce qui est engagé, du chantier accepté à la
-         facture payée : le mot laissait croire à des devis signés en attente. */
-      '<div class="carte2"><b class="num">' + eur(t.signe) + '</b><small>engagé, tous statuts</small></div>' +
-      '<div class="carte2"><b class="num">' + eur(t.propose) + '</b><small>devis sans réponse</small></div>' +
-      '<div class="carte2"><b class="num">' + eur(t.aFacturer) + '</b><small>à facturer' +
-      (t.nAFacturer ? ' · ' + t.nAFacturer + ' chantier' + (t.nAFacturer > 1 ? 's' : '') : '') +
-      '</small></div>' +
+      '<div class="carte2"><b class="num">' + eur(t.caFacture) + '</b><small>facturé' +
+      n(t.nFactures, 'facture') + '</small></div>' +
       '<div class="carte2"><b class="num">' + eur(t.encaisse) + '</b><small>encaissé</small></div>' +
+      /* « À facturer » avait sa propre tuile : c'est le chantier qu'on risque
+         d'oublier, et il compte même sans ligne chiffrée. Il reste dit ici,
+         en sous-compte, plutôt que de manger une tuile de la liste dictée. */
+      '<div class="carte2"><b class="num">' + eur(t.attente) + '</b><small>en attente' +
+      n(t.nAttente, 'chantier') +
+      (t.nAFacturer ? ', dont ' + t.nAFacturer + ' à facturer' : '') + '</small></div>' +
+      '<div class="carte2"><b class="num">' + eur(t.propose) + '</b><small>devis en attente' +
+      n(t.nPropose, 'devis', true) + '</small></div>' +
       '</div>' +
       /* « En cours » est le nom d'un statut : l'employer pour compter tout ce
          qui n'est pas soldé faisait annoncer « 31 en cours » avec un seul
@@ -10513,6 +10632,8 @@ function renderFiltreChantiers() {
   var tete = [['ouverts', 'Chantiers ouverts', C.filtre(A.chantiers, 'ouverts').length],
     ['tous', 'Tous', A.chantiers.length]];
   if (incomplets) tete.push(['acompleter', 'À compléter', incomplets]);
+  var avecDevis = C.filtre(A.chantiers, 'avecdevis').length;
+  if (avecDevis) tete.push(['avecdevis', 'Avec devis', avecDevis]);
   var ouv = [], clos = [];
   C.STATUTS.forEach(function (st) {
     var n = C.filtre(A.chantiers, st.c).length;
@@ -10523,15 +10644,24 @@ function renderFiltreChantiers() {
     (ouv.length ? '<optgroup label="En cours">' + ouv.map(opt).join('') + '</optgroup>' : '') +
     (clos.length ? '<optgroup label="Clos">' + clos.map(opt).join('') + '</optgroup>' : '');
 }
+function renderTriChantiers() {
+  var s = $('#c-tri'); if (!s) return;
+  var v = A.triCh || 'auto';
+  s.innerHTML = C.TRIS_CH.map(function (o) {
+    return '<option value="' + o.c + '"' + (v === o.c ? ' selected' : '') + '>' +
+      esc(o.n) + '</option>';
+  }).join('');
+}
 function renderListeChantiers() {
   var z = $('#liste-chantiers'); if (!z) return;
+  renderTriChantiers();
   var q = (A.rechCh || '').trim();
   /* Une recherche passe outre le filtre : un numéro de facture appartient
      presque toujours à un chantier payé, donc rangé hors des « ouverts ».
      Taper le bon numéro et ne rien voir sortir serait le pire des deux. */
-  var vieux = !!A.triAncien;
-  var l = q ? C.tri(C.chercher(A.chantiers, q), vieux)
-    : C.tri(C.filtre(A.chantiers, A.filtreCh || 'ouverts'), vieux);
+  var vieux = !!A.triAncien, crit = A.triCh || 'auto';
+  var l = q ? C.tri(C.chercher(A.chantiers, q), vieux, crit)
+    : C.tri(C.filtre(A.chantiers, A.filtreCh || 'ouverts'), vieux, crit);
   var bs = $('#c-sens');
   if (bs) bs.textContent = vieux ? '↑ plus ancien d’abord' : '↓ plus récent d’abord';
   if (!l.length) {
@@ -10550,14 +10680,19 @@ function renderListeChantiers() {
     return '<div class="chantier-l">' +
       '<span class="pastille" style="background:' + (COUL_STATUT[c.statut] || '#7A8471') +
       '" title="' + esc(C.nomStatut(c.statut, c)) + '"></span>' +
-      '<div><span class="chantier-n">' + esc(c.nom || 'Chantier') + '</span>' +
-      '<span class="chantier-d">' + esc([c.donneur || c.client, c.proprietaire, c.foret,
-        c.parcelles ? 'p. ' + c.parcelles : ''].filter(Boolean).join(' · ') || 'sans donneur d’ordre') +
-      '</span>' +
-      (uniq.length ? '<span class="chantier-d">' + esc(uniq.slice(0, 3).join(', ')) +
-        (uniq.length > 3 ? '…' : '') +
-        (place ? ' · ' + E.fmt(place, place % 1 ? 1 : 0) + ' j placée' + (place > 1 ? 's' : '') : '') +
-        ((c.echeance || c.fin) ? ' · avant le ' + dateCourte(c.echeance || c.fin) : '') + '</span>' : '') +
+      '<div><span class="chantier-n">' + esc(C.nomChantier(c)) + '</span>' +
+        '<span class="chantier-d">' + esc([c.donneur || c.client, c.foret,
+          c.parcelles ? 'p. ' + c.parcelles : '',
+          /* La première prestation est dans le titre ; les autres se disent
+             sans se lister, sinon la ligne double de longueur. */
+          uniq.length > 1 ? 'et ' + (uniq.length - 1) + ' autre prestation' +
+            (uniq.length > 2 ? 's' : '') : '']
+          .filter(Boolean).join(' · ') || 'sans donneur d’ordre') +
+        '</span>' +
+      '<span class="chantier-d">' + esc(datesCh(c).concat(
+        place ? [E.fmt(place, place % 1 ? 1 : 0) + ' j placée' + (place > 1 ? 's' : '')] : [],
+        (c.echeance || c.fin) ? ['avant le ' + dateCourte(c.echeance || c.fin)] : []
+      ).join(' · ')) + '</span>' +
       /* Le badge et sa date tiennent toujours sur leur propre ligne, quel que
          soit ce qui précède : sinon les lignes de longueur inégale font danser
          les badges d'un chantier à l'autre. */
@@ -10566,7 +10701,6 @@ function renderListeChantiers() {
          il doit se lire dans la liste, pas seulement sur la fiche. */
       (c.numeroFacture ? '<span class="num-fact">n° ' + esc(c.numeroFacture) + '</span> ' : '') +
       badgeStatut(c) +
-      (dateStatut(c) ? ' <span class="muted">' + esc(dateStatut(c)) + '</span>' : '') +
       (retard ? ' <span class="retard">en retard</span>' : '') +
       /* Une fiche à moitié remplie se perd dans le carnet : elle se signale,
          sans jamais empêcher de l'enregistrer telle quelle. */
@@ -10688,8 +10822,11 @@ function optionsTravaux(sel, opt) {
 /* L'ordre du carnet, pour le sélecteur comme pour les voisins : numéro de
    facture d'abord, dates ensuite. Trier par « maj » remontait un chantier dès
    qu'on l'ouvrait pour le corriger — l'ordre paraissait dû au hasard. */
+/* Le sélecteur de la fiche et « Précédente / Suivante » suivent le même ordre
+   que le carnet : deux ordres différents pour la même liste, et le voisin
+   annoncé ne serait pas celui qu'on vient de voir. */
 function chantiersOrdonnes() {
-  return C.tri(A.chantiers || [], !!A.triAncien);
+  return C.tri(A.chantiers || [], !!A.triAncien, A.triCh || 'auto');
 }
 
 /* Fiche précédente et suivante, dans ce même ordre. */
@@ -10708,7 +10845,7 @@ function boutonsVoisins(id) {
      inverserait aussi leur sens. */
   var bouton = function (c, mot, cote) {
     return '<button class="btn btn-min" ' + (c ? 'data-voisin="' + esc(c.id) + '"' : 'disabled') +
-      ' style="flex:1;text-align:' + cote + '" title="' + esc(c ? (c.nom || 'chantier') : '') + '">' +
+      ' style="flex:1;text-align:' + cote + '" title="' + esc(c ? C.nomChantier(c) : '') + '">' +
       esc(mot) + '</button>';
   };
   return '<div class="btn-rang" style="margin-top:9px;gap:7px">' +
@@ -10723,7 +10860,7 @@ function optionsChantiers(sel) {
   chantiersOrdonnes().forEach(function (c) {
     var lieu = [c.commune, c.foret].filter(Boolean).join(', ');
     var o = '<option value="' + esc(c.id) + '"' + (c.id === sel ? ' selected' : '') + '>' +
-      esc(c.nom || 'sans nom') + (lieu ? ' — ' + esc(lieu) : '') +
+      esc(C.nomChantier(c)) + (lieu ? ' — ' + esc(lieu) : '') +
       ' · ' + esc(C.nomStatut(c.statut, c)) + '</option>';
     (C.statutOuvert(c.statut) ? ouv : clos).push(o);
   });
@@ -11241,7 +11378,7 @@ function renderFiche() {
     '<div class="carte">' +
     teteBloc('Le chantier', 'f-identite', 'modifier') +
     '<div id="f-bloc-chantier">' +
-    '<h2 style="margin:0">' + esc(c.nom || 'Chantier') + '</h2>' +
+    '<h2 style="margin:0">' + esc(C.nomChantier(c)) + '</h2>' +
     '<p class="muted" style="font-size:12.5px;margin:3px 0 0">' +
     esc([c.donneur || c.client ? 'via ' + (c.donneur || c.client) : '',
       c.proprietaire ? c.proprietaire + (c.siren ? ' (SIREN)' : '') : '',
@@ -11410,7 +11547,7 @@ function prisCeJour(occ, ts) {
   o.prevus.concat(o.reels).forEach(function (p) {
     var ch = p.chantier;
     if (!ch || ch.id === ceChantierId || vus[ch.id]) return;
-    vus[ch.id] = 1; r.push(ch.nom || 'chantier sans nom');
+    vus[ch.id] = 1; r.push(C.nomChantier(ch));
   });
   return r;
 }
@@ -11579,7 +11716,6 @@ function ouvrirJourneesCh(id) {
    Il ne reste ici que ce qu'on sait au moment où le chantier arrive : pour
    qui, où, et ce qu'on y fait. */
 function ouvrirEnteteCh() {
-  var nomTouche = false;
   majDatalistClients(); majDatalistLieux();
   modale('Nouveau chantier',
     '<div class="grille g2">' +
@@ -11612,21 +11748,22 @@ function ouvrirEnteteCh() {
     'style="margin-top:2px"><span>Propriétaire identifié producteur agricole (n° SIREN)' +
     '<span class="muted" style="display:block;font-size:11.5px">Ouvre le taux réduit de ' +
     'TVA sur les travaux qui y donnent droit. Retenu pour ce propriétaire.</span></span></label>' +
-    '<div class="champ"><label class="eyebrow" for="ce-nom">Nom du chantier</label>' +
-    '<input type="text" id="ce-nom" class="gros" autocomplete="off">' +
-    '<p class="muted" style="font-size:11.5px;margin:5px 0 0" id="ce-nom-aide">Proposé ' +
-    'd’après les travaux, le propriétaire et la commune. Écrivez le vôtre si vous préférez.</p></div>' +
+    '<div class="champ"><p class="eyebrow" style="margin:0 0 4px">Il s’appellera</p>' +
+    '<p class="gros" id="ce-nom-apercu" style="margin:0;font-weight:600"></p>' +
+    '<p class="muted" style="font-size:11.5px;margin:5px 0 0">Composé des travaux, du ' +
+    'propriétaire et de la commune, et refait tout seul si l’un des trois change. ' +
+    'Tous vos chantiers portent ainsi le même genre de nom.</p></div>' +
     '<div class="btn-rang" style="margin-top:11px">' +
     '<button class="btn primaire" id="ce-ok">Créer le chantier</button></div>');
 
   brancherOffreListe('ce-donneur', 'clients');
   brancherOffreListe('ce-proprio', 'proprios');
-  /* Le nom suit la saisie tant qu'il n'y a pas mis la main. Dès qu'il écrit
-     le sien, il se fige : c'est le sien, on ne l'écrase pas. */
-  var recomposer = function () {
-    if (nomTouche) return;
-    $('#ce-nom').value = C.nomAutoChantier($('#ce-trav').value,
+  var compose = function () {
+    return C.nomAutoChantier($('#ce-trav').value,
       $('#ce-proprio').value.trim(), $('#ce-com').value.trim());
+  };
+  var recomposer = function () {
+    $('#ce-nom-apercu').textContent = compose() || 'à préciser ci-dessus';
   };
   ['#ce-proprio', '#ce-com'].forEach(function (x) {
     $(x).addEventListener('input', recomposer);
@@ -11640,17 +11777,22 @@ function ouvrirEnteteCh() {
   $('#ce-proprio').addEventListener('change', reprendreSiren);
   $('#ce-proprio').addEventListener('blur', reprendreSiren);
   $('#ce-trav').addEventListener('change', recomposer);
-  $('#ce-nom').addEventListener('input', function () { nomTouche = true; });
   recomposer();
 
   $('#ce-ok').addEventListener('click', function () {
-    var nom = $('#ce-nom').value.trim();
-    if (!nom) { toast('Donnez un nom au chantier.'); return; }
+    if (!compose()) {
+      toast('Il faut le type de travaux, le propriétaire ou la commune : c’est ce qui ' +
+        'nomme le chantier.');
+      return;
+    }
     var trav = $('#ce-trav').value;
     var c = {
       id: uid(), cree: Date.now(), maj: Date.now(), statut: 'devis', aDevis: true,
+      /* Aujourd'hui à midi, corrigeable : un chantier saisi après coup n'est
+         pas arrivé aujourd'hui. Midi, comme toutes les dates du fichier. */
+      dateEntree: C.minuit(Date.now()) + 12 * 3600000,
       siren: $('#ce-siren').checked,
-      nom: nom, donneur: $('#ce-donneur').value.trim(),
+      donneur: $('#ce-donneur').value.trim(),
       proprietaire: $('#ce-proprio').value.trim(),
       commune: $('#ce-com').value.trim(), foret: $('#ce-foret').value.trim(),
       lignes: trav ? [{ travail: trav, unite: C.uniteDe(trav), quantite: '', prix: '',
@@ -11732,8 +11874,11 @@ function ouvrirIdentiteCh(id) {
   var gps = c.gps || null;
   majDatalistClients();
   modale('Le chantier',
-    '<div class="champ"><label class="eyebrow" for="ic-nom">Nom du chantier</label>' +
-    '<input type="text" id="ic-nom" class="gros" autocomplete="off" value="' + esc(c.nom || '') + '"></div>' +
+    '<div class="champ"><p class="eyebrow" style="margin:0 0 4px">Nom du chantier</p>' +
+    '<p class="gros" id="ic-nom-apercu" style="margin:0;font-weight:600">' +
+    esc(C.nomChantier(c)) + '</p>' +
+    '<p class="muted" style="font-size:11.5px;margin:5px 0 0">Composé des travaux, du ' +
+    'propriétaire et de la commune. Corrigez l’un des trois et le nom suit.</p></div>' +
     '<div class="grille g2">' +
     '<div class="champ"><label class="eyebrow" for="ic-donneur">Donneur d’ordre' +
     '<button type="button" class="mini-plus" data-ajlist="clients" data-ajchamp="ic-donneur" ' +
@@ -11760,6 +11905,10 @@ function ouvrirIdentiteCh(id) {
     '<div class="champ"><label class="eyebrow" for="ic-cad">Réf. cadastrale</label>' +
     '<input type="text" id="ic-cad" autocomplete="off" placeholder="section et numéro" value="' +
     esc(c.cadastre || '') + '"></div>' +
+    /* L'ordre d'arrivée dans Sylve, pas la date des travaux. C'est elle qui
+       range les chantiers qui n'ont ni devis ni facture. */
+    '<div class="champ"><label class="eyebrow" for="ic-entree">Entré le</label>' +
+    '<input type="date" id="ic-entree" value="' + versChamp(C.dateEntree(c)) + '"></div>' +
     '</div>' +
     '<label class="ligne-check" style="display:flex;align-items:flex-start;gap:8px;font-size:13.5px;margin:10px 0 0">' +
     '<input type="checkbox" id="ic-siren"' + (c.siren ? ' checked' : '') + ' style="margin-top:2px">' +
@@ -11772,17 +11921,26 @@ function ouvrirIdentiteCh(id) {
     '<button class="btn primaire" id="ic-ok">Valider</button></div>');
   brancherOffreListe('ic-donneur', 'clients');
   brancherOffreListe('ic-proprio', 'proprios');
+  var suivreNom = function () {
+    var l = (c.lignes || []).filter(function (x) {
+      return x.travail && !C.estFourniture(x.travail);
+    })[0] || (c.lignes || []).filter(function (x) { return x.travail; })[0];
+    $('#ic-nom-apercu').textContent = C.nomAutoChantier(l ? l.travail : '',
+      $('#ic-proprio').value.trim(), $('#ic-com').value.trim()) || C.nomChantier(c);
+  };
+  ['#ic-proprio', '#ic-com'].forEach(function (x) {
+    $(x).addEventListener('input', suivreNom);
+  });
   $('#ic-gps').addEventListener('click', function () {
     var b = this;
     releverPosition(b, function (pt) { gps = pt; b.textContent = 'Position enregistrée ✓'; });
   });
   $('#ic-ok').addEventListener('click', function () {
-    var nom = $('#ic-nom').value.trim();
-    if (!nom) { toast('Donnez un nom au chantier.'); return; }
-    majChantier(c, { nom: nom, donneur: $('#ic-donneur').value.trim(),
+    majChantier(c, { donneur: $('#ic-donneur').value.trim(),
       proprietaire: $('#ic-proprio').value.trim(), foret: $('#ic-foret').value.trim(),
       parcelles: $('#ic-parc').value.trim(), commune: $('#ic-com').value.trim(),
       departement: $('#ic-dep').value.trim(), cadastre: $('#ic-cad').value.trim(),
+      dateEntree: versDate($('#ic-entree').value) || C.dateEntree(c),
       siren: $('#ic-siren').checked, gps: gps }, 'Chantier modifié.');
     poserSiren($('#ic-proprio').value.trim(), $('#ic-siren').checked);
     Promise.resolve(sauverCfg());
@@ -12292,7 +12450,7 @@ function dateParDefautTemps(c) {
 }
 function ouvrirTemps(id, quand) {
   var c = chantier(id); if (!c) return;
-  modale('Temps passé — ' + (c.nom || 'chantier'),
+  modale('Temps passé — ' + C.nomChantier(c),
     '<div class="grille g2">' +
     /* La date était pré-remplie, donc elle avait l'air obligatoire : on ne
        pouvait pas dire « j'ai fait trois journées » sans dire quand, ce qui
@@ -12381,7 +12539,7 @@ function ouvrirTemps(id, quand) {
 
 function ouvrirStatut(id) {
   var c = chantier(id); if (!c) return;
-  modale('Statut — ' + (c.nom || 'chantier'),
+  modale('Statut — ' + C.nomChantier(c),
     C.statutsPossibles(c).map(function (s) {
       return '<button class="liste-item" data-setstatut="' + s.c + '" style="width:100%;text-align:left;background:none;border:none;border-bottom:1px solid var(--trait);cursor:pointer">' +
         '<span class="pastille" style="background:' + COUL_STATUT[s.c] + '"></span>' +
@@ -12496,7 +12654,7 @@ function renderEstimResultat() {
   var refs = r.refs.slice(0, 5).map(function (x) {
     return '<div class="liste-item"><span class="pastille" style="background:' +
       (COUL_STATUT[x.chantier.statut] || '#7A8471') + '"></span>' +
-      '<div class="li-c"><b>' + esc(x.chantier.nom || 'Chantier') + '</b>' +
+      '<div class="li-c"><b>' + esc(C.nomChantier(x.chantier)) + '</b>' +
       '<small>' + E.fmt(x.rendement, x.rendement < 10 ? 2 : 0) + ' ' + u + '/j · ' +
       E.fmt(x.quantite, 0) + ' ' + u + ' en ' + E.fmt(x.jours, 1) + ' j' +
       (x.prixJour ? ' · ' + eur(x.prixJour) + '/j' : '') +
@@ -12557,7 +12715,7 @@ function ouvrirDetailRendement(travail) {
   var u = C.courtUnite(refs[0].unite);
   modale('Rendements — ' + C.nomTravail(travail),
     refs.sort(function (a, b) { return b.rendement - a.rendement; }).map(function (r) {
-      return '<div class="liste-item"><div class="li-c"><b>' + esc(r.chantier.nom || 'Chantier') + '</b>' +
+      return '<div class="liste-item"><div class="li-c"><b>' + esc(C.nomChantier(r.chantier)) + '</b>' +
         '<small>' + E.fmt(r.rendement, 2) + ' ' + u + '/j · ' + E.fmt(r.quantite, 0) + ' ' + u +
         ' en ' + E.fmt(r.jours, 1) + ' j' + (r.prixJour ? ' · ' + eur(r.prixJour) + '/j' : '') +
         (r.difficulte ? ' · difficulté ' + r.difficulte + '/5' : '') +
@@ -12578,7 +12736,7 @@ function renderBandeauPlanif() {
   if (!c) { z.innerHTML = ''; return; }
   var placees = C.totalPlace(c), reste = C.resteAPlacer(c);
   z.innerHTML = '<div class="carte2" style="margin-bottom:11px;border-color:var(--encre)">' +
-    '<b style="font-size:13.5px">Placement — ' + esc(c.nom || 'chantier') + '</b>' +
+    '<b style="font-size:13.5px">Placement — ' + esc(C.nomChantier(c)) + '</b>' +
     '<div class="muted" style="font-size:12.5px;margin-top:2px">' +
     (reste == null
       ? placees + ' journée' + (placees > 1 ? 's' : '') + ' placée' + (placees > 1 ? 's' : '')
@@ -12639,7 +12797,7 @@ function ouvrirFicheJour(ts) {
     corps += '<p class="eyebrow" style="margin:14px 0 6px">Ce que vous y avez fait</p>' +
       o.reels.map(function (r) {
         return '<div class="liste-item"><div class="li-c"><b>' +
-          esc(r.chantier.nom || 'Chantier') + '</b><small>' +
+          esc(C.nomChantier(r.chantier)) + '</b><small>' +
           C.ditDuree(C.heuresSaisie(r.temps, A.cfg), A.cfg) +
           (C.nb(r.temps.personnes) > 1 ? ' × ' + C.nb(r.temps.personnes) + ' pers.' : '') +
           (r.temps.activite ? ' · ' + esc(C.nomTravail(r.temps.activite)) : '') + '</small></div>' +
@@ -12657,7 +12815,7 @@ function ouvrirFicheJour(ts) {
       enAttente.map(function (p) {
         return '<div class="liste-item"><span class="pastille" style="background:' +
           (p.fermete === 'ferme' ? '#2E7D46' : '#B98A00') + '"></span>' +
-          '<div class="li-c"><b>' + esc(p.chantier.nom || 'Chantier') + '</b><small>' +
+          '<div class="li-c"><b>' + esc(C.nomChantier(p.chantier)) + '</b><small>' +
           C.ditDuree(C.nb(p.part != null ? p.part : 1) * C.HEURES_JOUR(A.cfg), A.cfg) +
           ' prévues · ' +
           esc([p.chantier.donneur, C.nomStatut(p.chantier.statut, p.chantier)]
@@ -12836,7 +12994,7 @@ function ouvrirResolutionJour(ts) {
   var rang = 0;
   reste.forEach(function (x, i) { if (C.jourCle(x.d) === C.jourCle(ts)) rang = i; });
   var d = new Date(ts);
-  var noms = o.prevus.map(function (p) { return p.chantier.nom || 'Chantier'; });
+  var noms = o.prevus.map(function (p) { return C.nomChantier(p.chantier); });
 
   modale('Le ' + d.toLocaleDateString('fr-FR') + ' — que s’est-il passé ?',
     '<p class="sous-titre-bloc">Ce jour était <b>' +
@@ -12894,7 +13052,7 @@ function ouvrirDeplacerJour(ts) {
   var d = new Date(ts);
   modale('Déplacer la journée du ' + d.toLocaleDateString('fr-FR'),
     '<p class="sous-titre-bloc">' +
-    esc(o.prevus.map(function (p) { return p.chantier.nom || 'Chantier'; }).join(', ')) +
+    esc(o.prevus.map(function (p) { return C.nomChantier(p.chantier); }).join(', ')) +
     ' — vers quel jour ?</p>' +
     '<div class="champ"><label class="eyebrow" for="dj-date">Le vrai jour</label>' +
     '<input type="date" id="dj-date" value="' + versChamp(ts) + '"></div>' +
@@ -12957,7 +13115,7 @@ function ouvrirPoserChantier(ts) {
   modale('Poser un chantier — ' + d.toLocaleDateString('fr-FR'),
     '<div class="champ"><label class="eyebrow" for="pj-ch">Chantier</label>' +
     '<select id="pj-ch">' + libres.map(function (c) {
-      return '<option value="' + c.id + '">' + esc(c.nom || 'Chantier') + '</option>';
+      return '<option value="' + c.id + '">' + esc(C.nomChantier(c)) + '</option>';
     }).join('') + '</select></div>' +
     '<div class="champ"><label class="eyebrow" for="pj-part">Combien de temps</label>' +
     '<select id="pj-part">' + partsPossibles(1) + '</select></div>' +
@@ -13053,7 +13211,7 @@ function renderFicheChantier() {
     '<select id="fch-ch"><option value="">— choisir —</option>' +
     liste.map(function (x) {
       return '<option value="' + x.id + '"' + (c && c.id === x.id ? ' selected' : '') + '>' +
-        esc(x.nom || 'Chantier') + '</option>';
+        esc(C.nomChantier(x)) + '</option>';
     }).join('') + '</select></div></div>';
 
   if (!c) {
@@ -13311,7 +13469,7 @@ function htmlFeuilleFiche(c) {
     '</div>' +
 
     C.RISQUES_FICHE.map(groupe).join('') +
-    '<div class="fp"><span>Fiche de chantier — ' + esc(c.nom || '') + '</span>' +
+    '<div class="fp"><span>Fiche de chantier — ' + esc(C.nomChantier(c)) + '</span>' +
     '<span>Établie le ' + dateCourte(Date.now()) + ' · page 1 sur 2</span></div>' +
     '</div>' +
 
@@ -13349,7 +13507,7 @@ function htmlFeuilleFiche(c) {
     '<div>Date et signature du chef d’entreprise</div></div>' +
     '<p class="fn">Cette fiche doit être présente sur le chantier. Tous les intervenants ' +
     'doivent en prendre connaissance avant le début des travaux.</p></div>' +
-    '<div class="fp"><span>Fiche de chantier — ' + esc(c.nom || '') + '</span>' +
+    '<div class="fp"><span>Fiche de chantier — ' + esc(C.nomChantier(c)) + '</span>' +
     '<span>Établie le ' + dateCourte(Date.now()) + ' · page 2 sur 2</span></div>' +
     '</div>';
 }
@@ -13368,7 +13526,7 @@ function naturedesTravaux(c) {
    La même feuille, dans une fenêtre, avant d'engager l'impression. */
 function apercuFiche(c) {
   if (!c) return;
-  modale('Aperçu — ' + (c.nom || 'chantier'),
+  modale('Aperçu — ' + C.nomChantier(c),
     '<div class="apercu-feuille">' + htmlFeuilleFiche(c) + '</div>' +
     '<div class="btn-rang" style="margin-top:11px">' +
     '<button class="btn primaire" id="ap-imp">Imprimer / PDF</button></div>');
@@ -13483,7 +13641,7 @@ function renderJourDetail() {
     h += '<p class="eyebrow" style="margin:0 0 6px">Prévu</p>' + occ.prevus.map(function (p) {
       return '<div class="liste-item"><span class="pastille" style="background:' +
         (p.fermete === 'ferme' ? '#2E7D46' : '#B98A00') + '"></span>' +
-        '<div class="li-c"><b>' + esc(p.chantier.nom || 'Chantier') + '</b><small>' +
+        '<div class="li-c"><b>' + esc(C.nomChantier(p.chantier)) + '</b><small>' +
         esc([p.chantier.donneur || p.chantier.client, C.nomStatut(p.chantier.statut, p.chantier)].filter(Boolean).join(' · ')) +
         (p.part != null && p.part < 1 ? ' · demi-journée' : '') +
         (p.fermete === 'provisoire' ? ' — provisoire' : '') + '</small></div>' +
@@ -13493,7 +13651,7 @@ function renderJourDetail() {
   if (occ.reels.length) {
     h += '<p class="eyebrow" style="margin:12px 0 6px">Fait</p>' + occ.reels.map(function (r) {
       return '<div class="liste-item"><span class="pastille" style="background:#1D6FB8"></span>' +
-        '<div class="li-c"><b>' + esc(r.chantier.nom || 'Chantier') + ' — ' + E.fmt(r.jours, 2) + ' j-h</b>' +
+        '<div class="li-c"><b>' + esc(C.nomChantier(r.chantier)) + ' — ' + E.fmt(r.jours, 2) + ' j-h</b>' +
         '<small>' + E.fmt(C.nb(r.temps.duree), 1) + (r.temps.unite === 'h' ? ' h' : ' j') +
         (C.nb(r.temps.personnes) > 1 ? ' × ' + C.nb(r.temps.personnes) + ' pers.' : '') +
         (r.temps.activite ? ' · ' + esc(C.nomTravail(r.temps.activite)) : '') + '</small></div>' +
@@ -14366,7 +14524,7 @@ function prochaineJourneeHtml() {
   return '<button class="suite" data-bulle="calendrier">' +
     '<svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><rect x="4" y="5.6" width="16" ' +
     'height="14" rx="2"/><path d="M4 10.2h16M8.6 3.6v3.8M15.4 3.6v3.8"/></svg>' +
-    '<span><b>' + quand + '</b> — ' + esc(trouve.ch.nom || 'chantier') + ', ' +
+    '<span><b>' + quand + '</b> — ' + esc(C.nomChantier(trouve.ch)) + ', ' +
     esc(C.fmtJours(trouve.p)) +
     /* Pour qui je travaille : c'est ce qu'on veut savoir la veille. */
     (trouve.ch.donneur ? '<small>pour ' + esc(trouve.ch.donneur) + '</small>' : '') +
@@ -14408,7 +14566,7 @@ function renderATraiter() {
       var m = C.montant(x.chantier);
       return '<button class="alerte" data-alerte="' + x.chantier.id + '">' +
         '<span class="ic" style="background:' + (COUL_ALERTE[x.type] || '#7A8471') + '"></span>' +
-        '<span><b>' + esc(TITRE_ALERTE[x.type] || '') + ' — ' + esc(x.chantier.nom || 'Chantier') +
+        '<span><b>' + esc(TITRE_ALERTE[x.type] || '') + ' — ' + esc(C.nomChantier(x.chantier)) +
         (m ? ' · ' + eur(m) : '') + '</b>' +
         '<small>' + esc(x.texte) +
         (x.chantier.donneur ? ' · ' + esc(x.chantier.donneur) : '') + '</small></span></button>';
@@ -14489,7 +14647,7 @@ function renderAlertes() {
     al.map(function (a) {
       return '<button class="alerte" data-alerte="' + a.chantier.id + '">' +
         '<span class="ic" style="background:' + (COUL_ALERTE[a.type] || '#7A8471') + '"></span>' +
-        '<span><b>' + esc(TITRE_ALERTE[a.type] || '') + ' — ' + esc(a.chantier.nom || 'Chantier') + '</b>' +
+        '<span><b>' + esc(TITRE_ALERTE[a.type] || '') + ' — ' + esc(C.nomChantier(a.chantier)) + '</b>' +
         '<small>' + esc(a.texte) + (a.chantier.donneur ? ' · ' + esc(a.chantier.donneur) : '') + '</small></span></button>';
     }).join('') + '</div>';
   majPastilleEntreprise();
@@ -15096,7 +15254,7 @@ function renderImportResultat() {
       r.erreurs.slice(0, 4).map(function (e) { return '<li>' + esc(e) + '</li>'; }).join('') +
       (r.erreurs.length > 4 ? '<li>…</li>' : '') + '</ul></div>' : '') +
     '<div style="margin-top:9px">' + r.chantiers.slice(0, 5).map(function (c) {
-      return '<div class="liste-item"><div class="li-c"><b>' + esc(c.nom) + ' — ' + eur(C.montant(c)) + '</b>' +
+      return '<div class="liste-item"><div class="li-c"><b>' + esc(C.nomChantier(c)) + ' — ' + eur(C.montant(c)) + '</b>' +
         '<small>' + esc([c.donneur, c.lignes.length + ' ligne(s)',
           C.tempsTotal(c, A.cfg) ? E.fmt(C.tempsTotal(c, A.cfg), 1) + ' j' : ''].filter(Boolean).join(' · ')) +
         '</small></div></div>';
@@ -15573,7 +15731,7 @@ function ouvrirJournee(id, modele) {
     '<select id="mj-ch"><option value="">— aucun, journée libre —</option>' +
     chs.map(function (c) {
       return '<option value="' + c.id + '"' +
-        (src && src.chantier === c.id ? ' selected' : '') + '>' + esc(c.nom || 'Chantier') + '</option>';
+        (src && src.chantier === c.id ? ' selected' : '') + '>' + esc(C.nomChantier(c)) + '</option>';
     }).join('') + '</select></div>' +
     '<div class="grille g2">' +
     '<div class="champ"><label class="eyebrow" for="mj-lieu">Forêt</label>' +
@@ -16355,7 +16513,7 @@ function ouvrirFicheArticle(id) {
         (m.commande ? ' · ' + esc(m.commande) : '') +
         (m.fournisseur ? ' · ' + esc(m.fournisseur) : '') +
         (m.client ? ' · ' + esc(m.client) : '') +
-        (ch ? ' · ' + esc(ch.nom || 'chantier') : '') +
+        (ch ? ' · ' + esc(C.nomChantier(ch)) : '') +
         (m.attendu ? ' · attendu' : '') +
         (m.etat === 'engage' ? ' · engagé' : m.etat === 'prevu' ? ' · prévu' : '') +
         (m.perte ? ' · perte' + (m.motif ? ' (' + esc(m.motif) + ')' : '') : '') +
@@ -16468,10 +16626,10 @@ function listeSorties(pertes) {
     }, 0);
     var coul = s.perte ? '#B4231F' : s.debours ? '#5C6BA8' : etat === 'sorti' ? '#2E7D46'
       : etat === 'engage' ? '#B98A00' : etat === 'mort' ? '#8A9382' : '#7A8471';
-    var titre = s.perte ? 'Perte' : (s.num || (ch ? (ch.nom || 'Chantier') : s.client || 'Sortie'));
+    var titre = s.perte ? 'Perte' : (s.num || (ch ? C.nomChantier(ch) : s.client || 'Sortie'));
     var sous = [dateCourte(s.date)];
     if (!s.perte && s.client) sous.push(esc(s.client));
-    if (ch) sous.push(esc(ch.nom || 'chantier'));
+    if (ch) sous.push(esc(C.nomChantier(ch)));
     if (s.perte) { if (s.motif) sous.push(esc(s.motif)); }
     else sous.push(esc(ST.nomStatutVente(st)));
     if (!s.perte && !s.debours && ca) sous.push('marge ' + eur(ST.arr(ca - cout, 2)));
@@ -17091,7 +17249,7 @@ function renderCarteChantiers() {
   var z = $('#carte-svg'); if (!z) return;
   var pts = A.chantiers.filter(function (c) { return c.gps && c.gps.lat != null; })
     .map(function (c) {
-      return { gps: c.gps, nom: c.nom || 'Chantier', id: c.id, statut: c.statut,
+      return { gps: c.gps, nom: C.nomChantier(c), id: c.id, statut: c.statut,
         detail: [c.donneur, C.nomStatut(c.statut, c), C.montant(c) ? eur(C.montant(c)) : ''].filter(Boolean).join(' · ') };
     });
   if (!pts.length) {
@@ -17142,7 +17300,7 @@ function renderCarteChantiers() {
    chantier restait introuvable par son numéro. On le demande donc là où il se
    remplit vraiment. Jamais imposé : la facture n'est pas toujours éditée. */
 function demanderNumeroFacture(c) {
-  modale('Facturé — ' + (c.nom || 'chantier'),
+  modale('Facturé — ' + C.nomChantier(c),
     champNumero('F', 'nf-num', c.numeroFacture, 'N° de facture') +
     '<div class="grille g2">' +
     '<div class="champ"><label class="eyebrow" for="nf-date">Facturé le</label>' +
@@ -18096,7 +18254,7 @@ function ouvrirSortieStock(id, perte, artPref) {
       '<select id="so-ch"><option value="">— sans chantier —</option>' +
       chs.map(function (x) {
         return '<option value="' + x.id + '"' + (s && s.chantier === x.id ? ' selected' : '') + '>' +
-          esc(x.nom || 'Chantier') + '</option>';
+          esc(C.nomChantier(x)) + '</option>';
       }).join('') + '</select></div>' +
       '<div class="grille g2">' +
       '<div class="champ"><label class="eyebrow" for="so-client">Client</label>' +
@@ -18997,7 +19155,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.74.0-20260906-2355';
+var VERSION = '4.75.0-20260908-0910';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.74.0-20260906-2355**
+Version courante : **4.75.0-20260908-0910**
 
 ---
 
@@ -51,7 +51,7 @@ npm run controle   # vérificateur + service worker + tests + reconstruction + c
 ```
 
 Doit afficher **« Bon pour livraison »**, puis **« le service worker tient »**
-(24 vérifications), puis la suite au vert — 1493 à ce jour — puis
+(24 vérifications), puis la suite au vert — 1536 à ce jour — puis
 **« Sylve.html est conforme »**.
 
 Compter **moins de deux minutes**. Ça a été dix, et deux choses l'expliquaient :
@@ -227,6 +227,14 @@ travailler.
   contient `$$` — les sélecteurs `t.$$()` des tests — `String.replace` le lit
   comme un `$` littéral. Utiliser `split().join()` ou une fonction de
   remplacement.
+- **Un motif de remplacement qui commence par une parenthèse mange le nom
+  de la fonction devant.** Remplacer `(c.nom || 'chantier')` par
+  `C.nomChantier(c)` a transformé `esc(c.nom || 'chantier')` en
+  `escC.nomChantier(c)` : syntaxe valide, vérificateur au vert, et un
+  `ReferenceError` qui tuait le calendrier au premier rendu. Un seul site sur
+  six. **Compter les occurrences ne suffit pas quand le motif est ouvert à
+  gauche** : inclure ce qui précède (`esc(`, `+ (`) ou relire les sites
+  touchés. C'est un scénario qui l'a attrapé, pas le vérificateur.
 - **Ne jamais réécrire un fichier avec `Set-Content` sous PowerShell 5.1.**
   `Get-Content -Raw` lit en ANSI, `Set-Content -Encoding utf8` réécrit en
   UTF-8 : chaque accent traverse deux fois l'encodage et ressort en `Ã©`,
@@ -1230,8 +1238,9 @@ Le formulaire de création portait encore les vingt-trois champs de l'ancien
 forêt, type de travaux**. Le reste se remplit bloc par bloc sur la fiche.
 
 - **`nomAutoChantier(travail, proprietaire, commune)`** compose « Dégagement
-  manuel — Dupont, Foncine ». Il suit la saisie **tant qu'il n'a pas touché au
-  champ** ; dès qu'il écrit le sien, il se fige. Proposé, jamais imposé.
+  manuel — Dupont, Foncine ». Il était proposé et se figeait dès qu'il tapait
+  le sien ; depuis la 4.75 le nom ne se stocke plus du tout — voir *Le nom du
+  chantier ne se stocke plus*. Le champ a disparu des deux formulaires.
 - **Le type de travaux ouvre la première ligne** du bloc Travaux, avec son
   unité, sans quantité ni prix. Demandé par lui : « en général à la création je
   sais déjà le type de travaux effectués ».
@@ -1362,6 +1371,109 @@ franchie, l'autre le rang comptable.
 masquée hors d'une partie — le bouton d'accueil y faisait déjà le trajet. Il
 l'a voulue partout : « comme ça j'ai les deux possibilités. » Hors partie, elle
 vise l'accueil.
+
+## Le nom du chantier ne se stocke plus
+
+*« Le titre, je ne devrais pas le choisir. Ou alors je devrais pouvoir le
+modifier, mais… non, même pas. Sinon je ne le modifie pas, ils sont tous
+pareils, comme ça je ne me pose plus de questions. »*
+
+Et la cause des titres dépareillés, qu'il décrivait sans pouvoir la nommer
+(*« quand je l'enregistre, c'est bizarre »*) : **`nomAutoChantier()` ne
+s'appliquait qu'une fois, à la création.** Le propriétaire et la commune se
+remplissent souvent après, sur la fiche. Le nom gardait donc ce qu'il savait
+au départ et ne rattrapait jamais — sans qu'aucune saisie soit fautive.
+
+`nomChantier(c)` **se compose à la lecture**, comme le statut d'un jour du
+calendrier. Prestation — propriétaire, commune.
+
+- **Aucune migration, aucun renommage.** C'était la question posée avant de
+  s'y mettre : il a choisi « composé, jamais modifiable », ce qui semblait
+  imposer de réécrire ses trente-cinq chantiers. Dériver l'a rendu inutile —
+  rien n'est touché, donc rien n'est risqué. Troisième fois que ce projet y
+  gagne : `c.temps`, le statut d'un jour, et maintenant le nom.
+- **`c.nom` reste en base et sert de repli.** Un chantier sans prestation,
+  sans propriétaire et sans commune n'a rien à composer : son ancien nom vaut
+  mieux que « Chantier ». C'est le repli qui permet de ne rien réécrire.
+- **La recherche garde les deux.** Le nom composé *et* l'ancien : c'est encore
+  par le mot qu'il avait tapé qu'il retrouve un vieux chantier, et ce mot ne
+  s'affiche plus nulle part.
+- **La première prestation qui n'est pas une fourniture.** « Fourniture de
+  tuteurs — Martin, Levier » nommerait mal un dégagement qui en consomme.
+- **Le champ de saisie a disparu des deux formulaires**, remplacé par un
+  aperçu en lecture seule qui suit la frappe. Il voit sous quel nom le
+  chantier s'appellera sans avoir à le décider — la même idée que
+  `blocValeur()`, *« c'est bien d'avoir un bloc visuel où je n'ai rien à
+  modifier »*.
+- La création ne réclame plus un nom mais **de quoi en composer un** : le
+  type de travaux, le propriétaire ou la commune.
+
+**Corollaire pour les tests** : un scénario qui sème un `nom` et l'attend à
+l'écran ne dit plus rien. Trois l'ont fait, et ils semaient tous un nom libre
+pour éprouver autre chose — la mise en page d'un nom long, la recherche. Ils
+sèment maintenant ce qui *compose* ce nom.
+
+## La ligne du carnet, et l'ordre qu'on lui donne
+
+*« Le propriétaire est répété une deuxième fois. On part sur la prestation, le
+propriétaire, la commune ; en dessous le donneur d'ordre. Comme ça je peux
+mettre facturé le, ensuite payé le, comme ça c'est facile à lire. »*
+
+- **Le titre porte le propriétaire et la commune** : les redire dessous était
+  une répétition, et c'est ce qui rendait la ligne illisible. La deuxième
+  ligne ne garde que le donneur d'ordre, la forêt et les parcelles.
+- **Les prestations en trop se comptent au lieu de se lister** (« et 2 autres
+  prestations ») : la première est dans le titre, les nommer toutes doublait
+  la longueur de la ligne.
+- **`datesCh()` rend toutes les étapes datées**, pas seulement la dernière.
+  `dateStatut()` n'en donnait qu'une : une fois le chantier payé, on ne voyait
+  plus quand la facture était partie, donc plus le délai. `dateStatut()` sert
+  encore sur la fiche, où il n'y a qu'une ligne à écrire.
+
+**Le tri se choisit** — `TRIS_CH` : ordre du classeur, n° de facture, date de
+facture, date de paiement, date du devis, date d'entrée. Le sens
+ancien/récent existait déjà et reste à part.
+
+- **Ce qui n'a pas la valeur demandée va à la fin, dans les deux sens.** Un
+  chantier sans facture n'est pas « la plus ancienne des factures » ; le
+  ranger sur une date qu'il n'a pas serait un mensonge. Entre eux, ils
+  suivent leur date d'entrée.
+- **La fiche suit le même ordre.** `chantiersOrdonnes()` reçoit le critère :
+  deux ordres différents pour la même liste, et « Précédente » n'annoncerait
+  pas le chantier qu'on vient de voir.
+
+**`dateEntree(c)`** est le jour où le chantier est entré dans Sylve — pas
+celui des travaux. Posée à la création, corrigeable sur la fiche : un chantier
+saisi après coup n'est pas arrivé aujourd'hui. **Repli sur `cree`**, donc rien
+à migrer là non plus.
+
+**Un filtre « Avec devis »** rejoint « Chantiers ouverts », « Tous » et « À
+compléter » : *« sélectionner uniquement les chantiers qui ont eu un devis, et
+pouvoir aussi les trier ».*
+
+## La tête du carnet, dans ses mots
+
+*« Engagé tous statuts, ça c'est un peu bizarre. Devis sans réponse… »* Les
+deux intitulés l'arrêtaient à chaque passage. Il a dicté la liste qu'il veut
+lire, et tranché le point d'argent : **facturé et encaissé côte à côte**,
+parce que l'écart entre les deux est justement ce qu'il vient voir.
+
+| Tuile | Ce qu'elle dit |
+|---|---|
+| **Facturé** | la facture est partie, réglée ou non · N factures |
+| **Encaissé** | ce qui est rentré |
+| **En attente** | engagé, pas encore facturé · N chantiers, dont N à facturer |
+| **Devis en attente** | ce qui n'a pas eu de réponse · N devis |
+
+**Le facturé est la base des déclarations**, celle que Sylve emploie déjà :
+les deux écrans doivent dire la même chose, sinon le jour de la déclaration il
+ne sait plus lequel croire.
+
+**« À facturer » a perdu sa tuile mais pas son signal.** C'est le chantier
+qu'on risque d'oublier, et il compte même sans ligne chiffrée — il est devenu
+un sous-compte de « en attente » plutôt que de manger une tuile de la liste
+qu'il a dictée. Un scénario le gardait ; il a fallu le recaler, pas le
+supprimer.
 
 ## Une facture qui attend n’est pas un impayé
 
@@ -2105,9 +2217,6 @@ phrases plus loin il demandait *plus* de détail sur cet impayé. Les deux
   sous-catégories** : il manque le niveau du dessus. Ajouter un champ de
   catégorie sur chaque entrée de `TRAVAUX` sans toucher aux codes, qui portent
   l'historique.
-- **Le nom automatique du chantier.** Il dit que le nom « ne veut rien dire ».
-  Validé sur le principe : sous-catégorie + propriétaire + lieu, puis le n° de
-  devis et enfin celui de facture prennent le relais comme référence.
 - **Le formulaire de création d'un chantier** est encore l'ancien en-tête de
   vingt-trois champs (`ouvrirEnteteCh`). À raccourcir aux essentiels : le reste
   se remplit bloc par bloc sur la fiche.
@@ -2125,10 +2234,10 @@ phrases plus loin il demandait *plus* de détail sur cet impayé. Les deux
   plus. Ne pas en écrire un second jeu.
 
 - **Les grandes familles dans les filtres du carnet.** Il s'y perd avec
-  trente-cinq chantiers dont trente et un payés : les filtres sont à plat
-  (ouvert, à compléter, en cours, facturé…) et il ne sait plus à quelle famille
-  chacun appartient. Il aime les groupes *En cours / Clos* du sélecteur de
-  fiche et voudrait la même chose. Dit le 23 août, jamais tranché.
+  trente-cinq chantiers dont trente et un payés. Les filtres sont désormais
+  groupés *En cours / Clos*, et « Avec devis » s'y est ajouté en 4.75 ; ce
+  qu'il évoquait en plus — retrouver la **famille de travaux** d'un chantier
+  dans le filtre — n'est toujours pas fait. Dit le 23 août.
 - **Le nom du classement dans les exports.** `.xlsx`, CSV et impression
   écrivent toujours « Class. Comt ». Ces fichiers partent chez le client et
   reprennent le tableur d'origine : lui demander avant d'y toucher.

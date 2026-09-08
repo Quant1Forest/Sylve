@@ -1628,8 +1628,9 @@ scenario('Carnet : un numéro de facture retrouve son chantier, même payé', as
     chantiers: [
       { id: 'c1', nom: 'Vaux plantation', statut: 'paye', aDevis: false, lignes: [], temps: [],
         numeroFacture: 'F-2026-031', donneur: 'Cabinet Dubois', datePaiement: Date.now(), maj: Date.now() },
-      { id: 'c2', nom: 'Places dégagement', statut: 'encours', aDevis: false, lignes: [], temps: [],
-        commune: 'Foncine', maj: Date.now() }
+      { id: 'c2', statut: 'encours', aDevis: false, temps: [], proprietaire: 'Renaud',
+        commune: 'Foncine', maj: Date.now(),
+        lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 1, prix: 500, nature: 'prestation' }] }
     ]
   }));
   t.clic('[data-vue="carnet"]'); await t.pause(300);
@@ -1639,14 +1640,14 @@ scenario('Carnet : un numéro de facture retrouve son chantier, même payé', as
   t.saisir('#c-rech', 'F-2026-031'); await t.pause(250);
   const z = t.$('#liste-chantiers').textContent;
   verifierVrai('la recherche le fait sortir', /Vaux plantation/.test(z));
-  verifierVrai('et elle écarte l’autre', !/Places dégagement/.test(z));
+  verifierVrai('et elle écarte l’autre', !/Renaud/.test(z));
   verifierVrai('elle dit sur quoi elle a cherché', /1 chantier sur 2/.test(z));
 
   /* Les accents et les majuscules ne comptent pas, et deux mots peuvent
      tomber dans deux champs différents. */
   t.saisir('#c-rech', 'foncine'); await t.pause(250);
   verifierVrai('une commune en minuscules suffit',
-    /Places dégagement/.test(t.$('#liste-chantiers').textContent));
+    /Renaud/.test(t.$('#liste-chantiers').textContent));
   t.saisir('#c-rech', 'dubois vaux'); await t.pause(250);
   verifierVrai('deux mots dans deux champs se retrouvent',
     /Vaux plantation/.test(t.$('#liste-chantiers').textContent));
@@ -1887,7 +1888,7 @@ scenario('Entreprise : le bilan est au-dessus des tuiles, et chaque bulle mène 
         quantite: 1000, prix: 0.5, nature: 'prestation' }], temps: [], joursEstimes: 4,
         jours: [{ d: Date.now(), p: 1 }], maj: Date.now() },
       { id: 'c2', nom: 'Les Places', statut: 'encours', lignes: [], temps: [], maj: Date.now() },
-      { id: 'c3', nom: 'Foncine', statut: 'facture', lignes: [{ travail: 'DEGAG', unite: 'ha',
+      { id: 'c3', commune: 'Foncine', statut: 'facture', lignes: [{ travail: 'DEGAG', unite: 'ha',
         quantite: 2, prix: 900, nature: 'prestation' }], temps: [], donneur: 'Cabinet Dubois',
         numeroFacture: 'F-9', dateFacture: Date.now() - 70 * 86400000, maj: Date.now() }
     ]
@@ -2205,14 +2206,16 @@ scenario('Carnet : les lignes tombent sur une grille, montants alignés', async 
      endroit. */
   /* Des dates distinctes et fixes : deux appels à Date.now() peuvent différer
      d'une milliseconde, et le tri bascule alors l'ordre d'un passage à l'autre. */
-  const ligne = (id, nom, prix, jour) => ({ id, nom, statut: 'encours', temps: [],
+  /* Le nom se compose du travail, du propriétaire et de la commune : un nom
+     long se sème donc par eux, plus par un champ libre. */
+  const ligne = (id, proprio, prix, jour) => ({ id, statut: 'encours', temps: [],
     maj: new Date(2026, 0, jour, 12).getTime(),
-    donneur: 'Cabinet Dubois',
+    donneur: 'Cabinet Dubois', proprietaire: proprio, commune: 'Foncine-le-Haut',
     lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 1, prix: prix, nature: 'prestation' }] });
   const t = await ouvrir(Object.assign({}, VIDE, {
     module: 'chantiers',
-    chantiers: [ligne('c1', 'Un nom de chantier particulièrement long', 12000, 20),
-      ligne('c2', 'Court', 90, 10)]
+    chantiers: [ligne('c1', 'Groupement forestier de la Haute Vallée du Doubs', 12000, 20),
+      ligne('c2', 'Dupont', 90, 10)]
   }));
   t.clic('[data-vue="carnet"]'); await t.pause(300);
   const lignes = t.$$('#liste-chantiers .chantier-l');
@@ -2225,7 +2228,7 @@ scenario('Carnet : les lignes tombent sur une grille, montants alignés', async 
   verifierVrai('et il ne double pas le nom',
     !/\u20AC/.test(lignes[0].querySelector('.chantier-n').textContent));
   verifierVrai('le nom long est bien là',
-    /particulièrement long/.test(lignes[0].querySelector('.chantier-n').textContent));
+    /Haute Vallée du Doubs/.test(lignes[0].querySelector('.chantier-n').textContent));
   /* Les boutons ne sont plus étirés ni centrés : ils commencent au même bord. */
   const actions = lignes.map(l => l.querySelector('.chantier-act'));
   verifierVrai('chaque ligne porte ses trois boutons',
@@ -2253,7 +2256,248 @@ scenario('Carnet : « ouverts » n’est pas « en cours », et un terminé se c
   verifierVrai('trois chantiers ouverts, dits « ouverts »', /3 chantiers ouverts/.test(tete));
   verifierVrai('le mot « en cours » ne sert plus à compter', !/3 chantiers en cours/.test(tete));
   /* Le chantier terminé n'a pas de montant, mais il se compte. */
-  verifierVrai('le chantier à facturer est compté', /1 chantier/.test(tete));
+  verifierVrai('le chantier à facturer est compté', /dont 1 à facturer/.test(tete));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Carnet : le nom du chantier se compose et ne se tape plus', async () => {
+  /* « Le titre, je ne devrais pas le choisir. Sinon je ne le modifie pas, ils
+     sont tous pareils, comme ça je ne me pose plus de questions. »
+
+     Et la cause des titres dépareillés : le nom était écrit une fois, à la
+     création. Le propriétaire et la commune se remplissent souvent après, sur
+     la fiche — le nom gardait ce qu'il avait au départ. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [{ id: 'c1', nom: 'un vieux titre tapé à la main', statut: 'encours',
+      aDevis: false, temps: [], jours: [], maj: Date.now(),
+      donneur: 'Cabinet Dubois', proprietaire: 'Martin', commune: 'Levier',
+      lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 2, prix: 500, nature: 'prestation' }] }]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(300);
+  const nom = t.$('#liste-chantiers .chantier-n').textContent;
+  verifier('prestation, propriétaire, commune', 'Dégagement manuel — Martin, Levier', nom);
+  verifierVrai('l’ancien titre ne s’affiche plus',
+    !/vieux titre/.test(t.$('#liste-chantiers').textContent));
+
+  /* Rien n'a été réécrit : c'est une lecture, pas une migration. */
+  verifier('la donnée n’a pas bougé', 'un vieux titre tapé à la main',
+    (t.stock('chantiers') || [])[0].nom);
+  /* Et il retrouve encore son chantier par le mot qu'il avait tapé. */
+  t.saisir('#c-rech', 'vieux titre'); await t.pause(250);
+  verifierVrai('l’ancien nom reste cherchable',
+    /Dégagement manuel/.test(t.$('#liste-chantiers').textContent));
+  t.saisir('#c-rech', ''); await t.pause(250);
+
+  /* Corriger la commune corrige le nom : c'est tout l'objet. */
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+  t.clic('#f-identite'); await t.pause(400);
+  verifier('le champ de saisie a disparu', null, t.$('#ic-nom'));
+  t.saisir('#ic-com', 'Foncine');
+  await t.pause(200);
+  verifier('l’aperçu suit la frappe', 'Dégagement manuel — Martin, Foncine',
+    t.$('#ic-nom-apercu').textContent);
+  t.clic('#ic-ok'); await t.pause(600);
+  verifierVrai('et la fiche porte le nouveau nom',
+    /Dégagement manuel — Martin, Foncine/.test(t.texte('#vue-chantier')));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Carnet : un chantier sans rien à composer garde son ancien nom', async () => {
+  /* Le repli. Un chantier repris du carnet sans prestation, sans propriétaire
+     et sans commune n'a rien à composer : son ancien nom vaut mieux que
+     « Chantier ». C'est ce repli qui permet de ne rien réécrire. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [{ id: 'c1', nom: 'Reprise carnet 2024', statut: 'paye', aDevis: false,
+      temps: [], jours: [], lignes: [], maj: Date.now() }]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(300);
+  t.choisir('#c-filtre', 'tous'); await t.pause(300);
+  verifier('l’ancien nom tient lieu de nom', 'Reprise carnet 2024',
+    t.$('#liste-chantiers .chantier-n').textContent);
+
+  /* Une fourniture ne nomme pas un chantier : c'est la prestation qui parle. */
+  const C0 = t.w.BCC;
+  verifier('la fourniture ne prend pas la tête', 'Dégagement manuel — Martin',
+    C0.nomChantier({ proprietaire: 'Martin', lignes: [
+      { travail: 'F_TUTEUR' }, { travail: 'DEGAG' }] }));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Carnet : la ligne ne redit pas le propriétaire, et porte ses dates', async () => {
+  /* « Il y a aussi le propriétaire qui est répété une deuxième fois. On part
+     sur la prestation, le propriétaire, la commune ; en dessous le donneur
+     d'ordre. Comme ça je peux mettre facturé le, ensuite payé le. » */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [{ id: 'c1', statut: 'paye', aDevis: true, temps: [], jours: [],
+      maj: Date.now(), donneur: 'Cabinet Dubois', proprietaire: 'Martin',
+      commune: 'Levier', foret: 'Forêt de la Côte',
+      numeroFacture: 'F-2026-0016',
+      dateDevis: new Date(2026, 1, 4, 12).getTime(),
+      dateFacture: new Date(2026, 2, 12, 12).getTime(),
+      datePaiement: new Date(2026, 3, 30, 12).getTime(),
+      lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 2, prix: 500, nature: 'prestation' }] }]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(300);
+  t.choisir('#c-filtre', 'tous'); await t.pause(300);
+  const ligne = t.$('#liste-chantiers .chantier-l');
+  const sous = [...ligne.querySelectorAll('.chantier-d')].map(x => x.textContent);
+
+  verifierVrai('le titre porte le propriétaire',
+    /Martin/.test(ligne.querySelector('.chantier-n').textContent));
+  verifierVrai('la ligne d’en dessous ne le redit pas', !/Martin/.test(sous[0]));
+  verifierVrai('elle porte le donneur d’ordre', /Cabinet Dubois/.test(sous[0]));
+
+  /* Les trois étapes, pas seulement la dernière : c'est l'écart entre la
+     facture et le paiement qu'il vient lire. */
+  verifierVrai('le devis est daté', /devis le 04\/02\/2026/.test(sous[1]));
+  verifierVrai('la facture aussi', /facturé le 12\/03\/2026/.test(sous[1]));
+  verifierVrai('et le paiement', /payé le 30\/04\/2026/.test(sous[1]));
+  verifierVrai('le numéro de facture reste lisible',
+    /F-2026-0016/.test(ligne.textContent));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Carnet : le tri se choisit, et ce qui n’a pas la date va à la fin', async () => {
+  /* « De pouvoir choisir : du plus ancien au plus récent, ok, mais de choisir
+     si c'est sur le numéro de facture, sur la date de paiement, sur la date
+     d'émission de la facture, ou sur celle du devis. » */
+  const J = (m, j) => new Date(2026, m, j, 12).getTime();
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [
+      { id: 'c1', proprietaire: 'Alpha', statut: 'paye', aDevis: true, temps: [], jours: [],
+        lignes: [], maj: J(0, 1), numeroFacture: 'F-2026-0002',
+        dateDevis: J(0, 10), dateFacture: J(2, 1), datePaiement: J(5, 1) },
+      { id: 'c2', proprietaire: 'Beta', statut: 'paye', aDevis: true, temps: [], jours: [],
+        lignes: [], maj: J(0, 2), numeroFacture: 'F-2026-0001',
+        dateDevis: J(1, 10), dateFacture: J(3, 1), datePaiement: J(4, 1) },
+      /* Ni devis ni facture : il n'a qu'une date d'entrée. */
+      { id: 'c3', proprietaire: 'Gamma', statut: 'encours', aDevis: false, temps: [], jours: [],
+        lignes: [], maj: J(0, 3), cree: J(6, 1) }
+    ]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(300);
+  t.choisir('#c-filtre', 'tous'); await t.pause(300);
+  const noms = () => [...t.$$('#liste-chantiers .chantier-n')].map(x => x.textContent);
+
+  t.choisir('#c-tri', 'facture'); await t.pause(300);
+  /* Du plus récent d'abord : F-0002 avant F-0001. Celui sans facture ferme
+     la marche — il n'est pas « la plus ancienne des factures ». */
+  verifier('par numéro de facture', ['Alpha', 'Beta', 'Gamma'], noms());
+
+  t.choisir('#c-tri', 'paiement'); await t.pause(300);
+  verifier('par date de paiement', ['Alpha', 'Beta', 'Gamma'], noms());
+
+  t.choisir('#c-tri', 'datefacture'); await t.pause(300);
+  verifier('par date de facture', ['Beta', 'Alpha', 'Gamma'], noms());
+
+  t.choisir('#c-tri', 'devis'); await t.pause(300);
+  verifier('par date de devis', ['Beta', 'Alpha', 'Gamma'], noms());
+
+  /* Le sens s'inverse, mais ce qui n'a pas la valeur reste à la fin. */
+  t.clic('#c-sens'); await t.pause(300);
+  verifier('du plus ancien, sans remonter les sans-devis',
+    ['Alpha', 'Beta', 'Gamma'], noms());
+
+  /* Et la date d'entrée range ceux qui n'ont rien d'autre. */
+  t.clic('#c-sens'); await t.pause(300);
+  t.choisir('#c-tri', 'entree'); await t.pause(300);
+  verifier('par date d’entrée, personne n’est relégué',
+    ['Gamma', 'Beta', 'Alpha'], noms());
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Carnet : la date d’entrée se pose seule et se corrige', async () => {
+  /* Elle ne dit rien des travaux : c'est l'ordre d'arrivée, et c'est ce qui
+     range les chantiers qui n'ont ni devis ni facture. */
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'chantiers' }));
+  t.clic('[data-vue="carnet"]'); await t.pause(300);
+  t.clic('#c-nouveau'); await t.pause(400);
+  t.saisir('#ce-proprio', 'Martin');
+  t.saisir('#ce-com', 'Levier');
+  await t.pause(200);
+  verifier('le nom se montre avant d’être créé', 'Martin, Levier',
+    t.$('#ce-nom-apercu').textContent);
+  t.clic('#ce-ok'); await t.pause(700);
+
+  const c = (t.stock('chantiers') || [])[0];
+  verifierVrai('le chantier est né', !!c);
+  const C0 = t.w.BCC;
+  verifier('entré aujourd’hui', C0.jourCle(Date.now()), C0.jourCle(C0.dateEntree(c)));
+
+  /* Un chantier saisi après coup n'est pas arrivé aujourd'hui. */
+  t.clic('#f-identite'); await t.pause(400);
+  t.choisir('#ic-entree', jourISO(new Date(2026, 0, 15, 12).getTime()));
+  t.clic('#ic-ok'); await t.pause(600);
+  verifier('la date se corrige', C0.jourCle(new Date(2026, 0, 15, 12).getTime()),
+    C0.jourCle(C0.dateEntree((t.stock('chantiers') || [])[0])));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Carnet : le filtre ne garde que les chantiers qui ont eu un devis', async () => {
+  /* « Ce serait bien pour sélectionner uniquement les chantiers qui ont eu un
+     devis, et pouvoir aussi les trier. » Tous n'en partent pas : un client qui
+     rappelle pour finir une parcelle, un dépannage. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [
+      { id: 'c1', proprietaire: 'Avecdevis', statut: 'encours', aDevis: true,
+        temps: [], jours: [], lignes: [], maj: Date.now() },
+      { id: 'c2', proprietaire: 'Sansdevis', statut: 'encours', aDevis: false,
+        temps: [], jours: [], lignes: [], maj: Date.now() }
+    ]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(300);
+  t.choisir('#c-filtre', 'avecdevis'); await t.pause(350);
+  const z = t.$('#liste-chantiers').textContent;
+  verifierVrai('celui qui a un devis est là', /Avecdevis/.test(z));
+  verifierVrai('l’autre est écarté', !/Sansdevis/.test(z));
+  /* Le compte du filtre ne se devine pas : il est écrit dans l'option. */
+  verifierVrai('et le filtre dit combien',
+    /Avec devis \(1\)/.test(t.$('#c-filtre').textContent));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Carnet : la tête dit le facturé, l’encaissé et ce qui attend', async () => {
+  /* « Chiffre d'affaires total, nombre de factures éditées, nombre de
+     chantiers en attente, nombre de devis en attente. Avec un chiffre pour
+     dire : tant de chantiers en attente, ça fait tant d'euros. »
+     Et l'écart entre facturé et encaissé est justement ce qu'il veut voir. */
+  const ligne = p => [{ travail: 'DEGAG', unite: 'ha', quantite: 1, prix: p, nature: 'prestation' }];
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [
+      { id: 'c1', proprietaire: 'A', statut: 'paye', aDevis: false, temps: [], jours: [],
+        maj: Date.now(), lignes: ligne(1000) },
+      { id: 'c2', proprietaire: 'B', statut: 'facture', aDevis: false, temps: [], jours: [],
+        maj: Date.now(), lignes: ligne(500) },
+      { id: 'c3', proprietaire: 'C', statut: 'termine', aDevis: false, temps: [], jours: [],
+        maj: Date.now(), lignes: ligne(300) },
+      { id: 'c4', proprietaire: 'D', statut: 'envoye', aDevis: true, temps: [], jours: [],
+        maj: Date.now(), lignes: ligne(200) }
+    ]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(350);
+  const tete = t.texte('#carnet-totaux');
+  /* Facturé : la facture est partie, réglée ou non — la base des déclarations. */
+  verifierVrai('le facturé additionne payé et facturé', /1 500 €facturé/.test(tete));
+  verifierVrai('et compte les factures', /2 factures/.test(tete));
+  verifierVrai('l’encaissé ne retient que le réglé', /1 000 €encaissé/.test(tete));
+  verifierVrai('ce qui attend est chiffré', /300 €en attente/.test(tete));
+  verifierVrai('et ce qui presse est dit', /dont 1 à facturer/.test(tete));
+  verifierVrai('les devis en attente aussi', /200 €devis en attente · 1 devis/.test(tete));
+  /* Les mots qui l'arrêtaient à chaque passage. */
+  verifierVrai('« engagé, tous statuts » a disparu', !/engagé, tous statuts/.test(tete));
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -2420,7 +2664,7 @@ scenario('Listes : le nom se propose en quittant le champ, pas à la validation'
   /* Enregistrer ne pose plus aucune question. */
   let demande = null;
   t.w.confirm = m => { demande = m; return false; };
-  t.saisir('#ce-nom', 'Vaux');
+  t.saisir('#ce-proprio', 'Vaux');
   t.clic('#ce-ok'); await t.pause(450);
   verifier('la validation ne demande plus rien', null, demande);
   verifier('et le chantier est enregistré', 1, (t.stock('chantiers') || []).length);
@@ -4196,16 +4440,16 @@ scenario('Devis : la photo se prend au passage, jamais après coup', async () =>
   const t = await ouvrir(Object.assign({}, VIDE, {
     module: 'chantiers',
     chantiers: [
-      { id: 'c1', nom: 'Avec devis', statut: 'termine', aDevis: true, temps: [], maj: Date.now(),
+      { id: 'c1', proprietaire: 'Martin', statut: 'termine', aDevis: true, temps: [], maj: Date.now(),
         lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 4, prix: 800, nature: 'prestation' }] },
       /* Repris du carnet : déjà payé, aucun devis n'a existé. */
-      { id: 'c2', nom: 'Repris du carnet', statut: 'paye', aDevis: false, temps: [], maj: Date.now(),
+      { id: 'c2', proprietaire: 'Renaud', statut: 'paye', aDevis: false, temps: [], maj: Date.now(),
         numeroFacture: 'F-2025-0007', datePaiement: Date.now(),
         lignes: [{ travail: 'PLANT', unite: 'plant', quantite: 500, prix: 2, nature: 'prestation' }] },
       /* Celui-ci a bien eu un devis, mais il est facturé depuis longtemps et
          aucune photo n'a été prise à l'époque. La garde « aDevis » ne le
          protège pas : seule la condition de passage le protège. */
-      { id: 'c3', nom: 'Facturé de longue date', statut: 'paye', aDevis: true, temps: [],
+      { id: 'c3', proprietaire: 'Bourgeois', statut: 'paye', aDevis: true, temps: [],
         maj: Date.now(), numeroDevis: 'D-2025-0003', numeroFacture: 'F-2025-0012',
         dateFacture: Date.now(), datePaiement: Date.now(),
         lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 2, prix: 700, nature: 'prestation' }] }
@@ -4230,7 +4474,7 @@ scenario('Devis : la photo se prend au passage, jamais après coup', async () =>
      scénario continuait alors sur le chantier précédent sans le dire. */
   t.choisir('#f-choix', 'c2'); await t.pause(450);
   verifierVrai('on est bien passé sur le chantier repris',
-    /Repris du carnet/.test(t.texte('#f-bloc-chantier')));
+    /Renaud/.test(t.texte('#f-bloc-chantier')));
   t.clic('#f-facture'); await t.pause(350);
   t.clic('#fc-ok'); await t.pause(450);
   verifierVrai('un chantier déjà payé ne se voit pas inventer un devis',
@@ -4240,7 +4484,7 @@ scenario('Devis : la photo se prend au passage, jamais après coup', async () =>
      pas figer aujourd'hui ce qui a été facturé il y a des mois. */
   t.choisir('#f-choix', 'c3'); await t.pause(450);
   verifierVrai('on est bien passé sur celui qui avait un devis',
-    /Facturé de longue date/.test(t.texte('#f-bloc-chantier')));
+    /Bourgeois/.test(t.texte('#f-bloc-chantier')));
   t.clic('#f-facture'); await t.pause(350);
   t.clic('#fc-ok'); await t.pause(450);
   verifierVrai('ni celui qui avait un devis mais est facturé depuis longtemps',
@@ -4332,14 +4576,14 @@ scenario('Devis : les journées se déduisent des lignes, sans double saisie', a
   const t = await ouvrir(Object.assign({}, VIDE, {
     module: 'chantiers', cfg: { prixJourVise: 650 },
     chantiers: [
-      { id: 'c1', nom: 'À la journée', statut: 'accepte', aDevis: true, temps: [], maj: Date.now(),
+      { id: 'c1', proprietaire: 'À la journée', statut: 'accepte', aDevis: true, temps: [], maj: Date.now(),
         /* Trois journées au devis, et une ligne à l'hectare que le temps
            déduit ne couvre pas. */
         lignes: [
           { travail: 'DEGAG', unite: 'jour', quantite: 3, prix: 800, nature: 'prestation' },
           { travail: 'PLANT', unite: 'ha', quantite: 2, prix: 400, nature: 'prestation' }
         ] },
-      { id: 'c2', nom: 'À l’hectare', statut: 'accepte', aDevis: true, temps: [], maj: Date.now(),
+      { id: 'c2', proprietaire: 'À l’hectare', statut: 'accepte', aDevis: true, temps: [], maj: Date.now(),
         joursEstimes: 5,
         lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 6, prix: 500, nature: 'prestation' }] }
     ]
@@ -4523,7 +4767,7 @@ scenario('Recettes : le débours se voit, hors du chiffre d’affaires', async (
 });
 
 /* --------------------------------------------------------------------- */
-scenario('Création : cinq champs, et le nom qui se propose', async () => {
+scenario('Création : cinq champs, et le nom qui se montre', async () => {
   /* Le formulaire tenait en vingt-trois champs : le devis, la facture, les
      journées, le peuplement, le statut, la note. Tout cela se remplit bloc
      par bloc sur la fiche. Il ne reste que ce qu'on sait en arrivant. */
@@ -4537,22 +4781,27 @@ scenario('Création : cinq champs, et le nom qui se propose', async () => {
   verifier('ni les journées', null, t.$('#ce-plusjour'));
   verifierVrai('mais le type de travaux, oui', t.$('#ce-trav'));
 
+  /* Le nom ne se tape plus : il se montre, et il suit la saisie. */
+  verifier('rien à taper pour le nom', null, t.$('#ce-nom'));
   t.saisir('#ce-proprio', 'Dupont');
   t.saisir('#ce-com', 'Foncine'); await t.pause(250);
-  verifier('le nom se propose sans les travaux', 'Dupont, Foncine', t.$('#ce-nom').value);
+  verifier('il se montre sans les travaux', 'Dupont, Foncine',
+    t.$('#ce-nom-apercu').textContent);
   t.choisir('#ce-trav', 'DEGAG'); await t.pause(250);
   verifier('et le type de travaux le complète',
-    'Dégagement manuel — Dupont, Foncine', t.$('#ce-nom').value);
+    'Dégagement manuel — Dupont, Foncine', t.$('#ce-nom-apercu').textContent);
 
-  /* Un nom écrit à la main est le sien : il ne se fait plus écraser. */
-  t.saisir('#ce-nom', 'Le clos du haut'); await t.pause(150);
   t.saisir('#ce-com', 'Chaux'); await t.pause(250);
-  verifier('le nom choisi tient', 'Le clos du haut', t.$('#ce-nom').value);
+  verifier('corriger la commune corrige le nom',
+    'Dégagement manuel — Dupont, Chaux', t.$('#ce-nom-apercu').textContent);
 
   t.saisir('#ce-donneur', 'Cabinet Dubois');
   t.clic('#ce-ok'); await t.pause(550);
   const c = (t.stock('chantiers') || [])[0];
-  verifier('le chantier est créé sous son nom', 'Le clos du haut', c.nom);
+  /* Rien n'est stocké sous « nom » : le nom se lit, il ne s'écrit pas. */
+  verifierVrai('aucun nom n’est enregistré', !c.nom);
+  verifier('mais le chantier en porte un', 'Dégagement manuel — Dupont, Chaux',
+    t.w.BCC.nomChantier(c));
   verifier('avec son donneur d’ordre', 'Cabinet Dubois', c.donneur);
   verifier('et sa commune', 'Chaux', c.commune);
   verifier('une première ligne de travaux est ouverte', 'DEGAG', (c.lignes[0] || {}).travail);
@@ -6121,7 +6370,7 @@ scenario('Fiche de chantier : au-delà de quatre hectares, elle est annoncée ob
   t.clic('#f-fichech'); await t.pause(500);
   verifierVrai('le bouton ouvre la fiche de chantier',
     t.$('#vue-fichech').classList.contains('actif'));
-  verifierVrai('sur le bon chantier', /Dégagement Martin/.test(t.texte('#fch-corps')));
+  verifierVrai('sur le bon chantier', /Dégagement manuel — Martin, Levier/.test(t.texte('#fch-corps')));
   verifierVrai('avec le rappel de l’obligation',
     /Fiche obligatoire/.test(t.texte('#fch-corps')));
 
