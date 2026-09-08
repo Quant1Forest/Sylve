@@ -2690,8 +2690,13 @@ scenario('Listes : le nom se propose en quittant le champ, pas à la validation'
   verifierVrai('le nom est repris en clair', /Groupement de Vaux/.test(offre.textContent));
   verifierVrai('et un bouton l’ajoute', t.$('#ce-donneur-offre [data-offre]'));
 
-  /* Le chantier n'est pas encore enregistré : la liste s'enrichit tout de même. */
-  t.clic('#ce-donneur-offre [data-offre]'); await t.pause(350);
+  /* Le chantier n'est pas encore enregistré : la liste s'enrichit tout de même.
+     Depuis la 4.77, l'offre demande d'abord de qui il s'agit — un donneur
+     d'ordre est un gestionnaire, pas un propriétaire. */
+  t.clic('#ce-donneur-offre [data-offre]'); await t.pause(300);
+  verifierVrai('le type est demandé avant d’ajouter', t.$('#tc-type'));
+  t.choisir('#tc-type', 'gestion'); await t.pause(150);
+  t.clic('#tc-ok'); await t.pause(400);
   const clients = t.stock('clients') || [];
   verifierVrai('le donneur d’ordre est entré dans la liste',
     clients.indexOf('Groupement de Vaux') >= 0);
@@ -6726,6 +6731,86 @@ scenario('Calendrier : le prélèvement lit les champs que le formulaire écrit'
   verifierVrai('la fiche du jour la nomme', /Assurance décennale/.test(dit));
   verifierVrai('avec son montant', /420 €/.test(dit));
   verifierVrai('et jamais 0 €', !/Groupama · annuel0 €/.test(dit));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Clients : un nom nouveau se range par type, et le SIREN suit', async () => {
+  /* « C'est tous des clients. Des fois c'est des propriétaires forestiers,
+     des fois des gestionnaires, ça peut être une entreprise de travaux. Il
+     faudrait que je puisse choisir quel type c'est, et si c'est un
+     propriétaire, me demander s'il a un numéro de SIREN. »
+
+     Et le défaut qu'il décrivait : « quand je crée un nouveau propriétaire,
+     il ne me demande pas s'il a un SIREN ». La case existait, plus bas dans
+     le formulaire — mais rien ne la reliait au nom qu'il venait de créer. */
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'chantiers' }));
+  t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.clic('#c-nouveau'); await t.pause(400);
+
+  /* Le mot a changé : c'est un client, pas forcément un propriétaire. */
+  verifierVrai('le champ s’appelle « Client »',
+    /Client/.test(t.$('[for="ce-proprio"]').textContent));
+
+  t.saisir('#ce-proprio', 'Groupement de Vaux');
+  t.$('#ce-proprio').dispatchEvent(new t.w.Event('blur'));
+  await t.pause(200);
+  t.clic('#ce-proprio-offre [data-offre]'); await t.pause(400);
+
+  /* C'est là que la question se pose, sur le nom qui vient de naître. */
+  verifierVrai('le type est demandé', /c’est qui/.test(t.$('#ce-proprio-offre').textContent));
+  verifierVrai('avec les quatre types',
+    options(t, '#tc-type').join(' · ') === 'Propriétaire forestier · Gestionnaire · ' +
+      'Entreprise de travaux · Autre');
+  /* Le premier type est propriétaire : le SIREN s'ouvre d'emblée. */
+  verifierVrai('le SIREN est proposé', !t.$('#tc-siren-l').hidden);
+
+  /* Un gestionnaire refacture : la question n'a pas de sens pour lui. */
+  t.choisir('#tc-type', 'gestion'); await t.pause(200);
+  verifierVrai('elle disparaît sur un gestionnaire', t.$('#tc-siren-l').hidden);
+
+  t.choisir('#tc-type', 'proprio'); await t.pause(200);
+  cocher(t, '#tc-siren', true);
+  t.clic('#tc-ok'); await t.pause(600);
+
+  const cfg = t.stock('cfg') || {};
+  verifier('le type est rangé sous le nom', 'proprio',
+    ((cfg.contacts || {})['Groupement de Vaux'] || {}).type);
+  verifier('et le SIREN avec', true,
+    ((cfg.contacts || {})['Groupement de Vaux'] || {}).siren);
+  /* La liste ne change pas de forme : ce sont toujours des noms. */
+  verifier('la liste reste une liste de noms', ['Groupement de Vaux'], t.stock('proprios'));
+  verifierVrai('et le nom est bien ajouté', /ajouté à vos clients/.test(
+    t.$('#ce-proprio-offre').textContent));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Clients : sans type, on ne retire rien — le SIREN reste proposé', async () => {
+  /* Les trente-cinq chantiers déjà saisis n'ont aucun type. Tant qu'on ne
+     sait pas ce qu'est quelqu'un, on ne lui retire rien : la case reste. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    proprios: ['Ancien sans type', 'Cabinet gestionnaire'],
+    cfg: { contacts: { 'Cabinet gestionnaire': { type: 'gestion' } } }
+  }));
+  const C0 = t.w;
+  t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.clic('#c-nouveau'); await t.pause(400);
+
+  t.saisir('#ce-proprio', 'Ancien sans type'); await t.pause(250);
+  verifierVrai('un nom sans type garde la question',
+    !t.$('#ce-siren').closest('.ligne-check').hidden);
+
+  t.saisir('#ce-proprio', 'Cabinet gestionnaire'); await t.pause(250);
+  verifierVrai('un gestionnaire ne l’a plus',
+    t.$('#ce-siren').closest('.ligne-check').hidden);
+
+  /* Un nom déjà connu ne repose pas la question du type. */
+  t.$('#ce-proprio').dispatchEvent(new t.w.Event('blur'));
+  await t.pause(250);
+  verifierVrai('et rien ne redemande son type',
+    !t.$('#ce-proprio-offre').textContent.trim());
   verifier('aucune erreur', [], t.erreurs);
 });
 

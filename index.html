@@ -7899,6 +7899,12 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.77', quoi: [
+    { t: '« Proprietaire » devient « Client » : tous ne sont pas proprietaires', vue: 'carnet' },
+    { t: 'Un nom nouveau se range par type : proprietaire, gestionnaire, ETF, autre', vue: 'carnet' },
+    { t: 'Et le n° SIREN ne se demande que la ou il a un sens', vue: 'carnet' },
+    { t: 'Trois endroits cherchaient un lieu de chantier qui n existe pas', vue: 'calendrier' }
+  ] },
   { v: '4.76', quoi: [
     { t: 'Notez votre propre cadence : une tige toutes les dix minutes', vue: 'rendements' },
     { t: 'Elle se lit a cote de ce que vos chantiers ont mesure, avec l ecart', vue: 'rendements' },
@@ -7934,13 +7940,6 @@ var NOTES_MAJ = [
     { t: 'Le SIREN se demande a la creation et se retient par proprietaire', vue: 'carnet' },
     { t: 'Les journees a trancher s annoncent aussi dans l agenda', vue: 'calendrier' },
     { t: 'Un seul « j ai travaille », et des pastilles qui se voient', vue: 'calendrier' }
-  ] },
-  { v: '4.72', quoi: [
-    { t: 'La fiche de chantier obligatoire, prete a imprimer', vue: 'fichech' },
-    { t: 'Sylve reprend le lieu, les travaux, la position ; vous cochez les risques', vue: 'fichech' },
-    { t: 'Ce qu elle ignore s ecrit « a completer », jamais un blanc', vue: 'fichech' },
-    { t: 'Au-dela de 4 ha, le chantier annonce qu une fiche est exigee', vue: 'chantier' },
-    { t: 'SIRET, telephone et adresse de l entreprise', vue: 'reglages' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -11830,7 +11829,7 @@ function ouvrirEnteteCh() {
     '<input type="text" id="ce-donneur" autocomplete="off" list="liste-clients" ' +
     'placeholder="expert, gestionnaire…">' +
     '<p class="offre-liste" id="ce-donneur-offre"></p></div>' +
-    '<div class="champ"><label class="eyebrow" for="ce-proprio">Propriétaire' +
+    '<div class="champ"><label class="eyebrow" for="ce-proprio">Client' +
     '<button type="button" class="mini-plus" data-ajlist="proprios" data-ajchamp="ce-proprio" ' +
     'title="Ajouter à la liste">+ liste</button></label>' +
     '<input type="text" id="ce-proprio" autocomplete="off" list="liste-proprios">' +
@@ -11850,7 +11849,7 @@ function ouvrirEnteteCh() {
        case à la création, tout chantier neuf partait à 20 %. */
     '<label class="ligne-check" style="display:flex;align-items:flex-start;gap:8px;' +
     'font-size:13.5px;margin:0 0 13px"><input type="checkbox" id="ce-siren" ' +
-    'style="margin-top:2px"><span>Propriétaire identifié producteur agricole (n° SIREN)' +
+    'style="margin-top:2px"><span>Identifié producteur agricole (n° SIREN)' +
     '<span class="muted" style="display:block;font-size:11.5px">Ouvre le taux réduit de ' +
     'TVA sur les travaux qui y donnent droit. Retenu pour ce propriétaire.</span></span></label>' +
     '<div class="champ"><p class="eyebrow" style="margin:0 0 4px">Il s’appellera</p>' +
@@ -11878,9 +11877,13 @@ function ouvrirEnteteCh() {
   var reprendreSiren = function () {
     var n = $('#ce-proprio').value.trim();
     if (n && contacts()[n] && contacts()[n].siren != null) $('#ce-siren').checked = sirenDe(n);
+    var ouvre = sirenPossible(n);
+    $('#ce-siren').closest('.ligne-check').hidden = !ouvre;
+    if (!ouvre) $('#ce-siren').checked = false;
   };
   $('#ce-proprio').addEventListener('change', reprendreSiren);
   $('#ce-proprio').addEventListener('blur', reprendreSiren);
+  $('#ce-proprio').addEventListener('input', reprendreSiren);
   $('#ce-trav').addEventListener('change', recomposer);
   recomposer();
 
@@ -11943,15 +11946,67 @@ function brancherOffreListe(champId, cle) {
     if (!e.target.closest('[data-offre]')) return;
     var nom = champ.value.trim();
     if (!nom) return;
-    listeDe(cle).push(nom);
-    sauverListe(cle).then(function () {
-      majDatalistClients(); majDatalistLieux(); renderListesReglages();
-      offre.className = 'offre-liste visible faite';
-      offre.textContent = '« ' + nom +' » ajouté à vos ' + LISTES[cle].nom.toLowerCase() + '.';
-    });
+    var finir = function () {
+      listeDe(cle).push(nom);
+      return sauverListe(cle).then(function () {
+        majDatalistClients(); majDatalistLieux(); renderListesReglages();
+        offre.className = 'offre-liste visible faite';
+        offre.textContent = '« ' + nom + ' » ajouté à vos ' +
+          LISTES[cle].nom.toLowerCase() +
+          (typeDe(nom) ? ' — ' + nomTypeClient(typeDe(nom)).toLowerCase() : '') + '.';
+      });
+    };
+    /* Un lieu n'a pas de type ; une personne, si. Et c'est le moment de le
+       demander : après, on ne saura plus de qui on parle. */
+    if (cle === 'clients' || cle === 'proprios') demanderTypeClient(offre, nom, finir);
+    else finir();
   });
 }
 
+
+/* Poser le type d'un nom qu'on vient de créer, et le SIREN si c'est un
+   propriétaire. Deux questions au plus, à l'endroit où le nom naît — et
+   sous le champ, jamais en fenêtre : il n'y a qu'une modale à la fois, et
+   elle emporterait le formulaire de création avec le nom en cours. */
+function demanderTypeClient(offre, nom, apres) {
+  offre.className = 'offre-liste visible';
+  offre.innerHTML = '« ' + esc(nom) + ' », c’est qui ?' +
+    '<select id="tc-type" style="margin:6px 0 0;width:100%">' +
+    TYPES_CLIENT.map(function (t) {
+      return '<option value="' + t.c + '">' + esc(t.n) + '</option>';
+    }).join('') + '</select>' +
+    '<label class="ligne-check" id="tc-siren-l" style="display:flex;' +
+    'align-items:flex-start;gap:7px;margin:7px 0 0">' +
+    '<input type="checkbox" id="tc-siren" style="margin-top:2px">' +
+    '<span>Identifié producteur agricole (n° SIREN) — ouvre le taux réduit' +
+    '</span></label>' +
+    '<span style="display:block;margin-top:7px">' +
+    '<button type="button" id="tc-ok">Enregistrer</button> ' +
+    '<button type="button" id="tc-passer">Je ne sais pas</button></span>';
+
+  var suivre = function () {
+    /* La question du SIREN disparaît dès que le type la rend sans objet,
+       plutôt que de rester grisée : une case sans objet se coche quand même. */
+    var t = $('#tc-type').value, ouvre = false;
+    TYPES_CLIENT.forEach(function (x) { if (x.c === t && x.siren) ouvre = true; });
+    $('#tc-siren-l').hidden = !ouvre;
+    if (!ouvre) $('#tc-siren').checked = false;
+  };
+  $('#tc-type').addEventListener('change', suivre);
+  suivre();
+
+  var conclure = function (poser) {
+    if (poser) {
+      poserType(nom, $('#tc-type').value);
+      if (!$('#tc-siren-l').hidden) poserSiren(nom, $('#tc-siren').checked);
+    }
+    Promise.resolve(sauverCfg()).then(function () { if (apres) apres(); });
+  };
+  $('#tc-ok').addEventListener('click', function () { conclure(true); });
+  /* « Je ne sais pas » n'est pas un refus : sans type, Sylve continue de
+     proposer le SIREN, comme pour tous les noms d'avant. */
+  $('#tc-passer').addEventListener('click', function () { conclure(false); });
+}
 
 /* Enregistre quelques champs d'un chantier et redessine ce qu'il faut. Tous
    les petits formulaires passent par là : c'est ce qui garantit qu'aucun
@@ -11991,7 +12046,7 @@ function ouvrirIdentiteCh(id) {
     '<input type="text" id="ic-donneur" autocomplete="off" list="liste-clients" ' +
     'placeholder="expert, gestionnaire…" value="' + esc(c.donneur || c.client || '') + '">' +
     '<p class="offre-liste" id="ic-donneur-offre"></p></div>' +
-    '<div class="champ"><label class="eyebrow" for="ic-proprio">Propriétaire' +
+    '<div class="champ"><label class="eyebrow" for="ic-proprio">Client' +
     '<button type="button" class="mini-plus" data-ajlist="proprios" data-ajchamp="ic-proprio" ' +
     'title="Ajouter à la liste">+ liste</button></label>' +
     '<input type="text" id="ic-proprio" autocomplete="off" list="liste-proprios" value="' +
@@ -12017,7 +12072,7 @@ function ouvrirIdentiteCh(id) {
     '</div>' +
     '<label class="ligne-check" style="display:flex;align-items:flex-start;gap:8px;font-size:13.5px;margin:10px 0 0">' +
     '<input type="checkbox" id="ic-siren"' + (c.siren ? ' checked' : '') + ' style="margin-top:2px">' +
-    '<span>Propriétaire identifié producteur agricole (n° SIREN)' +
+    '<span>Identifié producteur agricole (n° SIREN)' +
     '<span class="muted" style="display:block;font-size:11.5px">Ouvre le taux réduit sur les ' +
     'travaux qui y donnent droit.</span></span></label>' +
     '<div class="btn-rang" style="margin-top:11px">' +
@@ -12026,6 +12081,13 @@ function ouvrirIdentiteCh(id) {
     '<button class="btn primaire" id="ic-ok">Valider</button></div>');
   brancherOffreListe('ic-donneur', 'clients');
   brancherOffreListe('ic-proprio', 'proprios');
+  var suivreSiren = function () {
+    var ouvre = sirenPossible($('#ic-proprio').value.trim());
+    $('#ic-siren').closest('.ligne-check').hidden = !ouvre;
+    if (!ouvre) $('#ic-siren').checked = false;
+  };
+  $('#ic-proprio').addEventListener('input', suivreSiren);
+  suivreSiren();
   var suivreNom = function () {
     var l = (c.lignes || []).filter(function (x) {
       return x.travail && !C.estFourniture(x.travail);
@@ -13421,6 +13483,40 @@ function ouvrirPoserChantier(ts) {
    elles restent des noms, et les datalists continuent d'y puiser. Le numéro
    vit à côté, indexé par le nom. Zéro migration, donc zéro risque sur ce
    qu'il a déjà saisi — et il ne le remplit que le jour où il en a besoin. */
+var TYPES_CLIENT = [
+  { c: 'proprio', n: 'Propriétaire forestier', siren: true },
+  { c: 'gestion', n: 'Gestionnaire' },
+  { c: 'etf', n: 'Entreprise de travaux' },
+  { c: 'autre', n: 'Autre' }
+];
+function nomTypeClient(c) {
+  for (var i = 0; i < TYPES_CLIENT.length; i++) {
+    if (TYPES_CLIENT[i].c === c) return TYPES_CLIENT[i].n;
+  }
+  return '';
+}
+function typeDe(nom) {
+  var c = contacts()[String(nom || '').trim()];
+  return (c && c.type) || '';
+}
+function poserType(nom, t) {
+  var k = String(nom || '').trim();
+  if (!k) return;
+  var l = contacts();
+  l[k] = l[k] || {};
+  l[k].type = t || '';
+}
+/* Tant qu'on ne sait pas ce qu'est quelqu'un, on ne lui retire rien : un
+   nom sans type garde la question du SIREN. Les trente-cinq chantiers déjà
+   saisis sont dans ce cas, et rien ne doit changer pour eux. */
+function sirenPossible(nom) {
+  var t = typeDe(nom);
+  if (!t) return true;
+  for (var i = 0; i < TYPES_CLIENT.length; i++) {
+    if (TYPES_CLIENT[i].c === t) return !!TYPES_CLIENT[i].siren;
+  }
+  return true;
+}
 function contacts() {
   A.cfg = A.cfg || {};
   A.cfg.contacts = A.cfg.contacts || {};
@@ -13498,7 +13594,7 @@ function renderFicheChantier() {
 
   if (!c) {
     z.innerHTML = tete + '<div class="carte"><div class="vide"><p>Choisissez un chantier. ' +
-      'Sylve reprendra le propriétaire, le donneur d’ordre, le lieu et les travaux ; ' +
+      'Sylve reprendra le client, le donneur d’ordre, le lieu et les travaux ; ' +
       'vous ne cocherez que les risques.</p></div></div>';
     return;
   }
@@ -13525,7 +13621,7 @@ function renderFicheChantier() {
       : '') +
 
     '<div class="carte"><h2>Qui, où, quoi</h2>' +
-    paireFiche('Propriétaire', c.proprietaire || '—') +
+    paireFiche('Client', c.proprietaire || '—') +
     paireFiche('Donneur d’ordre', c.donneur || c.client || '—') +
     paireFiche('Commune', (c.commune || '—') + (c.departement ? ' (' + c.departement + ')' : '')) +
     paireFiche('Lieu-dit', c.foret || '—') +
@@ -13729,6 +13825,9 @@ function htmlFeuilleFiche(c) {
     (cfg.adresseEntreprise ? '<span>' + esc(cfg.adresseEntreprise) + '</span>' : '') +
     '</div></div>' +
 
+    /* La feuille dit « propriétaire » parce que l'arrêté du 31 mars 2011 le
+       nomme ainsi : elle part sur le chantier et se lit par un contrôleur.
+       Le mot de l'écran a changé, pas celui du document. */
     '<div class="fs"><h2>Propriétaire et donneur d’ordre</h2><div class="fg">' +
     l('Propriétaire', c.proprietaire) +
     /* Facultatif : l'arrêté demande ses coordonnées, pas son téléphone. */
@@ -15599,9 +15698,13 @@ var LISTES = {
     aide: 'Ceux qui vous confient les chantiers et à qui part la facture : experts, ' +
       'gestionnaires, confrères en sous-traitance, ou un propriétaire qui vous ' +
       'démarche lui-même.' },
-  proprios: { nom: 'Propriétaires', champ: 'proprios', cle: 'bordcub.proprios',
-    aide: 'Le propriétaire de la forêt, celui qui règle. À laisser vide quand c’est ' +
-      'le donneur d’ordre lui-même.' },
+  /* Le mot affiché a changé, la clé jamais : « proprios » reste « proprios »
+     en base. Voir le tableau du nommage dans les notes du projet — c'est le
+     piège le plus coûteux du fichier. */
+  proprios: { nom: 'Clients', champ: 'proprios', cle: 'bordcub.proprios',
+    aide: 'Celui à qui vous facturez : propriétaire forestier, gestionnaire, ' +
+      'entreprise de travaux. À laisser vide quand c’est le donneur d’ordre ' +
+      'lui-même. Son type décide si Sylve vous demande un n° SIREN.' },
   lieux: { nom: 'Forêts et communes', champ: 'lieuxRegles', cle: 'bordcub.lieux',
     aide: 'Proposés à la saisie d’une journée et d’un chantier.' },
   essencesCh: { nom: 'Essences', champ: 'essencesCh', cfg: true,
@@ -19482,7 +19585,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.76.0-20260908-1740';
+var VERSION = '4.77.0-20260908-2340';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

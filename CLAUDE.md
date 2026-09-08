@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.76.0-20260908-1740**
+Version courante : **4.77.0-20260908-2340**
 
 ---
 
@@ -51,7 +51,7 @@ npm run controle   # vérificateur + service worker + tests + reconstruction + c
 ```
 
 Doit afficher **« Bon pour livraison »**, puis **« le service worker tient »**
-(24 vérifications), puis la suite au vert — 1635 à ce jour — puis
+(24 vérifications), puis la suite au vert — 1650 à ce jour — puis
 **« Sylve.html est conforme »**.
 
 Compter **moins de deux minutes**. Ça a été dix, et deux choses l'expliquaient :
@@ -1169,7 +1169,64 @@ deux. `chercher()` regarde nom, donneur, propriétaire, forêt, parcelles,
 commune, les deux numéros et la note ; plusieurs mots doivent tous se
 retrouver, pas forcément dans le même champ.
 
-## Donneur d'ordre et propriétaire — le nommage piège
+## Le client, et son type
+
+*« C'est tous des clients. Des fois c'est des propriétaires forestiers, des
+fois des gestionnaires, ça peut être une entreprise de travaux sylvicoles. Il
+faudrait que je puisse choisir quel type de client c'est, et si c'est un
+propriétaire, me demander s'il a un numéro de SIREN. »*
+
+**Le mot à l'écran devient « Client »** — sur le chantier, la fiche et les
+Réglages. Il désignait « Propriétaire » ce qui n'en est pas toujours un.
+
+**Sauf sur la fiche de chantier imprimée**, qui garde « Propriétaire » : c'est
+le mot de l'arrêté du 31 mars 2011, et cette feuille part sur le chantier pour
+être lue par un contrôleur. Le vocabulaire d'un document réglementaire ne suit
+pas celui de l'application.
+
+`TYPES_CLIENT` — propriétaire forestier, gestionnaire, entreprise de travaux,
+autre. Le type vit dans `A.cfg.contacts[nom]`, à côté du téléphone et du
+SIREN qui y sont déjà : **aucune migration**, les listes restent des listes de
+noms. Même mécanique qu'en 4.72 pour le téléphone, et pour la même raison.
+
+- **Le SIREN ne se demande qu'au propriétaire forestier.** Un gestionnaire ou
+  une entreprise refacturent : la question n'a pas de sens pour eux, et la
+  poser quand même fait cocher au hasard. La case **disparaît** plutôt que de
+  rester grisée — une case sans objet finit toujours par se faire cocher.
+- **Sans type, on ne retire rien.** `sirenPossible()` rend `true` sur un nom
+  qu'on ne connaît pas : les trente-cinq chantiers déjà saisis gardent la
+  question, et rien ne change pour eux. « Je ne sais pas » n'est pas un refus.
+- **La question se pose là où le nom naît** : dans l'offre d'ajout, sous le
+  champ. C'était son défaut — *« quand je crée un nouveau propriétaire, il ne
+  me demande pas s'il a un numéro de SIREN »*. La case existait, vingt lignes
+  plus bas, sans lien visible avec le nom qu'il venait de taper.
+
+**Piège rencontré, et il vaut d'être retenu : il n'y a qu'une modale à la
+fois.** La première version posait la question en fenêtre — elle écrasait le
+formulaire de création et emportait le nom en cours de saisie. Un scénario l'a
+attrapé. **Toute question posée pendant un formulaire se pose dans le
+formulaire**, jamais par-dessus.
+
+## Le nommage inversé s'est aggravé — à lire avant d'y toucher
+
+Le tableau du nommage vaut plus que jamais depuis que le mot affiché a changé :
+
+| À l'écran | Liste interne | Champ du chantier |
+|---|---|---|
+| Donneur d'ordre | **`clients`** | `donneur` |
+| **Client** | **`proprios`** | `proprietaire` |
+
+Autrement dit : **ce que l'écran appelle « Client » est stocké sous
+`proprios`, et le magasin nommé `clients` porte les donneurs d'ordre.** Les
+clés ne se renomment jamais — elles feraient chercher les données dans un
+tiroir vide — mais quiconque lira `clients` dans le code croira toucher aux
+clients alors qu'il touche aux donneurs d'ordre.
+
+**Vérifier ce tableau avant de toucher à l'un des deux.** C'est déjà le piège
+qui a fait remplir chaque menu déroulant avec la mauvaise moitié du carnet, à
+l'import.
+
+## Donneur d'ordre et propriétaire — l'origine du nommage
 
 Le stockage et l'interface ne disent pas la même chose, et l'import s'y est
 laissé prendre :
