@@ -51,7 +51,7 @@ npm run controle   # vérificateur + service worker + tests + reconstruction + c
 ```
 
 Doit afficher **« Bon pour livraison »**, puis **« le service worker tient »**
-(24 vérifications), puis la suite au vert — 1573 à ce jour — puis
+(24 vérifications), puis la suite au vert — 1635 à ce jour — puis
 **« Sylve.html est conforme »**.
 
 Compter **moins de deux minutes**. Ça a été dix, et deux choses l'expliquaient :
@@ -1599,6 +1599,14 @@ La liste des priorités ne se cochait plus. **Tout script de retouche passe par
 `split().join()`**, jamais par `String.replace`, dès que le texte inséré peut
 contenir un `$`.
 
+**Un scénario qui sème ce que le code lit ne vérifie rien.** Les frais fixes
+du calendrier lisaient `charge.nom` et `charge.montant` ; le formulaire écrit
+`libelle` et `ttc`. Le repère annonçait donc « € 0 » sans nom — et le
+scénario passait au vert, parce qu’il semait les mêmes champs faux. **Deux
+erreurs qui se confirment l’une l’autre.** C’est *lui* qui l’a trouvé, sur son
+téléphone. Un objet semé doit l’être **tel que le formulaire l’enregistre** :
+c’est la seule source écrite ailleurs, pour d’autres raisons.
+
 **Un compte écrit en dur ne garde rien.** Le scénario des tuiles vérifiait
 « six tuiles » : il a cassé à l’arrivée du septième module sans rien apprendre.
 Il croise maintenant les tuiles avec **le sélecteur de module du bandeau**,
@@ -2073,6 +2081,29 @@ et c'est une petite liste qu'il enrichit lui-même.
 **Piège de vocabulaire à connaître** : `UNITES` ne contient pas de « tige ».
 Une tige se compte en `unite`, affichée « u ». Un scénario qui sème
 `unite: 'tige'` produit un rendement incalculable, sans rien dire.
+
+## Il ne planifie qu’une semaine ou deux à l’avance
+
+*« Je ne vais pas prévoir tout le chantier d’un coup : je pose un ou deux
+jours, j’ai une vision par rapport à la semaine, deux semaines. Après, passé
+un mois, ça peut être compliqué. »*
+
+C’est une contrainte de méthode, pas un oubli, et `enRetard()` l’ignorait :
+il disait « toutes les journées posées sont derrière ». Sur cette façon de
+travailler, c’est vrai **dès le premier jour fait** — il pose un jour sur
+trois, il le fait, et le lendemain le chantier s’annonce en retard alors
+qu’il reste deux journées à poser.
+
+**S’il reste des journées à poser (`resteAPlacer() > 0`), il n’y a rien à
+signaler** : c’est la planification qui n’est pas finie, pas le chantier qui
+traîne. Sans estimation d’aucune sorte, `resteAPlacer()` rend `null` et on
+retombe sur la règle d’avant — sinon un chantier oublié ne se signalerait
+plus jamais.
+
+**Le prix par journée souffre du même biais, et n’est pas corrigé.** Trois
+journées facturées 1 050 €, une seule faite : `prixJour()` divise 1 050 par 1
+et annonce 1 050 €/jour. Le chiffre n’est pas faux, il est **prématuré** —
+reste à décider ce qu’on affiche sur un chantier commencé mais pas fini.
 
 ## « En retard » ne se disait pas d'un chantier
 
