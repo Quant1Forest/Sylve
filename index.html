@@ -216,6 +216,8 @@ body:not(.m-ent) .mod-ent{display:none}
    tout seul en dessous. */
 .kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(102px,1fr));gap:8px;margin-top:11px}
 .kpi .carte2{padding:9px 8px;min-width:0}
+/* Deux carreaux par ligne : ce qui est rentré en haut, ce qui arrive en bas. */
+.kpi2{grid-template-columns:repeat(2,1fr)}
 .kpi b{font-size:17px;display:block;white-space:nowrap;letter-spacing:-.01em}
 
 .lien-regl{
@@ -465,12 +467,19 @@ input.mini{padding:6px 7px;border:1px solid var(--trait);border-radius:7px;font-
 .chantier-l .pastille{margin-top:3px}
 /* Le prélèvement se voit sans se confondre avec le statut du jour : une
    marque dans l'angle, pas une seconde pastille. */
-.cal-prel{position:absolute;top:2px;right:3px;font-size:9px;line-height:1;
-  color:var(--doux);font-weight:600}
+.cal-prel{position:absolute;top:1px;right:3px;font-size:11px;line-height:1;
+  color:var(--encre);font-weight:700;opacity:.75}
+/* Le compté n'est pas le mesuré : il porte l'ocre des prévisions, pas le
+   vert de ce qui a eu lieu. */
+.compte{color:#B98A00}
 .chantier-n{font-weight:600;font-size:14.5px}
 .chantier-d{display:block;font-size:12px;color:var(--doux);margin-top:2px}
 .chantier-e{display:block;font-size:12px;margin-top:4px}
-.chantier-m{display:block;font-size:15px;white-space:nowrap}
+/* Trois lignes dans la colonne de droite : le hors taxes et le TTC se lisent
+   d'un balayage, la TVA se lit quand on s'arrête dessus. */
+.chantier-m{display:block;font-size:15px;white-space:nowrap;text-align:right}
+.chantier-m b{display:block;font-weight:600;line-height:1.25}
+.chantier-m small{display:block;font-size:11px;color:var(--doux);margin-top:1px}
 .chantier-act{grid-column:2/4;display:flex;gap:6px;margin-top:9px}
 
 /* Le bilan de l'écran Entreprise. Trois colonnes tiennent sur 375 px sans
@@ -3554,6 +3563,25 @@ function montant(ch) {
    Le total de la facture le garde donc, « ce que ça a rapporté » et le prix
    par journée l'écartent. Sans ça, la fiche et le bilan des finances donnaient
    deux chiffres différents pour le même chantier. */
+/* Ce que la facture ajoute au hors taxes. Un chantier peut mêler deux taux
+   — le répulsif n'ouvre pas droit au taux réduit là où le reste y a droit —
+   d'où le calcul ligne à ligne plutôt qu'un taux appliqué au total. */
+function tvaChantier(ch) {
+  return arr(((ch && ch.lignes) || []).reduce(function (t, l) {
+    return t + montantLigne(l) * tauxLigne(l, ch) / 100;
+  }, 0), 2);
+}
+/* Le taux, quand il est unique. Taux mêlés, on rend null : afficher l'un
+   des deux serait un mensonge, et afficher le plus élevé en serait un autre. */
+function tauxChantier(ch) {
+  var vus = [];
+  ((ch && ch.lignes) || []).forEach(function (l) {
+    var t = tauxLigne(l, ch);
+    if (vus.indexOf(t) < 0) vus.push(t);
+  });
+  return vus.length === 1 ? vus[0] : null;
+}
+function ttcChantier(ch) { return arr(montant(ch) + tvaChantier(ch), 2); }
 function montantDebours(ch) {
   return arr(((ch && ch.lignes) || []).reduce(function (t, l) {
     return t + (l.nature === 'debours' ? montantLigne(l) : 0);
@@ -3780,6 +3808,36 @@ function dateChantier(ch) {
   return ch.maj || ch.cree || 0;
 }
 
+/* Les cadences notées à la main vivent dans la configuration, comme les
+   notes personnelles : elle part dans les sauvegardes, et c'est une petite
+   liste que l'utilisateur enrichit lui-même. */
+function cadences(cfg, travail, unite) {
+  var l = (cfg && cfg.cadences) || [];
+  if (!travail) return l.slice();
+  return l.filter(function (x) {
+    return x.travail === travail && (!unite || x.unite === unite);
+  });
+}
+/* Il compte en minutes par tige, jamais en tiges par jour : c'est ce qu'on
+   lit sur une montre. La conversion se fait ici, une fois, et tout ce qui
+   suit raisonne dans l'unité des rendements — l'unité par jour. */
+function cadenceParJour(c, cfg) {
+  if (!c) return 0;
+  var v = nb(c.valeur);
+  if (!(v > 0)) return 0;
+  if (c.sens === 'parjour') return arr(v, 3);
+  /* minutes par unité : ce qu'on fait en une journée de travail. */
+  return arr(HEURES_JOUR(cfg) * 60 / v, 3);
+}
+/* La moyenne de ce qu'il a compté pour une prestation. Non pondérée : ce
+   sont des observations, pas des mesures — les pondérer donnerait à l'une
+   d'elles une autorité qu'elle n'a pas. */
+function cadenceComptee(cfg, travail, unite) {
+  var l = cadences(cfg, travail, unite).map(function (c) { return cadenceParJour(c, cfg); })
+    .filter(function (v) { return v > 0; });
+  if (!l.length) return null;
+  return arr(l.reduce(function (t, v) { return t + v; }, 0) / l.length, 2);
+}
 function references(chantiers, travail, cfg) {
   var refs = [];
   (chantiers || []).forEach(function (ch) {
@@ -3870,7 +3928,12 @@ function enRetard(ch, maintenant) {
   var ech = ch.echeance || ch.fin;
   if (ech && minuit(ech) < m) return true;
   var pl = journeesPlacees(ch);
-  return pl.length ? pl[pl.length - 1].d < m : false;
+  if (!pl.length) return false;
+  if (pl[pl.length - 1].d >= m) return false;
+  /* S'il reste des journées à poser, il n'y a rien à signaler : c'est la
+     planification qui n'est pas finie, pas le chantier qui traîne. */
+  var reste = resteAPlacer(ch);
+  return !(reste != null && reste > 0);
 }
 
 
@@ -4245,8 +4308,15 @@ function alertes(chantiers, cfg, maintenant) {
   var out = [];
   (chantiers || []).forEach(function (ch) {
     if (enRetard(ch, now)) {
+      /* ch.fin n'existe plus depuis que l'échéance de chantier a été retirée :
+         la phrase annonçait « Invalid Date ». C'est le dernier jour posé qui
+         date la chose. */
+      var dernier = dateChantier(ch);
       out.push({ type: 'retard', chantier: ch, gravite: 2,
-        texte: 'en retard depuis le ' + new Date(ch.fin).toLocaleDateString('fr-FR') });
+        texte: dernier
+          ? 'dernière journée posée le ' + new Date(dernier).toLocaleDateString('fr-FR') +
+            ', chantier pas encore terminé'
+          : 'toutes les journées posées sont passées, chantier pas encore terminé' });
     }
     /* Un devis a sa propre échéance : celle qu'il porte écrite. Quand elle
        est connue, c'est elle qui parle — approcher de la fin de validité
@@ -4707,7 +4777,7 @@ function parDonneur(chantiers, cfg) {
 function totaux(chantiers, cfg) {
   var t = { propose: 0, nPropose: 0, signe: 0, aFacturer: 0, nAFacturer: 0,
     facture: 0, encaisse: 0, caFacture: 0, nFactures: 0, attente: 0, nAttente: 0,
-    jours: 0, n: 0, ouverts: 0, retard: 0 };
+    signes: 0, nSignes: 0, jours: 0, n: 0, ouverts: 0, retard: 0 };
   var now = Date.now();
   (chantiers || []).forEach(function (c) {
     var m = montant(c);
@@ -4715,6 +4785,10 @@ function totaux(chantiers, cfg) {
     if (statutOuvert(c.statut)) t.ouverts++;
     if (enRetard(c, now)) t.retard++;
     if (c.statut === 'devis' || c.statut === 'envoye') { t.propose += m; t.nPropose++; }
+    /* Le devis est signé et le chantier reste à poser. Même définition que
+       la bulle de l'écran Entreprise : deux écrans qui comptent la même
+       chose doivent la compter pareil. */
+    if (c.statut === 'accepte') { t.signes += m; t.nSignes++; }
     /* Facturé : la facture est partie, réglée ou non. C'est la base que Sylve
        emploie déjà pour les déclarations — les deux écrans doivent dire la
        même chose. */
@@ -4731,7 +4805,7 @@ function totaux(chantiers, cfg) {
     if (c.statut === 'paye') t.encaisse += m;
     t.jours += tempsMoi(c, cfg);
   });
-  ['propose', 'signe', 'aFacturer', 'facture', 'encaisse', 'caFacture', 'attente', 'jours']
+  ['propose', 'signe', 'aFacturer', 'facture', 'encaisse', 'caFacture', 'attente', 'signes', 'jours']
     .forEach(function (k) { t[k] = arr(t[k], 2); });
   return t;
 }
@@ -4787,6 +4861,8 @@ function nomChantier(c) {
 var M = {
   JOUR: JOUR, TRAVAUX: TRAVAUX, UNITES: UNITES, STATUTS: STATUTS,
   nomAutoChantier: nomAutoChantier, nomChantier: nomChantier,
+  cadences: cadences, cadenceParJour: cadenceParJour, cadenceComptee: cadenceComptee,
+  tvaChantier: tvaChantier, tauxChantier: tauxChantier, ttcChantier: ttcChantier,
   dateEntree: dateEntree, TRIS_CH: TRIS_CH, cleTri: cleTri,
   montantDebours: montantDebours, montantHorsDebours: montantHorsDebours,
   MOYENS_PAIEMENT: MOYENS_PAIEMENT, nomMoyenPaiement: nomMoyenPaiement,
@@ -7823,6 +7899,16 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.76', quoi: [
+    { t: 'Notez votre propre cadence : une tige toutes les dix minutes', vue: 'rendements' },
+    { t: 'Elle se lit a cote de ce que vos chantiers ont mesure, avec l ecart', vue: 'rendements' },
+    { t: 'Et vous dites sur quel chantier vous l avez constatee', vue: 'rendements' },
+    { t: '« En retard » devient « jours passes » : c est ce que le calcul dit', vue: 'carnet' },
+    { t: 'Chaque ligne du carnet porte le HT, le TTC, le taux et la TVA', vue: 'carnet' },
+    { t: 'Et en tete : facture, encaisse, devis signes, premier donneur d ordre', vue: 'carnet' },
+    { t: 'Un chantier pas fini d etre planifie n est plus dit en retard', vue: 'carnet' },
+    { t: 'Le prelevement du calendrier annonce enfin son nom et son montant', vue: 'calendrier' }
+  ] },
   { v: '4.75', quoi: [
     { t: 'Le nom du chantier se compose seul, et suit si vous le corrigez', vue: 'carnet' },
     { t: 'La ligne ne redit plus le proprietaire, et porte devis, facture et paiement', vue: 'carnet' },
@@ -7855,13 +7941,6 @@ var NOTES_MAJ = [
     { t: 'Ce qu elle ignore s ecrit « a completer », jamais un blanc', vue: 'fichech' },
     { t: 'Au-dela de 4 ha, le chantier annonce qu une fiche est exigee', vue: 'chantier' },
     { t: 'SIRET, telephone et adresse de l entreprise', vue: 'reglages' }
-  ] },
-  { v: '4.71', quoi: [
-    { t: 'Un jour du calendrier porte un seul statut, une seule pastille', vue: 'calendrier' },
-    { t: 'Cliquer un jour ouvre sa fiche : statut, chantiers, temps', vue: 'calendrier' },
-    { t: 'Un jour non travaille se pose et se note — conge, pluie, arret', vue: 'calendrier' },
-    { t: 'Un jour passe reste au planning doit etre tranche', vue: 'calendrier' },
-    { t: 'Et une journee se deplace du mauvais jour vers le bon', vue: 'calendrier' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -10599,18 +10678,20 @@ function renderCarnet() {
     var n = function (x, mot, invariable) {
       return x ? ' · ' + x + ' ' + mot + (x > 1 && !invariable ? 's' : '') : '';
     };
-    z.innerHTML = '<div class="kpi">' +
+    var pd = premierDonneur(A.chantiers, A.cfg, t.caFacture);
+    z.innerHTML = '<div class="kpi kpi2">' +
       '<div class="carte2"><b class="num">' + eur(t.caFacture) + '</b><small>facturé' +
       n(t.nFactures, 'facture') + '</small></div>' +
       '<div class="carte2"><b class="num">' + eur(t.encaisse) + '</b><small>encaissé</small></div>' +
-      /* « À facturer » avait sa propre tuile : c'est le chantier qu'on risque
-         d'oublier, et il compte même sans ligne chiffrée. Il reste dit ici,
-         en sous-compte, plutôt que de manger une tuile de la liste dictée. */
-      '<div class="carte2"><b class="num">' + eur(t.attente) + '</b><small>en attente' +
-      n(t.nAttente, 'chantier') +
-      (t.nAFacturer ? ', dont ' + t.nAFacturer + ' à facturer' : '') + '</small></div>' +
-      '<div class="carte2"><b class="num">' + eur(t.propose) + '</b><small>devis en attente' +
-      n(t.nPropose, 'devis', true) + '</small></div>' +
+      '<div class="carte2"><b class="num">' + (t.nSignes || '—') + '</b><small>devis signé' +
+      (t.nSignes > 1 ? 's' : '') + (t.nSignes ? ' · ' + eur(t.signes) : ', à planifier') +
+      '</small></div>' +
+      /* Qui le fait vivre. Le pourcentage est l'information : un donneur
+         d'ordre à soixante pour cent n'est pas un client, c'est un risque. */
+      '<div class="carte2"><b class="num">' + (pd ? eur(pd.montant) : '—') +
+      '</b><small>' + (pd
+        ? esc(pd.nom) + (pd.part != null ? ' · ' + pd.part + '\u00A0%' : '')
+        : 'premier donneur d’ordre') + '</small></div>' +
       '</div>' +
       /* « En cours » est le nom d'un statut : l'employer pour compter tout ce
          qui n'est pas soldé faisait annoncer « 31 en cours » avec un seul
@@ -10618,12 +10699,22 @@ function renderCarnet() {
       '<p class="muted" style="font-size:12px;margin:11px 0 0">' + t.ouverts + ' chantier' +
       (t.ouverts > 1 ? 's' : '') + ' ouvert' + (t.ouverts > 1 ? 's' : '') +
       ' · ' + E.fmt(t.jours, 1) + ' jours-homme cumulés' +
-      (t.retard ? ' · <span class="retard">' + t.retard + ' en retard</span>' : '') + '</p>';
+      (t.nAFacturer ? ' · <b>' + t.nAFacturer + ' à facturer</b>' : '') +
+      (t.retard ? ' · <span class="retard">' + t.retard + ' aux jours passés</span>' : '') + '</p>';
   }
   renderFiltreChantiers();
   renderListeChantiers();
   renderAlertes();
   renderEntreprise();
+}
+function premierDonneur(chantiers, cfg, total) {
+  var l = C.parDonneur(chantiers, cfg)
+    .filter(function (e) { return e.facture > 0; })
+    .sort(function (a, b) { return b.facture - a.facture; });
+  if (!l.length) return null;
+  var e = l[0];
+  return { nom: e.donneur, montant: e.facture,
+    part: total > 0 ? Math.round(e.facture / total * 100) : null };
 }
 function renderFiltreChantiers() {
   var s = $('#c-filtre'); if (!s) return;
@@ -10679,7 +10770,7 @@ function renderListeChantiers() {
   }
   var now = Date.now();
   z.innerHTML = l.map(function (c) {
-    var m = C.montant(c), retard = C.enRetard(c, now);
+    var m = C.montant(c), retard = C.enRetard(c, now), tauxCh = C.tauxChantier(c);
     var manque = C.champsManquants(c);
     var trav = (c.lignes || []).map(function (x) { return C.nomTravail(x.travail); });
     var uniq = trav.filter(function (v, i) { return trav.indexOf(v) === i; });
@@ -10708,12 +10799,19 @@ function renderListeChantiers() {
          il doit se lire dans la liste, pas seulement sur la fiche. */
       (c.numeroFacture ? '<span class="num-fact">n° ' + esc(c.numeroFacture) + '</span> ' : '') +
       badgeStatut(c) +
-      (retard ? ' <span class="retard">en retard</span>' : '') +
+      (retard ? ' <span class="retard">jours passés</span>' : '') +
       /* Une fiche à moitié remplie se perd dans le carnet : elle se signale,
          sans jamais empêcher de l'enregistrer telle quelle. */
       (manque.length ? ' <span class="acompleter">à compléter</span>' : '') +
       '</span></div>' +
-      '<span class="chantier-m num">' + (m ? eur(m) : '') + '</span>' +
+      /* Hors taxes et TTC tous les deux en gros : le premier fait le chiffre
+         d'affaires et les déclarations, le second est ce que le client paie. */
+      '<span class="chantier-m num">' + (m
+        ? '<b>' + eur(m) + ' HT</b><b>' + eur(C.ttcChantier(c)) + ' TTC</b>' +
+          '<small>TVA ' + (tauxCh != null
+            ? String(tauxCh).replace('.', ',') + ' %\u00A0· ' : 'mêlée\u00A0· ') +
+          eur(C.tvaChantier(c)) + '</small>'
+        : '') + '</span>' +
       '<div class="chantier-act">' +
       '<button class="btn-min" data-chouvrir="' + c.id + '">Ouvrir</button>' +
       '<button class="btn-min" data-chtemps="' + c.id + '">Temps</button>' +
@@ -11210,7 +11308,7 @@ function blocTravaux(c) {
         eur(deb) + '</span></div>' : '') +
       '<div style="display:flex;justify-content:space-between;font-size:13px" class="muted">' +
       '<span>TVA ' + C.tauxPresents(c).map(function (t) { return String(t).replace('.', ','); }).join(' et ') + ' %</span><span class="num">' +
-      eur((c.lignes || []).reduce(function (s, l) { return s + C.montantLigne(l) * C.tauxLigne(l, c) / 100; }, 0)) +
+      eur(C.tvaChantier(c)) +
       '</span></div>' : '') +
 
     /* Le temps que ça demande vit ici, avec ce qui le chiffre. Il était deux
@@ -11392,7 +11490,7 @@ function renderFiche() {
       c.foret, c.parcelles ? 'parc. ' + c.parcelles : '', c.commune].filter(Boolean).join(' · ') || 'sans donneur d’ordre') + '</p>' +
     '<div style="margin-top:9px">' + badgeStatut(c) +
     (dateStatut(c) ? ' <span class="muted" style="font-size:12px">' + esc(dateStatut(c)) + '</span>' : '') +
-    (C.enRetard(c, Date.now()) ? ' <span class="retard">en retard</span>' : '') + '</div>' +
+    (C.enRetard(c, Date.now()) ? ' <span class="retard">jours passés</span>' : '') + '</div>' +
     /* La facture se lit dès l'en-tête : c'est sur son numéro qu'il se repère,
        et en enchaînant les fiches par « précédente / suivante » il doit le voir
        sans dérouler. Rien ne s'affiche tant qu'il n'y a rien à dire. */
@@ -12697,7 +12795,26 @@ function renderRendements() {
   var blocs = [];
   C.TRAVAUX.forEach(function (t) {
     var refs = C.references(A.chantiers, t.c, A.cfg);
-    if (!refs.length) return;
+    /* L'unité qui fait foi est celle des chantiers ; à défaut, celle de la
+       première cadence notée. */
+    var toutes = C.cadences(A.cfg, t.c);
+    var uRef = refs.length ? C.courtUnite(refs[0].unite)
+      : (toutes[0] ? toutes[0].unite : '');
+    var cpt = C.cadenceComptee(A.cfg, t.c, uRef);
+    /* Une prestation qu'il a chronométrée mais jamais facturée mérite sa
+       ligne : c'est justement là que le compté est tout ce qu'on a. */
+    if (!refs.length && cpt == null) return;
+    if (!refs.length) {
+      var u0 = uRef;
+      blocs.push('<div class="liste-item pile-c"><div class="li-h">' +
+        '<span class="pastille" style="background:#B98A00;margin-top:4px"></span>' +
+        '<div class="li-c"><b>' + esc(t.n) + ' — ' + E.fmt(cpt, cpt < 10 ? 2 : 0) +
+        ' ' + u0 + '/j comptés</b><small>Rien de mesuré encore : aucun chantier ' +
+        'n’a de quantité et de temps sur cette prestation.</small></div></div>' +
+        '<div class="li-actions"><button class="btn-min" data-rdetail="' + t.c +
+        '">Détail</button></div></div>');
+      return;
+    }
     var u = C.courtUnite(refs[0].unite);
     var rends = refs.map(function (r) { return r.rendement; });
     var moy = C.arr(rends.reduce(function (s, x) { return s + x; }, 0) / rends.length, 3);
@@ -12708,7 +12825,11 @@ function renderRendements() {
       '<div class="li-c"><b>' + esc(t.n) + ' — ' + E.fmt(moy, moy < 10 ? 2 : 0) + ' ' + u + '/j</b>' +
       '<small>' + refs.length + ' chantier' + (refs.length > 1 ? 's' : '') +
       ' · de ' + E.fmt(Math.min.apply(null, rends), 2) + ' à ' + E.fmt(Math.max.apply(null, rends), 2) + ' ' + u + '/j' +
-      (pjMoy ? ' · ' + eur(pjMoy) + '/jour obtenu' : '') + '</small></div></div>' +
+      (pjMoy ? ' · ' + eur(pjMoy) + '/jour obtenu' : '') +
+      /* L'écart est l'information : le mesuré porte les aléas — la pluie, la
+         route, le matériel — que le chronomètre ne voit pas. */
+      (cpt != null ? '<br><b class="compte">' + E.fmt(cpt, cpt < 10 ? 2 : 0) + ' ' + u +
+        '/j comptés</b> · ' + ecartCadence(moy, cpt) : '') + '</small></div></div>' +
       '<div class="li-actions"><button class="btn-min" data-rdetail="' + t.c + '">Détail</button>' +
       '<button class="btn-min" data-restim="' + t.c + '">Estimer</button></div></div>');
   });
@@ -12716,11 +12837,38 @@ function renderRendements() {
     : '<div class="vide"><p>Aucun rendement calculable. Il faut des chantiers avec des quantités ' +
       'ET du temps saisi — sur les chantiers mêlant plusieurs travaux, marquez l’activité dans chaque saisie de temps.</p></div>';
 }
+/* « Trente pour cent plus lent que compté. » Un pourcentage sec ne dit pas
+   dans quel sens il va ; la phrase, si. */
+function ecartCadence(mesure, compte) {
+  if (!(compte > 0) || !(mesure > 0)) return '';
+  var p = Math.round(Math.abs(mesure - compte) / compte * 100);
+  if (p < 5) return 'le terrain vous donne raison';
+  return p + ' % ' + (mesure < compte ? 'plus lent' : 'plus vite') + ' sur le terrain';
+}
 function ouvrirDetailRendement(travail) {
   var refs = C.references(A.chantiers, travail, A.cfg);
-  if (!refs.length) return;
-  var u = C.courtUnite(refs[0].unite);
+  var toutes = C.cadences(A.cfg, travail);
+  if (!refs.length && !toutes.length) return;
+  var u = refs.length ? C.courtUnite(refs[0].unite)
+    : (toutes[0] ? toutes[0].unite : C.courtUnite(C.uniteDe(travail)));
+  var cds = C.cadences(A.cfg, travail, u);
   modale('Rendements — ' + C.nomTravail(travail),
+    '<p class="eyebrow" style="margin:0 0 6px">Ce que vous avez compté</p>' +
+    (cds.length ? cds.map(function (c) {
+      var ch = c.chantier ? chantier(c.chantier) : null;
+      return '<div class="liste-item"><div class="li-c"><b>' +
+        E.fmt(C.cadenceParJour(c, A.cfg), 2) + ' ' + u + '/j</b><small>' +
+        esc(ditCadence(c, u)) +
+        (ch ? ' · ' + esc(C.nomChantier(ch)) : ' · sans chantier') +
+        (c.note ? '<br>' + esc(c.note) : '') + '</small></div>' +
+        '<button class="btn-min" data-cdsup="' + c.id + '">✕</button></div>';
+    }).join('') : '<p class="muted" style="font-size:12.5px;margin:0">Rien de compté ' +
+      'pour cette prestation.</p>') +
+    '<div class="btn-rang" style="margin:9px 0 15px">' +
+    '<button class="btn btn-min" id="cd-plus">+ Noter une cadence</button></div>' +
+    '<p class="eyebrow" style="margin:0 0 6px">Ce que les chantiers ont mesuré</p>' +
+    (refs.length ? '' : '<p class="muted" style="font-size:12.5px;margin:0">Aucun ' +
+      'chantier n’a encore de quantité et de temps sur cette prestation.</p>') +
     refs.sort(function (a, b) { return b.rendement - a.rendement; }).map(function (r) {
       return '<div class="liste-item"><div class="li-c"><b>' + esc(C.nomChantier(r.chantier)) + '</b>' +
         '<small>' + E.fmt(r.rendement, 2) + ' ' + u + '/j · ' + E.fmt(r.quantite, 0) + ' ' + u +
@@ -12729,6 +12877,87 @@ function ouvrirDetailRendement(travail) {
         (r.note ? '<br>' + esc(r.note) : '') +
         (critLibelle(r.chantier.criteres) ? '<br>' + esc(critLibelle(r.chantier.criteres)) : '') + '</small></div></div>';
     }).join(''));
+  $('#cd-plus').addEventListener('click', function () { ouvrirCadence(travail, u); });
+  $('#modale-corps').addEventListener('click', function (e) {
+    var x = e.target.closest('[data-cdsup]');
+    if (!x) return;
+    A.cfg.cadences = C.cadences(A.cfg).filter(function (c) { return c.id !== x.dataset.cdsup; });
+    Promise.resolve(sauverCfg()).then(function () {
+      fermerModale(); renderRendements(); toast('Cadence retirée.');
+    });
+  });
+}
+function ouvrirCadence(travail, unite) {
+  var u = unite || C.courtUnite(C.uniteDe(travail));
+  /* Les chantiers qui portent cette prestation d'abord : c'est sur l'un
+     d'eux qu'il vient de la chronométrer. */
+  var porte = function (c) {
+    return (c.lignes || []).some(function (l) {
+      return C.travauxDeLigne(l).indexOf(travail) >= 0;
+    });
+  };
+  var chs = A.chantiers.slice().sort(function (a, b) {
+    var pa = porte(a) ? 0 : 1, pb = porte(b) ? 0 : 1;
+    if (pa !== pb) return pa - pb;
+    return C.dateChantier(b) - C.dateChantier(a);
+  });
+  modale('Ce que vous avez compté — ' + C.nomTravail(travail),
+    '<p class="sous-titre-bloc">Ce que vous relevez montre en main, sur le ' +
+    'chantier. Il se lira à côté de ce que vos journées ont mesuré : l’écart ' +
+    'entre les deux, ce sont les aléas — la route, le matériel, la pluie.</p>' +
+    '<div class="champ"><label class="eyebrow" for="cd-sens">Vous comptez en</label>' +
+    '<select id="cd-sens">' +
+    '<option value="minutes">minutes par ' + esc(u) + '</option>' +
+    '<option value="parjour">' + esc(u) + ' par jour</option></select></div>' +
+    '<div class="champ"><label class="eyebrow" for="cd-val">Combien</label>' +
+    '<input type="text" id="cd-val" class="gros" inputmode="decimal">' +
+    '<p class="muted" style="font-size:11.5px;margin:5px 0 0" id="cd-conv"></p></div>' +
+    '<div class="champ"><label class="eyebrow" for="cd-ch">Constaté sur</label>' +
+    '<select id="cd-ch"><option value="">— sans chantier —</option>' +
+    chs.map(function (c) {
+      return '<option value="' + c.id + '">' + esc(C.nomChantier(c)) + '</option>';
+    }).join('') + '</select></div>' +
+    '<div class="champ"><label class="eyebrow" for="cd-note">Dans quel contexte</label>' +
+    '<input type="text" id="cd-note" autocomplete="off" ' +
+    'placeholder="ronce épaisse, pente, tiges serrées…"></div>' +
+    '<div class="btn-rang" style="margin-top:11px">' +
+    '<button class="btn primaire" id="cd-ok">Enregistrer</button></div>');
+
+  /* La conversion s'écrit sous le champ, à chaque frappe : il tape ce qu'il a
+     chronométré et voit ce que ça donne en journée, sans le calculer. */
+  var lire = function () {
+    return { valeur: $('#cd-val').value, sens: $('#cd-sens').value };
+  };
+  var majConv = function () {
+    var v = C.cadenceParJour(lire(), A.cfg);
+    $('#cd-conv').textContent = v > 0
+      ? 'soit ' + E.fmt(v, v < 10 ? 2 : 0) + ' ' + u + ' par journée de ' +
+        C.HEURES_JOUR(A.cfg) + ' h'
+      : '';
+  };
+  $('#cd-val').addEventListener('input', majConv);
+  $('#cd-sens').addEventListener('change', majConv);
+
+  $('#cd-ok').addEventListener('click', function () {
+    var c = lire();
+    if (!(C.cadenceParJour(c, A.cfg) > 0)) { toast('Donnez un nombre.'); return; }
+    A.cfg.cadences = C.cadences(A.cfg);
+    A.cfg.cadences.push({
+      id: uid(), travail: travail, unite: u, valeur: C.nb(c.valeur), sens: c.sens,
+      chantier: $('#cd-ch').value, note: $('#cd-note').value.trim(), date: Date.now()
+    });
+    Promise.resolve(sauverCfg()).then(function () {
+      fermerModale(); renderRendements(); toast('Cadence enregistrée.');
+    });
+  });
+}
+/* La phrase telle qu'il l'a dictée, pas la valeur convertie : « une tige
+   toutes les dix minutes » est ce qu'il retrouvera, pas « 48 tiges/j ». */
+function ditCadence(c, u) {
+  var v = C.nb(c.valeur);
+  return c.sens === 'parjour'
+    ? E.fmt(v, v < 10 ? 2 : 0) + ' ' + u + ' par jour'
+    : E.fmt(v, v < 10 ? 1 : 0) + ' min par ' + u;
 }
 
 /* ============================================== CALENDRIER ET ALERTES */
@@ -12836,10 +13065,10 @@ function ouvrirFicheJour(ts) {
     corps += '<p class="eyebrow" style="margin:14px 0 6px">Prélevé ce jour-là</p>' +
       pr.map(function (x) {
         return '<div class="liste-item"><div class="li-c"><b>' +
-          esc(x.charge.nom || 'Charge fixe') + '</b><small>' +
+          esc(x.charge.libelle || 'Charge fixe') + '</b><small>' +
           esc([x.charge.beneficiaire, FIN.nomPeriodicite(x.charge.periodicite)]
             .filter(Boolean).join(' · ')) + '</small></div>' +
-          '<span class="num">' + eur(C.nb(x.charge.montant)) + '</span></div>';
+          '<span class="num">' + eur(C.nb(x.charge.ttc)) + '</span></div>';
       }).join('');
   }
   if (abs) {
@@ -13642,10 +13871,10 @@ function renderCalendrier() {
     /* Le repère du prélèvement ne remplace pas la pastille du statut : il se
        pose dans l'angle, et il annonce son montant au survol. */
     var pr = prel[k] || [];
-    var somme = pr.reduce(function (t2, x) { return t2 + C.nb(x.charge.montant); }, 0);
+    var somme = pr.reduce(function (t2, x) { return t2 + C.nb(x.charge.ttc); }, 0);
     h += '<button class="' + cls.join(' ') + '" data-jour="' + ts + '">' +
       (pr.length ? '<span class="cal-prel" title="' +
-        esc(pr.map(function (x) { return x.charge.nom || 'charge'; }).join(', ')) +
+        esc(pr.map(function (x) { return x.charge.libelle || 'charge fixe'; }).join(', ')) +
         (somme ? ' — ' + eur(C.arr(somme, 2)) : '') + '">€</span>' : '') +
       '<span class="n">' + d + (demi ? '<sup style="font-size:8px">½</sup>' : '') + '</span>' +
       '<span class="pts">' + pts + '</span></button>';
@@ -13747,7 +13976,7 @@ function renderJourDetail() {
 var COUL_ALERTE = { impaye: '#B4231F', retard: '#C4611B', afacturer: '#B98A00',
   devis: '#7A8471', aprevoir: '#1F5FA9', aplacer: '#2E4A3C', encours: '#7A8471',
   approche: '#2E7D46' };
-var TITRE_ALERTE = { impaye: 'Facture impayée', retard: 'Chantier en retard',
+var TITRE_ALERTE = { impaye: 'Facture impayée', retard: 'Journées passées',
   afacturer: 'À facturer', devis: 'Devis sans réponse',
   aprevoir: 'À prévoir', aplacer: 'Journées à placer', encours: 'En cours',
   approche: 'Chantier prévu' };
@@ -19249,7 +19478,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.75.0-20260908-0910';
+var VERSION = '4.76.0-20260908-1740';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

@@ -2256,7 +2256,7 @@ scenario('Carnet : « ouverts » n’est pas « en cours », et un terminé se c
   verifierVrai('trois chantiers ouverts, dits « ouverts »', /3 chantiers ouverts/.test(tete));
   verifierVrai('le mot « en cours » ne sert plus à compter', !/3 chantiers en cours/.test(tete));
   /* Le chantier terminé n'a pas de montant, mais il se compte. */
-  verifierVrai('le chantier à facturer est compté', /dont 1 à facturer/.test(tete));
+  verifierVrai('le chantier à facturer est compté', /1 à facturer/.test(tete));
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -2468,34 +2468,47 @@ scenario('Carnet : le filtre ne garde que les chantiers qui ont eu un devis', as
 });
 
 /* --------------------------------------------------------------------- */
-scenario('Carnet : la tête dit le facturé, l’encaissé et ce qui attend', async () => {
-  /* « Chiffre d'affaires total, nombre de factures éditées, nombre de
-     chantiers en attente, nombre de devis en attente. Avec un chiffre pour
-     dire : tant de chantiers en attente, ça fait tant d'euros. »
-     Et l'écart entre facturé et encaissé est justement ce qu'il veut voir. */
+scenario('Carnet : la tête dit le facturé, l’encaissé et qui le fait vivre', async () => {
+  /* « En attente, ça veut dire quoi ? Tu pourrais l'enlever et mettre juste le
+     nombre de devis signés. Et ce qui serait très intéressant, c'est le
+     chiffre d'affaires que j'ai fait avec le plus gros donneur d'ordre. »
+     Quatre carreaux, deux par ligne : ce qui est rentré en haut, ce qui
+     arrive en bas. */
   const ligne = p => [{ travail: 'DEGAG', unite: 'ha', quantite: 1, prix: p, nature: 'prestation' }];
   const t = await ouvrir(Object.assign({}, VIDE, {
     module: 'chantiers',
     chantiers: [
-      { id: 'c1', proprietaire: 'A', statut: 'paye', aDevis: false, temps: [], jours: [],
-        maj: Date.now(), lignes: ligne(1000) },
-      { id: 'c2', proprietaire: 'B', statut: 'facture', aDevis: false, temps: [], jours: [],
-        maj: Date.now(), lignes: ligne(500) },
+      { id: 'c1', proprietaire: 'A', donneur: 'Cabinet Dubois', statut: 'paye', aDevis: false,
+        temps: [], jours: [], maj: Date.now(), lignes: ligne(1000) },
+      { id: 'c2', proprietaire: 'B', donneur: 'Cabinet Dubois', statut: 'facture', aDevis: false,
+        temps: [], jours: [], maj: Date.now(), lignes: ligne(500) },
+      /* Terminé sans facture : il ne compte pas dans le facturé, mais c'est
+         celui qu'on risque d'oublier. */
       { id: 'c3', proprietaire: 'C', statut: 'termine', aDevis: false, temps: [], jours: [],
         maj: Date.now(), lignes: ligne(300) },
-      { id: 'c4', proprietaire: 'D', statut: 'envoye', aDevis: true, temps: [], jours: [],
-        maj: Date.now(), lignes: ligne(200) }
+      { id: 'c4', proprietaire: 'D', donneur: 'Cabinet Dubois', statut: 'accepte', aDevis: true,
+        temps: [], jours: [], maj: Date.now(), lignes: ligne(200) },
+      /* Un second donneur d'ordre, plus petit : c'est le plus gros qui parle. */
+      { id: 'c5', proprietaire: 'E', donneur: 'Petit cabinet', statut: 'paye', aDevis: false,
+        temps: [], jours: [], maj: Date.now(), lignes: ligne(200) }
     ]
   }));
   t.clic('[data-vue="carnet"]'); await t.pause(350);
   const tete = t.texte('#carnet-totaux');
   /* Facturé : la facture est partie, réglée ou non — la base des déclarations. */
-  verifierVrai('le facturé additionne payé et facturé', /1 500 €facturé/.test(tete));
-  verifierVrai('et compte les factures', /2 factures/.test(tete));
-  verifierVrai('l’encaissé ne retient que le réglé', /1 000 €encaissé/.test(tete));
-  verifierVrai('ce qui attend est chiffré', /300 €en attente/.test(tete));
-  verifierVrai('et ce qui presse est dit', /dont 1 à facturer/.test(tete));
-  verifierVrai('les devis en attente aussi', /200 €devis en attente · 1 devis/.test(tete));
+  verifierVrai('le facturé additionne payé et facturé', /1 700 €facturé/.test(tete));
+  verifierVrai('et compte les factures', /3 factures/.test(tete));
+  verifierVrai('l’encaissé ne retient que le réglé', /1 200 €encaissé/.test(tete));
+  /* « En attente » ne voulait rien dire : il cède la place à un compte. */
+  verifierVrai('« en attente » a disparu', !/en attente/.test(tete));
+  verifierVrai('les devis signés se comptent', /1devis signé · 200 €/.test(tete));
+  /* Qui le fait vivre, et pour quelle part : un donneur d'ordre à quatre-vingts
+     pour cent n'est pas un client, c'est un risque. */
+  verifierVrai('le premier donneur d’ordre est nommé', /1 500 €Cabinet Dubois/.test(tete));
+  verifierVrai('avec sa part du total', /88 %/.test(tete));
+  verifierVrai('le plus petit ne prend pas sa place', !/Petit cabinet/.test(tete));
+  /* « À facturer » a quitté le carreau, pas l'écran. */
+  verifierVrai('et ce qui presse reste dit', /1 à facturer/.test(tete));
   /* Les mots qui l'arrêtaient à chaque passage. */
   verifierVrai('« engagé, tous statuts » a disparu', !/engagé, tous statuts/.test(tete));
   verifier('aucune erreur', [], t.erreurs);
@@ -6390,8 +6403,8 @@ scenario('Calendrier : les frais fixes se voient tomber sur leur jour', async ()
     module: 'calendrier',
     /* La charge est calée sur le quantième du jour, quel que soit ce jour :
        une garde écrite « si on est le 12 » ne mordrait qu'une fois par mois. */
-    charges: [{ id: 'ch1', nom: 'Assurance décennale', beneficiaire: 'Groupama',
-      montant: 420, periodicite: 'annuel', jour: jour, moisReference: d.getMonth(),
+    charges: [{ id: 'ch1', libelle: 'Assurance décennale', beneficiaire: 'Groupama',
+      ttc: 420, periodicite: 'annuel', jour: jour, moisReference: d.getMonth(),
       debut: new Date(d.getFullYear() - 2, d.getMonth(), jour, 12).getTime(),
       categorie: 'ASSUR', sansTva: true }]
   }));
@@ -6426,10 +6439,10 @@ scenario('Calendrier : une charge arrêtée ne tombe plus sur le calendrier', as
   const t = await ouvrir(Object.assign({}, VIDE, {
     module: 'calendrier',
     charges: [
-      { id: 'ch1', nom: 'Contrat résilié', montant: 90, periodicite: 'mensuel',
+      { id: 'ch1', libelle: 'Contrat résilié', ttc: 90, periodicite: 'mensuel',
         jour: d.getDate(), moisReference: 0, arretee: true,
         debut: new Date(d.getFullYear() - 2, 0, 1, 12).getTime(), categorie: 'ABO' },
-      { id: 'ch2', nom: 'Pas encore souscrit', montant: 60, periodicite: 'mensuel',
+      { id: 'ch2', libelle: 'Pas encore souscrit', ttc: 60, periodicite: 'mensuel',
         jour: d.getDate(), moisReference: 0, categorie: 'ABO',
         debut: new Date(d.getFullYear() + 2, 0, 1, 12).getTime() }
     ]
@@ -6437,6 +6450,258 @@ scenario('Calendrier : une charge arrêtée ne tombe plus sur le calendrier', as
   await t.pause(350);
   const casse = t.$('[data-jour="' + t.w.BCC.minuit(d.getTime()) + '"]');
   verifier('aucun repère sur la case', null, casse.querySelector('.cal-prel'));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Rendements : ce qu’il a compté se lit à côté de ce qui a été mesuré', async () => {
+  /* « J'ai compté qu'à peu près, dans ce contexte-là, je mettais une tige à
+     élaguer toutes les dix minutes. Ça me l'enregistre et je le retiens. Ça
+     permettra d'avoir les deux côte à côte. »
+
+     Les deux chiffres ne disent pas la même chose : le mesuré vient des
+     journées saisies et paie les aléas — la route, le matériel, la pluie ;
+     le compté vient de la montre. L'écart est l'information. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'rendements', cfg: { heuresJour: 8 },
+    chantiers: [{ id: 'c1', proprietaire: 'Martin', commune: 'Levier', statut: 'paye',
+      aDevis: false, maj: Date.now(), jours: [],
+      /* 240 tiges en 8 jours-homme : 30 tiges par jour mesurées. */
+      lignes: [{ travail: 'ELAG', unite: 'unite', quantite: 240, prix: 4, nature: 'prestation' }],
+      temps: [{ date: Date.now(), duree: 64, unite: 'h', personnes: 1, activite: 'ELAG' }] }]
+  }));
+  await t.pause(300);
+  verifierVrai('le mesuré est là', /30 u\/j/.test(t.texte('#rend-corps')));
+  verifierVrai('rien de compté encore', !/comptés/.test(t.texte('#rend-corps')));
+
+  t.clic('[data-rdetail="ELAG"]'); await t.pause(400);
+  verifierVrai('le détail réclame une cadence',
+    /Rien de compté pour cette prestation/.test(t.texte('#modale')));
+  t.clic('#cd-plus'); await t.pause(400);
+
+  /* Une tige toutes les dix minutes, sur huit heures : 48 tiges par jour. */
+  t.saisir('#cd-val', '10'); await t.pause(200);
+  verifierVrai('la conversion s’écrit sous le champ',
+    /soit 48 u par journée de 8 h/.test(t.$('#cd-conv').textContent));
+  t.choisir('#cd-ch', 'c1');
+  t.saisir('#cd-note', 'ronce épaisse');
+  t.clic('#cd-ok'); await t.pause(600);
+
+  const cds = (t.stock('cfg') || {}).cadences || [];
+  verifier('la cadence est rangée dans la configuration', 1, cds.length);
+  /* On garde ce qu'il a tapé, pas la conversion : « dix minutes » est ce
+     qu'il retrouvera, pas « 48 tiges/j ». */
+  verifier('avec sa valeur telle qu’il l’a dite', 10, cds[0].valeur);
+  verifier('et son sens', 'minutes', cds[0].sens);
+  verifier('et le chantier où il l’a constatée', 'c1', cds[0].chantier);
+
+  const dit = t.texte('#rend-corps');
+  verifierVrai('le compté se lit à côté du mesuré', /48 u\/j comptés/.test(dit));
+  /* 30 mesuré contre 48 compté : 38 % plus lent sur le terrain. */
+  verifierVrai('et l’écart est dit en clair', /38 % plus lent sur le terrain/.test(dit));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Rendements : une cadence se dit dans les deux sens, et se retire', async () => {
+  /* « Une tige toutes les dix minutes » se chronomètre ; « huit cents plants
+     par jour » se constate le soir. Convertir de tête serait exactement le
+     calcul qu'on lui épargne. */
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'rendements', cfg: { heuresJour: 8 } }));
+  const C0 = t.w.BCC;
+  verifier('minutes par unité', 48, C0.cadenceParJour({ valeur: 10, sens: 'minutes' }, { heuresJour: 8 }));
+  verifier('unités par jour', 800, C0.cadenceParJour({ valeur: 800, sens: 'parjour' }, { heuresJour: 8 }));
+  /* Le réglage des heures par jour compte : sept heures ne font pas huit. */
+  verifier('la journée de sept heures donne moins', 42,
+    C0.cadenceParJour({ valeur: 10, sens: 'minutes' }, { heuresJour: 7 }));
+  verifier('un nombre absent ne vaut rien', 0, C0.cadenceParJour({ valeur: '', sens: 'minutes' }, {}));
+
+  /* Une prestation jamais facturée mais chronométrée mérite sa ligne : c'est
+     là que le compté est tout ce qu'on a. */
+  const t2 = await ouvrir(Object.assign({}, VIDE, {
+    module: 'rendements', cfg: { heuresJour: 8,
+      cadences: [{ id: 'k1', travail: 'ELAG', unite: 'u', valeur: 12, sens: 'minutes',
+      chantier: '' }] }
+  }));
+  await t2.pause(300);
+  const dit = t2.texte('#rend-corps');
+  verifierVrai('la prestation apparaît quand même', /Élagage/i.test(dit));
+  verifierVrai('avec le compté seul', /40 u\/j comptés/.test(dit));
+  verifierVrai('et l’écran dit qu’il n’y a rien de mesuré', /Rien de mesuré encore/.test(dit));
+
+  t2.clic('[data-rdetail="ELAG"]'); await t2.pause(400);
+  verifierVrai('le détail la liste', /12 min par u/.test(t2.texte('#modale')));
+  verifierVrai('et dit qu’aucun chantier ne la porte', /sans chantier/.test(t2.texte('#modale')));
+  t2.clic('[data-cdsup="k1"]'); await t2.pause(600);
+  verifier('elle se retire', 0, ((t2.stock('cfg') || {}).cadences || []).length);
+  verifierVrai('et la ligne disparaît avec elle', !/comptés/.test(t2.texte('#rend-corps')));
+  verifier('aucune erreur', [], t.erreurs.concat(t2.erreurs));
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Carnet : « en retard » ne se dit plus d’un chantier, seulement d’une facture', async () => {
+  /* Le mot l'a trompé deux fois. enRetard() ne parle d'aucune échéance
+     manquée : il dit que toutes les journées posées sont derrière et que le
+     chantier n'est pas soldé. Un vrai retard existe pourtant — celui d'une
+     facture dont l'échéance est dépassée — et lui garde son mot. */
+  const JOUR = 86400000;
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [
+      /* Journées toutes passées, chantier jamais terminé. */
+      { id: 'c1', proprietaire: 'Jourspasses', statut: 'encours', aDevis: false,
+        temps: [], maj: Date.now(), jours: [{ d: Date.now() - 20 * JOUR, p: 1 }],
+        lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 2, prix: 500, nature: 'prestation' }] },
+      /* Facture dont l'échéance est dépassée : celle-là est bien en retard. */
+      { id: 'c2', proprietaire: 'Impaye', statut: 'facture', aDevis: false, temps: [], jours: [],
+        maj: Date.now(), numeroFacture: 'F-2026-0003',
+        dateFacture: Date.now() - 90 * JOUR, echeancePaiement: Date.now() - 30 * JOUR,
+        lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 1, prix: 900, nature: 'prestation' }] }
+    ]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(350);
+  const z = t.texte('#liste-chantiers');
+  verifierVrai('le chantier dit ce que le calcul dit', /jours passés/.test(z));
+  verifierVrai('et plus « en retard »', !/en retard/.test(z));
+
+  /* L'alerte aussi : elle annonçait « en retard depuis le Invalid Date »,
+     parce que l'échéance de chantier a été retirée il y a longtemps. */
+  const al = t.w.BCC.alertes(t.stock('chantiers'), null, Date.now());
+  const r = al.filter(a => a.type === 'retard')[0];
+  verifierVrai('l’alerte existe', !!r);
+  verifierVrai('elle date la dernière journée posée',
+    /dernière journée posée le \d/.test(r.texte));
+  verifierVrai('et jamais une date impossible', !/Invalid/.test(r.texte));
+
+  /* Le retard de paiement, lui, en est un : le mot reste. */
+  const imp = al.filter(a => a.type === 'impaye')[0];
+  verifierVrai('l’impayé est bien relevé', !!imp);
+  verifierVrai('avec son échéance dépassée', /échéance dépassée/.test(imp.texte));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Carnet : la ligne porte le hors taxes, le TTC et la TVA', async () => {
+  /* « Tu mets le montant hors taxes. Est-ce que tu pourrais mettre le taux de
+     TVA, la TVA, le montant TTC, sur le côté droit ? Comme ça ça permet de
+     voir un global très rapidement. » Les deux montants en gros, la TVA en
+     dessous : c'est lui qui a tranché lequel domine.
+
+     Le taux réduit demande un SIREN : sans lui tout est à 20 % et la question
+     des taux mêlés ne se pose jamais. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [
+      { id: 'c1', proprietaire: 'Simple', statut: 'encours', aDevis: false, siren: false,
+        temps: [], jours: [], maj: Date.now() - 1000,
+        lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 2, prix: 500, nature: 'prestation' }] },
+      /* Deux taux sur le même chantier : le répulsif n'ouvre pas droit au taux
+         réduit là où le dégagement y a droit. */
+      { id: 'c2', proprietaire: 'Melange', statut: 'encours', aDevis: false, siren: true,
+        temps: [], jours: [], maj: Date.now(),
+        lignes: [
+          { travail: 'DEGAG', unite: 'ha', quantite: 1, prix: 1000, nature: 'prestation' },
+          { travail: 'F_REPULSIF', unite: 'unite', quantite: 100, prix: 1, nature: 'vente' }
+        ] }
+    ]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(350);
+  const tout = t.texte('#liste-chantiers');
+  verifierVrai('les deux chantiers sont là', /Simple/.test(tout) && /Melange/.test(tout));
+
+  /* Un seul taux : il s'écrit. 1 000 € HT à 20 % font 1 200 € TTC. */
+  verifierVrai('le hors taxes reste là', /1 000 € HT/.test(tout));
+  verifierVrai('le TTC est calculé', /1 200 € TTC/.test(tout));
+  verifierVrai('le taux et la TVA sont dits', /TVA 20 % · 200 €/.test(tout));
+
+  /* Taux mêlés : afficher l'un des deux serait un mensonge. */
+  verifierVrai('les taux mêlés se disent mêlés', /TVA mêlée · /.test(tout));
+  verifierVrai('et jamais un taux inventé', !/TVA 10 % · /.test(tout));
+
+  /* Le carnet et la fiche passent par le même calcul : deux copies d'un calcul
+     de TVA finissent toujours par diverger, et c'est la TVA. */
+  const C0 = t.w.BCC;
+  const c2 = (t.stock('chantiers') || []).filter(x => x.id === 'c2')[0];
+  verifier('pas de taux unique quand ils sont deux', null, C0.tauxChantier(c2));
+  verifier('un taux unique se rend quand il l’est', 20,
+    C0.tauxChantier((t.stock('chantiers') || []).filter(x => x.id === 'c1')[0]));
+  verifierVrai('la TVA mêlée est celle des lignes, pas d’un taux moyen',
+    C0.tvaChantier(c2) === C0.arr(1000 * C0.tauxLigne(c2.lignes[0], c2) / 100 +
+      100 * C0.tauxLigne(c2.lignes[1], c2) / 100, 2));
+  verifier('et le TTC vaut le HT plus la TVA',
+    C0.arr(C0.montant(c2) + C0.tvaChantier(c2), 2), C0.ttcChantier(c2));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Chantier : un chantier pas fini d’être planifié n’est pas en retard', async () => {
+  /* « Je ne vais pas prévoir tout le chantier d'un coup : je pose un ou deux
+     jours, j'ai une vision à la semaine ou deux. »
+
+     enRetard() disait seulement « toutes les journées posées sont derrière ».
+     Sur sa façon de travailler c'est vrai dès le premier jour fait : il pose
+     un jour sur trois, il le fait, et le lendemain le chantier s'annonce en
+     retard. Il reste pourtant deux journées à poser. */
+  const JOUR = 86400000;
+  const C0 = (await ouvrir(Object.assign({}, VIDE, { module: 'chantiers' }))).w.BCC;
+  const hier = Date.now() - JOUR;
+  /* Trois journées au devis, une seule posée, et elle est passée. */
+  const enCours = { statut: 'encours', jours: [{ d: hier, p: 1 }], temps: [],
+    lignes: [{ travail: 'DEGAG', unite: 'jour', quantite: 3, prix: 350, nature: 'prestation' }] };
+  verifierVrai('il reste deux journées à poser', C0.resteAPlacer(enCours) === 2);
+  verifierVrai('donc rien à signaler', !C0.enRetard(enCours, Date.now()));
+
+  /* Les trois posées, toutes passées, et le chantier jamais soldé : là, oui. */
+  const tout = { statut: 'encours', temps: [],
+    jours: [{ d: hier - 2 * JOUR, p: 1 }, { d: hier - JOUR, p: 1 }, { d: hier, p: 1 }],
+    lignes: [{ travail: 'DEGAG', unite: 'jour', quantite: 3, prix: 350, nature: 'prestation' }] };
+  verifierVrai('plus rien à poser', C0.resteAPlacer(tout) === 0);
+  verifierVrai('et le chantier traîne', C0.enRetard(tout, Date.now()));
+
+  /* Un jour encore à venir : on n'a rien à dire non plus. */
+  const avenir = { statut: 'encours', temps: [],
+    jours: [{ d: hier, p: 1 }, { d: Date.now() + JOUR, p: 1 }, { d: Date.now() + 2 * JOUR, p: 1 }],
+    lignes: [{ travail: 'DEGAG', unite: 'jour', quantite: 3, prix: 350, nature: 'prestation' }] };
+  verifierVrai('un jour à venir suffit à se taire', !C0.enRetard(avenir, Date.now()));
+
+  /* Sans estimation d'aucune sorte, on ne sait pas ce qui reste : on retombe
+     sur la règle d'avant, sinon un chantier oublié ne se signalerait jamais. */
+  const sansVise = { statut: 'encours', temps: [], lignes: [],
+    jours: [{ d: hier, p: 1 }] };
+  verifier('rien ne dit ce qui reste', null, C0.resteAPlacer(sansVise));
+  verifierVrai('et le chantier se signale quand même', C0.enRetard(sansVise, Date.now()));
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Calendrier : le prélèvement lit les champs que le formulaire écrit', async () => {
+  /* « Là j'ai un signe €, mais pourtant il met zéro. Charge fixe tous les
+     mois, zéro. » Le repère lisait `nom` et `montant` ; le formulaire écrit
+     `libelle` et `ttc`. Le premier scénario ne l'a pas vu parce qu'il semait
+     les mêmes champs faux que le code lisait — deux erreurs qui se confirment
+     l'une l'autre.
+
+     La charge est donc semée telle que le formulaire l'enregistre. */
+  const d = new Date(); d.setHours(12, 0, 0, 0);
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'calendrier',
+    charges: [{ id: 'ch1', libelle: 'Assurance décennale', beneficiaire: 'Groupama',
+      ttc: 420, periodicite: 'annuel', jour: d.getDate(), moisReference: d.getMonth(),
+      debut: new Date(d.getFullYear() - 2, d.getMonth(), d.getDate(), 12).getTime(),
+      categorie: 'ASSUR', taux: 0 }]
+  }));
+  await t.pause(350);
+  const marque = t.$('[data-jour="' + t.w.BCC.minuit(d.getTime()) + '"] .cal-prel');
+  verifierVrai('la case porte le repère', !!marque);
+  const titre = marque.getAttribute('title');
+  verifierVrai('il nomme la charge', /Assurance décennale/.test(titre));
+  verifierVrai('et jamais « charge » tout court', !/^charge —/.test(titre));
+  verifierVrai('il annonce le montant, pas zéro', /420/.test(titre) && !/— 0 €/.test(titre));
+
+  t.clic('[data-jour="' + t.w.BCC.minuit(d.getTime()) + '"]'); await t.pause(450);
+  const dit = t.texte('#modale');
+  verifierVrai('la fiche du jour la nomme', /Assurance décennale/.test(dit));
+  verifierVrai('avec son montant', /420 €/.test(dit));
+  verifierVrai('et jamais 0 €', !/Groupama · annuel0 €/.test(dit));
   verifier('aucune erreur', [], t.erreurs);
 });
 
