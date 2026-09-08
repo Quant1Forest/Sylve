@@ -1254,23 +1254,23 @@ forêt, type de travaux**. Le reste se remplit bloc par bloc sur la fiche.
   (Le peuplement), case du devis et étapes de statut (Le devis et Statut). Ils
   visent maintenant ces écrans.
 
-## Ce qui manque encore au débours
+## Le débours : c'était un manque, il est comblé
 
-**Signalé le 23 août, pas encore fait.** La nature d'une ligne est **déduite du
-travail** : une fourniture devient `vente`, tout le reste `prestation`. Le
-**débours n'est jamais assignable** depuis l'application — ses lignes de débours
-n'existent que parce que la reprise du carnet les a posées. Et rien ne le
-distingue sur la fiche : une vente affiche « · fourniture », un débours
-n'affiche rien.
+**Cette section décrivait deux manques du 23 août ; les deux sont faits.**
+Relue le 8 septembre, elle mentait — et une note périmée coûte plus cher
+qu'une note absente, parce qu'on la croit.
 
-Conséquence : le calcul est juste (le débours est bien hors CA), mais **il ne
-peut ni en créer un, ni en voir un, ni corriger une erreur**. Pour quelqu'un qui
-doit déduire ces montants de son chiffre d'affaires, c'est un manque réel.
+- **Le débours est assignable** : la nature d'une ligne se choisit dans le
+  formulaire (`<option value="debours">`), et la fiche l'annonce
+  — « · **débours**, hors chiffre d'affaires ». Le calcul, lui, était juste
+  depuis le début : `horsCA` le tient à l'écart du chiffre d'affaires.
+- **Le champ « Produit du stock » se ferme** quand une sortie manuelle existe
+  déjà pour le chantier (`stockAPart`), avec son explication — au lieu de
+  laisser saisir puis d'avertir après coup.
 
-**Autre demande du même jour** : quand une sortie de stock manuelle existe déjà
-pour un chantier — c'est le cas des trente-deux repris du carnet — le champ
-« Produit du stock » devrait être **grisé avec son explication**, au lieu de le
-laisser saisir puis d'afficher un message après coup.
+**Leçon de méthode** : avant de porter un manque à l'écran comme s'il durait,
+vérifier dans le code qu'il dure encore. Trois fois déjà, ce fichier a décrit
+comme ouvert ce qui était clos.
 
 ## Le vert, et la couleur qui ne bouge plus
 
