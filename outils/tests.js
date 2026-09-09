@@ -6815,6 +6815,107 @@ scenario('Clients : sans type, on ne retire rien — le SIREN reste proposé', a
 });
 
 /* --------------------------------------------------------------------- */
+scenario('Rendements : les lignes s’alignent, et se trient comme il veut', async () => {
+  /* « Il y en a qui sont calés à gauche, d'autres un peu plus décalées. Et
+     ces pastilles, elles servent à quoi ? Elles ont la même couleur. »
+
+     Elles ne distinguaient rien : chaque ligne est déjà une prestation
+     différente. Et deux formes de ligne — l'une à deux boutons, l'autre à un
+     seul — faisaient danser les titres. Une seule forme, sans pastille. */
+  const J = (m, j) => new Date(2026, m, j, 12).getTime();
+  const ligne = (id, trav, prop, q, jour) => ({ id, proprietaire: prop, statut: 'paye',
+    aDevis: false, maj: J(0, 1), jours: [], temps: [{ date: jour, duree: 8, unite: 'h',
+      personnes: 1, activite: trav }],
+    lignes: [{ travail: trav, unite: 'unite', quantite: q, prix: 4, nature: 'prestation' }] });
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    /* Pas de « journeesMigrees » : le temps semé doit devenir des journées,
+       sinon l'indexation vide c.temps et plus rien ne se calcule. */
+    module: 'rendements', cfg: { heuresJour: 8,
+      /* Une prestation chronométrée mais jamais facturée : elle a sa ligne. */
+      cadences: [{ id: 'k1', travail: 'BROY', unite: 'ha', valeur: 2, sens: 'parjour',
+        chantier: '' }] },
+    chantiers: [
+      ligne('c1', 'ELAG', 'Ancien', 40, J(1, 10)),
+      ligne('c2', 'DEGAG', 'Recent', 30, J(6, 10)),
+      ligne('c3', 'DEGAG', 'Autre', 20, J(5, 10))
+    ]
+  }));
+  await t.pause(350);
+
+  /* Plus aucune pastille : elles ne portaient aucune information. */
+  verifier('plus de pastille décorative', 0, t.$$('#rend-corps .pastille').length);
+  /* Et toutes les lignes ont la même forme : deux boutons, alignés. */
+  const items = t.$$('#rend-corps .liste-item');
+  verifierVrai('au moins trois prestations', items.length >= 3);
+  verifierVrai('chacune porte deux boutons',
+    items.every(i => i.querySelectorAll('.li-actions button').length === 2));
+  /* Celle qui n'a aucun chantier ne s'estime pas, mais garde sa place. */
+  const sansMesure = items.filter(i => /comptés/.test(i.textContent))[0];
+  verifierVrai('la prestation seulement comptée est là', !!sansMesure);
+  verifierVrai('son bouton « Estimer » est fermé',
+    sansMesure.querySelector('[data-restim]') === null &&
+    sansMesure.querySelectorAll('.li-actions button')[1].disabled);
+
+  const noms = () => t.$$('#rend-corps .li-c b').map(b => b.textContent.split(' —')[0]);
+  verifier('par défaut, l’ordre alphabétique',
+    noms().slice().sort((a, b) => a.localeCompare(b, 'fr')), noms());
+
+  /* Du plus récent : le dégagement de juillet passe devant l'élagage de
+     février, et la prestation sans chantier ferme la marche. */
+  t.choisir('#rend-tri', 'recent'); await t.pause(300);
+  const r = noms();
+  verifierVrai('le plus récemment travaillé en tête', /Dégagement/.test(r[0]));
+  verifierVrai('et celui sans chantier à la fin', /Broyage/i.test(r[r.length - 1]));
+
+  t.choisir('#rend-tri', 'chantiers'); await t.pause(300);
+  verifierVrai('par nombre de chantiers, le dégagement d’abord',
+    /Dégagement/.test(noms()[0]));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Chantier : le prix de journée attend que le chantier soit fini', async () => {
+  /* « Ce n'est pas un chiffre utile en cours de chantier. Il sert plutôt à la
+     fin : tu as fait tant de journées, tu as facturé tant, donc ta journée
+     vaut tant. »
+
+     Trois journées facturées 1 050 €, une seule faite : la division annonçait
+     1 050 € par jour. Le chiffre n'était pas faux, il était prématuré — et il
+     remontait tel quel dans la moyenne des rendements. */
+  const C0 = (await ouvrir(Object.assign({}, VIDE, { module: 'chantiers' }))).w.BCC;
+  const enCours = { statut: 'encours',
+    temps: [{ date: Date.now(), duree: 8, unite: 'h', personnes: 1, activite: 'DEGAG' }],
+    lignes: [{ travail: 'DEGAG', unite: 'jour', quantite: 3, prix: 350, nature: 'prestation' }] };
+  verifier('rien tant que le chantier tourne', null, C0.prixJour(enCours, { heuresJour: 8 }));
+
+  /* Terminé, la facture est ce qu'elle sera : le chiffre a un sens. */
+  const fini = Object.assign({}, enCours, { statut: 'facture' });
+  verifier('le chantier soldé le rend', 1050, C0.prixJour(fini, { heuresJour: 8 }));
+  verifierVrai('« soldé » couvre terminé, facturé et payé',
+    ['termine', 'facture', 'paye'].every(st => C0.chantierSolde({ statut: st })) &&
+    !C0.chantierSolde({ statut: 'encours' }) && !C0.chantierSolde({ statut: 'accepte' }));
+
+  /* Et la fiche dit pourquoi le chiffre n'est pas là, plutôt que de le taire. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers', cfg: { heuresJour: 8, journeesMigrees: true },
+    chantiers: [{ id: 'c1', proprietaire: 'Martin', statut: 'encours', aDevis: false,
+      maj: Date.now(), jours: [], temps: [],
+      lignes: [{ travail: 'DEGAG', unite: 'jour', quantite: 3, prix: 350, nature: 'prestation' }] }],
+    journees: [{ id: 'j1', date: Date.now(), chantier: 'c1', personnes: 1, nonProd: 0,
+      postes: [{ travaux: 'DEGAG', heures: 8, quantite: 0 }] }]
+  }));
+  await t.pause(350);
+  t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+  const f = t.texte('#vue-chantier');
+  verifierVrai('la fiche dit pourquoi il manque',
+    /se lira quand le chantier sera terminé/.test(f));
+  verifierVrai('et n’annonce pas 1 050 € par jour-homme',
+    !/1 050 €par jour-homme/.test(f));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
 /* Un chantier prêt pour une fiche de chantier. */
 const CH_FICHE = () => ({
   module: 'chantiers',

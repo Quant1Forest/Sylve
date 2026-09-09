@@ -1705,6 +1705,9 @@ if (froid && s > 0) montrer(s);
         <p class="muted" style="font-size:12.5px;margin:0 0 12px">
           Par type de travaux, d'après les chantiers où le temps est saisi.
         </p>
+        <div class="champ" style="max-width:250px;margin-bottom:11px">
+          <select id="rend-tri"></select>
+        </div>
         <div id="rend-corps"></div>
       </div>
     </section>
@@ -3704,7 +3707,14 @@ function coutCarburant(km, cfg) {
   return arr(km / 100 * l100 * prix, 2);
 }
 /* Prix de journée réellement obtenu : mon montant sur mes journées. */
+/* Un chantier soldé : le travail est fini, la facture est ce qu'elle sera.
+   Tant qu'il tourne, le montant est complet mais les journées ne le sont
+   pas — diviser l'un par l'autre ne dit rien. */
+function chantierSolde(ch) {
+  return ['termine', 'facture', 'paye'].indexOf(ch && ch.statut) >= 0;
+}
 function prixJour(ch, cfg) {
+  if (!chantierSolde(ch)) return null;
   var j = tempsMoi(ch, cfg);
   return j > 0 ? arr(montant(ch) / j, 2) : null;
 }
@@ -4891,7 +4901,7 @@ var M = {
   joursSaisie: joursSaisie, mesJours: mesJours, tempsTotal: tempsTotal, tempsMoi: tempsMoi,
   heuresPostes: heuresPostes, heuresJournee: heuresJournee, joursJournee: joursJournee,
   prixJourVise: prixJourVise, bilanJournees: bilanJournees, HEURES_JOUR: HEURES_JOUR,
-  prixJour: prixJour, rendement: rendement,
+  prixJour: prixJour, chantierSolde: chantierSolde, rendement: rendement,
   dureePrevue: dureePrevue, enRetard: enRetard, journeesANoter: journeesANoter, tri: tri, filtre: filtre, chercher: chercher,
   totaux: totaux,
   dernierEvenement: dernierEvenement, rangComptable: rangComptable,
@@ -6341,7 +6351,7 @@ function ecrire(k, o) { return Store.set(k, JSON.stringify(o)); }
 /* ---------------------------------------------------------------- état */
 var A = {
   cfg: null, index: [], bord: null, piles: [], chantiers: [], module: 'cubage', ici: null,
-  vuePiles: 'stock', filtreCh: 'ouverts', rechCh: '', triAncien: false, triCh: 'auto', chOuvert: null, clients: [], proprios: [], estim: null, imp: null, articles: [], charges: [], fournisseurs: [], commandes: [], sorties: [], mvt: 'achats', journees: [], lieuxRegles: [], listeReglee: 'clients', revient: null, calMois: null, calJour: null, nbAlertes: 0, planifie: null,
+  vuePiles: 'stock', triRend: 'alpha', filtreCh: 'ouverts', rechCh: '', triAncien: false, triCh: 'auto', chOuvert: null, clients: [], proprios: [], estim: null, imp: null, articles: [], charges: [], fournisseurs: [], commandes: [], sorties: [], mvt: 'achats', journees: [], lieuxRegles: [], listeReglee: 'clients', revient: null, calMois: null, calJour: null, nbAlertes: 0, planifie: null,
   depenses: [], periode: null, filtreDep: 'tous', vueAna: 'ensemble', secReglages: 'general',
   achats: [], fch: null, fchFiltre: 'ouverts',
   versements: [], vehicule: null,
@@ -7899,6 +7909,11 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.78', quoi: [
+    { t: 'Le prix de journee attend que le chantier soit fini pour se montrer', vue: 'chantier' },
+    { t: 'Rendements : plus de pastilles, les lignes s alignent enfin', vue: 'rendements' },
+    { t: 'Et un tri : alphabetique, du plus recent, du plus de chantiers', vue: 'rendements' }
+  ] },
   { v: '4.77', quoi: [
     { t: '« Proprietaire » devient « Client » : tous ne sont pas proprietaires', vue: 'carnet' },
     { t: 'Un nom nouveau se range par type : proprietaire, gestionnaire, ETF, autre', vue: 'carnet' },
@@ -7933,13 +7948,6 @@ var NOTES_MAJ = [
     { t: 'Fiche de chantier : les risques se reprennent d un chantier de la meme foret', vue: 'fichech' },
     { t: 'Le telephone du proprietaire n est plus reclame en rouge', vue: 'fichech' },
     { t: 'Et un plan joint libere le cadre du croquis', vue: 'fichech' }
-  ] },
-  { v: '4.73', quoi: [
-    { t: 'Un temps note ne disparait plus tout seul — il comptait pour rien', vue: 'chantier' },
-    { t: 'Retirer une saisie n en retire qu une, et pour de bon', vue: 'calendrier' },
-    { t: 'Le SIREN se demande a la creation et se retient par proprietaire', vue: 'carnet' },
-    { t: 'Les journees a trancher s annoncent aussi dans l agenda', vue: 'calendrier' },
-    { t: 'Un seul « j ai travaille », et des pastilles qui se voient', vue: 'calendrier' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -8583,6 +8591,9 @@ function brancher() {
   });
 
   /* --- rendements --- */
+  $('#rend-tri').addEventListener('change', function () {
+    A.triRend = this.value; renderRendements();
+  });
   $('#rend-corps').addEventListener('click', function (e) {
     var d4 = e.target.closest('[data-rdetail]'), s4 = e.target.closest('[data-restim]');
     if (d4) ouvrirDetailRendement(d4.dataset.rdetail);
@@ -11418,6 +11429,12 @@ function blocJournees(c, bil, pj, vise, rends, mixteNonMarque) {
       (pj ? '<div class="carte2"><b class="num">' + eur(pj) + '</b><small>par jour-homme' +
         (vise ? (pj >= vise ? ' ✓' : ' ✕') : '') + '</small></div>' : '') +
       rends + '</div>' : '') +
+    /* Le taire sans rien dire laisserait croire à un oubli. */
+    (faitH && !C.chantierSolde(c)
+      ? '<p class="muted" style="font-size:12px;margin:9px 0 0">Le prix de journée ' +
+        'se lira quand le chantier sera terminé : tant qu’il tourne, la facture est ' +
+        'entière et les journées ne le sont pas.</p>'
+      : '') +
     (bil.prevues != null && bil.faites > 0
       ? '<div class="carte2" style="margin-top:11px;border-color:' +
         (bil.ecart > 0.25 ? '#B4231F' : bil.ecart < -0.25 ? '#2E7D46' : 'var(--trait)') + '">' +
@@ -12852,9 +12869,24 @@ function renderEstimResultat() {
 }
 
 /* ---------------------------------------------------------- rendements */
+var TRIS_REND = [
+  { c: 'alpha', n: 'Par ordre alphabétique' },
+  { c: 'recent', n: 'Du plus récent au plus ancien' },
+  { c: 'ancien', n: 'Du plus ancien au plus récent' },
+  { c: 'chantiers', n: 'Du plus de chantiers au moins' }
+];
+function renderTriRendements() {
+  var s = $('#rend-tri'); if (!s) return;
+  var v = A.triRend || 'alpha';
+  s.innerHTML = TRIS_REND.map(function (o) {
+    return '<option value="' + o.c + '"' + (v === o.c ? ' selected' : '') + '>' +
+      esc(o.n) + '</option>';
+  }).join('');
+}
 function renderRendements() {
   var z = $('#rend-corps'); if (!z) return;
-  var blocs = [];
+  renderTriRendements();
+  var lignes = [];
   C.TRAVAUX.forEach(function (t) {
     var refs = C.references(A.chantiers, t.c, A.cfg);
     /* L'unité qui fait foi est celle des chantiers ; à défaut, celle de la
@@ -12868,13 +12900,10 @@ function renderRendements() {
     if (!refs.length && cpt == null) return;
     if (!refs.length) {
       var u0 = uRef;
-      blocs.push('<div class="liste-item pile-c"><div class="li-h">' +
-        '<span class="pastille" style="background:#B98A00;margin-top:4px"></span>' +
-        '<div class="li-c"><b>' + esc(t.n) + ' — ' + E.fmt(cpt, cpt < 10 ? 2 : 0) +
-        ' ' + u0 + '/j comptés</b><small>Rien de mesuré encore : aucun chantier ' +
-        'n’a de quantité et de temps sur cette prestation.</small></div></div>' +
-        '<div class="li-actions"><button class="btn-min" data-rdetail="' + t.c +
-        '">Détail</button></div></div>');
+      lignes.push({ code: t.c, nom: t.n, n: 0, date: 0,
+        titre: esc(t.n) + ' — ' + E.fmt(cpt, cpt < 10 ? 2 : 0) + ' ' + u0 + '/j comptés',
+        sous: 'Rien de mesuré encore : aucun chantier n’a de quantité et de temps ' +
+          'sur cette prestation.', estimer: false });
       return;
     }
     var u = C.courtUnite(refs[0].unite);
@@ -12882,18 +12911,38 @@ function renderRendements() {
     var moy = C.arr(rends.reduce(function (s, x) { return s + x; }, 0) / rends.length, 3);
     var pjs = refs.filter(function (r) { return r.prixJour; });
     var pjMoy = pjs.length ? C.arr(pjs.reduce(function (s, r) { return s + r.prixJour; }, 0) / pjs.length, 2) : null;
-    blocs.push('<div class="liste-item pile-c"><div class="li-h">' +
-      '<span class="pastille" style="background:#2E4A3C;margin-top:4px"></span>' +
-      '<div class="li-c"><b>' + esc(t.n) + ' — ' + E.fmt(moy, moy < 10 ? 2 : 0) + ' ' + u + '/j</b>' +
-      '<small>' + refs.length + ' chantier' + (refs.length > 1 ? 's' : '') +
+    lignes.push({ code: t.c, nom: t.n, n: refs.length,
+      date: Math.max.apply(null, refs.map(function (r) { return r.date || 0; })),
+      estimer: true,
+      titre: esc(t.n) + ' — ' + E.fmt(moy, moy < 10 ? 2 : 0) + ' ' + u + '/j',
+      sous: refs.length + ' chantier' + (refs.length > 1 ? 's' : '') +
       ' · de ' + E.fmt(Math.min.apply(null, rends), 2) + ' à ' + E.fmt(Math.max.apply(null, rends), 2) + ' ' + u + '/j' +
       (pjMoy ? ' · ' + eur(pjMoy) + '/jour obtenu' : '') +
       /* L'écart est l'information : le mesuré porte les aléas — la pluie, la
          route, le matériel — que le chronomètre ne voit pas. */
       (cpt != null ? '<br><b class="compte">' + E.fmt(cpt, cpt < 10 ? 2 : 0) + ' ' + u +
-        '/j comptés</b> · ' + ecartCadence(moy, cpt) : '') + '</small></div></div>' +
-      '<div class="li-actions"><button class="btn-min" data-rdetail="' + t.c + '">Détail</button>' +
-      '<button class="btn-min" data-restim="' + t.c + '">Estimer</button></div></div>');
+        '/j comptés</b> · ' + ecartCadence(moy, cpt) : '') });
+  });
+
+  /* Le tri qu'il a choisi. « Estimer » n'a de sens que sur une prestation
+     mesurée : sans chantier derrière, il n'y a rien à estimer — mais le
+     bouton garde sa place, sinon les lignes ne s'alignent plus. */
+  var tri = A.triRend || 'alpha';
+  lignes.sort(function (a, b) {
+    if (tri === 'recent') return (b.date - a.date) || a.nom.localeCompare(b.nom, 'fr');
+    if (tri === 'ancien') return (a.date - b.date) || a.nom.localeCompare(b.nom, 'fr');
+    if (tri === 'chantiers') return (b.n - a.n) || a.nom.localeCompare(b.nom, 'fr');
+    return a.nom.localeCompare(b.nom, 'fr');
+  });
+  var blocs = lignes.map(function (x) {
+    return '<div class="liste-item pile-c"><div class="li-h">' +
+      '<div class="li-c"><b>' + x.titre + '</b><small>' + x.sous + '</small></div></div>' +
+      '<div class="li-actions">' +
+      '<button class="btn-min" data-rdetail="' + x.code + '">Détail</button>' +
+      (x.estimer
+        ? '<button class="btn-min" data-restim="' + x.code + '">Estimer</button>'
+        : '<button class="btn-min" disabled>Estimer</button>') +
+      '</div></div>';
   });
   z.innerHTML = blocs.length ? blocs.join('')
     : '<div class="vide"><p>Aucun rendement calculable. Il faut des chantiers avec des quantités ' +
@@ -19585,7 +19634,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.77.0-20260908-2340';
+var VERSION = '4.78.0-20260909-0030';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
