@@ -74,6 +74,10 @@ function ouvrir(graines, options) {
         w.URL.createObjectURL = () => 'blob:test';
         w.URL.revokeObjectURL = () => {};
         w.Element.prototype.scrollIntoView = function () {};
+        /* Un crochet pour poser ce que JSDOM n'a pas — un écran, un capteur —
+           AVANT que l'application démarre : elle ne branche que ce qui existe
+           déjà au lancement. */
+        if (options.avant) options.avant(w);
       }
     });
     const erreurs = [];
@@ -6912,6 +6916,98 @@ scenario('Chantier : le prix de journée attend que le chantier soit fini', asyn
     /se lira quand le chantier sera terminé/.test(f));
   verifierVrai('et n’annonce pas 1 050 € par jour-homme',
     !/1 050 €par jour-homme/.test(f));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Réglages : garder l’écran allumé, et dire ce que le téléphone répond', async () => {
+  /* « Est-ce que tu penses qu'il y aurait moyen que ça ne mette pas le mode
+     veille du téléphone ? Sauf que moi j'ai un mode Stamina qui économise la
+     batterie. »
+
+     wakeLock est une demande, pas un ordre : un mode d'économie peut refuser,
+     et le système la relâche de lui-même dès que la page passe derrière.
+     D'où un réglage, jamais un comportement imposé — et un message qui dit
+     ce que le téléphone a répondu, sinon on ne saurait jamais dans quel cas
+     on se trouve. */
+  /* JSDOM n'a pas d'écran : on pose le nôtre, qui accepte, et AVANT le
+     démarrage — l'application ne branche que ce qu'elle trouve alors. */
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'entreprise' }), {
+    avant: w => {
+      w.__veille = { demandes: 0, relachees: 0, ecouteur: null };
+      w.navigator.wakeLock = {
+        request: () => {
+          w.__veille.demandes++;
+          return Promise.resolve({
+            release: () => {
+              w.__veille.relachees++;
+              if (w.__veille.ecouteur) w.__veille.ecouteur();
+            },
+            addEventListener: (n, f) => { if (n === 'release') w.__veille.ecouteur = f; }
+          });
+        }
+      };
+    }
+  });
+  const veille = t.w.__veille;
+  t.clic('[data-vue="reglages"]'); await t.pause(400);
+
+  const c = t.$('#r-veille');
+  verifierVrai('le réglage existe', !!c);
+  verifierVrai('décoché par défaut', !c.checked);
+  verifierVrai('et l’écran s’éteint comme d’habitude',
+    /s’éteint comme d’habitude/.test(t.$('#r-veille-aide').textContent));
+
+  cocher(t, '#r-veille', true); await t.pause(400);
+  verifier('le réglage est enregistré', true, (t.stock('cfg') || {}).ecranAllume);
+  verifier('le téléphone a été sollicité une fois', 1, veille.demandes);
+  verifierVrai('et l’écran dit qu’il a accepté',
+    /a accepté/.test(t.$('#r-veille-aide').textContent));
+
+  /* Passer en arrière-plan relâche : sinon n'importe quel site viderait la
+     batterie. Revenir redemande. */
+  Object.defineProperty(t.d, 'hidden', { value: true, configurable: true });
+  t.d.dispatchEvent(new t.w.Event('visibilitychange')); await t.pause(250);
+  verifier('elle est relâchée en arrière-plan', 1, veille.relachees);
+  Object.defineProperty(t.d, 'hidden', { value: false, configurable: true });
+  t.d.dispatchEvent(new t.w.Event('visibilitychange')); await t.pause(250);
+  verifier('et redemandée au retour', 2, veille.demandes);
+
+  cocher(t, '#r-veille', false); await t.pause(400);
+  verifier('décocher l’enregistre aussi', false, (t.stock('cfg') || {}).ecranAllume);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Réglages : un téléphone qui refuse la veille le dit', async () => {
+  /* Le mode Stamina et ses cousins peuvent refuser. Le taire laisserait
+     croire que le réglage marche, et il chercherait ailleurs. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'entreprise', cfg: { ecranAllume: true }
+  }), {
+    avant: w => {
+      w.navigator.wakeLock = { request: () => Promise.reject(new Error('refusé')) };
+    }
+  });
+  t.clic('[data-vue="reglages"]'); await t.pause(400);
+  cocher(t, '#r-veille', true); await t.pause(400);
+  verifierVrai('l’écran dit que le téléphone n’a pas suivi',
+    /n’a pas suivi/.test(t.$('#r-veille-aide').textContent));
+  verifierVrai('et nomme la cause probable',
+    /économie de batterie/.test(t.$('#r-veille-aide').textContent));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Réglages : un navigateur sans veille ferme le réglage', async () => {
+  /* Une case qu'on peut cocher sans effet est pire que pas de case. */
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'entreprise' }));
+  /* JSDOM n'a pas wakeLock : c'est exactement le cas à éprouver. */
+  verifierVrai('le navigateur simulé n’en a pas', !t.w.navigator.wakeLock);
+  t.clic('[data-vue="reglages"]'); await t.pause(400);
+  verifierVrai('la case est fermée', t.$('#r-veille').disabled);
+  verifierVrai('et l’écran le dit',
+    /ne sait pas garder l’écran allumé/.test(t.$('#r-veille-aide').textContent));
   verifier('aucune erreur', [], t.erreurs);
 });
 
