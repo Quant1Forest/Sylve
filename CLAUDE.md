@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.78.0-20260909-0030**
+Version courante : **4.79.0-20260909-0120**
 
 ---
 
@@ -51,7 +51,7 @@ npm run controle   # vérificateur + service worker + tests + reconstruction + c
 ```
 
 Doit afficher **« Bon pour livraison »**, puis **« le service worker tient »**
-(24 vérifications), puis la suite au vert — 1666 à ce jour — puis
+(24 vérifications), puis la suite au vert — 1681 à ce jour — puis
 **« Sylve.html est conforme »**.
 
 Compter **moins de deux minutes**. Ça a été dix, et deux choses l'expliquaient :
@@ -2148,6 +2148,42 @@ Le lecteur de shapefile et le simplificateur vivent dans le bac à sable de la
 séance, pas dans le dépôt : ils ne serviront qu'une fois, au moment de la
 conversion. **Les fichiers IGN ne doivent jamais entrer dans le dépôt**, comme
 le classeur comptable.
+
+## Garder l'écran allumé — le téléphone garde le dernier mot
+
+*« Est-ce que tu penses qu'il y aurait moyen que ça ne mette pas le mode
+veille du téléphone ? Sauf que moi j'ai un mode Stamina qui économise la
+batterie. »*
+
+`navigator.wakeLock` est une **demande, pas un ordre**. Trois conséquences,
+et l'écran les dit toutes les trois plutôt que de laisser deviner :
+
+- un mode d'économie de batterie — Stamina et ses cousins — peut refuser ;
+- le système relâche **de lui-même** dès que la page passe en arrière-plan ou
+  que l'écran se verrouille. Sans quoi n'importe quel site viderait la
+  batterie. Revenir sur l'application redemande : la demande d'avant est
+  perdue ;
+- un navigateur qui ne sait pas faire ferme la case. **Une case qu'on peut
+  cocher sans effet est pire que pas de case.**
+
+`A.cfg.ecranAllume` — un **réglage**, jamais un comportement imposé : ça vide
+la batterie, et c'est son téléphone.
+
+**Le message compte autant que la fonction.** *« Le téléphone a accepté »* ou
+*« Demandé, mais le téléphone n'a pas suivi — un mode d'économie peut
+refuser »*. Sans lui, il n'aurait jamais su dans quel cas il se trouve, et il
+aurait cherché la panne dans Sylve.
+
+**Deux gardes qui se couvraient, encore.** `demanderVeille()` relâche déjà
+quand la page est cachée ; le gestionnaire de `visibilitychange` le refaisait.
+Casser l'une laissait l'autre tenir. Il n'en reste qu'une, et le sabotage
+l'atteint. **Quatrième fois que ce motif apparaît** — le réflexe à prendre :
+après avoir écrit une garde, chercher qui d'autre dit déjà la même chose.
+
+**Et le banc d'essai a gagné un crochet.** `ouvrir(graines, { avant })` pose ce
+que JSDOM n'a pas — un écran, un capteur — **avant** que l'application démarre.
+Sans lui, rien de ce qui se branche au lancement n'était testable : poser le
+faux après coup, c'est le poser trop tard.
 
 ## Le prix de journée ne se lit qu'à la fin
 
