@@ -5,7 +5,7 @@
    ========================================================================== */
 'use strict';
 
-var VERSION = '4.79.0-20260909-0120';
+var VERSION = '4.80.0-20260909-2200';
 var CACHE = 'bordcub-' + VERSION;
 var FICHIERS = [
   './',
@@ -13,7 +13,12 @@ var FICHIERS = [
   './manifest.webmanifest',
   './icone-192.png',
   './icone-512.png',
-  './icone-maskable-512.png'
+  './icone-maskable-512.png',
+  /* Le fond de carte : 322 Ko de contours de communes. Il vit à part parce
+     qu'il ne bouge presque jamais — le mettre dans index.html le ferait
+     retransférer à chaque mise à jour. Mais il doit être en cache, sinon la
+     carte serait le seul écran à réclamer du réseau. */
+  './communes.js'
 ];
 
 self.addEventListener('install', function (ev) {
