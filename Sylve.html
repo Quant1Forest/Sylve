@@ -1251,6 +1251,14 @@ if (froid && s > 0) montrer(s);
             aria-label="Durée de l'écran de démarrage, en secondes">
         </div>
         <p class="muted" style="font-size:12px;margin:8px 0 0" id="r-dem-aide"></p>
+        <label class="ligne-check" style="display:flex;align-items:flex-start;gap:8px;
+               font-size:13.5px;margin:16px 0 0">
+          <input type="checkbox" id="r-veille" style="margin-top:2px">
+          <span>Garder l’écran allumé
+            <span class="muted" style="display:block;font-size:11.5px" id="r-veille-aide">
+              Tant que Sylve est ouvert et à l’écran. Le téléphone garde le dernier
+              mot : un mode d’économie de batterie peut refuser.</span></span>
+        </label>
         <p class="muted" style="font-size:12px;margin:10px 0 0" id="r-version"></p>
       </div>
       <p class="eyebrow reg-titre" data-sec="ent" data-sous="journee" style="margin:4px 0 8px">Ma journée de travail</p>
@@ -7907,6 +7915,10 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.79', quoi: [
+    { t: 'Un reglage pour garder l ecran allume quand Sylve est devant', vue: 'reglages' },
+    { t: 'Il dit ce que le telephone a repondu : un mode d economie peut refuser', vue: 'reglages' }
+  ] },
   { v: '4.78', quoi: [
     { t: 'Le prix de journee attend que le chantier soit fini pour se montrer', vue: 'chantier' },
     { t: 'Rendements : plus de pastilles, les lignes s alignent enfin', vue: 'rendements' },
@@ -7938,14 +7950,6 @@ var NOTES_MAJ = [
     { t: 'Un chantier pose ce jour-la reste choisissable, meme paye', vue: 'calendrier' },
     { t: 'Toutes les journees passees se valident d un seul geste', vue: 'calendrier' },
     { t: 'Et les frais fixes se voient tomber sur leur jour', vue: 'calendrier' }
-  ] },
-  { v: '4.74', quoi: [
-    { t: 'Une journee prevue se valide d un seul geste : c etait comme prevu', vue: 'calendrier' },
-    { t: 'La fiche du jour dit enfin combien d heures etaient prevues', vue: 'calendrier' },
-    { t: 'Le meme bouton sur l ecran qui demande de trancher', vue: 'calendrier' },
-    { t: 'Fiche de chantier : les risques se reprennent d un chantier de la meme foret', vue: 'fichech' },
-    { t: 'Le telephone du proprietaire n est plus reclame en rouge', vue: 'fichech' },
-    { t: 'Et un plan joint libere le cadre du croquis', vue: 'fichech' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -10672,6 +10676,39 @@ function versDate(v) { return v ? new Date(v + 'T12:00:00').getTime() : null; }
    le jour d'avant. « + une journée » proposait un jour libre et en montrait
    un autre, souvent celui déjà pris qu'il venait d'écarter. */
 function versChamp(ts) { return ts ? C.jourCle(ts) : ''; }
+
+var veilleTenue = null;
+function veilleVoulue() { return !!(A.cfg && A.cfg.ecranAllume); }
+function veilleDisponible() {
+  return !!(navigator.wakeLock && navigator.wakeLock.request);
+}
+function libererVeille() {
+  if (!veilleTenue) return;
+  try { veilleTenue.release(); } catch (e) { /* déjà relâchée */ }
+  veilleTenue = null;
+}
+/* Rend une promesse pour que l'appelant sache si le téléphone a accepté. */
+function demanderVeille() {
+  if (!veilleVoulue() || !veilleDisponible() || document.hidden) {
+    libererVeille();
+    return Promise.resolve(false);
+  }
+  if (veilleTenue) return Promise.resolve(true);
+  return navigator.wakeLock.request('screen').then(function (v) {
+    veilleTenue = v;
+    /* Le système relâche de lui-même en arrière-plan : on l'apprend ici. */
+    v.addEventListener('release', function () { veilleTenue = null; });
+    return true;
+  })['catch'](function () { veilleTenue = null; return false; });
+}
+/* Revenir sur l'application redemande : la demande d'avant est perdue. */
+function brancherVeille() {
+  if (!veilleDisponible()) return;
+  /* Une seule porte : demanderVeille() relâche déjà quand la page est
+     cachée. Tester « hidden » ici aussi faisait deux gardes qui se
+     couvraient l'une l'autre — aucune n'était alors éprouvable. */
+  document.addEventListener('visibilitychange', function () { demanderVeille(); });
+}
 
 /* ------------------------------------------------------------- le carnet */
 function renderCarnet() {
@@ -19587,11 +19624,43 @@ function majLibelleDemarrage(s) {
       'sauter, et il ne revient pas quand vous rouvrez l’application dans la journée.'
     : 'L’application s’ouvre directement sur l’accueil.';
 }
+/* La case dit ce que le téléphone a répondu. Sans ça, on ne saurait jamais
+   si l'écran reste allumé parce que le réglage marche, ou s'il s'éteint
+   parce qu'un mode d'économie a refusé. */
+function renderReglagesVeille() {
+  var el = $('#r-veille'); if (!el) return;
+  var a = $('#r-veille-aide');
+  if (!veilleDisponible()) {
+    el.checked = false;
+    el.disabled = true;
+    if (a) a.textContent = 'Ce navigateur ne sait pas garder l’écran allumé.';
+    return;
+  }
+  el.disabled = false;
+  el.checked = veilleVoulue();
+  if (!a) return;
+  a.textContent = !veilleVoulue()
+    ? 'L’écran s’éteint comme d’habitude.'
+    : veilleTenue
+      ? 'Le téléphone a accepté : l’écran reste allumé tant que Sylve est devant.'
+      : 'Demandé, mais le téléphone n’a pas suivi — un mode d’économie de ' +
+        'batterie peut refuser.';
+}
+function brancherReglagesVeille() {
+  var el = $('#r-veille'); if (!el) return;
+  el.addEventListener('change', function () {
+    A.cfg.ecranAllume = this.checked;
+    sauverCfg();
+    /* On attend la réponse du téléphone avant de dire quoi que ce soit. */
+    demanderVeille().then(renderReglagesVeille);
+  });
+}
 function renderReglagesDemarrage() {
   var el = $('#r-dem'); if (!el) return;
   var s = dureeDemarrage();
   el.value = s;
   majLibelleDemarrage(s);
+  renderReglagesVeille();
 }
 function brancherReglagesDemarrage() {
   var el = $('#r-dem'); if (!el) return;
@@ -19609,6 +19678,10 @@ function brancherReglagesDemarrage() {
     if (!(s > 0)) { toast('Écran de démarrage désactivé.'); return; }
     if (window.BCdem) window.BCdem.voir(s);
   });
+  brancherReglagesVeille();
+  brancherVeille();
+  /* Si le réglage était déjà posé, on redemande à l'ouverture. */
+  demanderVeille().then(renderReglagesVeille);
 }
 
 
@@ -19632,7 +19705,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.78.0-20260909-0030';
+var VERSION = '4.79.0-20260909-0120';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
