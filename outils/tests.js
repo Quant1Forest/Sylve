@@ -7012,6 +7012,208 @@ scenario('Réglages : un navigateur sans veille ferme le réglage', async () => 
 });
 
 /* --------------------------------------------------------------------- */
+/* Deux communes carrées, à côté l'une de l'autre, écrites comme le
+   convertisseur les écrit : deltas de dix mètres en varint base 64. Les
+   fabriquer ici plutôt que d'en recopier de vraies garde le scénario lisible
+   et indépendant du fichier de 322 Ko. */
+const varint = n => {
+  n = n < 0 ? ~(n << 1) : (n << 1);
+  let out = '';
+  while (n >= 0x20) { out += String.fromCharCode((0x20 | (n & 0x1f)) + 63); n >>= 5; }
+  return out + String.fromCharCode(n + 63);
+};
+const contour = pts => {
+  let px = 0, py = 0, m = '';
+  for (const p of pts) {
+    const x = Math.round(p[0] / 10), y = Math.round(p[1] / 10);
+    m += varint(x - px) + varint(y - py);
+    px = x; py = y;
+  }
+  return m;
+};
+/* Autour de Levier, dans le Doubs : X ≈ 959 000, Y ≈ 6 668 000. */
+const CARRE = (x0, y0, c) => contour([[x0, y0], [x0 + c, y0], [x0 + c, y0 + c], [x0, y0 + c], [x0, y0]]);
+const FOND_ESSAI = CARRE(955000, 6665000, 8000) + String.fromCharCode(10) +
+  CARRE(963000, 6665000, 8000);
+
+scenario('Carte : la projection Lambert 93 tombe juste', async () => {
+  /* Les fichiers de l'IGN sont en Lambert 93, ses positions en latitude et
+     longitude. Une projection fausse ne se voit qu'à l'écran, et trop tard :
+     elle mettrait ses chantiers au large de l'Atlantique sans rien dire. */
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'calendrier' }));
+  const LB = t.w.BCUI._carte.LB;
+
+  /* L'origine de la projection tombe sur la fausse origine, au mètre près. */
+  const o = LB.vers(46.5, 3);
+  verifierVrai('origine en X', Math.abs(o.x - 700000) < 0.5);
+  verifierVrai('origine en Y', Math.abs(o.y - 6600000) < 0.5);
+
+  /* Aller-retour : c'est ce qui garantit qu'un point posé se relit au même
+     endroit. */
+  const d = LB.vers(47.0667, 6.4167);
+  const r = LB.depuis(d.x, d.y);
+  verifierVrai('la latitude revient', Math.abs(r.lat - 47.0667) < 0.000001);
+  verifierVrai('la longitude revient', Math.abs(r.lon - 6.4167) < 0.000001);
+  /* Et le point tombe bien dans le Doubs, pas ailleurs. */
+  verifierVrai('Levier est dans le Doubs',
+    d.x > 940000 && d.x < 980000 && d.y > 6650000 && d.y < 6690000);
+
+  /* Un degré de latitude vaut environ 111 km : la projection doit le rendre. */
+  const a1 = LB.vers(46, 6), a2 = LB.vers(47, 6);
+  verifierVrai('un degré de latitude fait 111 km',
+    Math.abs(Math.abs(a2.y - a1.y) - 111200) < 900);
+
+  /* Et la propriété qui DÉFINIT une conique conforme sécante : l'échelle
+     vaut exactement 1 sur les deux parallèles de référence — 44° et 49° —
+     et moins entre les deux. Une fenêtre géographique ne l'aurait pas vu :
+     un parallèle faux ne déplace que de deux cents mètres. La longueur
+     vraie d'un arc de parallèle est écrite ici, à part, pour que les deux
+     sources soient indépendantes. */
+  const arcParallele = (lat, dlon) => {
+    const A = 6378137, E = 0.081819191042816, p = lat * Math.PI / 180;
+    return A * Math.cos(p) / Math.sqrt(1 - E * E * Math.sin(p) * Math.sin(p)) *
+      (dlon * Math.PI / 180);
+  };
+  const echelle = lat => {
+    const g = LB.vers(lat, 5.9), d = LB.vers(lat, 6.1);
+    return Math.sqrt(Math.pow(d.x - g.x, 2) + Math.pow(d.y - g.y, 2)) /
+      arcParallele(lat, 0.2);
+  };
+  verifierVrai('échelle 1 sur le parallèle du bas', Math.abs(echelle(44) - 1) < 0.00001);
+  verifierVrai('échelle 1 sur celui du haut', Math.abs(echelle(49) - 1) < 0.00001);
+  verifierVrai('et moins de 1 entre les deux', echelle(46.5) < 0.9995);
+
+  /* Le décodeur et l'encodeur doivent rester d'accord. Le séparateur est un
+     saut de ligne, hors de l'alphabet « ? » à « ~ » : la barre verticale en
+     faisait partie et coupait les contours au milieu. */
+  const pts = t.w.BCUI._carte.decoder(CARRE(955000, 6665000, 8000));
+  verifier('cinq points relus', 10, pts.length);
+  verifierVrai('au bon endroit', Math.abs(pts[0] - 955000) <= 5 &&
+    Math.abs(pts[1] - 6665000) <= 5);
+  verifierVrai('et le carré est fermé',
+    Math.abs(pts[8] - pts[0]) <= 5 && Math.abs(pts[9] - pts[1]) <= 5);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Carte : le fond se dessine, et le chantier se place d’un doigt', async () => {
+  /* « Est-ce qu'on ne pourrait pas juste avoir un fond de carte et pouvoir
+     sélectionner des points, dire : ce chantier, c'était à tel endroit ? » */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'calendrier',
+    chantiers: [{ id: 'c1', proprietaire: 'Martin', commune: 'Levier', statut: 'encours',
+      aDevis: false, temps: [], jours: [], lignes: [], maj: Date.now() }]
+  }), {
+    /* Le fond est posé avant le démarrage : chargerFond() le prend tel quel
+       plutôt que d'aller chercher communes.js, que JSDOM ne sert pas. */
+    avant: w => { w.COMMUNES = FOND_ESSAI; }
+  });
+  t.clic('[data-vue="carte"]'); await t.pause(500);
+
+  verifier('le fond est prêt', 'pret', t.w.BCUI._carte.fond().etat);
+  /* Deux communes semées, deux contours relus. Se contenter d'« un tracé
+     existe » laissait passer un séparateur pris dans l'alphabet du varint :
+     les contours se collaient en un seul, et le dessin restait plausible. */
+  verifier('deux contours, pas un', 2, t.w.BCUI._carte.fond().contours.length);
+  verifier('cinq points chacun', [10, 10],
+    t.w.BCUI._carte.fond().contours.map(c => c.length));
+  const plan = t.$('#carte-plan');
+  verifierVrai('la carte est dessinée', !!plan);
+  verifierVrai('avec les contours du fond', !!plan.querySelector('path'));
+  verifierVrai('et une échelle', /\d/.test(plan.querySelector('text').textContent));
+  /* Sans chantier localisé, la liste le dit et propose le geste. */
+  verifierVrai('la liste invite à placer', /Poser un chantier/.test(t.texte('#carte-liste')));
+
+  /* JSDOM ne mesure rien : on donne au dessin sa taille réelle, sinon le
+     doigt tombe dans le vide. */
+  plan.getBoundingClientRect = () => ({ left: 0, top: 0, width: 320, height: 240 });
+
+  t.clic('#carte-poser'); await t.pause(400);
+  verifierVrai('le chantier est proposé', /Martin/.test(t.texte('#modale')));
+  t.choisir('#pc-ch', 'c1');
+  t.clic('#pc-ok'); await t.pause(400);
+  verifierVrai('l’écran dit quoi faire',
+    /Appuyez sur la carte/.test(t.$('#carte-aide').textContent));
+
+  /* Un appui au centre du dessin : ce doit être le centre du cadrage. */
+  const svg2 = t.$('#carte-plan');
+  svg2.getBoundingClientRect = () => ({ left: 0, top: 0, width: 320, height: 240 });
+  svg2.dispatchEvent(new t.w.MouseEvent('click',
+    { bubbles: true, clientX: 160, clientY: 120 }));
+  await t.pause(600);
+
+  const c = (t.stock('chantiers') || [])[0];
+  verifierVrai('le chantier porte une position', !!(c.gps && c.gps.lat != null));
+  /* Le centre du cadrage par défaut, converti : on doit retomber dessus. */
+  const LB = t.w.BCUI._carte.LB;
+  const revenu = LB.vers(c.gps.lat, c.gps.lon);
+  verifierVrai('et c’est bien le point visé',
+    Math.abs(revenu.x - 825000) < 500 && Math.abs(revenu.y - 6640000) < 500);
+  verifierVrai('le mode « poser » s’est refermé',
+    !/Appuyez sur la carte/.test(t.$('#carte-aide').textContent));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Carte : sans fond, elle marche quand même et le dit', async () => {
+  /* Sylve.html ouvert seul n'a pas communes.js à côté. Laisser un cadre vide
+     sans rien dire ferait chercher la panne ailleurs. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'calendrier',
+    chantiers: [{ id: 'c1', proprietaire: 'Martin', statut: 'encours', aDevis: false,
+      temps: [], jours: [], lignes: [], maj: Date.now(),
+      gps: { lat: 47.0667, lon: 6.4167 } }]
+  }));
+  t.clic('[data-vue="carte"]'); await t.pause(400);
+
+  /* JSDOM ne va chercher aucun script : ni chargé, ni en erreur. On joue
+     l'erreur que le navigateur enverrait si le fichier manquait — c'est le
+     vrai chemin, pas un raccourci. */
+  const sc = [...t.d.head.querySelectorAll('script')]
+    .filter(x => /communes.js/.test(x.src || ''))[0];
+  verifierVrai('le fond a bien été demandé', !!sc);
+  sc.dispatchEvent(new t.w.Event('error'));
+  await t.pause(400);
+
+  verifier('le fond manque', 'absent', t.w.BCUI._carte.fond().etat);
+  verifierVrai('la carte est quand même dessinée', !!t.$('#carte-plan'));
+  verifierVrai('sans contour', !t.$('#carte-plan path'));
+  verifierVrai('mais avec le chantier', !!t.$('#carte-plan [data-cartept="c1"]'));
+  verifierVrai('et l’écran dit pourquoi',
+    /Fond de carte indisponible/.test(t.$('#carte-aide').textContent));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Carte : le zoom a des bornes des deux côtés', async () => {
+  /* Sans bornes, deux absurdités : la France entière dans un timbre, ou
+     trois arbres à l'écran alors que le fond est simplifié à cent mètres. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'calendrier',
+    chantiers: [{ id: 'c1', proprietaire: 'Martin', statut: 'encours', aDevis: false,
+      temps: [], jours: [], lignes: [], maj: Date.now(),
+      gps: { lat: 47.0667, lon: 6.4167 } }]
+  }));
+  t.clic('[data-vue="carte"]'); await t.pause(500);
+
+  const echelle = () => t.w.BCUI._carte.cadre().m;
+  const depart = echelle();
+  verifierVrai('le cadrage s’ouvre sur le chantier', depart > 3 && depart < 4000);
+
+  for (let i = 0; i < 40; i++) t.clic('#carte-plus');
+  await t.pause(300);
+  verifierVrai('on ne descend pas sous trois mètres par pixel', echelle() >= 3);
+  for (let i = 0; i < 80; i++) t.clic('#carte-moins');
+  await t.pause(300);
+  verifierVrai('et on ne monte pas au-dessus de quatre kilomètres', echelle() <= 4000);
+
+  /* « Tout voir » revient au cadrage d'origine. */
+  t.clic('#carte-tout'); await t.pause(300);
+  verifier('« Tout voir » recadre comme au départ', depart, echelle());
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
 /* Un chantier prêt pour une fiche de chantier. */
 const CH_FICHE = () => ({
   module: 'chantiers',

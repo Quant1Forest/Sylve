@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.79.0-20260909-0120**
+Version courante : **4.80.0-20260909-2200**
 
 ---
 
@@ -51,7 +51,7 @@ npm run controle   # vérificateur + service worker + tests + reconstruction + c
 ```
 
 Doit afficher **« Bon pour livraison »**, puis **« le service worker tient »**
-(24 vérifications), puis la suite au vert — 1681 à ce jour — puis
+(24 vérifications), puis la suite au vert — 1721 à ce jour — puis
 **« Sylve.html est conforme »**.
 
 Compter **moins de deux minutes**. Ça a été dix, et deux choses l'expliquaient :
@@ -209,8 +209,9 @@ l'ancien code. Le vérificateur refuse de passer si les deux divergent.
 | `Sylve.html` | Version autonome, fabriquée par `outils/construire.js`. Ne jamais l'éditer à la main. |
 | `sw.js` | Service worker. Sa constante `VERSION` doit être identique à celle de `index.html`. |
 | `manifest.webmanifest` | Nom, couleurs, icônes de la PWA. |
+| `communes.js` | Fond de carte : 2 880 contours de communes, 322 Ko. Fabriqué par `outils/convertir-communes.js`, chargé à la demande, mis en cache par le service worker. |
 | `icone-*.png` | Icônes d'installation. La version *maskable* garde toute son encre dans la zone de rognage d'Android. |
-| `outils/` | Vérificateur, tests, tests du service worker, construction, conformité du fichier autonome, reprise du carnet, **vocabulaire des magasins**. |
+| `outils/` | Vérificateur, tests, tests du service worker, construction, conformité du fichier autonome, reprise du carnet, vocabulaire des magasins, **conversion du fond de carte**. |
 
 Les fichiers d'origine du logo ne sont pas dans le dépôt : ils sont gardés à
 part. Le dépôt étant public, il ne contient que ce qui est servi, plus de quoi
@@ -1850,6 +1851,98 @@ même nom le reprend.
 Limite connue : renommer un client orpheline son numéro. Rare, et le jour où
 ça gêne, l’écran des listes éditera les deux ensemble.
 
+## La carte : des tracés, pas des images
+
+*« Est-ce qu'on ne pourrait pas juste avoir un fond de carte et pouvoir
+sélectionner des points, dire : ce chantier, c'était à tel endroit ? »*
+
+Ce qui a rendu la chose possible, ce sont **ses fichiers**. Un fond de carte
+ordinaire, ce sont des tuiles d'image servies par un serveur : réseau et
+dépendance, les deux choses que Sylve refuse — et c'est ce refus qui la fait
+marcher au fond d'une parcelle. Un shapefile, lui, n'est pas une image : ce
+sont des **tracés**, et un tracé s'embarque.
+
+`outils/convertir-communes.js` lit la couche COMMUNE du PARCELLAIRE-EXPRESS de
+l'IGN, simplifie en Douglas–Peucker à 100 m, et écrit `communes.js` :
+**2 880 contours, 2,7 millions de points ramenés à 90 000, 322 Ko.**
+
+- **Les fichiers de l'IGN ne doivent jamais entrer dans le dépôt** — 248 Mo
+  pour le seul parcellaire du Doubs, et le SCAN 25 se compte en gigaoctets.
+  Même règle que le classeur comptable.
+- **Le fichier produit vit à côté**, mis en cache par le service worker : il
+  ne bouge presque jamais, et le mettre dans `index.html` le ferait
+  retransférer à chaque mise à jour. Il se charge **à la première ouverture
+  de l'écran Carte**, pas au démarrage.
+- **Conséquence assumée : `Sylve.html` ouvert seul n'a pas de fond.** L'écran
+  le dit — laisser un cadre vide ferait chercher la panne ailleurs — et un
+  délai de garde de huit secondes évite un « Chargement… » éternel.
+
+**Trois mesures avant de choisir l'écriture** — on ne devine pas :
+
+| Écriture | Poids |
+|---|---|
+| décimal au mètre | 790 Ko |
+| décimal à dix mètres | 617 Ko |
+| **varint en base 64** | **322 Ko** |
+
+Celle des polylignes de Google : l'écart au point précédent, par pas de dix
+mètres, en groupes de cinq bits décalés de 63. Dix mètres parce que cent
+mètres de tolérance et une précision au mètre ne vont pas ensemble — on
+paierait des chiffres que la simplification a déjà jetés.
+
+**LE PIÈGE DU SÉPARATEUR.** L'alphabet du varint va de « ? » (63) à « ~ »
+(126) : **la barre verticale en fait partie.** L'avoir prise pour séparer les
+contours les coupait au milieu — 6 379 morceaux au lieu de 2 880, et des
+communes au large de l'Atlantique. Le séparateur est un saut de ligne, et le
+convertisseur comme le décodeur portent l'avertissement.
+
+**C'est un croisement qui l'a trouvé, pas l'écran** : la projection dit où
+tombent les six départements, le rectangle des contours dit autre chose, et
+les deux ne pouvaient pas avoir raison. Deux sources écrites pour des raisons
+différentes — la règle du projet, encore une fois.
+
+## Lambert 93, et la garde qui ne servait à rien
+
+Les fichiers IGN sont en **Lambert 93** (EPSG:2154), ses positions en latitude
+et longitude. `LB.vers()` et `LB.depuis()` font le trajet ; RGF93 et WGS84 se
+confondent à moins d'un mètre, aucune translation de datum.
+
+**La latitude ne se ferme pas** : l'inverse itère huit fois, l'écart tombe sous
+le micromètre dès le quatrième tour.
+
+**Et une leçon sur les gardes.** Le sabotage du parallèle de référence — 44°
+changé en 45° — **n'a rien fait crier**. Mesuré : l'erreur n'est que de 40 à
+200 mètres, invisible pour toute vérification géographique large. Il a fallu
+chercher la propriété qui **définit** la projection : sur une conique conforme
+sécante, **l'échelle vaut exactement 1 sur les deux parallèles de référence**,
+et moins entre les deux. La longueur vraie d'un arc de parallèle est écrite à
+part dans le scénario, pour que les deux sources restent indépendantes.
+
+**Deuxième garde qui ne prouvait rien** : le scénario vérifiait qu'« un tracé
+existe ». Avec les contours collés en un seul par un mauvais séparateur, le
+dessin reste plausible. Il **compte** maintenant les contours et leurs points.
+C'est le même piège que le graphique des ventes en 4.42 : *un contrôle qui
+vérifie qu'un dessin existe ne prouve rien.*
+
+## Ce que la carte sait faire, et ce qu'elle ne fera pas
+
+- **Glisser, pincer, molette.** Le cadrage tient en trois nombres — centre en
+  Lambert, mètres par pixel — et Lambert 93 étant une projection plane, un
+  mètre vaut un mètre dans les deux sens : l'échelle se réduit à un seul
+  nombre, sans déformation à corriger.
+- **Le zoom a des bornes**, de 3 m à 4 km par pixel : sans elles, la France
+  entière dans un timbre, ou trois arbres à l'écran alors que le fond est
+  simplifié à cent mètres.
+- **Seuls les contours qui traversent le cadre sont dessinés.** Sur 2 880,
+  l'écran n'en voit qu'une poignée ; les parcourir tous à chaque redessin
+  ferait ramer le zoom.
+- **Poser un chantier** : on choisit le chantier, on touche la carte, le point
+  est converti en latitude/longitude et enregistré dans `c.gps` — le même
+  champ que le relevé GPS et que les coordonnées collées.
+- **Ni photo aérienne, ni SCAN 25, ni parcellaire cadastral.** Ce sont des
+  images ; elles demandent du réseau. La réponse reste non, et la raison n'a
+  pas changé.
+
 ## Deux choses qu’on ne peut pas faire, et pourquoi
 
 **Récupérer un point désigné dans Google Maps.** *« Je clique sur l’endroit
@@ -2359,11 +2452,9 @@ de sa part, **non tranchées** :
   fois, **tranchée le 8 septembre : il le garde.** C’est un raccourci vers la
   vue des Chantiers (`moduleDeVue()` la rend à son premier propriétaire), pas
   un doublon de données. Ne plus rouvrir le sujet.
-- **La Carte** est vide : elle affiche les chantiers géolocalisés, et il n’en
-  a jamais placé un seul. **Il a tranché le 8 septembre** : on lui fabrique un
-  fond de communes à partir de ses fichiers IGN, pour qu’il pose un chantier
-  d’un doigt au lieu de coller des coordonnées. Voir *Les fonds de carte : ce
-  qui est mesuré*. Reste à savoir **quels départements**.
+- **La Carte** a son fond depuis la 4.80 : les communes de ses six
+  départements, hors ligne, et un chantier se pose d’un doigt. Voir *La carte :
+  des tracés, pas des images*.
 
 ## Le temps tient dans un seul bloc, et se compte en heures
 

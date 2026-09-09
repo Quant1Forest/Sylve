@@ -1609,6 +1609,13 @@ if (froid && s > 0) montrer(s);
         <div class="carte-titre"><h2>Carte des chantiers</h2>
           <button class="btn btn-min" id="carte-ici">Ma position</button></div>
         <div id="carte-svg"></div>
+        <div class="btn-rang" style="margin-top:9px">
+          <button class="btn btn-min" id="carte-moins">−</button>
+          <button class="btn btn-min" id="carte-plus">+</button>
+          <button class="btn btn-min" id="carte-tout">Tout voir</button>
+          <button class="btn btn-min" id="carte-poser">Poser un chantier</button>
+        </div>
+        <p class="muted" style="font-size:11.5px;margin:7px 0 0" id="carte-aide"></p>
         <div id="carte-liste"></div>
       </div>
     </section>
@@ -6359,7 +6366,7 @@ function ecrire(k, o) { return Store.set(k, JSON.stringify(o)); }
 /* ---------------------------------------------------------------- état */
 var A = {
   cfg: null, index: [], bord: null, piles: [], chantiers: [], module: 'cubage', ici: null,
-  vuePiles: 'stock', triRend: 'alpha', filtreCh: 'ouverts', rechCh: '', triAncien: false, triCh: 'auto', chOuvert: null, clients: [], proprios: [], estim: null, imp: null, articles: [], charges: [], fournisseurs: [], commandes: [], sorties: [], mvt: 'achats', journees: [], lieuxRegles: [], listeReglee: 'clients', revient: null, calMois: null, calJour: null, nbAlertes: 0, planifie: null,
+  vuePiles: 'stock', triRend: 'alpha', carte: null, cartePose: null, filtreCh: 'ouverts', rechCh: '', triAncien: false, triCh: 'auto', chOuvert: null, clients: [], proprios: [], estim: null, imp: null, articles: [], charges: [], fournisseurs: [], commandes: [], sorties: [], mvt: 'achats', journees: [], lieuxRegles: [], listeReglee: 'clients', revient: null, calMois: null, calJour: null, nbAlertes: 0, planifie: null,
   depenses: [], periode: null, filtreDep: 'tous', vueAna: 'ensemble', secReglages: 'general',
   achats: [], fch: null, fchFiltre: 'ouverts',
   versements: [], vehicule: null,
@@ -7917,6 +7924,11 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.80', quoi: [
+    { t: 'Une vraie carte : les communes de six departements, hors ligne', vue: 'carte' },
+    { t: 'Glissez pour vous deplacer, pincez pour zoomer', vue: 'carte' },
+    { t: 'Et « Poser un chantier » place un point d un doigt', vue: 'carte' }
+  ] },
   { v: '4.79', quoi: [
     { t: 'Un reglage pour garder l ecran allume quand Sylve est devant', vue: 'reglages' },
     { t: 'Il dit ce que le telephone a repondu : un mode d economie peut refuser', vue: 'reglages' }
@@ -7941,17 +7953,6 @@ var NOTES_MAJ = [
     { t: 'Et en tete : facture, encaisse, devis signes, premier donneur d ordre', vue: 'carnet' },
     { t: 'Un chantier pas fini d etre planifie n est plus dit en retard', vue: 'carnet' },
     { t: 'Le prelevement du calendrier annonce enfin son nom et son montant', vue: 'calendrier' }
-  ] },
-  { v: '4.75', quoi: [
-    { t: 'Le nom du chantier se compose seul, et suit si vous le corrigez', vue: 'carnet' },
-    { t: 'La ligne ne redit plus le proprietaire, et porte devis, facture et paiement', vue: 'carnet' },
-    { t: 'Le tri se choisit : n° de facture, dates de facture, de paiement, de devis', vue: 'carnet' },
-    { t: 'Un filtre pour les seuls chantiers qui ont eu un devis', vue: 'carnet' },
-    { t: 'En tete : facture, encaisse, ce qui attend et les devis sans reponse', vue: 'carnet' },
-    { t: '« Comme le… » reprend le chantier et les prestations, plus la date', vue: 'calendrier' },
-    { t: 'Un chantier pose ce jour-la reste choisissable, meme paye', vue: 'calendrier' },
-    { t: 'Toutes les journees passees se valident d un seul geste', vue: 'calendrier' },
-    { t: 'Et les frais fixes se voient tomber sur leur jour', vue: 'calendrier' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -8890,8 +8891,16 @@ function brancher() {
   });
   $('#carte-svg').addEventListener('click', function (e) {
     var g = e.target.closest('[data-cartept]');
-    if (g) ouvrirChantier(g.dataset.cartept);
+    if (g && !A.cartePose) { ouvrirChantier(g.dataset.cartept); return; }
+    if (A.cartePose) poserSurCarte(e);
   });
+  $('#carte-plus').addEventListener('click', function () { zoomerCarte(0.6); });
+  $('#carte-moins').addEventListener('click', function () { zoomerCarte(1 / 0.6); });
+  $('#carte-tout').addEventListener('click', function () {
+    A.carte = null; renderCarteChantiers();
+  });
+  $('#carte-poser').addEventListener('click', ouvrirPoseCarte);
+  brancherGestesCarte();
   $('#carte-liste').addEventListener('click', function (e) {
     var b = e.target.closest('[data-carteouvrir]');
     if (b) ouvrirChantier(b.dataset.carteouvrir);
@@ -10710,6 +10719,112 @@ function brancherVeille() {
      cachée. Tester « hidden » ici aussi faisait deux gardes qui se
      couvraient l'une l'autre — aucune n'était alors éprouvable. */
   document.addEventListener('visibilitychange', function () { demanderVeille(); });
+}
+
+/* ==========================================================  FOND DE CARTE
+   « Est-ce qu'on ne pourrait pas juste avoir un fond de carte et pouvoir
+   poser des points ? »
+
+   Un fond de carte ordinaire, ce sont des tuiles d'image servies par un
+   serveur : réseau et dépendance, les deux choses que Sylve refuse — et
+   c'est ce refus qui la fait marcher au fond d'une parcelle. Mais ses
+   fichiers IGN ne sont pas des images : ce sont des tracés, et un tracé
+   s'embarque. 2 880 contours de communes sur six départements, 322 Ko.
+
+   Ils vivent dans communes.js, chargé à la demande : les parcourir au
+   démarrage coûterait une seconde pour un écran qu'on ouvre rarement. */
+var FOND = { etat: 'rien', contours: null };
+
+/* Lambert 93 (EPSG:2154), la projection des fichiers de l'IGN : conique
+   conforme sécante sur l'ellipsoïde GRS80. RGF93 et WGS84 se confondent à
+   moins d'un mètre — aucune translation de datum, ça ne se voit pas à
+   l'échelle d'un chantier. */
+var LB = (function () {
+  var A = 6378137, E = 0.081819191042816;
+  var LAT0 = 46.5 * Math.PI / 180, LON0 = 3 * Math.PI / 180;
+  var LAT1 = 44 * Math.PI / 180, LAT2 = 49 * Math.PI / 180;
+  var X0 = 700000, Y0 = 6600000;
+  var pm = function (p) { var s2 = Math.sin(p); return Math.cos(p) / Math.sqrt(1 - E * E * s2 * s2); };
+  var pt = function (p) {
+    var s2 = Math.sin(p);
+    return Math.tan(Math.PI / 4 - p / 2) / Math.pow((1 - E * s2) / (1 + E * s2), E / 2);
+  };
+  var N = Math.log(pm(LAT1) / pm(LAT2)) / Math.log(pt(LAT1) / pt(LAT2));
+  var F = pm(LAT1) / (N * Math.pow(pt(LAT1), N));
+  var RHO0 = A * F * Math.pow(pt(LAT0), N);
+  return {
+    vers: function (lat, lon) {
+      var p = lat * Math.PI / 180, l = lon * Math.PI / 180;
+      var rho = A * F * Math.pow(pt(p), N), g = N * (l - LON0);
+      return { x: X0 + rho * Math.sin(g), y: Y0 + RHO0 - rho * Math.cos(g) };
+    },
+    depuis: function (x, y) {
+      var dx = x - X0, dy = RHO0 - (y - Y0);
+      var rho = Math.sqrt(dx * dx + dy * dy) * (N < 0 ? -1 : 1);
+      var t = Math.pow(rho / (A * F), 1 / N);
+      var lon = Math.atan2(dx, dy) / N + LON0;
+      /* La latitude ne se ferme pas : on itère. L'écart tombe sous le
+         micromètre dès le quatrième tour. */
+      var p = Math.PI / 2 - 2 * Math.atan(t);
+      for (var i = 0; i < 8; i++) {
+        var s2 = Math.sin(p);
+        p = Math.PI / 2 - 2 * Math.atan(t * Math.pow((1 - E * s2) / (1 + E * s2), E / 2));
+      }
+      return { lat: p * 180 / Math.PI, lon: lon * 180 / Math.PI };
+    }
+  };
+})();
+
+/* L'écriture des polylignes de Google : l'écart au point précédent, par pas
+   de dix mètres, en groupes de cinq bits décalés de 63.
+   L'alphabet va de « ? » à « ~ » — le séparateur des contours doit rester
+   hors de cette plage, sinon il les coupe au milieu. C'est un saut de
+   ligne, et le convertisseur porte le même avertissement. */
+function decoderContour(txt) {
+  var out = [], i = 0, x = 0, y = 0, res, dec, b;
+  while (i < txt.length) {
+    res = 0; dec = 0;
+    do { b = txt.charCodeAt(i++) - 63; res |= (b & 0x1f) << dec; dec += 5; } while (b >= 0x20);
+    x += ((res & 1) ? ~(res >> 1) : (res >> 1));
+    res = 0; dec = 0;
+    do { b = txt.charCodeAt(i++) - 63; res |= (b & 0x1f) << dec; dec += 5; } while (b >= 0x20);
+    y += ((res & 1) ? ~(res >> 1) : (res >> 1));
+    out.push(x * 10, y * 10);
+  }
+  return out;
+}
+
+/* Chargé une fois, à la demande. La promesse est gardée : deux ouvertures
+   rapprochées ne téléchargent pas deux fois. */
+var fondPromis = null;
+function chargerFond() {
+  if (fondPromis) return fondPromis;
+  if (window.COMMUNES) {
+    FOND.contours = String(window.COMMUNES).split(String.fromCharCode(10)).map(decoderContour);
+    FOND.etat = 'pret';
+    return (fondPromis = Promise.resolve(true));
+  }
+  FOND.etat = 'charge';
+  fondPromis = new Promise(function (ok) {
+    var sc = document.createElement('script');
+    sc.src = 'communes.js';
+    sc.onload = function () {
+      if (!window.COMMUNES) { FOND.etat = 'absent'; ok(false); return; }
+      FOND.contours = String(window.COMMUNES).split(String.fromCharCode(10)).map(decoderContour);
+      FOND.etat = 'pret';
+      ok(true);
+    };
+    /* Sylve.html ouvert seul n'a pas le fichier à côté : on le dit plutôt
+       que de laisser un cadre vide. */
+    sc.onerror = function () { FOND.etat = 'absent'; ok(false); };
+    /* Un chargement qui n'aboutit ni ne rate laisserait « Chargement… »
+       pour toujours. Au bout de huit secondes on renonce et on le dit. */
+    setTimeout(function () {
+      if (FOND.etat === 'charge') { FOND.etat = 'absent'; renderCarteChantiers(); ok(false); }
+    }, 8000);
+    document.head.appendChild(sc);
+  });
+  return fondPromis;
 }
 
 /* ------------------------------------------------------------- le carnet */
@@ -17761,53 +17876,235 @@ function synchroniserDepensesCharges() {
 
 
 /* ------------------------------------------------- carte des chantiers */
-function renderCarteChantiers() {
-  var z = $('#carte-svg'); if (!z) return;
-  var pts = A.chantiers.filter(function (c) { return c.gps && c.gps.lat != null; })
+/* Le cadrage : où l'on regarde, et de combien de mètres par pixel. */
+function cadreCarte() {
+  if (A.carte) return A.carte;
+  var pts = chantiersLocalises();
+  if (!pts.length) {
+    /* Rien de posé : on ouvre sur le centre des six départements. */
+    return (A.carte = { cx: 825000, cy: 6640000, m: 900 });
+  }
+  var xs = [], ys = [];
+  pts.forEach(function (p) {
+    var l = LB.vers(p.gps.lat, p.gps.lon);
+    xs.push(l.x); ys.push(l.y);
+  });
+  var minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
+  var minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
+  /* Une marge d'un cinquième, et jamais moins de deux kilomètres de large :
+     un seul chantier ne doit pas ouvrir sur un zoom absurde. */
+  var large = Math.max(maxX - minX, maxY - minY, 2000) * 1.2;
+  return (A.carte = { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, m: large / 320 });
+}
+function chantiersLocalises() {
+  return (A.chantiers || []).filter(function (c) { return c.gps && c.gps.lat != null; })
     .map(function (c) {
       return { gps: c.gps, nom: C.nomChantier(c), id: c.id, statut: c.statut,
-        detail: [c.donneur, C.nomStatut(c.statut, c), C.montant(c) ? eur(C.montant(c)) : ''].filter(Boolean).join(' · ') };
+        detail: [c.donneur, C.nomStatut(c.statut, c),
+          C.montant(c) ? eur(C.montant(c)) : ''].filter(Boolean).join(' · ') };
     });
-  if (!pts.length) {
-    z.innerHTML = '';
-    $('#carte-liste').innerHTML = '<div class="vide"><p>Aucun chantier localisé. ' +
-      'Depuis la fiche, « Modifier l’en-tête » puis « Enregistrer la position ».</p></div>';
-    return;
+}
+function renderCarteChantiers() {
+  var z = $('#carte-svg'); if (!z) return;
+  /* Le fond se charge à la première ouverture, puis se garde. */
+  if (FOND.etat === 'rien') {
+    chargerFond().then(function () { renderCarteChantiers(); });
   }
-  var lats = pts.map(function (p) { return p.gps.lat; }), lons = pts.map(function (p) { return p.gps.lon; });
-  if (A.ici) { lats.push(A.ici.lat); lons.push(A.ici.lon); }
-  var minLa = Math.min.apply(null, lats), maxLa = Math.max.apply(null, lats);
-  var minLo = Math.min.apply(null, lons), maxLo = Math.max.apply(null, lons);
-  var W = 320, Hh = 240, pad = 30;
-  var dLa = (maxLa - minLa) || 0.01, dLo = (maxLo - minLo) || 0.01;
-  var px = function (lo) { return pad + (lo - minLo) / dLo * (W - 2 * pad); };
-  var py = function (la) { return Hh - pad - (la - minLa) / dLa * (Hh - 2 * pad); };
-  var svg = '<svg viewBox="0 0 ' + W + ' ' + Hh + '" width="100%" style="max-width:380px;background:var(--carte2);border-radius:11px;border:1px solid var(--trait)">';
+  return dessinerCarteChantiers(z);
+}
+/* Zoomer, c'est changer le nombre de mètres par pixel. Les bornes évitent
+   les deux absurdités : la France entière dans un timbre, ou trois arbres
+   à l'écran alors que le fond est simplifié à cent mètres. */
+function zoomerCarte(f) {
+  var v = cadreCarte();
+  v.m = Math.min(4000, Math.max(3, v.m * f));
+  renderCarteChantiers();
+}
+/* Le doigt déplace la carte, deux doigts la zooment. On travaille en
+   coordonnées du dessin, pas de l'écran : le SVG s'étire à la largeur
+   disponible, et un pixel d'écran ne vaut pas un pixel de dessin. */
+function pointDessin(ev, svg) {
+  var r = svg.getBoundingClientRect();
+  if (!r.width) return null;
+  return { x: (ev.clientX - r.left) / r.width * 320,
+    y: (ev.clientY - r.top) / r.height * 240 };
+}
+function brancherGestesCarte() {
+  var z = $('#carte-svg'); if (!z) return;
+  var doigts = {}, depart = null, ecart0 = 0, m0 = 0;
+  var svg = function () { return $('#carte-plan'); };
+  z.addEventListener('pointerdown', function (e) {
+    var p = svg(); if (!p) return;
+    doigts[e.pointerId] = { x: e.clientX, y: e.clientY };
+    var n = Object.keys(doigts);
+    if (n.length === 1) {
+      var d = pointDessin(e, p);
+      var v = cadreCarte();
+      depart = d ? { d: d, cx: v.cx, cy: v.cy } : null;
+    } else if (n.length === 2) {
+      var a = doigts[n[0]], b = doigts[n[1]];
+      ecart0 = Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2));
+      m0 = cadreCarte().m;
+      depart = null;
+    }
+  });
+  z.addEventListener('pointermove', function (e) {
+    if (!doigts[e.pointerId]) return;
+    doigts[e.pointerId] = { x: e.clientX, y: e.clientY };
+    var n = Object.keys(doigts), p = svg(); if (!p) return;
+    var v = cadreCarte();
+    if (n.length === 1 && depart) {
+      var d = pointDessin(e, p); if (!d) return;
+      v.cx = depart.cx - (d.x - depart.d.x) * v.m;
+      v.cy = depart.cy + (d.y - depart.d.y) * v.m;
+      renderCarteChantiers();
+    } else if (n.length === 2 && ecart0 > 0) {
+      var a = doigts[n[0]], b = doigts[n[1]];
+      var ec = Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2));
+      if (ec > 0) { v.m = Math.min(4000, Math.max(3, m0 * ecart0 / ec)); renderCarteChantiers(); }
+    }
+  });
+  var lacher = function (e) {
+    delete doigts[e.pointerId];
+    if (!Object.keys(doigts).length) { depart = null; ecart0 = 0; }
+  };
+  z.addEventListener('pointerup', lacher);
+  z.addEventListener('pointercancel', lacher);
+  /* La molette pour l'ordinateur : le pincement n'y existe pas. */
+  z.addEventListener('wheel', function (e) {
+    if (!svg()) return;
+    e.preventDefault();
+    zoomerCarte(e.deltaY > 0 ? 1.2 : 1 / 1.2);
+  });
+}
+
+/* --- poser un chantier d'un doigt -------------------------------------
+   « Ce qui pourrait être bien, c'est de pouvoir sélectionner des points,
+   enfin de dire : ce chantier, c'était à tel endroit. » */
+function ouvrirPoseCarte() {
+  var l = (A.chantiers || []).slice()
+    .sort(function (a, b) { return C.dateChantier(b) - C.dateChantier(a); });
+  if (!l.length) { toast('Aucun chantier à placer.'); return; }
+  modale('Placer un chantier sur la carte',
+    '<p class="sous-titre-bloc">Choisissez le chantier, puis appuyez sur la carte ' +
+    'à l’endroit voulu. La position remplace celle qu’il portait déjà.</p>' +
+    '<div class="champ"><label class="eyebrow" for="pc-ch">Chantier</label>' +
+    '<select id="pc-ch">' + l.map(function (c) {
+      return '<option value="' + c.id + '">' + esc(C.nomChantier(c)) +
+        (c.gps && c.gps.lat != null ? ' — déjà placé' : '') + '</option>';
+    }).join('') + '</select></div>' +
+    '<div class="btn-rang"><button class="btn primaire" id="pc-ok">Choisir sur la carte</button>' +
+    '</div>');
+  $('#pc-ok').addEventListener('click', function () {
+    A.cartePose = $('#pc-ch').value;
+    fermerModale();
+    renderCarteChantiers();
+    toast('Appuyez sur la carte à l’endroit du chantier.');
+  });
+}
+function poserSurCarte(ev) {
+  var c = chantier(A.cartePose); if (!c) { A.cartePose = null; return; }
+  var p = $('#carte-plan'); if (!p) return;
+  var d = pointDessin(ev, p); if (!d) return;
+  var v = cadreCarte();
+  var g = LB.depuis(v.cx + (d.x - 160) * v.m, v.cy - (d.y - 120) * v.m);
+  c.gps = { lat: C.arr(g.lat, 5), lon: C.arr(g.lon, 5) };
+  c.maj = Date.now();
+  A.cartePose = null;
+  sauverChantiers().then(function () {
+    renderCarteChantiers(); renderCarnet(); renderFiche();
+    toast(C.nomChantier(c) + ' placé.');
+  });
+}
+function dessinerCarteChantiers(z) {
+  var pts = chantiersLocalises();
+  var v = cadreCarte();
+  var W = 320, H = 240;
+  /* Lambert 93 est une projection plane : un mètre vaut un mètre dans les
+     deux sens, et l'échelle se réduit à un seul nombre. */
+  var px = function (x) { return W / 2 + (x - v.cx) / v.m; };
+  var py = function (y) { return H / 2 - (y - v.cy) / v.m; };
+
+  var fond = '';
+  if (FOND.etat === 'pret') {
+    /* On ne dessine que ce qui traverse le cadre : sur 2 880 contours,
+       l'écran n'en voit qu'une poignée, et les parcourir tous à chaque
+       redessin ferait ramer le zoom. */
+    var mx = v.m * W / 2 * 1.2, my = v.m * H / 2 * 1.2;
+    var g0 = v.cx - mx, d0 = v.cx + mx, b0 = v.cy - my, h0 = v.cy + my;
+    var traces = [];
+    FOND.contours.forEach(function (c) {
+      var dedans = false, d = '', i;
+      for (i = 0; i < c.length; i += 2) {
+        if (c[i] >= g0 && c[i] <= d0 && c[i + 1] >= b0 && c[i + 1] <= h0) { dedans = true; break; }
+      }
+      if (!dedans) return;
+      for (i = 0; i < c.length; i += 2) {
+        d += (i ? 'L' : 'M') + px(c[i]).toFixed(1) + ' ' + py(c[i + 1]).toFixed(1);
+      }
+      traces.push(d + 'Z');
+    });
+    fond = traces.length
+      ? '<path d="' + traces.join('') + '" fill="none" stroke="#B8AB95" stroke-width="0.6"/>'
+      : '';
+  }
+
+  var svg = '<svg id="carte-plan" viewBox="0 0 ' + W + ' ' + H + '" width="100%" ' +
+    'style="max-width:420px;background:var(--carte2);border-radius:11px;' +
+    'border:1px solid var(--trait);touch-action:none">' + fond;
+
   pts.forEach(function (p) {
-    var x = px(p.gps.lon), y = py(p.gps.lat);
+    var l = LB.vers(p.gps.lat, p.gps.lon);
+    var x = px(l.x), y = py(l.y);
+    if (x < -20 || x > W + 20 || y < -20 || y > H + 20) return;
     svg += '<g style="cursor:pointer" data-cartept="' + p.id + '">' +
-      '<circle cx="' + x.toFixed(0) + '" cy="' + y.toFixed(0) + '" r="7" fill="' + (COUL_STATUT[p.statut] || '#7A8471') + '"/>' +
-      '<text x="' + x.toFixed(0) + '" y="' + (y - 10).toFixed(0) + '" font-size="9" text-anchor="middle" fill="#22301C">' +
-      xmlEsc(p.nom.slice(0, 16)) + '</text></g>';
+      '<circle cx="' + x.toFixed(0) + '" cy="' + y.toFixed(0) + '" r="6" fill="' +
+      (COUL_STATUT[p.statut] || '#7A8471') + '" stroke="#F4EDE2" stroke-width="1.5"/>' +
+      '<text x="' + x.toFixed(0) + '" y="' + (y - 9).toFixed(0) + '" font-size="8.5" ' +
+      'text-anchor="middle" fill="#22301C">' + xmlEsc(p.nom.slice(0, 18)) + '</text></g>';
   });
   if (A.ici) {
-    svg += '<circle cx="' + px(A.ici.lon).toFixed(0) + '" cy="' + py(A.ici.lat).toFixed(0) +
+    var li = LB.vers(A.ici.lat, A.ici.lon);
+    svg += '<circle cx="' + px(li.x).toFixed(0) + '" cy="' + py(li.y).toFixed(0) +
       '" r="5" fill="#1D6FB8" stroke="#fff" stroke-width="1.5"/>';
   }
+  /* Une échelle, sinon on ne sait pas si l'on regarde un canton ou une
+     région. Un trait de cinquante pixels, arrondi à un compte rond. */
+  var metres = v.m * 50;
+  var rond = Math.pow(10, Math.floor(Math.log(metres) / Math.LN10));
+  rond = metres / rond >= 5 ? rond * 5 : metres / rond >= 2 ? rond * 2 : rond;
+  svg += '<g><line x1="10" y1="' + (H - 12) + '" x2="' + (10 + rond / v.m).toFixed(0) +
+    '" y2="' + (H - 12) + '" stroke="#22301C" stroke-width="1.5"/>' +
+    '<text x="10" y="' + (H - 16) + '" font-size="8.5" fill="#22301C">' +
+    xmlEsc(G.fmtDistance(rond)) + '</text></g>';
   svg += '</svg>';
-  var largeur = G.distance({ lat: minLa, lon: minLo }, { lat: minLa, lon: maxLo });
-  z.innerHTML = svg + '<p class="muted" style="font-size:11.5px;margin:6px 0 0">Plan schématique' +
-    (largeur ? ' — largeur ≈ ' + G.fmtDistance(largeur) : '') + '. Appuyez sur un point.</p>';
+  z.innerHTML = svg;
+
+  var aide = $('#carte-aide');
+  if (aide) {
+    aide.textContent = A.cartePose
+      ? 'Appuyez sur la carte à l’endroit du chantier.'
+      : FOND.etat === 'charge' ? 'Chargement du fond de carte…'
+        : FOND.etat === 'absent'
+          ? 'Fond de carte indisponible : les chantiers restent placés les uns par ' +
+            'rapport aux autres.'
+          : 'Glissez pour vous déplacer, pincez pour zoomer. Appuyez sur un point ' +
+            'pour ouvrir sa fiche.';
+  }
 
   var tri = G.parDistance(pts, A.ici, 'gps');
-  $('#carte-liste').innerHTML = tri.map(function (t) {
-    var p = t.o;
-    return '<div class="liste-item"><span class="pastille" style="background:' + (COUL_STATUT[p.statut] || '#7A8471') + '"></span>' +
-      '<div class="li-c"><b>' + esc(p.nom) + '</b><small>' + esc(p.detail) + '</small></div>' +
-      (t.d != null ? '<span class="pt-dist">' + esc(G.fmtDistance(t.d)) + '</span>' : '') +
-      '<button class="btn-min" data-carteouvrir="' + p.id + '">Fiche</button>' +
-      '<a class="btn-min" href="' + esc(G.lienNav(p.gps, p.nom)) + '">Y aller</a></div>';
-  }).join('');
+  $('#carte-liste').innerHTML = pts.length
+    ? tri.map(function (t) {
+      var p = t.o;
+      return '<div class="liste-item"><span class="pastille" style="background:' +
+        (COUL_STATUT[p.statut] || '#7A8471') + '"></span>' +
+        '<div class="li-c"><b>' + esc(p.nom) + '</b><small>' + esc(p.detail) + '</small></div>' +
+        (t.d != null ? '<span class="pt-dist">' + esc(G.fmtDistance(t.d)) + '</span>' : '') +
+        '<button class="btn-min" data-carteouvrir="' + p.id + '">Fiche</button>' +
+        '<a class="btn-min" href="' + esc(G.lienNav(p.gps, p.nom)) + '">Y aller</a></div>';
+    }).join('')
+    : '<div class="vide"><p>Aucun chantier localisé. « Poser un chantier » place ' +
+      'un point sur la carte, ou relevez la position depuis la fiche du chantier.</p></div>';
 }
 
 /* Un devis qui n'aboutit pas : savoir pourquoi vaut mieux qu'un taux brut. */
@@ -19688,6 +19985,10 @@ function brancherReglagesDemarrage() {
 
 
 window.BCUI = { toast: toast,
+  /* La projection et le décodeur s'éprouvent seuls : une carte fausse ne se
+     voit qu'à l'écran, et trop tard. */
+  _carte: { LB: LB, decoder: decoderContour, fond: function () { return FOND; },
+    cadre: function () { return A.carte; } },
   _importCsv: function (txt) { A.imp = C.analyseCsv(txt); renderImportResultat(); },
   _setCal: function (mois, jour) { A.calMois = mois; A.calJour = jour; renderCalendrier(); },
   _setChantier: function (id, maj) { var c = chantier(id); if (!c) return; Object.keys(maj).forEach(function (k) { c[k] = maj[k]; }); c.maj = Date.now(); sauverChantiers().then(function () { renderCarnet(); renderFiche(); renderAccueil(); }); },
@@ -19707,7 +20008,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.79.0-20260909-0120';
+var VERSION = '4.80.0-20260909-2200';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
