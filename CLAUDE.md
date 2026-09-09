@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.77.0-20260908-2340**
+Version courante : **4.78.0-20260909-0030**
 
 ---
 
@@ -51,7 +51,7 @@ npm run controle   # vérificateur + service worker + tests + reconstruction + c
 ```
 
 Doit afficher **« Bon pour livraison »**, puis **« le service worker tient »**
-(24 vérifications), puis la suite au vert — 1650 à ce jour — puis
+(24 vérifications), puis la suite au vert — 1666 à ce jour — puis
 **« Sylve.html est conforme »**.
 
 Compter **moins de deux minutes**. Ça a été dix, et deux choses l'expliquaient :
@@ -2149,6 +2149,51 @@ séance, pas dans le dépôt : ils ne serviront qu'une fois, au moment de la
 conversion. **Les fichiers IGN ne doivent jamais entrer dans le dépôt**, comme
 le classeur comptable.
 
+## Le prix de journée ne se lit qu'à la fin
+
+*« Ce n'est pas un chiffre qui est utile en cours de chantier. Il sert plutôt
+à la fin : tu as fait tant de journées, tu as facturé tant, donc ta journée
+vaut tant d'euros. »*
+
+Trois journées facturées 1 050 €, une seule faite : `prixJour()` divisait
+1 050 par 1 et annonçait **1 050 € par jour-homme**. Le chiffre n'était pas
+faux, il était **prématuré** — le montant est complet dès le devis, les
+journées ne le sont qu'à la fin.
+
+`chantierSolde(ch)` — terminé, facturé, payé — commande désormais
+`prixJour()`, qui rend `null` avant. Deux conséquences :
+
+- **La fiche dit pourquoi le chiffre manque** plutôt que de le taire : un
+  chiffre absent sans explication ressemble à un oubli.
+- **La moyenne des rendements s'en trouve nettoyée.** `references()` remontait
+  ce prix prématuré dans le « €/jour obtenu » de chaque prestation, où il
+  faussait tout. C'est l'effet le moins visible et le plus important.
+
+## Les rendements : une seule forme de ligne, et un tri
+
+*« Il y en a qui sont calés à gauche, d'autres un peu plus décalées. Et ces
+pastilles, elles servent à quoi ? Elles ont la même couleur. »*
+
+- **Les pastilles sont parties.** Elles ne distinguaient rien : chaque ligne
+  est déjà une prestation différente. Une couleur qui ne code rien est du
+  bruit — la même règle que pour `appliquerCouleur()` en 4.44.
+- **L'alignement était de mon fait.** La ligne « compté seul », ajoutée avec
+  les cadences, n'avait qu'un bouton là où les autres en ont deux. Toutes les
+  lignes se construisent maintenant par le même chemin, et le bouton
+  « Estimer » d'une prestation sans chantier est **fermé, pas absent** : il
+  garde sa place, sinon rien ne s'aligne. **Une liste dont les lignes n'ont pas
+  la même forme fait danser les titres** — c'est la leçon déjà apprise sur le
+  carnet en 4.30.
+- **`TRIS_REND`** : alphabétique (défaut), du plus récent, du plus ancien, du
+  plus de chantiers. Le tri travaille sur une liste d'objets construite avant
+  le rendu, pas sur du HTML déjà assemblé.
+
+**Piège de graine rencontré, et il vaut d'être noté.** Le scénario semait des
+`temps` avec `journeesMigrees: true` : la migration ne tournait pas,
+`indexerJournees()` vidait `c.temps`, et plus aucun rendement ne se calculait.
+**Semer du temps sans journées demande de laisser la migration faire son
+travail** — c'est-à-dire de ne pas poser ce drapeau.
+
 ## La cadence qu'il compte lui-même
 
 *« J'ai compté qu'à peu près, dans ce contexte-là, je mettais une tige à
@@ -2208,10 +2253,9 @@ traîne. Sans estimation d’aucune sorte, `resteAPlacer()` rend `null` et on
 retombe sur la règle d’avant — sinon un chantier oublié ne se signalerait
 plus jamais.
 
-**Le prix par journée souffre du même biais, et n’est pas corrigé.** Trois
-journées facturées 1 050 €, une seule faite : `prixJour()` divise 1 050 par 1
-et annonce 1 050 €/jour. Le chiffre n’est pas faux, il est **prématuré** —
-reste à décider ce qu’on affiche sur un chantier commencé mais pas fini.
+**Le prix par journée souffrait du même biais**, et il est corrigé depuis la
+4.78 : il ne se lit qu’une fois le chantier soldé. Voir *Le prix de journée
+ne se lit qu’à la fin*.
 
 ## « En retard » ne se disait pas d'un chantier
 
