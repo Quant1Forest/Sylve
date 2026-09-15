@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.83.0-20260915-1922**
+Version courante : **4.83.0-20260915-2015**
 
 ---
 
@@ -51,7 +51,7 @@ npm run controle   # vérificateur + service worker + tests + reconstruction + c
 ```
 
 Doit afficher **« Bon pour livraison »**, puis **« le service worker tient »**
-(24 vérifications), puis la suite au vert — 1775 à ce jour — puis
+(33 vérifications), puis la suite au vert — 1805 à ce jour — puis
 **« Sylve.html est conforme »**.
 
 Compter **moins de deux minutes**. Ça a été dix, et deux choses l'expliquaient :
@@ -466,8 +466,8 @@ sans raison casse la correspondance avec l'historique à importer.
 
 ## Charges fixes
 
-Les postes courants d’un entrepreneur seul : assurances, abonnements, les frais
-de compte bancaire, un prêt. D'où les catégories `ABO`, `BANQUE` et `PRET`,
+Les postes courants d'un entrepreneur seul : assurances, abonnements et
+logiciels, frais de compte bancaire, prêt. D'où les catégories `ABO`, `BANQUE` et `PRET`,
 qui n'existaient pas — sans elles tout finissait en « Frais administratif » et
 le graphique de répartition ne disait rien.
 
@@ -1119,12 +1119,11 @@ repères de `A.vehicule.infos` — `kmAchat`, `prixAchat`, `kmRevente`,
 de quoi se calculer : une ligne dit ce qui lui manque plutôt qu’un zéro qui
 passerait pour un chiffre.
 
-**Le véhicule a été acheté d’occasion**, tard dans sa vie, avec une borne de
-revente visée — c’est le précédent propriétaire qui l’avait pris neuf. L’historique
-d’entretien d’avant son achat **compte quand même** : il ne l’a pas payé, mais
-c’est la seule base fiable pour savoir ce que ce véhicule coûte. Avec le peu
-de kilomètres qu’il a faits depuis, ses propres factures ne diraient rien. Ces
-interventions vivent donc dans le carnet et **jamais dans les dépenses**.
+**Un véhicule acheté d’occasion garde son historique d’entretien d’avant
+l’achat, et il compte** : il n’a pas été payé par l’utilisateur, mais c’est la
+seule base fiable pour savoir ce que le véhicule coûte — quelques milliers de
+kilomètres de ses propres factures ne diraient rien. Ces interventions vivent
+donc dans le carnet et **jamais dans les dépenses**.
 
 **`prixLitreMoyen()` est une moyenne pondérée par les quantités** — un plein
 de soixante litres pèse trois fois un plein de vingt. Il l’a demandé ainsi, et
@@ -1228,7 +1227,7 @@ noms. Même mécanique qu'en 4.72 pour le téléphone, et pour la même raison.
   poser quand même fait cocher au hasard. La case **disparaît** plutôt que de
   rester grisée — une case sans objet finit toujours par se faire cocher.
 - **Sans type, on ne retire rien.** `sirenPossible()` rend `true` sur un nom
-  qu'on ne connaît pas : les des dizaines de chantiers déjà saisis gardent la
+  qu'on ne connaît pas : les chantiers déjà saisis gardent la
   question, et rien ne change pour eux. « Je ne sais pas » n'est pas un refus.
 - **La question se pose là où le nom naît** : dans l'offre d'ajout, sous le
   champ. C'était son défaut — *« quand je crée un nouveau propriétaire, il ne
@@ -1319,13 +1318,28 @@ D'où une **quatrième pastille dans Analyses**, et non un module.
 - **La base est le CA FACTURÉ**, à sa demande expresse du 23 août. Le micro-BIC
   se déclare normalement sur l'**encaissé** ; il le sait, c'est son choix, et
   c'est écrit à l'écran. Ne pas le « corriger » en silence.
-- **`impotEstime()` suit sa règle** : d’autres revenus consomment la tranche à
-  0 %, donc la base entre directement dans celle à 11 %, dont il reste une
-  capacité (`impotCapacite`, 20 000 € par défaut), puis bascule à 30 %. Les
-  trois nombres sont réglables — les tranches changent chaque année.
+- **`impotEstime()` suit sa règle** : quand d'autres revenus du foyer
+  consomment la tranche à 0 %, la base entre directement dans celle à 11 %,
+  dont il reste une capacité (`impotCapacite`), puis bascule à 30 %. Les trois
+  nombres sont réglables — les tranches changent chaque année. **La capacité
+  n'a pas de valeur par défaut** depuis la 4.83 : sans elle l'impôt ne s'estime
+  pas, et l'écran dit ce qui manque. Voir *Aucun chiffre à lui*.
 - **Le remboursement vit sur le versement d'origine**, pas sur une ligne à
-  part : un versement peut être remboursé, et le
-  net doit se lire sans perdre l'histoire.
+  part : le net doit se lire sans perdre l'histoire.
+- **Le versement libératoire** (4.83) : une case, **l'année à partir de
+  laquelle** il s'applique, deux taux modifiables — 1 % sur les ventes, 1,7 %
+  sur les prestations. `vlApplicable(cfg, annee)` et `versementLiberatoire(ca,
+  cfg)`. Sur le **brut**, sans abattement ni tranche ; le débours reste dehors.
+  Cocher propose l'an prochain : *« je vais sûrement passer au versement
+  libératoire pour l'an prochain »*. Les années d'avant restent au barème —
+  cocher ne réécrit pas les estimations passées, et un scénario le garde.
+  **Son droit à l'option n'est pas vérifié** : elle est liée au régime
+  micro-social, et ses cotisations MSA calculées après abattement laissent un
+  doute. Il devait appeler la MSA.
+- **Les cotisations MSA : un seul taux, sur la base après abattement** — 50 %
+  en prestations, 71 % en ventes. C'est lui qui l'a corrigé le 15 septembre,
+  après qu'on lui a parlé à tort de deux taux « comme à l'URSSAF ». Sylve le
+  faisait déjà : « Appliqué au montant après abattement ».
 - **`A.decl` n'est pas `A.periode`.** Le sélecteur des déclarations est
   propre à cet écran : il raisonne en mois ou trimestre, pendant que le reste
   des Analyses garde la période générale. Changer de rythme replie l'indice —
@@ -1600,6 +1614,10 @@ compléter* et les statuts un par un.
 - **« En cours ou à planifier »** (`afaire`) : `accepte` et `encours`. *« Pour
   voir ce qui me reste à faire et m'organiser. »* Un chantier terminé ou
   facturé ne demande plus de journée.
+- **Les familles de travaux** (4.83) forment un groupe à part : un chantier y
+  figure dès qu'**une** de ses lignes relève de la famille, et la famille suit
+  ses réglages (`travauxPerso[code].cat`), pas le rangement livré. Une famille
+  sans chantier ne s'affiche pas.
 - **« Ouverts » n'a pas changé de sens** : un facturé non payé y reste,
   l'argent n'est pas rentré. C'est `statutOuvert()`, qui sert ailleurs.
 - **Le groupe « En cours » s'appelle « Ouverts ».** Il rangeait les facturés
@@ -1719,8 +1737,8 @@ les logos euros touchent presque les chiffres. »* Deux causes distinctes :
   **Corollaire connu : une regex écrite avec une espace ordinaire ne matche
   plus.** C’est le piège jumeau de celui de l’euro, et il a fait rougir un
   scénario d’analyses.
-- **Les nombres tenaient en 19 px dans des tuiles de 96 px.** un montant à six chiffres
-  n’y entre pas. Tuiles à 102 px, chiffre à 17 px, et `white-space: nowrap` :
+- **Les nombres tenaient en 19 px dans des tuiles de 96 px.** Un montant à six
+  chiffres n’y entre pas. Tuiles à 102 px, chiffre à 17 px, et `white-space: nowrap` :
   mieux vaut une tuile qui s’étire qu’un « € » tout seul en dessous.
 
 ## Les priorités d’achat sont des horizons
@@ -1761,20 +1779,13 @@ Tournée du 2 septembre, complétée le 9 et le 15, par ordre de maturité :
   service worker ignore les tuiles (autre origine), seul le cache du
   navigateur en garde parfois. Proposé le 15 septembre : garder les tuiles
   déjà vues, avec une taille plafonnée. Pas encore validé.
-- **Le versement libératoire.** Il compte y passer l'an prochain et veut *« un
-  simple truc à cocher »* pour basculer du barème progressif. Proposé : un
-  réglage qui porte **l'année à partir de laquelle** il s'applique — cocher
-  ne doit pas réécrire les estimations des années passées — et deux taux
-  modifiables, ventes et prestations. Pas encore validé.
-- **Le chiffre `20 000 €`** — la capacité de la tranche à 11 % par défaut,
-  dans `index.html`, ce fichier et un scénario — vient de sa situation
-  personnelle. Signalé le 15 septembre ; le remplacer change ses estimations
-  s'il n'a pas saisi la sienne. Ne pas y toucher sans lui.
-- **L'historique du dépôt garde des chiffres réels** : kilométrages du
-  véhicule et dépenses de carburant, écrits dans ce fichier en 4.65
-  (`3371a8d`) et retirés au commit `74bc29d`. Les effacer de l'historique
-  demande de le réécrire et de forcer la publication. Expliqué le 15
-  septembre, pas décidé.
+- **L'historique du dépôt garde ce que les fichiers actuels n'ont plus** :
+  kilométrages du véhicule et dépenses de carburant (écrits en 4.65, retirés
+  en `74bc29d`), la capacité d'impôt par défaut, les noms de communes des
+  tests, les contours de six départements (`communes.js`), et **son
+  adresse e-mail comme auteur de chaque commit**. *« Sur l'historique, oui, ce
+  serait bien de pouvoir les enlever. »* La réécriture est préparée, pas
+  publiée : elle remplace tout l'historique en ligne et attend son feu vert.
 
 ## Les achats à venir
 
@@ -1898,8 +1909,7 @@ et c’est sur cette nuance que se décide où l’on court pour donner l’aler
 **La fiche vit sur le chantier** (`c.fiche`), donc elle part dans les
 sauvegardes sans nouveau format. Une troisième vue du module Chantiers, avec
 un **filtre** sur la liste : *« je filtre chantier ouvert, comme ça je n’ai
-pas à chercher dans une liste assez grande »* — des dizaines de chantiers dont
-presque tous payés.
+pas à chercher dans une liste assez grande »*.
 
 **Ce que Sylve ignore s’écrit « à compléter », jamais un blanc.** Un blanc sur
 une fiche de sécurité se lit comme une absence de risque. La fiche s’imprime
@@ -1913,6 +1923,40 @@ faire cent mètres cubes, je ne fais que des travaux sylvicoles. »* Annoncer un
 seuil qu’il ne rencontrera pas n’aurait fait que du bruit. Le rappel vit **sur
 la fiche du chantier**, là où il chiffre, pas dans un écran qu’il ouvrirait
 après coup.
+
+## Aucun chiffre à lui
+
+*« À la base, on a dit aucune information personnelle dans l'application parce
+que c'est public. Donc on enlève tout. »* La règle était écrite en tête de ce
+fichier depuis longtemps ; elle a été enfreinte **à plusieurs endroits sans
+qu'aucun ne soit un nom** :
+
+- une **valeur par défaut** tirée de sa situation fiscale, dans le code ;
+- des **exemples** qui étaient ses vrais chiffres — kilométrage du véhicule,
+  comptes de son carnet, quantités de son stock — dans ce fichier, les
+  commentaires et les tests ;
+- des **noms de communes et des coordonnées** de son secteur dans les tests,
+  et le centre de ses départements comme point de départ de la carte ;
+- le site régional d'une association, qui situait la région ;
+- **les exemples d'import du stock** (`outils/exemples/*.csv`) : ses vraies
+  commandes et ventes, clients et fournisseurs anonymisés mais quantités, prix
+  et dates vrais — et le prix d'achat de son répulsif recopié en exemple dans
+  le code.
+
+Retirés en 4.83 : chiffres ronds inventés, communes inventées (*Clairbois*,
+*Montjoie*, *Les Essarts*), la carte s'ouvre sur le milieu de la France.
+
+**Remplacer des exemples sans perdre la vérification.** Le scénario d'import
+comparait le stock calculé aux chiffres du tableur — une source écrite
+ailleurs. Recopier ce que Sylve affiche avec les nouveaux fichiers aurait
+fait un test qui se confirme lui-même. La règle a donc été **recalculée à
+part** (`calcul-stock.js`, dans le bac à sable de la séance), d'abord éprouvée
+sur les anciens fichiers — elle retrouvait exactement les quatre valeurs
+attendues — puis appliquée aux nouveaux.
+
+**La leçon : un chiffre à lui ne devient jamais un défaut ni un exemple.** Un
+exemple s'invente, rond et quelconque. Un défaut qui dépend de sa situation
+n'existe pas : le champ reste vide et l'écran dit ce qui manque.
 
 ## Ce que la fiche de chantier n'exige pas
 
@@ -1978,6 +2022,24 @@ champ que le relevé GPS et que les coordonnées collées.
 
 **« Ma position » y va et se serre** à trois mètres au sol par pixel.
 
+**Ce qu'on a regardé reste hors réseau** (4.83) : *« quand je regarde une zone
+sur la carte, qu'elle s'enregistre sur le téléphone, comme ça même hors réseau
+je peux y avoir accès »*. Le service worker range les tuiles dans
+`sylve-tuiles`, **un cache sans numéro de version** — le ménage de l'activation
+ne vise que les `bordcub-*`, une mise à jour n'efface donc pas ce qu'il a
+regardé. Plafond `TUILES_MAX` = 3 000, soit une cinquantaine de Mo ; au-delà,
+les plus anciennes partent.
+
+- **Les tuiles se demandent en CORS** (`crossorigin="anonymous"`). Une réponse
+  opaque pèse plusieurs Mo dans le quota du navigateur quelle que soit sa
+  taille, et porte `ok` à faux : sans CORS, rien ne serait jamais gardé. L'IGN
+  répond avec `Access-Control-Allow-Origin: *`, vérifié le 15 septembre.
+- **Une garde en double a été retirée** avant d'être éprouvée : le service
+  worker vérifiait `rep.ok` *et* `rep.type === 'cors'`, or une réponse opaque
+  n'est jamais `ok`. Cinquième fois que le motif revient.
+- **Rien ne se télécharge d'avance** : c'est ce qu'il a regardé qui reste. Pour
+  une zone sans réseau, la parcourir chez soi avant.
+
 **On cherche une commune** (`chercherCommune`) : le géocodage de l'IGN
 (`data.geopf.fr/geocodage/search`, `type=municipality`), le même fournisseur
 que les tuiles. Une seule réponse, on y va ; plusieurs, on choisit, avec le
@@ -1999,7 +2061,7 @@ chantiers placés les uns par rapport aux autres, et l'écran le dit.
 ## Les contours de communes : faits en 4.80, retirés en 4.82
 
 Pendant deux versions, un fond **hors ligne** — 2 906 contours de communes de
-six départements, tirés de ses shapefiles IGN, 344 Ko dans `communes.js`
+six départements, tirés de shapefiles IGN, 344 Ko dans `communes.js`
 — s'est dessiné sous les chantiers, puis par-dessus la photo. Il l'a retiré :
 *« on va enlever la partie qui délimite les communes, ça sert à rien »*, et
 avec lui le choix « Contours seuls ». Un téléphone resté réglé dessus
@@ -2784,8 +2846,7 @@ et corrigés : les comptes de jours en millisecondes, les échéances repliées
 sur le 28, les liens des notes de mise à jour. Les deux premiers dormaient
 derrière des scénarios qui ne cassaient que certains jours.
 
-L'historique est repris et vit sur le téléphone : tout le
-carnet. Le fichier
+L'historique est repris et vit sur le téléphone. Le fichier
 se refabrique avec `outils/importer-carnet.js` à partir des deux classeurs, qui
 restent chez l'utilisateur.
 
@@ -2821,11 +2882,9 @@ phrases plus loin il demandait *plus* de détail sur cet impayé. Les deux
 
 - **La CFE** n'est pas calculée : il a dit ne pas savoir la calculer lui-même.
   Elle existe comme type de versement, rien de plus.
-- **Le taux de cotisation est unique**, alors que l'URSSAF en distingue
-  deux — prestations et ventes de marchandises, ces dernières nettement plus
-  basses. Le 15 septembre il a répondu que *« c'est le même »* ; signalé que
-  ses fournitures vendues relèvent normalement du taux des ventes. À laisser
-  tel quel tant qu'il ne le demande pas.
+- **Le taux de cotisation unique est juste** : à la MSA, le même taux
+  s'applique à la base après abattement (50 % en prestations, 71 % en ventes).
+  Question close le 15 septembre — voir *Les déclarations*.
 
 *Les catégories au-dessus des prestations et le formulaire de création
 raccourci, notés ici comme « prêts à faire », sont faits : voir* Cinq familles
@@ -2833,8 +2892,9 @@ au-dessus des prestations *et* La création d'un chantier.
 
 **Proposé, en attente de sa réponse :**
 
-- **Les grandes familles dans les filtres du carnet.** Il s'y perd avec
-  des dizaines de chantiers dont presque tous payés. Les filtres sont désormais
+- **Les grandes familles dans les filtres du carnet** — **faites en 4.83**,
+  voir *Les filtres dans l'ordre qu'il a dicté*. Il s'y perdait avec des
+  dizaines de chantiers presque tous payés. Les filtres sont désormais
   groupés *En cours / Clos*, et « Avec devis » s'y est ajouté en 4.75 ; ce
   qu'il évoquait en plus — retrouver la **famille de travaux** d'un chantier
   dans le filtre — n'est toujours pas fait. Dit le 23 août ; le 15 septembre

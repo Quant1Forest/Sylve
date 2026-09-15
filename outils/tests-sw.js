@@ -64,7 +64,10 @@ function monde(options) {
       return Promise.resolve();
     },
     put(req, rep) { caches.get(nom).set(cle(req), rep); return Promise.resolve(); },
-    match(req) { return Promise.resolve(caches.get(nom).get(cle(req)) || undefined); }
+    match(req) { return Promise.resolve(caches.get(nom).get(cle(req)) || undefined); },
+    /* Une Map rend ses clés dans l'ordre d'arrivée, comme le vrai cache. */
+    keys() { return Promise.resolve([...caches.get(nom).keys()]); },
+    delete(req) { return Promise.resolve(caches.get(nom).delete(cle(req))); }
   });
 
   const ctx = {
@@ -237,6 +240,60 @@ function fichiersAnnonces() {
       request: { url: 'https://ailleurs.example/x', method: 'GET', mode: 'cors' }
     });
     verifier('une adresse étrangère non plus', null, ailleurs);
+  }
+
+  /* ---------------------------------------------------------------- */
+  console.log('\n  Tuiles de la carte : ce qu’on a regardé reste hors réseau');
+  {
+    const tuile = n => 'https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&TILEROW=' + n;
+    const demander = (m, url) => m.declencher('fetch', {
+      request: { url, method: 'GET', mode: 'cors' }
+    }).then(r => r);
+    /* L'IGN répond en CORS : c'est ainsi que la carte demande ses images. */
+    const cors = url => ({ url, ok: true, type: 'cors', reseau: true,
+      clone() { return Object.assign({}, this); } });
+
+    const m = monde({ reseau: { [tuile(1)]: cors(tuile(1)) } });
+    await m.declencher('install');
+    const r1 = await demander(m, tuile(1));
+    verifierVrai('une tuile inconnue vient du réseau', r1 && r1.reseau);
+    await new Promise(r => setTimeout(r, 10));
+    verifierVrai('et elle est gardée dans le cache des tuiles',
+      m.caches.get('sylve-tuiles') && m.caches.get('sylve-tuiles').has(tuile(1)));
+
+    /* Hors réseau, la même zone se revoit. */
+    m.ctx.fetch = () => Promise.reject(new Error('hors ligne'));
+    const r2 = await demander(m, tuile(1));
+    verifierVrai('hors réseau, la tuile déjà vue revient', r2 && r2.url === tuile(1));
+
+    /* Le cache des tuiles ne porte pas de version : une mise à jour de Sylve
+       ne doit pas effacer ce qu'il a regardé. */
+    await m.declencher('activate');
+    verifierVrai('une mise à jour ne l’efface pas', m.caches.has('sylve-tuiles'));
+
+    /* Une réponse opaque compte plusieurs Mo dans le quota : jamais gardée. */
+    const opaque = monde({ reseau: { [tuile(2)]: { url: tuile(2), ok: false, type: 'opaque',
+      clone() { return Object.assign({}, this); } } } });
+    await opaque.declencher('install');
+    await demander(opaque, tuile(2));
+    await new Promise(r => setTimeout(r, 10));
+    verifierVrai('une réponse opaque n’est pas gardée',
+      !(opaque.caches.get('sylve-tuiles') && opaque.caches.get('sylve-tuiles').has(tuile(2))));
+
+    /* Le plafond : au-delà, les plus anciennes partent. On lit le plafond dans
+       sw.js, et on le dépasse d'une tuile. */
+    const max = Number((fs.readFileSync(path.join(racine, 'sw.js'), 'utf8')
+      .match(/var TUILES_MAX = (\d+)/) || [])[1]);
+    verifierVrai('un plafond est posé', max > 0);
+    const plein = monde();
+    plein.ctx.fetch = req => Promise.resolve(cors(req.url));
+    await plein.declencher('install');
+    for (let i = 0; i <= max; i++) await demander(plein, tuile(1000 + i));
+    await new Promise(r => setTimeout(r, 50));
+    const garde = plein.caches.get('sylve-tuiles');
+    verifier('le cache s’arrête au plafond', max, garde ? garde.size : 0);
+    verifierVrai('la plus ancienne est partie', garde && !garde.has(tuile(1000)));
+    verifierVrai('la plus récente est là', garde && garde.has(tuile(1000 + max)));
   }
 
   /* ---------------------------------------------------------------- */

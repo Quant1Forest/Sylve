@@ -210,8 +210,8 @@ body:not(.m-ent) .mod-ent{display:none}
 .ligne-trav{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center;padding:7px 0;border-bottom:1px solid var(--trait)}
 .ligne-trav:last-child{border-bottom:none}
 .fiche-tete{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
-/* Des tuiles un peu plus larges et un chiffre un cran plus bas : un montant à six chiffres
-   ne tenait pas en 19 px dans 96 px, et le symbole passait à la ligne. Le
+/* Des tuiles un peu plus larges et un chiffre un cran plus bas : un montant à
+   six chiffres ne tenait pas en 19 px dans 96 px, et le symbole passait à la ligne. Le
    nombre ne se coupe jamais — mieux vaut une tuile qui s'étire qu'un « € »
    tout seul en dessous. */
 .kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(102px,1fr));gap:8px;margin-top:11px}
@@ -4455,8 +4455,8 @@ var COLONNES_CSV = ['chantier', 'date', 'donneur', 'proprietaire', 'foret', 'par
 
 function modeleCsv() {
   return COLONNES_CSV.join(';') + '\r\n' +
-    'Montjoie plantation;15/03/2025;Cabinet Dubois;GF des Sapins;Montjoie;12;PLANT;plant;2000;0,45;prestation;10;5;1;DOU;1100;;2;1;paye;\r\n' +
-    'Montjoie plantation;15/03/2025;Cabinet Dubois;GF des Sapins;Montjoie;12;PROTEC;unite;2000;0,90;vente;20;;;;;;;;;\r\n';
+    'Clairbois plantation;15/03/2025;Cabinet Dubois;GF des Sapins;Clairbois;12;PLANT;plant;2000;0,45;prestation;10;5;1;DOU;1100;;2;1;paye;\r\n' +
+    'Clairbois plantation;15/03/2025;Cabinet Dubois;GF des Sapins;Clairbois;12;PROTEC;unite;2000;0,90;vente;20;;;;;;;;;\r\n';
 }
 function decoupeCsv(txt) {
   var lignes = String(txt).replace(/^\uFEFF/, '').split(/\r?\n/).filter(function (l) { return l.trim(); });
@@ -4702,6 +4702,15 @@ function filtre(chantiers, quoi) {
      dépannage. */
   if (quoi === 'avecdevis') return l.filter(function (c) { return aDevis(c); });
   if (quoi === 'clos') return l.filter(function (c) { return !statutOuvert(c.statut); });
+  /* « L'idée : filtrer par grande famille. » Un chantier y figure dès qu'une
+     de ses lignes en relève : celui qui mêle plantation et protections se
+     retrouve sous les deux. La famille suit les réglages, où il la change. */
+  if (quoi.indexOf('fam:') === 0) {
+    var fam = quoi.slice(4);
+    return l.filter(function (c) {
+      return (c.lignes || []).some(function (x) { return categorieLigne(x) === fam; });
+    });
+  }
   /* « Uniquement ce qui est à faire ou en cours, pour voir ce qui me reste à
      faire et m'organiser. » Un chantier terminé ou facturé ne demande plus
      de journée, même s'il reste ouvert tant qu'il n'est pas payé. */
@@ -4714,7 +4723,7 @@ function filtre(chantiers, quoi) {
    la commune, ou le numéro porté sur la facture ou le devis. Les accents et
    les majuscules ne comptent pas — le numéro se tape d'une main.
    Plusieurs mots doivent tous se retrouver, pas forcément dans le même
-   champ : « dubois montjoie » sort le chantier de Montjoie passé par Dubois. */
+   champ : « dubois clairbois » sort le chantier de Clairbois passé par Dubois. */
 /* Ce qu'une fiche doit porter pour être exploitable. Rien n'est jamais
    bloqué à la saisie — on note trois mots sur un bord de route et on complète
    le soir — mais on doit pouvoir retrouver ce qui est resté à moitié rempli.
@@ -5550,20 +5559,49 @@ function simulation(chantiers, b, cfg) {
   };
 }
 
-/* L'impôt tel qu'il le calcule : sa base s'ajoute aux autres revenus du
-   foyer, qui consomment déjà la tranche à 0 %. Ce qui arrive ici entre donc
-   directement dans la tranche à 11 %, dont il reste une capacité donnée,
-   puis bascule au taux suivant. Les trois nombres sont à lui : les tranches
-   changent chaque année, et sa situation aussi. Rien n'est officiel ici. */
+/* L'impôt au barème, tel qu'il le calcule : quand d'autres revenus du foyer
+   consomment déjà la tranche à 0 %, ce qui arrive ici entre directement dans
+   la tranche à 11 %, dont il reste une capacité, puis bascule au taux
+   suivant. Les trois nombres sont à lui : les tranches changent chaque année,
+   et sa situation aussi. Rien n'est officiel ici.
+
+   La capacité n'a PAS de valeur par défaut. Elle en a eu une, tirée de sa
+   situation — et le dépôt est public. Sans elle, l'impôt ne s'estime pas :
+   un chiffre inventé serait pire qu'un blanc qui dit ce qui manque. */
 function impotEstime(base, cfg) {
   var c = cfg || {};
-  var capacite = c.impotCapacite != null ? nb(c.impotCapacite) : 20000;
+  var capacite = c.impotCapacite != null && c.impotCapacite !== '' ? nb(c.impotCapacite) : null;
   var t1 = c.impotTaux1 != null ? nb(c.impotTaux1) : 11;
   var t2 = c.impotTaux2 != null ? nb(c.impotTaux2) : 30;
+  if (capacite == null) {
+    return { capacite: null, t1: t1, t2: t2, base1: null, base2: null,
+      tranche1: null, tranche2: null, total: null };
+  }
   var b1 = Math.min(nb(base), capacite), b2 = Math.max(0, nb(base) - capacite);
   return { capacite: capacite, t1: t1, t2: t2, base1: arr(b1, 2), base2: arr(b2, 2),
     tranche1: arr(b1 * t1 / 100, 2), tranche2: arr(b2 * t2 / 100, 2),
     total: arr(b1 * t1 / 100 + b2 * t2 / 100, 2) };
+}
+
+/* Le versement libératoire : l'impôt payé avec les cotisations, en
+   pourcentage du chiffre d'affaires BRUT — ni abattement, ni tranche. « Je
+   vais sûrement passer au versement libératoire pour l'an prochain. » Les
+   taux sont les siens, modifiables : 1 % sur les ventes et 1,7 % sur les
+   prestations à ce jour. Le débours reste dehors, comme partout.
+
+   Il vaut à partir d'une année : les années d'avant restent au barème, sinon
+   cocher la case réécrirait les estimations passées. */
+function vlApplicable(cfg, annee) {
+  var d = cfg && cfg.vlDepuis;
+  return d != null && d !== '' && nb(annee) >= nb(d);
+}
+function versementLiberatoire(ca, cfg) {
+  var c = cfg || {};
+  var tv = c.vlTauxVente != null ? nb(c.vlTauxVente) : 1;
+  var tp = c.vlTauxPresta != null ? nb(c.vlTauxPresta) : 1.7;
+  var v = arr(nb(ca && ca.vente) * tv / 100, 2);
+  var p = arr(nb(ca && ca.prestation) * tp / 100, 2);
+  return { tauxVente: tv, tauxPresta: tp, vente: v, prestation: p, total: arr(v + p, 2) };
 }
 
 /* Taux de réussite des devis : combien de propositions se transforment.
@@ -5606,6 +5644,7 @@ var M = {
   parPrestation: parPrestation, parFamille: parFamille,
   parCategorie: parCategorie, parFournisseur: parFournisseur,
   simulation: simulation, impotEstime: impotEstime,
+  vlApplicable: vlApplicable, versementLiberatoire: versementLiberatoire,
   PERIODICITES: PERIODICITES, parAn: parAn, nomPeriodicite: nomPeriodicite,
   coutAnnuel: coutAnnuel, totalChargesAnnuel: totalChargesAnnuel,
   echeances: echeances, chargesDues: chargesDues,
@@ -7949,8 +7988,10 @@ function brancherReglagesMarque() {
 var NOTES_MAJ = [
   { v: '4.83', quoi: [
     { t: 'Ma journee : le temps total, les heures productives et le trajet', vue: 'calendrier' },
-    { t: 'Le hors production se calcule seul : total moins productif', vue: 'calendrier' },
-    { t: 'Mon entreprise : une bulle qui ne compte qu un chantier ouvre sa fiche' }
+    { t: 'Carte : les zones deja regardees restent visibles sans reseau', vue: 'carte' },
+    { t: 'Carnet : un filtre par famille de travaux', vue: 'carnet' },
+    { t: 'Declarations : le versement liberatoire se coche, a partir de son annee', vue: 'analyses' },
+    { t: 'Le reste dans la tranche d impot est a ressaisir : plus de chiffre par defaut', vue: 'analyses' }
   ] },
   { v: '4.82', quoi: [
     { t: 'Carte : chercher une commune, et le doigt ne se bloque plus au bout d un moment', vue: 'carte' },
@@ -8647,6 +8688,20 @@ function brancher() {
     if (vm) ouvrirVersement(vm.dataset.versmod);
   });
   $('#ana-corps').addEventListener('change', function (e) {
+    if (e.target.closest('#decl-vl')) {
+      /* Cocher propose l'année prochaine : c'est pour l'an prochain qu'il
+         compte y passer. Décocher retire l'année, pas les taux. */
+      A.cfg.vlDepuis = e.target.checked ? new Date().getFullYear() + 1 : null;
+      sauverCfg(); renderAnalyses(); return;
+    }
+    if (e.target.closest('#decl-vl-an') || e.target.closest('#decl-vl-tp') ||
+      e.target.closest('#decl-vl-tv')) {
+      var depuis = Math.round(FIN.nb($('#decl-vl-an').value));
+      if (depuis > 1900) A.cfg.vlDepuis = depuis;
+      A.cfg.vlTauxPresta = $('#decl-vl-tp').value.trim() === '' ? null : FIN.nb($('#decl-vl-tp').value);
+      A.cfg.vlTauxVente = $('#decl-vl-tv').value.trim() === '' ? null : FIN.nb($('#decl-vl-tv').value);
+      sauverCfg(); renderAnalyses(); return;
+    }
     if (e.target.closest('#decl-cot') || e.target.closest('#decl-cap') ||
       e.target.closest('#decl-t1') || e.target.closest('#decl-t2') ||
       e.target.closest('#decl-base')) {
@@ -10964,6 +11019,8 @@ function renderFiltreChantiers() {
     ['clos', 'Chantiers clos', nf('clos')],
     ['afaire', 'En cours ou à planifier', nf('afaire')]);
   if (incomplets) tete.push(['acompleter', 'À compléter', incomplets]);
+  var fams = C.CAT_TRAVAUX.map(function (x) { return ['fam:' + x.c, x.n, nf('fam:' + x.c)]; })
+    .filter(function (o) { return o[2] > 0; });
   var ouv = [], clos = [];
   C.STATUTS.forEach(function (st) {
     var n = C.filtre(A.chantiers, st.c).length;
@@ -10974,6 +11031,7 @@ function renderFiltreChantiers() {
      « dans en cours, j'ai encore tous les chantiers que j'ai finis ». Il
      porte le nom du filtre qu'il détaille. */
   s.innerHTML = tete.map(opt).join('') +
+    (fams.length ? '<optgroup label="Familles de travaux">' + fams.map(opt).join('') + '</optgroup>' : '') +
     (ouv.length ? '<optgroup label="Ouverts">' + ouv.map(opt).join('') + '</optgroup>' : '') +
     (clos.length ? '<optgroup label="Clos">' + clos.map(opt).join('') + '</optgroup>' : '');
 }
@@ -13781,8 +13839,8 @@ function poserType(nom, t) {
   l[k].type = t || '';
 }
 /* Tant qu'on ne sait pas ce qu'est quelqu'un, on ne lui retire rien : un
-   nom sans type garde la question du SIREN. Les des dizaines de chantiers déjà
-   saisis sont dans ce cas, et rien ne doit changer pour eux. */
+   nom sans type garde la question du SIREN. Les chantiers déjà saisis sont
+   dans ce cas, et rien ne doit changer pour eux. */
 function sirenPossible(nom) {
   var t = typeDe(nom);
   if (!t) return true;
@@ -13845,7 +13903,7 @@ function chantierFiche() {
 function renderFicheChantier() {
   var z = $('#fch-corps'); if (!z) return;
   /* « Je filtre chantier ouvert, comme ça je n'ai pas à chercher dans une
-     liste assez grande. » Des dizaines de chantiers dont presque tous payés. */
+     liste assez grande. » */
   var f = A.fchFiltre || 'ouverts';
   var liste = C.tri(C.filtre(A.chantiers, f));
   var c = chantierFiche();
@@ -17161,8 +17219,8 @@ function renderStockFournitures() {
         '<td class="num">' + E.fmt(ST.valeurStock(a), 2) + '</td></tr>';
     }).join('') +
     /* On n'additionne pas des litres avec des unités. Tant que le catalogue
-       mêle les unités, les colonnes de quantité n'ont pas de total : « des dizaines de milliers
-       achetés » sur du répulsif au millilitre et des tuteurs à la pièce ne
+       mêle les unités, les colonnes de quantité n'ont pas de total : un
+       « acheté » qui cumule du répulsif au millilitre et des tuteurs à la pièce ne
        veut rien dire. Seule la valeur, en euros, se cumule toujours. */
     '<tr class="tot"><td style="text-align:left">Total</td>' +
     (uniteUnique
@@ -17970,9 +18028,9 @@ function cadreCarte() {
   if (A.carte) return A.carte;
   var pts = chantiersLocalises();
   if (!pts.length) {
-    /* Rien de posé : on ouvre sur le milieu de six départements, en
-       Mercator — 46,6° N, 2,4° E. */
-    return (A.carte = { cx: 267000, cy: 5877000, m: 1300 });
+    /* Rien de posé : on ouvre sur le milieu de la France, en Mercator —
+       46,6° N, 2,4° E — assez large pour la voir entière. */
+    return (A.carte = { cx: 267000, cy: 5877000, m: 4000 });
   }
   var xs = [], ys = [];
   pts.forEach(function (p) {
@@ -18147,7 +18205,8 @@ function dessinerCarteChantiers(z) {
   var W = 320, H = 240;
   /* Mercator est conforme : localement, l'échelle est la même dans les deux
      sens et tient en un seul nombre. Mais c'est un mètre de carte, pas de
-     terrain — au milieu de la France il en vaut 0,69, et c'est LB.facteurSol qui le dit. */
+     terrain — au milieu de la France il en vaut 0,69, et c'est LB.facteurSol
+     qui le dit. */
   var px = function (x) { return W / 2 + (x - v.cx) / v.m; };
   var py = function (y) { return H / 2 - (y - v.cy) / v.m; };
 
@@ -18173,7 +18232,9 @@ function dessinerCarteChantiers(z) {
         for (var j = 0; j < ny; j++) {
           var tx = x0 + i, ty = y0 + j;
           if (tx < 0 || ty < 0 || tx >= lim || ty >= lim) continue;
-          tuiles += '<img src="' + esc(urlTuile(ft, niv, tx, ty)) + '" alt="" ' +
+          /* En CORS : c'est ce qui permet au service worker de garder la
+             tuile pour hors réseau sans saturer le quota du téléphone. */
+          tuiles += '<img src="' + esc(urlTuile(ft, niv, tx, ty)) + '" alt="" crossorigin="anonymous" ' +
             'loading="lazy" style="position:absolute;width:' + cote.toFixed(2) +
             'px;height:' + cote.toFixed(2) + 'px;left:' +
             ((tx * T - demi - tg0) / v.m).toFixed(2) + 'px;top:' +
@@ -18592,11 +18653,20 @@ function htmlDeclarations() {
   var baseCot = brut ? caAn.total : caAn.totalApres;
   var imp = FIN.impotEstime(caAn.totalApres, A.cfg);
   var cot = FIN.arr(baseCot * tCot / 100, 2);
+  var virg = function (x) { return esc(String(x).replace('.', ',')); };
+  var vlCoche = A.cfg.vlDepuis != null && A.cfg.vlDepuis !== '';
+  var vlTaux = FIN.versementLiberatoire(caAn, A.cfg);
+  var vl = FIN.vlApplicable(A.cfg, an) ? vlTaux : null;
+  var impTotal = vl ? vl.total : imp.total;
   h += '<div class="carte"><h2>Cotisations et impôt — année ' + an + '</h2>' +
-    '<p class="muted" style="font-size:12px;margin:0 0 10px">Une estimation avec vos taux, sur la ' +
-    'base après abattement (' + eur(caAn.totalApres) + '). D’autres revenus consommant déjà la ' +
-    'tranche à 0 %, cette base entre directement dans celle à ' + esc(String(imp.t1).replace('.', ',')) +
-    ' %. Rien d’officiel : ni l’Urssaf, ni les impôts, ni un comptable.</p>' +
+    '<p class="muted" style="font-size:12px;margin:0 0 10px">' +
+    (vl
+      ? 'Une estimation avec vos taux. En ' + an + ', l’impôt passe au versement libératoire : un ' +
+        'pourcentage du chiffre d’affaires brut (' + eur(caAn.total) + '), sans abattement ni tranche.'
+      : 'Une estimation avec vos taux, sur la base après abattement (' + eur(caAn.totalApres) + '). ' +
+        'Si d’autres revenus du foyer consomment déjà la tranche à 0 %, cette base entre directement ' +
+        'dans celle à ' + virg(imp.t1) + ' %.') +
+    ' Rien d’officiel : ni la MSA, ni les impôts, ni un comptable.</p>' +
     '<div class="grille g2">' +
     '<div class="champ"><label class="eyebrow" for="decl-cot">Cotisations (%)</label>' +
     '<input type="text" id="decl-cot" inputmode="decimal" placeholder="25" value="' +
@@ -18606,22 +18676,44 @@ function htmlDeclarations() {
     '<option value="abattu"' + (brut ? '' : ' selected') + '>montant après abattement</option>' +
     '<option value="brut"' + (brut ? ' selected' : '') + '>chiffre d’affaires brut</option>' +
     '</select></div>' +
+    /* Les champs du barème restent là même au versement libératoire : ils
+       servent aux années d'avant, qu'on relit en changeant d'année. */
     '<div class="champ"><label class="eyebrow" for="decl-cap">Reste dans la tranche (€)</label>' +
-    '<input type="text" id="decl-cap" inputmode="decimal" value="' + imp.capacite + '"></div>' +
+    '<input type="text" id="decl-cap" inputmode="decimal" placeholder="à renseigner" value="' +
+    (imp.capacite != null ? imp.capacite : '') + '"></div>' +
     '<div class="champ"><label class="eyebrow" for="decl-t1">Taux de la tranche (%)</label>' +
-    '<input type="text" id="decl-t1" inputmode="decimal" value="' + String(imp.t1).replace('.', ',') + '"></div>' +
+    '<input type="text" id="decl-t1" inputmode="decimal" value="' + virg(imp.t1) + '"></div>' +
     '<div class="champ"><label class="eyebrow" for="decl-t2">Taux au-delà (%)</label>' +
-    '<input type="text" id="decl-t2" inputmode="decimal" value="' + String(imp.t2).replace('.', ',') + '"></div>' +
+    '<input type="text" id="decl-t2" inputmode="decimal" value="' + virg(imp.t2) + '"></div>' +
     '</div>' +
+    '<label class="ligne-check" style="display:flex;align-items:center;gap:8px;font-size:13.5px;' +
+    'margin:4px 0 8px"><input type="checkbox" id="decl-vl"' + (vlCoche ? ' checked' : '') + '> ' +
+    'Versement libératoire</label>' +
+    (vlCoche ? '<div class="grille g3">' +
+      '<div class="champ"><label class="eyebrow" for="decl-vl-an">À partir de</label>' +
+      '<input type="text" id="decl-vl-an" inputmode="numeric" value="' + esc(String(A.cfg.vlDepuis)) + '"></div>' +
+      '<div class="champ"><label class="eyebrow" for="decl-vl-tp">Prestations (%)</label>' +
+      '<input type="text" id="decl-vl-tp" inputmode="decimal" value="' + virg(vlTaux.tauxPresta) + '"></div>' +
+      '<div class="champ"><label class="eyebrow" for="decl-vl-tv">Ventes (%)</label>' +
+      '<input type="text" id="decl-vl-tv" inputmode="decimal" value="' + virg(vlTaux.tauxVente) + '"></div>' +
+      '</div>' : '') +
     '<div class="kpi" style="margin-top:4px">' +
     '<div class="carte2"><b class="num">' + (tCot ? eur(cot) : '—') + '</b><small>cotisations sur ' +
     eur(baseCot) + '</small></div>' +
-    '<div class="carte2"><b class="num">' + eur(imp.total) + '</b><small>impôt estimé</small></div>' +
-    '<div class="carte2"><b class="num">' + eur(FIN.arr((tCot ? cot : 0) + imp.total, 2)) +
+    '<div class="carte2" id="decl-impot"><b class="num">' + (impTotal != null ? eur(impTotal) : '—') +
+    '</b><small>' + (vl ? 'versement libératoire' : 'impôt estimé') + '</small></div>' +
+    '<div class="carte2"><b class="num">' + eur(FIN.arr((tCot ? cot : 0) + (impTotal || 0), 2)) +
     '</b><small>ensemble</small></div></div>' +
-    (imp.base2 ? '<p class="muted" style="font-size:11.5px;margin:9px 0 0">Dont ' + eur(imp.base1) + ' à ' +
-      esc(String(imp.t1).replace('.', ',')) + ' % et ' + eur(imp.base2) + ' à ' +
-      esc(String(imp.t2).replace('.', ',')) + ' %.</p>' : '') + '</div>';
+    (vl
+      ? '<p class="muted" style="font-size:11.5px;margin:9px 0 0">Dont ' + eur(vl.prestation) +
+        ' sur les prestations à ' + virg(vl.tauxPresta) + ' % et ' + eur(vl.vente) +
+        ' sur les ventes à ' + virg(vl.tauxVente) + ' %.</p>'
+      : imp.total == null
+        ? '<p class="muted" style="font-size:11.5px;margin:9px 0 0">Indiquez ce qu’il reste dans la ' +
+          'tranche à ' + virg(imp.t1) + ' % : sans ce nombre, l’impôt ne s’estime pas.</p>'
+        : imp.base2 ? '<p class="muted" style="font-size:11.5px;margin:9px 0 0">Dont ' + eur(imp.base1) +
+          ' à ' + virg(imp.t1) + ' % et ' + eur(imp.base2) + ' à ' + virg(imp.t2) + ' %.</p>' : '') +
+    '</div>';
 
   /* Le suivi. « Payé » était faux pour la TVA : il ne la paie pas, il la
      reverse — ou la récupère quand ses achats en portaient plus que ses
@@ -20153,7 +20245,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.83.0-20260915-1922';
+var VERSION = '4.83.0-20260915-2015';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

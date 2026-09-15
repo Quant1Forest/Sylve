@@ -159,6 +159,10 @@ scenario('Import CSV : le stock retombe sur les chiffres du tableur', async () =
   }
   const lignes = t.$$('#stock-table tbody tr').map(r => [...r.children].map(c => c.textContent.trim()));
   const par = n => lignes.find(l => l[0].indexOf(n) === 0);
+  /* Les exemples sont inventés depuis la 4.83 — les anciens portaient les
+     quantités et les prix de son vrai stock. Les valeurs attendues ont été
+     recalculées à part, par la règle écrite dans index.html, après avoir
+     vérifié que ce calcul retrouvait exactement celles des anciens fichiers. */
   verifier('gaine 14×120 : coût unitaire réel', '0,8905', par('Gaine de protection 14*120')[5]);
   verifier('tuteur châtaignier : coût unitaire réel', '0,7325', par('Tuteur en châtaignier')[5]);
   verifier('tuteur acacia : stock futur', '500', par('Tuteur en Acacia')[4]);
@@ -2738,7 +2742,7 @@ scenario('Listes : le nom se propose en quittant le champ, pas à la validation'
 
 /* --------------------------------------------------------------------- */
 scenario('Inventaire : on n’additionne pas des millilitres avec des pièces', async () => {
-  /* des dizaines de milliers « achetés » sur du répulsif au millilitre et des tuteurs à la pièce
+  /* Un « acheté » qui cumule du répulsif au millilitre et des tuteurs à la pièce
      ne veut rien dire. Même règle que les journées et les plants. */
   const t = await ouvrir(Object.assign({}, VIDE, {
     module: 'stock',
@@ -4428,6 +4432,39 @@ scenario('Carnet : les filtres dans l’ordre dicté, et ce qui reste à faire',
 });
 
 /* --------------------------------------------------------------------- */
+scenario('Carnet : filtrer par famille de travaux', async () => {
+  /* « Je me perds dans les chantiers » — l'idée du 23 août, retenue le 15
+     septembre : « toujours utile, on peut le mettre carrément ». Un chantier
+     figure sous chaque famille dont il porte une ligne, et la famille suit
+     les réglages. */
+  const ch = (id, travaux) => ({ id, statut: 'encours', aDevis: false, proprietaire: 'Client ' + id,
+    temps: [], jours: [], maj: Date.now(),
+    lignes: travaux.map(tv => ({ travail: tv, unite: 'ha', quantite: 1, prix: 100, nature: 'prestation' })) });
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    /* Le dégagement est rangé en gestion dans ses réglages : c'est ce
+       rangement-là que le filtre doit suivre, pas celui livré. */
+    cfg: { travauxPerso: { DEGAG: { cat: 'gestion' } } },
+    chantiers: [ch('p', ['PLANT']), ch('s', ['DEGAG']), ch('m', ['PLANT', 'PROTEC']), ch('v', [])]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(350);
+  const groupe = t.$$('#c-filtre optgroup').filter(g => g.getAttribute('label') === 'Familles de travaux')[0];
+  verifierVrai('un groupe « Familles de travaux »', !!groupe);
+  const valeurs = groupe ? [...groupe.querySelectorAll('option')].map(o => o.value) : [];
+  verifierVrai('la plantation y est', valeurs.indexOf('fam:plantation') >= 0);
+  verifierVrai('une famille sans chantier n’y est pas', valeurs.indexOf('fam:exploitation') < 0);
+
+  const garde = async q => {
+    t.choisir('#c-filtre', q); await t.pause(250);
+    return [...new Set(t.$$('#liste-chantiers [data-chouvrir]').map(b => b.dataset.chouvrir))].sort();
+  };
+  verifier('la plantation : les deux qui en portent', ['m', 'p'], await garde('fam:plantation'));
+  verifier('la protection gibier : celui qui mêle les deux', ['m'], await garde('fam:gibier'));
+  verifier('la famille suit ses réglages', ['s'], await garde('fam:gestion'));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
 scenario('Ma journée : le temps total, le productif, le trajet — et plus de case « non facturée »', async () => {
   /* « Journée non facturée au-dessus, ça on peut l'enlever, ça sert plus à
      rien. » Et : « il faudrait juste le temps total, et le temps productif.
@@ -5184,21 +5221,99 @@ scenario('Déclarations : le mois, la TVA de l’année, l’impôt par tranches
 });
 
 /* --------------------------------------------------------------------- */
-scenario('Déclarations : l’impôt commence dans la tranche à 11 %', async () => {
-  /* D’autres revenus consomment la tranche à 0 % : la base d'ici entre
-     directement à 11 %, puis bascule à 30 % au-delà de la capacité. */
+scenario('Déclarations : l’impôt commence dans la tranche à 11 %, et sa capacité est à lui', async () => {
+  /* Quand d'autres revenus consomment la tranche à 0 %, la base d'ici entre
+     directement à 11 %, puis bascule à 30 % au-delà de ce qu'il reste dans
+     la tranche.
+
+     Ce reste avait une valeur par défaut, tirée de sa situation — dans un
+     dépôt public. « Faut les enlever. » Sans valeur saisie, rien ne
+     s'invente. */
   const t = await ouvrir(VIDE);
   const FIN = t.w.BCF;
-  const sous = FIN.impotEstime(10000, {});
+  const vide = FIN.impotEstime(20000, {});
+  verifier('sans capacité saisie, pas d’impôt inventé', null, vide.total);
+  verifier('et pas de capacité non plus', null, vide.capacite);
+  const cap = { impotCapacite: 15000 };
+  const sous = FIN.impotEstime(10000, cap);
   verifier('sous la capacité, tout est à 11 %', 1100, sous.total);
   verifier('rien dans la seconde tranche', 0, sous.tranche2);
-  const dessus = FIN.impotEstime(20000, {});
-  verifier('la première tranche se remplit', 20000, dessus.base1);
-  verifier('à 11 %', 2200, dessus.tranche1);
-  verifier('le reste passe à 30 %', 0, dessus.tranche2);
-  verifier('et le total suit', 2200, dessus.total);
+  const dessus = FIN.impotEstime(20000, cap);
+  verifier('la première tranche se remplit', 15000, dessus.base1);
+  verifier('à 11 %', 1650, dessus.tranche1);
+  verifier('le reste passe à 30 %', 1500, dessus.tranche2);
+  verifier('et le total suit', 3150, dessus.total);
   const sien = FIN.impotEstime(20000, { impotCapacite: 15000, impotTaux1: 12, impotTaux2: 31 });
   verifier('ses propres nombres priment', 1800 + 1550, sien.total);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Déclarations : le versement libératoire, à partir de son année', async () => {
+  /* « Je vais sûrement passer au versement libératoire pour l'an prochain :
+     un simple truc à cocher, basculer du barème progressif au versement
+     libératoire. » Les années d'avant restent au barème : cocher ne réécrit
+     pas les estimations passées. */
+  const an = new Date().getFullYear();
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'finances', cfg: { impotCapacite: 15000 },
+    chantiers: [{ id: 'c1', statut: 'facture', aDevis: false, proprietaire: 'Client',
+      temps: [], jours: [], maj: Date.now(), numeroFacture: 'F-1', dateFacture: Date.now(),
+      lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 1, prix: 1000, nature: 'prestation' },
+        { travail: 'F_TUTEUR', unite: 'unite', quantite: 1, prix: 200, nature: 'vente' }] }]
+  }));
+  t.clic('[data-vue="analyses"]'); await t.pause(350);
+  t.clic('[data-ana="declarations"]'); await t.pause(400);
+  const impot = () => t.texte('#decl-impot');
+  verifierVrai('au départ, l’impôt est au barème', /impôt estimé/.test(impot()));
+  verifierVrai('la case existe, décochée', t.$('#decl-vl') && !t.$('#decl-vl').checked);
+
+  /* Cocher vise l'an prochain : l'année en cours ne bouge pas. */
+  t.$('#decl-vl').checked = true;
+  t.$('#decl-vl').dispatchEvent(new t.w.Event('change', { bubbles: true }));
+  await t.pause(400);
+  verifier('cocher vise l’an prochain', an + 1, (t.stock('cfg') || {}).vlDepuis);
+  verifierVrai('et cette année reste au barème', /impôt estimé/.test(impot()));
+
+  /* À partir de cette année : 1 000 € de prestations à 1,7 %, 200 € de ventes
+     à 1 %, sur le brut. */
+  t.choisir('#decl-vl-an', String(an)); await t.pause(400);
+  verifierVrai('cette année passe au versement libératoire', /versement libératoire/.test(impot()));
+  verifierVrai('dix-neuf euros', /^19 €/.test(impot()));
+  const txt = t.texte('#ana-corps');
+  verifierVrai('dont les prestations à 1,7 %', /17 € sur les prestations à 1,7 %/.test(txt));
+  verifierVrai('et les ventes à 1 %', / 2 € sur les ventes à 1 %/.test(txt));
+
+  /* Les taux sont les siens. */
+  t.choisir('#decl-vl-tp', '2'); await t.pause(400);
+  verifierVrai('un taux changé est pris', /20 € sur les prestations à 2 %/.test(t.texte('#ana-corps')));
+  verifier('et retenu', 2, (t.stock('cfg') || {}).vlTauxPresta);
+
+  /* Décocher revient au barème. */
+  t.$('#decl-vl').checked = false;
+  t.$('#decl-vl').dispatchEvent(new t.w.Event('change', { bubbles: true }));
+  await t.pause(400);
+  verifierVrai('décocher revient au barème', /impôt estimé/.test(impot()));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Déclarations : sans capacité saisie, l’écran dit ce qui manque', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'finances',
+    chantiers: [{ id: 'c1', statut: 'facture', aDevis: false, proprietaire: 'Client',
+      temps: [], jours: [], maj: Date.now(), numeroFacture: 'F-1', dateFacture: Date.now(),
+      lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 1, prix: 1000, nature: 'prestation' }] }]
+  }));
+  t.clic('[data-vue="analyses"]'); await t.pause(350);
+  t.clic('[data-ana="declarations"]'); await t.pause(400);
+  verifier('le champ est vide', '', t.$('#decl-cap').value);
+  verifierVrai('l’impôt ne s’invente pas', /—/.test(t.texte('#decl-impot')));
+  verifierVrai('et l’écran dit ce qui manque',
+    /Indiquez ce qu’il reste dans la tranche/.test(t.texte('#ana-corps')));
+  t.choisir('#decl-cap', '15000'); await t.pause(400);
+  verifier('saisie, elle est retenue', 15000, (t.stock('cfg') || {}).impotCapacite);
+  verifierVrai('et l’impôt s’estime', /€/.test(t.texte('#decl-impot')));
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -6909,7 +7024,7 @@ scenario('Clients : un nom nouveau se range par type, et le SIREN suit', async (
 
 /* --------------------------------------------------------------------- */
 scenario('Clients : sans type, on ne retire rien — le SIREN reste proposé', async () => {
-  /* Les des dizaines de chantiers déjà saisis n'ont aucun type. Tant qu'on ne
+  /* Les chantiers déjà saisis n'ont aucun type. Tant qu'on ne
      sait pas ce qu'est quelqu'un, on ne lui retire rien : la case reste. */
   const t = await ouvrir(Object.assign({}, VIDE, {
     module: 'chantiers',
@@ -7277,6 +7392,10 @@ scenario('Carte : photo aérienne ou carte IGN, et plus de contours', async () =
   const src = tuiles()[0].getAttribute('src');
   verifierVrai('à la Géoplateforme', /^https:\/\/data\.geopf\.fr\/wmts\?/.test(src));
   verifierVrai('en photo aérienne', /LAYER=ORTHOIMAGERY\.ORTHOPHOTOS/.test(src));
+  /* En CORS : une réponse opaque pèserait des Mo dans le quota, et le service
+     worker ne pourrait pas la garder pour hors réseau. */
+  verifier('demandée en CORS, pour pouvoir la garder', 'anonymous',
+    tuiles()[0].getAttribute('crossorigin'));
   verifierVrai('dans la grille des tuiles du web', /TILEMATRIXSET=PM/.test(src));
   /* Une tuile porte son niveau, sa ligne et sa colonne : sans les trois, elle
      ne désigne rien. */
@@ -7327,7 +7446,7 @@ scenario('Carte : un téléphone réglé sur « contours seuls » retombe sur la
 scenario('Carte : « Ma position » y va, au lieu d’y poser un point', async () => {
   /* « Il faudrait juste un bouton pour pouvoir zoomer sur soi-même. » Le
      bouton posait un point bleu quelque part et n'y allait pas : sur une
-     carte de six départements, autant ne rien poser. */
+     carte de France, autant ne rien poser. */
   const t = await ouvrir(Object.assign({}, VIDE, {
     module: 'calendrier',
     chantiers: [{ id: 'c1', proprietaire: 'Loin', statut: 'encours', aDevis: false,
