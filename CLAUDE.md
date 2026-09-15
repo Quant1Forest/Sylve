@@ -2166,7 +2166,9 @@ déjà, il imprime le plan qu’on lui donne et l’agrafe.
 
 **Reste ouvert** : joindre une photo au chantier — capture d’écran d’une carte
 faite à la maison, ou photo du plan papier. `reduireImage()` sait déjà le
-faire pour le logo. Proposé, pas demandé.
+faire pour le logo. Le 15 septembre : *« c’est surtout pour la fiche de
+chantier, ajouter une photo, un plan — on le met de côté, on garde en
+mémoire »*.
 
 ## Un jour, un statut, une pastille
 
@@ -2910,18 +2912,27 @@ au-dessus des prestations *et* La création d'un chantier.
 
 **Garé, à ne pas rouvrir sans lui :**
 
-- **La fiche annuelle récapitulative en PDF** — chiffre d'affaires, bénéfices,
-  fiscalité, top clients et produits, comparaison sur cinq ans. Il l'a décrite
-  puis mise de côté. L'analyse annuelle du stock en porte déjà la moitié des
-  chiffres.
+- **La fiche annuelle récapitulative en PDF — le prochain chantier.** Chiffre
+  d'affaires, bénéfices, fiscalité, top clients et produits, comparaison sur
+  cinq ans. Décrite puis mise de côté ; le 15 septembre : *« on travaillera sur
+  la fiche annuelle PDF, qui est intéressante parce qu'on arrive à la fin
+  d'année bientôt »*. L'analyse annuelle du stock en porte déjà la moitié des
+  chiffres. À commencer par une maquette.
 - **Le chantier des rendements** (voir plus haut). Toujours garé.
 
 **Jamais bouclé :**
 
 - **La boucle estimation → chantier → agenda.** Touche Rendements et Calendrier.
-  Il a dit vouloir garder l'estimation « pour la toute fin ».
+  Il a dit vouloir garder l'estimation « pour la toute fin ». Rappelé le 15
+  septembre : à garder en mémoire, il y reviendra.
 - **La revue de Calendrier et Rendements** : jamais parcourus avec lui.
-  Chantiers, Finances, Stock et Réglages l'ont été.
+  Chantiers, Finances, Stock et Réglages l'ont été. Même réponse le 15
+  septembre.
+- **La lecture des tickets de caisse.** Il veut essayer d'abord la lecture
+  dans le téléphone (rien ne sort), et Mistral le tente ensuite — *« une
+  entreprise française »* — sans vouloir payer pour un usage aussi rare.
+  L'essai demande de récupérer Tesseract (licences Apache et MIT) : **accord
+  demandé pour le téléchargement, pas encore donné**.
 - **Les lignes de chantier reprises du carnet ne désignent aucun article.**
   Ne pas les rattacher : leur sortie de stock existe déjà, importée du
   classeur. Une garde empêche la double déduction, mais la tentation
