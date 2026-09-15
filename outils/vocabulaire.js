@@ -48,7 +48,7 @@ module.exports = {
   /* ouvrirJournee, validerCommePrevu, migrerJournees. Le chantier porte
      `foret` : une journée, elle, a bien un `lieu`. */
   journees: ['id', 'date', 'chantier', 'lieu', 'commune', 'km', 'nonProd',
-    'personnes', 'sansMoi', 'fin', 'nonFacture', 'postes'],
+    'personnes', 'sansMoi', 'fin', 'nonFacture', 'postes', 'trajet'],
 
   articles: ['id', 'maj', 'nom', 'type', 'unite', 'dosage', 'prix', 'seuil',
     'fournisseur', 'note', 'mouvements'],

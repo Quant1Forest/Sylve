@@ -3662,7 +3662,11 @@ function mesJours(t, cfg) {
 function heuresPostes(j) {
   return arr(((j && j.postes) || []).reduce(function (s, p) { return s + nb(p.heures); }, 0), 2);
 }
-function heuresJournee(j) { return arr(heuresPostes(j) + nb(j && j.nonProd), 2); }
+/* Le trajet compte dans la journée, comme le hors production : il n'entre
+   jamais dans un rendement, mais c'est du temps donné au chantier. */
+function heuresJournee(j) {
+  return arr(heuresPostes(j) + nb(j && j.nonProd) + nb(j && j.trajet), 2);
+}
 function joursJournee(j, cfg) { return arr(heuresJournee(j) / HEURES_JOUR(cfg), 3); }
 
 /* Le prix de journée visé : réglage général, redéfini au devis si le
@@ -7941,6 +7945,11 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.83', quoi: [
+    { t: 'Ma journee : le temps total, les heures productives et le trajet', vue: 'calendrier' },
+    { t: 'Le hors production se calcule seul : total moins productif', vue: 'calendrier' },
+    { t: 'Mon entreprise : une bulle qui ne compte qu un chantier ouvre sa fiche' }
+  ] },
   { v: '4.82', quoi: [
     { t: 'Carte : chercher une commune, et le doigt ne se bloque plus au bout d un moment', vue: 'carte' },
     { t: 'Les contours de communes sont partis : photo aerienne ou carte IGN', vue: 'carte' },
@@ -7962,11 +7971,6 @@ var NOTES_MAJ = [
   { v: '4.79', quoi: [
     { t: 'Un reglage pour garder l ecran allume quand Sylve est devant', vue: 'reglages' },
     { t: 'Il dit ce que le telephone a repondu : un mode d economie peut refuser', vue: 'reglages' }
-  ] },
-  { v: '4.78', quoi: [
-    { t: 'Le prix de journee attend que le chantier soit fini pour se montrer', vue: 'chantier' },
-    { t: 'Rendements : plus de pastilles, les lignes s alignent enfin', vue: 'rendements' },
-    { t: 'Et un tri : alphabetique, du plus recent, du plus de chantiers', vue: 'rendements' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -9085,6 +9089,11 @@ function brancher() {
     if (ou === 'calendrier') { allerModule('calendrier', 'calendrier'); return; }
     if (ou === 'finances') { allerModule('finances', 'finances'); return; }
     if (ou === 'depenses') { allerModule('finances', 'depenses'); return; }
+    /* « Les bulles qui mènent droit à la fiche » : une liste d'un seul
+       chantier, c'est un appui de plus pour rien. La bulle compte par statut,
+       le raccourci aussi. */
+    var seuls = A.chantiers.filter(function (c) { return c.statut === ou; });
+    if (seuls.length === 1) { ouvrirChantier(seuls[0].id); return; }
     A.filtreCh = ou; A.rechCh = '';
     if ($('#c-rech')) $('#c-rech').value = '';
     renderFiltreChantiers(); renderListeChantiers();
@@ -15204,15 +15213,9 @@ function prochaineJourneeHtml() {
     '</span></button>';
 }
 
-/* « À traiter » porte deux choses de nature différente, dans cet ordre.
-   D'abord les trois avertissements qui portent un nom de chantier : en
-   retard, terminé mais pas facturé, facturé mais pas réglé. Ce n'est pas un
-   doublon des bulles — la bulle donne le compte et le montant, l'alerte dit
-   lequel et depuis quand, et c'est justement ce qu'on veut savoir d'un
-   impayé. Ensuite les notes qu'il s'écrit à lui-même, qui restent tant qu'il
-   ne les efface pas.
-   Le reste a trouvé sa place ailleurs : les devis sans réponse sur l'accueil,
-   les journées à placer et le travail qui approche dans les bulles. */
+/* Les notes qu'il s'écrit à lui-même, sous les tuiles de l'écran
+   Entreprise. Elles restent tant qu'il ne les efface pas. « À traiter » a
+   quitté cet écran en 4.82 : le carnet le porte. */
 var COUL_NOTE = [
   { c: '#B4231F', n: 'rouge' }, { c: '#C4611B', n: 'orange' },
   { c: '#B98A00', n: 'or' }, { c: '#2E7D46', n: 'vert' },
@@ -16277,10 +16280,13 @@ function retirerSaisie(t) {
     });
     if (!ote) return false;
   } else {
+    /* Le hors production et le trajet entrent ensemble dans le chantier,
+       en une seule saisie sans activité : la retirer retire les deux. */
     j.nonProd = 0;
+    j.trajet = 0;
   }
   /* Une journée sans poste ni temps mort ne dit plus rien : elle s'en va. */
-  if (!(j.postes || []).length && !C.nb(j.nonProd)) {
+  if (!(j.postes || []).length && !C.nb(j.nonProd) && !C.nb(j.trajet)) {
     A.journees = (A.journees || []).filter(function (x) { return x.id !== j.id; });
   }
   return true;
@@ -16303,10 +16309,11 @@ function indexerJournees() {
         activite: p.travaux || null, quantite: C.nb(p.quantite) || undefined, jrn: j.id });
       premier = false;
     });
-    /* Le trajet et les temps morts comptent dans la journée facturée mais
+    /* Le trajet et le hors production comptent dans la journée facturée mais
        jamais dans le rendement : ils entrent sans activité. */
-    if (C.nb(j.nonProd) > 0) {
-      c.temps.push({ date: j.date, duree: C.nb(j.nonProd), unite: 'h', personnes: pers,
+    var sansActivite = C.arr(C.nb(j.nonProd) + C.nb(j.trajet), 2);
+    if (sansActivite > 0) {
+      c.temps.push({ date: j.date, duree: sansActivite, unite: 'h', personnes: pers,
         sansMoi: (j.sansMoi || hors) || undefined, nonFacture: hors || undefined,
         km: premier ? (C.nb(j.km) || undefined) : undefined,
         activite: null, jrn: j.id });
@@ -16356,7 +16363,7 @@ function renderPostes() {
       optionsTravaux(p.travaux, { vide: true, sansFournitures: true }) + '</select>' +
       (pst.length > 1 ? '<button type="button" class="btn-min" data-pstsup="' + i + '">✕</button>' : '') +
       '</div><div class="grille g2">' +
-      '<div class="champ" style="margin:0"><label class="eyebrow">Heures</label>' +
+      '<div class="champ" style="margin:0"><label class="eyebrow">Heures productives</label>' +
       '<input type="text" data-psth="' + i + '" class="gros" inputmode="decimal" value="' + esc(p.heures) + '"></div>' +
       '<div class="champ" style="margin:0"><label class="eyebrow">Fait' + (u ? ' (' + esc(u) + ')' : '') + '</label>' +
       '<input type="text" data-pstq="' + i + '" class="gros" inputmode="decimal" value="' + esc(p.quantite) + '"></div>' +
@@ -16419,18 +16426,24 @@ function ouvrirJournee(id, modele) {
     '<input type="text" id="mj-commune" list="lieux-connus" autocomplete="off" value="' +
     esc((src && src.commune) || '') + '"></div>' +
     '</div>' +
+    /* « Il faudrait juste le temps total, et le temps productif. Et après, si
+       je peux rajouter le temps de trajet. » Le productif, ce sont les heures
+       des prestations — elles font les rendements. Le hors production s'en
+       déduit (affûtage, réglage, panne) et ne se tape plus. Le trajet reste
+       à part : il ne se passe pas sur le chantier. */
+    '<div class="champ" style="margin-top:6px"><label class="eyebrow" for="mj-total">' +
+    'Temps total sur le chantier</label>' +
+    '<input type="text" id="mj-total" class="gros" inputmode="decimal" ' +
+    'placeholder="heures, trajet non compris" value="' +
+    (j && C.arr(C.heuresPostes(j) + C.nb(j.nonProd), 2) > 0
+      ? C.arr(C.heuresPostes(j) + C.nb(j.nonProd), 2) : '') + '"></div>' +
     '<label class="eyebrow" style="margin-top:6px;display:block">Ce que j’ai fait</label>' +
     '<div id="mj-postes"></div>' +
-    /* Ce qu'il demandait existait sous un nom qui ne le disait pas : une
-       tronçonneuse à régler, une chaîne à affûter, ce n'est pas un « temps
-       mort » à ses yeux. Les heures des prestations sont les productives. */
-    '<label class="eyebrow" style="margin-top:11px;display:block">Hors production</label>' +
-    '<p class="muted" style="font-size:11.5px;margin:0 0 6px">Trajet, affûtage, réglage, ' +
-    'panne : le temps passé sur la journée sans avancer le travail.</p>' +
-    '<div class="grille g3">' +
-    '<div class="champ" style="margin:0"><label class="eyebrow" for="mj-nonprod">Heures</label>' +
-    '<input type="text" id="mj-nonprod" inputmode="decimal" value="' +
-    (j && C.nb(j.nonProd) ? j.nonProd : '') + '"></div>' +
+    '<p class="muted" id="mj-horsprod" style="font-size:12px;margin:6px 0 0"></p>' +
+    '<div class="grille g3" style="margin-top:11px">' +
+    '<div class="champ" style="margin:0"><label class="eyebrow" for="mj-trajet">Trajet (h)</label>' +
+    '<input type="text" id="mj-trajet" inputmode="decimal" value="' +
+    (j && C.nb(j.trajet) ? j.trajet : '') + '"></div>' +
     '<div class="champ" style="margin:0"><label class="eyebrow" for="mj-km">Kilomètres</label>' +
     '<input type="text" id="mj-km" inputmode="decimal" value="' +
     (src && C.nb(src.km) ? src.km : '') + '"></div>' +
@@ -16450,9 +16463,17 @@ function ouvrirJournee(id, modele) {
 
   var apercu = function () {
     var z = $('#mj-apercu'); if (!z) return;
-    var prod = pst.reduce(function (s, p) { return s + C.nb(p.heures); }, 0);
-    var np = C.nb($('#mj-nonprod').value);
-    var tot = prod + np;
+    var prod = C.arr(pst.reduce(function (s, p) { return s + C.nb(p.heures); }, 0), 2);
+    var total = C.nb($('#mj-total').value), trajet = C.nb($('#mj-trajet').value);
+    var np = total > prod ? C.arr(total - prod, 2) : 0;
+    var hp = $('#mj-horsprod');
+    if (hp) {
+      hp.textContent = total && total < prod
+        ? 'Le temps total est plus court que les heures productives.'
+        : np ? E.fmt(prod, 2) + ' h productives, ' + E.fmt(np, 2) +
+          ' h hors production — affûtage, réglage, panne.' : '';
+    }
+    var tot = Math.max(total, prod) + trajet;
     if (tot <= 0) { z.innerHTML = '<span class="muted">Indiquez vos heures.</span>'; return; }
     var pers = C.nb($('#mj-pers').value) || 1;
     var jrs = tot / C.HEURES_JOUR(A.cfg);
@@ -16464,6 +16485,7 @@ function ouvrirJournee(id, modele) {
       (nf ? ' <span class="retard">non facturée</span>' : '') +
       '<div class="muted" style="font-size:12.5px;margin-top:3px">' +
       E.fmt(prod, 2) + ' h productives' + (np ? ' · ' + E.fmt(np, 2) + ' h hors production' : '') +
+      (trajet ? ' · ' + E.fmt(trajet, 2) + ' h de trajet' : '') +
       (pers > 1 ? ' · ' + pers + ' personnes' : '') +
       (nf ? ' · compte pour le rendement seulement'
           : pj ? ' · ' + eur(C.arr(jrs * pj, 2)) + ' à ' + eur(pj) + '/j' : '') + '</div>' +
@@ -16486,7 +16508,7 @@ function ouvrirJournee(id, modele) {
     else return;
     renderPostes(); apercu();
   });
-  ['#mj-nonprod', '#mj-pers'].forEach(function (x) { $(x).addEventListener('input', apercu); });
+  ['#mj-total', '#mj-trajet', '#mj-pers'].forEach(function (x) { $(x).addEventListener('input', apercu); });
   $('#mj-ch').addEventListener('change', function () {
     var c = $('#mj-ch').value ? chantier($('#mj-ch').value) : null;
     if (!c) { apercu(); return; }
@@ -16496,8 +16518,9 @@ function ouvrirJournee(id, modele) {
     if (c.foret && !$('#mj-lieu').value) $('#mj-lieu').value = c.foret;
     if (c.commune && !$('#mj-commune').value) $('#mj-commune').value = c.commune;
     /* Les kilomètres du dernier trajet vers ce chantier : c'est la même
-       route. Estimer une distance entre deux communes demanderait une carte,
-       que l'application n'a pas — mais elle a sa propre mémoire. */
+       route. Estimer une distance entre deux communes demanderait un calcul
+       d'itinéraire, que l'application ne fait pas — mais elle a sa propre
+       mémoire. */
     if (!$('#mj-km').value) {
       var km = kmHabituels(c.id);
       if (km) $('#mj-km').value = km;
@@ -16534,14 +16557,23 @@ function ouvrirJournee(id, modele) {
       .map(function (p) {
         return { travaux: p.travaux, heures: C.nb(p.heures), quantite: C.nb(p.quantite) || 0 };
       });
-    var np = C.nb($('#mj-nonprod').value);
-    if (!postes.length && np <= 0) { toast('Indiquez au moins une prestation.'); return; }
+    var prod = C.arr(postes.reduce(function (s, p) { return s + p.heures; }, 0), 2);
+    var total = C.nb($('#mj-total').value), trajet = C.nb($('#mj-trajet').value);
+    /* Un total plus court que le productif ne peut pas être juste : l'un des
+       deux est mal tapé, et deviner lequel fausserait les rendements. */
+    if (total && total < prod) {
+      toast('Le temps total est plus court que les heures productives.'); return;
+    }
+    var np = total > prod ? C.arr(total - prod, 2) : 0;
+    if (!postes.length && np <= 0 && trajet <= 0) {
+      toast('Indiquez au moins une prestation ou un temps.'); return;
+    }
     var maj = {
       date: versDate($('#mj-date').value) || Date.now(),
       chantier: $('#mj-ch').value || null, lieu: $('#mj-lieu').value.trim(),
       commune: $('#mj-commune').value.trim(),
       nonFacture: !!(j && j.nonFacture),
-      km: C.nb($('#mj-km').value) || 0, nonProd: np,
+      km: C.nb($('#mj-km').value) || 0, nonProd: np, trajet: trajet || 0,
       personnes: C.nb($('#mj-pers').value) || 1,
       fin: !!$('#mj-fin').checked, note: $('#mj-note').value.trim(),
       postes: postes, maj: Date.now()
@@ -20119,7 +20151,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.82.0-20260915-1834';
+var VERSION = '4.83.0-20260915-1922';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

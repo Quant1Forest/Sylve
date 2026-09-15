@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.82.0-20260915-1834**
+Version courante : **4.83.0-20260915-1922**
 
 ---
 
@@ -51,7 +51,7 @@ npm run controle   # vérificateur + service worker + tests + reconstruction + c
 ```
 
 Doit afficher **« Bon pour livraison »**, puis **« le service worker tient »**
-(24 vérifications), puis la suite au vert — 1766 à ce jour — puis
+(24 vérifications), puis la suite au vert — 1775 à ce jour — puis
 **« Sylve.html est conforme »**.
 
 Compter **moins de deux minutes**. Ça a été dix, et deux choses l'expliquaient :
@@ -539,6 +539,11 @@ j'ai directement tous mes onglets, je ne suis pas obligé de défiler. Et il y a
 la même partie À traiter dans le carnet. »* « À traiter » a quitté l'écran ;
 celui du carnet porte désormais le montant de chaque alerte, qui ne vivait
 qu'ici. Ce qui suit décrit l'état d'avant, et reste vrai pour les bulles.
+
+**Une bulle qui ne compte qu'un chantier ouvre sa fiche** (4.83) : *« les
+bulles qui mènent droit à la fiche »*. Une liste d'un seul chantier, c'est un
+appui de plus pour rien. Le raccourci compte par statut, exactement comme la
+bulle — sinon il ouvrirait une fiche quand la bulle en annonce deux.
 
 **Une note va à la ligne** (`<textarea>`, `white-space: pre-line` sur
 `.note-texte`) : *« j'ai ce chantier, ce chantier, ce chantier »* s'écrit en
@@ -1637,18 +1642,38 @@ dépassement d’échéance.
 l’alerte d’impayé notées plus haut : elles ne font pas doublon, elles ne
 répondent pas à la même question.
 
-## Ma journée : productif et hors production
+## Ma journée : le temps total, le productif, le trajet
 
 *« Je devrais pouvoir faire une distinction : si j'y passe la journée, je mets
 8 heures. Mais j'ai eu un problème de tronçonneuse, j'ai dû affûter : en
-heures productives, j'ai peut-être passé que 7 heures. »*
+heures productives, j'ai peut-être passé que 7 heures. »* Puis, sur la 4.82 :
+*« il faudrait juste le temps total, et le temps productif. Et après, si je
+peux rajouter le temps de trajet. »*
 
-**Ça existait** : les heures des prestations sont les productives, `nonProd`
-porte le reste, et l'aperçu disait déjà « 7 h productives ». Mais le champ
-s'appelait « Trajet et temps morts », et une chaîne à affûter n'est pas un
-temps mort à ses yeux. Il s'appelle **« Hors production »**, avec ce qu'il
-couvre écrit dessous — trajet, affûtage, réglage, panne. Encore un manque de
-visibilité, pas d'absence.
+Trois nombres, dans ses mots (4.83) :
+
+| À l'écran | En base | |
+|---|---|---|
+| **Temps total sur le chantier** | — | se relit : productif + `nonProd` |
+| **Heures productives**, par prestation | `postes[].heures` | font les rendements |
+| *hors production* (affichée, jamais tapée) | `nonProd` | total − productif |
+| **Trajet (h)** | `trajet` | à part, hors chantier |
+
+- **Le total ne se stocke pas** : il se déduit du productif et du hors
+  production. Stocker les trois aurait fait deux endroits pour une même idée.
+- **Le trajet est additionnel** : le total est « trajet non compris », et
+  l'aperçu donne la journée entière — *9,50 h : 7 h productives · 1 h hors
+  production · 1,50 h de trajet* — pour qu'une mauvaise lecture se voie tout
+  de suite.
+- **Un total plus court que le productif ne s'enregistre pas** : l'un des deux
+  est mal tapé, et deviner lequel fausserait les rendements.
+- **Le trajet et le hors production entrent ensemble dans le chantier**, en une
+  saisie sans activité : ils comptent dans la journée facturée, jamais dans un
+  rendement. `heuresJournee()` compte le trajet ; `retirerSaisie()` retire les
+  deux.
+- **Les journées d'avant la 4.83 portent leur trajet dans `nonProd`** : il y
+  était mêlé au temps mort. Rien n'a été réécrit — rien ne permet de séparer
+  sûrement l'un de l'autre. À la réouverture, leur total inclut ce trajet.
 
 **La case « Journée non facturée » est partie** : *« ça sert plus à rien »*,
 dit deux fois. Une journée déjà marquée **garde sa marque** et l'aperçu la
@@ -1717,20 +1742,39 @@ Tournée du 2 septembre, complétée le 9 et le 15, par ordre de maturité :
 - **La photo d’un ticket qui remplit la dépense.** *« Je prends en photo ma
   facture, et ça me remplit automatiquement toutes les lignes : le
   fournisseur, ce qu’il y a sur le ticket, le TTC, la TVA. La catégorie, ce
-  sera à moi de choisir. »* Possible, pas hors ligne : il faut un service qui
-  lit l’image, donc du réseau, une clé à lui saisie sur le téléphone, et
-  quelques centimes par ticket. **Question posée le 15 septembre, sans
-  réponse** : ne rien construire avant. La clé ne doit jamais entrer dans le
-  dépôt.
+  sera à moi de choisir. »* Le réseau ne le gêne pas (*« quand j’ai des
+  factures, c’est en ville »*), mais **il ne veut pas que ses données sortent**
+  et a demandé si une IA open source comme Kimi ferait l’affaire. Réponse du
+  15 septembre : un modèle ouvert ne protège que s’il tourne chez soi ; le
+  service en ligne de Kimi envoie la photo à son éditeur. Trois voies
+  proposées — lecture du texte dans le téléphone (rien ne sort, moins fiable),
+  un service européen, ou un service américain qui s’engage à ne pas
+  entraîner ses modèles dessus. **Pas choisi : ne rien construire avant.** Une
+  clé de service ne doit jamais entrer dans le dépôt.
 - **Le prix de revient par travaux.** *« On le fera plus tard, mais tu peux le
   garder en note. »* Savoir ce que coûte réellement une journée de dégagement :
   amortissement de la débroussailleuse, mélange, huile, déplacement. De quoi
   situer un type de travaux par rapport à un autre. Le module Véhicule fait
   déjà ce raisonnement pour l’utilitaire — c’est le même, étendu au matériel.
-- **Les bulles de Mon entreprise mènent à la liste, jamais à la fiche.**
-  *« Les bulles sont déjà cliquables, mais… »* Le compte « dont 1 en retard »
-  existe déjà. Proposé en plus : un appui qui mène droit à la fiche quand il
-  n'y en a qu'une. Pas encore validé.
+- **La carte sans réseau.** *« Si je charge la carte avec du réseau, est-ce
+  que sans réseau je pourrais quand même l'avoir ? »* Pas aujourd'hui : le
+  service worker ignore les tuiles (autre origine), seul le cache du
+  navigateur en garde parfois. Proposé le 15 septembre : garder les tuiles
+  déjà vues, avec une taille plafonnée. Pas encore validé.
+- **Le versement libératoire.** Il compte y passer l'an prochain et veut *« un
+  simple truc à cocher »* pour basculer du barème progressif. Proposé : un
+  réglage qui porte **l'année à partir de laquelle** il s'applique — cocher
+  ne doit pas réécrire les estimations des années passées — et deux taux
+  modifiables, ventes et prestations. Pas encore validé.
+- **Le chiffre `20 000 €`** — la capacité de la tranche à 11 % par défaut,
+  dans `index.html`, ce fichier et un scénario — vient de sa situation
+  personnelle. Signalé le 15 septembre ; le remplacer change ses estimations
+  s'il n'a pas saisi la sienne. Ne pas y toucher sans lui.
+- **L'historique du dépôt garde des chiffres réels** : kilométrages du
+  véhicule et dépenses de carburant, écrits dans ce fichier en 4.65
+  (`3371a8d`) et retirés au commit `74bc29d`. Les effacer de l'historique
+  demande de le réécrire et de forcer la publication. Expliqué le 15
+  septembre, pas décidé.
 
 ## Les achats à venir
 
@@ -2777,41 +2821,24 @@ phrases plus loin il demandait *plus* de détail sur cet impayé. Les deux
 
 - **La CFE** n'est pas calculée : il a dit ne pas savoir la calculer lui-même.
   Elle existe comme type de versement, rien de plus.
-- **Le taux de cotisation est unique**, alors que le micro-BIC en distingue
-  deux — prestation et vente. Il a parlé d’un taux en bloc ; à scinder le
-  jour où l'écart le gêne.
+- **Le taux de cotisation est unique**, alors que l'URSSAF en distingue
+  deux — prestations et ventes de marchandises, ces dernières nettement plus
+  basses. Le 15 septembre il a répondu que *« c'est le même »* ; signalé que
+  ses fournitures vendues relèvent normalement du taux des ventes. À laisser
+  tel quel tant qu'il ne le demande pas.
 
-**Décidé, prêt à faire :**
-
-- **Les catégories.** Ses grandes catégories : travaux de plantation, travaux
-  d'amélioration sylvicole, fournitures, journées de gestion, travaux
-  d'exploitation, débours protection gibier. Ses sous-catégories : dégagement
-  de plantations, détourage, dépressage, élagage, fourniture de gaine,
-  inventaire en plein… **Ce que Sylve appelle `TRAVAUX` correspond à ses
-  sous-catégories** : il manque le niveau du dessus. Ajouter un champ de
-  catégorie sur chaque entrée de `TRAVAUX` sans toucher aux codes, qui portent
-  l'historique.
-- **Le formulaire de création d'un chantier** est encore l'ancien en-tête de
-  vingt-trois champs (`ouvrirEnteteCh`). À raccourcir aux essentiels : le reste
-  se remplit bloc par bloc sur la fiche.
+*Les catégories au-dessus des prestations et le formulaire de création
+raccourci, notés ici comme « prêts à faire », sont faits : voir* Cinq familles
+au-dessus des prestations *et* La création d'un chantier.
 
 **Proposé, en attente de sa réponse :**
-
-- **Les notes existent déjà, mais il ne les trouve pas.** Il a demandé « un
-  endroit où mettre des notes, comme l’application Notes du téléphone, avec des
-  titres et des couleurs » — puis s’est interrompu : « ah mais si je peux le
-  faire là ? ». C’est `A.cfg.notes`, sur l’écran Entreprise, sous « À traiter » :
-  titre, précision, six couleurs. **Encore un manque de visibilité, pas
-  d’absence** — le même diagnostic que « Recettes » et que le choix du cubage.
-  Sa vraie question est ailleurs : **faut-il les sortir d’Entreprise** pour les
-  poser plus haut, à côté des outils de terrain ? Il ne tranche pas, moi non
-  plus. Ne pas en écrire un second jeu.
 
 - **Les grandes familles dans les filtres du carnet.** Il s'y perd avec
   des dizaines de chantiers dont presque tous payés. Les filtres sont désormais
   groupés *En cours / Clos*, et « Avec devis » s'y est ajouté en 4.75 ; ce
   qu'il évoquait en plus — retrouver la **famille de travaux** d'un chantier
-  dans le filtre — n'est toujours pas fait. Dit le 23 août.
+  dans le filtre — n'est toujours pas fait. Dit le 23 août ; le 15 septembre
+  il ne s'en souvenait plus, rappel fait.
 - **Le nom du classement dans les exports.** `.xlsx`, CSV et impression
   écrivent toujours « Class. Comt ». Ces fichiers partent chez le client et
   reprennent le tableur d'origine : lui demander avant d'y toucher.

@@ -183,7 +183,7 @@ scenario('Ma journée : rendement par prestation et temps porté au chantier', a
   t.clic('#pst-plus'); await t.pause(120);
   t.choisir('[data-pstt="1"]', 'PROTEC');
   t.saisir('[data-psth="1"]', '4'); t.saisir('[data-pstq="1"]', '150');
-  t.saisir('#mj-nonprod', '1'); t.saisir('#mj-km', '64');
+  t.saisir('#mj-trajet', '1'); t.saisir('#mj-km', '64');
   const ap = t.texte('#mj-apercu');
   verifierVrai('la journée fait 8 heures', /8,00 h/.test(ap));
   verifierVrai('533 plants par jour', /533 plant\/jour/.test(ap));
@@ -193,7 +193,7 @@ scenario('Ma journée : rendement par prestation et temps porté au chantier', a
   const j = t.stock('journees');
   verifier('une journée enregistrée', 1, j.length);
   verifier('deux prestations', 2, j[0].postes.length);
-  verifier('le trajet reste à part', 1, j[0].nonProd);
+  verifier('le trajet reste à part', 1, j[0].trajet);
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -1959,11 +1959,12 @@ scenario('Entreprise : le bilan est au-dessus des tuiles, et chaque bulle mène 
   verifierVrai('depuis combien de temps', /70 jours/.test(at));
   verifierVrai('et par qui il passe', /Cabinet Dubois/.test(at));
 
-  /* Une bulle mène à la liste filtrée. */
+  /* Une seule facture en attente : la bulle mène droit à sa fiche. Le cas de
+     plusieurs, qui mène à la liste filtrée, a son propre scénario. */
   t.clic('[data-bulle="facture"]'); await t.pause(350);
-  verifier('la bulle des impayés filtre le carnet', 'facture', t.$('#c-filtre').value);
-  verifierVrai('et le chantier concerné est visible',
-    /Montjoie/.test(t.$('#liste-chantiers').textContent));
+  verifierVrai('la bulle d’un seul impayé ouvre sa fiche',
+    t.$('#vue-chantier').classList.contains('actif'));
+  verifierVrai('et c’est la bonne', /Montjoie/.test(t.texte('#vue-chantier')));
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -4427,12 +4428,12 @@ scenario('Carnet : les filtres dans l’ordre dicté, et ce qui reste à faire',
 });
 
 /* --------------------------------------------------------------------- */
-scenario('Ma journée : plus de case « non facturée », et le hors production dit ce qu’il couvre', async () => {
+scenario('Ma journée : le temps total, le productif, le trajet — et plus de case « non facturée »', async () => {
   /* « Journée non facturée au-dessus, ça on peut l'enlever, ça sert plus à
-     rien. » Et : « faire une distinction : j'y passe la journée, 8 heures ;
-     mais j'ai eu un problème de tronçonneuse, j'ai dû affûter, et en heures
-     productives j'ai peut-être passé que 7 heures. » Ça existait, sous le nom
-     « Trajet et temps morts » qui ne le disait pas. */
+     rien. » Et : « il faudrait juste le temps total, et le temps productif.
+     Et après, si je peux rajouter le temps de trajet. » Huit heures sur le
+     chantier dont une à régler la tronçonneuse et affûter : sept
+     productives. */
   const midi = new Date(); midi.setHours(12, 0, 0, 0);
   const t = await ouvrir(Object.assign({}, VIDE, {
     module: 'calendrier', cfg: { heuresJour: 8, journeesMigrees: true },
@@ -4447,26 +4448,74 @@ scenario('Ma journée : plus de case « non facturée », et le hors production 
   t.clic('#fj-travaille'); await t.pause(500);
   verifierVrai('la journée s’ouvre', !!t.$('#mj-ok'));
   verifier('la case « non facturée » a disparu', null, t.$('#mj-nonfact'));
-  const modale = t.texte('#modale');
-  verifierVrai('« hors production » nomme ce qu’il couvre',
-    /Hors production/.test(modale) && /affûtage/.test(modale));
+  /* Une journée déjà notée rouvre son total : ses six heures productives. */
+  verifier('le total d’une journée notée se relit', '6', t.$('#mj-total').value);
 
-  /* Huit heures sur place, dont une à régler et affûter : sept productives. */
+  /* Un total plus court que le productif ne s'enregistre pas : l'un des deux
+     est mal tapé, et deviner lequel fausserait les rendements. */
   t.saisir('#mj-postes [data-psth="0"]', '7');
-  t.saisir('#mj-nonprod', '1');
+  t.saisir('#mj-total', '6');
+  verifierVrai('l’écran le dit tout de suite',
+    /plus court que les heures productives/.test(t.texte('#mj-horsprod')));
+  t.clic('#mj-ok'); await t.pause(400);
+  /* Les heures productives sont ce qui changerait : six en base, sept tapées. */
+  verifier('et rien n’est enregistré', 6,
+    (t.stock('journees') || []).filter(x => x.id === 'j1')[0].postes[0].heures);
+  verifierVrai('la fenêtre reste ouverte pour corriger', !!t.$('#mj-ok'));
+
+  t.saisir('#mj-total', '8');
+  t.saisir('#mj-trajet', '1,5');
+  verifierVrai('le hors production se déduit, et dit ce qu’il couvre',
+    /1,00 h hors production — affûtage/.test(t.texte('#mj-horsprod')));
   const ap = t.texte('#mj-apercu');
-  verifierVrai('la journée fait huit heures', /8,00 h/.test(ap));
+  verifierVrai('la journée fait neuf heures et demie, trajet compris', /9,50 h/.test(ap));
   verifierVrai('dont sept productives', /7,00 h productives/.test(ap));
-  verifierVrai('et une hors production', /1,00 h hors production/.test(ap));
+  verifierVrai('une hors production', /1,00 h hors production/.test(ap));
+  verifierVrai('et le trajet à part', /1,50 h de trajet/.test(ap));
   /* Une journée marquée avant la 4.82 garde sa marque, et l'aperçu la dit :
      sans case pour la voir, l'effacer en silence changerait ses chiffres. */
   verifierVrai('l’aperçu signale une journée déjà marquée', /non facturée/.test(ap));
 
   t.clic('#mj-ok'); await t.pause(600);
   const j = (t.stock('journees') || []).filter(x => x.id === 'j1')[0];
-  verifier('le hors production reste à part', 1, j.nonProd);
+  verifier('le hors production est gardé, déduit', 1, j.nonProd);
+  verifier('le trajet aussi, à part', 1.5, j.trajet);
+  verifier('la journée compte tout', 9.5, t.w.BCC.heuresJournee(j));
   verifier('et la marque ancienne est gardée', true, j.nonFacture);
+
+  /* Le trajet entre dans le temps du chantier, sans activité : la fiche
+     compte neuf heures et demie, soit une journée et une heure et demie. */
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+  const rangs = t.$$('#vue-chantier .jrang').map(e => e.textContent.replace(/\s+/g, ' ').trim());
+  verifierVrai('la fiche compte le trajet dans le fait', rangs.some(r => /1 j 1,5 h/.test(r)));
   verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Bilan : une bulle d’un seul chantier ouvre sa fiche, plusieurs ouvrent la liste', async () => {
+  /* « Les bulles qui mènent droit à la fiche. » Une liste d'un seul
+     chantier, c'est un appui de plus pour rien. */
+  const ch = (id, statut) => ({ id, statut, aDevis: false, proprietaire: 'Client ' + id,
+    lignes: [], temps: [], jours: [], maj: Date.now() });
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'entreprise',
+    chantiers: [ch('a', 'encours'), ch('b', 'encours'), ch('c', 'accepte')]
+  }));
+  await t.pause(300);
+  t.clic('[data-bulle="accepte"]'); await t.pause(400);
+  verifierVrai('un seul devis signé : sa fiche s’ouvre',
+    t.$('#vue-chantier').classList.contains('actif'));
+  verifierVrai('et c’est la sienne', /Client c/.test(t.texte('#vue-chantier')));
+
+  const t2 = await ouvrir(Object.assign({}, VIDE, {
+    module: 'entreprise',
+    chantiers: [ch('a', 'encours'), ch('b', 'encours'), ch('c', 'accepte')]
+  }));
+  await t2.pause(300);
+  t2.clic('[data-bulle="encours"]'); await t2.pause(400);
+  verifierVrai('deux chantiers en cours : la liste', t2.$('#vue-carnet').classList.contains('actif'));
+  verifier('filtrée sur eux', 'encours', t2.$('#c-filtre').value);
+  verifier('aucune erreur', [], t.erreurs.concat(t2.erreurs));
 });
 
 /* --------------------------------------------------------------------- */
