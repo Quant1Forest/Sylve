@@ -7031,65 +7031,65 @@ const contour = pts => {
   }
   return m;
 };
-/* Un point quelconque, en Lambert 93. */
+/* Un point quelconque, en Web Mercator. */
 const CARRE = (x0, y0, c) => contour([[x0, y0], [x0 + c, y0], [x0 + c, y0 + c], [x0, y0 + c], [x0, y0]]);
-const FOND_ESSAI = CARRE(700000, 6600000, 8000) + String.fromCharCode(10) +
-  CARRE(708000, 6600000, 8000);
+/* Calés sur le centre par défaut de la carte — 46,6° N, 2,4° E — pour que
+   les scénarios les voient sans avoir à se déplacer. */
+const FOND_ESSAI = CARRE(259000, 5873000, 8000) + String.fromCharCode(10) +
+  CARRE(267000, 5873000, 8000);
 
-scenario('Carte : la projection Lambert 93 tombe juste', async () => {
-  /* Les fichiers de l'IGN sont en Lambert 93, ses positions en latitude et
-     longitude. Une projection fausse ne se voit qu'à l'écran, et trop tard :
-     elle mettrait ses chantiers au large de l'Atlantique sans rien dire. */
+scenario('Carte : Web Mercator tombe juste, et le fond se décode', async () => {
+  /* La carte est passée en Web Mercator : c'est la projection de toutes les
+     tuiles du web, et deux projections différentes ne se superposent jamais.
+
+     Ses propriétés sont exactes par définition, pas approchées — c'est ce
+     qui permet de les éprouver sans tolérance molle. */
   const t = await ouvrir(Object.assign({}, VIDE, { module: 'calendrier' }));
   const LB = t.w.BCUI._carte.LB;
 
-  /* L'origine de la projection tombe sur la fausse origine, au mètre près. */
-  const o = LB.vers(46.5, 3);
-  verifierVrai('origine en X', Math.abs(o.x - 700000) < 0.5);
-  verifierVrai('origine en Y', Math.abs(o.y - 6600000) < 0.5);
+  /* L'origine des longitudes et l'équateur tombent sur zéro. */
+  const o = LB.vers(0, 0);
+  verifierVrai('l’équateur est à zéro', Math.abs(o.x) < 0.001 && Math.abs(o.y) < 0.001);
+  /* Un demi-tour de longitude vaut la moitié du tour de Mercator. */
+  verifierVrai('180° font un demi-tour',
+    Math.abs(LB.vers(0, 180).x - Math.PI * 6378137) < 0.5);
 
   /* Aller-retour : c'est ce qui garantit qu'un point posé se relit au même
      endroit. */
   const d = LB.vers(44.1167, 3.2833);
   const r = LB.depuis(d.x, d.y);
-  verifierVrai('la latitude revient', Math.abs(r.lat - 44.1167) < 0.000001);
-  verifierVrai('la longitude revient', Math.abs(r.lon - 3.2833) < 0.000001);
-  /* Et le point tombe là où il doit, pas ailleurs. */
-  verifierVrai('le point tombe là où il doit',
-    d.x > 940000 && d.x < 980000 && d.y > 6650000 && d.y < 6690000);
+  verifierVrai('la latitude revient', Math.abs(r.lat - 44.1167) < 0.0000001);
+  verifierVrai('la longitude revient', Math.abs(r.lon - 3.2833) < 0.0000001);
 
-  /* Un degré de latitude vaut environ 111 km : la projection doit le rendre. */
-  const a1 = LB.vers(46, 6), a2 = LB.vers(47, 6);
-  verifierVrai('un degré de latitude fait 111 km',
-    Math.abs(Math.abs(a2.y - a1.y) - 111200) < 900);
-
-  /* Et la propriété qui DÉFINIT une conique conforme sécante : l'échelle
-     vaut exactement 1 sur les deux parallèles de référence — 44° et 49° —
-     et moins entre les deux. Une fenêtre géographique ne l'aurait pas vu :
-     un parallèle faux ne déplace que de deux cents mètres. La longueur
-     vraie d'un arc de parallèle est écrite ici, à part, pour que les deux
-     sources soient indépendantes. */
-  const arcParallele = (lat, dlon) => {
-    const A = 6378137, E = 0.081819191042816, p = lat * Math.PI / 180;
-    return A * Math.cos(p) / Math.sqrt(1 - E * E * Math.sin(p) * Math.sin(p)) *
-      (dlon * Math.PI / 180);
-  };
+  /* La propriété qui DÉFINIT Mercator : l'échelle horizontale vaut 1/cos(φ).
+     La longueur vraie d'un arc de parallèle sur la sphère est écrite ici, à
+     part, pour que les deux sources restent indépendantes. Sans cette garde,
+     une projection subtilement fausse passerait — c'est ce qui était arrivé
+     au parallèle de référence de Lambert, faux de deux cents mètres et
+     invisible pour toute vérification géographique large. */
+  const arcSphere = (lat, dlon) =>
+    6378137 * Math.cos(lat * Math.PI / 180) * (dlon * Math.PI / 180);
   const echelle = lat => {
-    const g = LB.vers(lat, 5.9), d = LB.vers(lat, 6.1);
-    return Math.sqrt(Math.pow(d.x - g.x, 2) + Math.pow(d.y - g.y, 2)) /
-      arcParallele(lat, 0.2);
+    const g = LB.vers(lat, 5.9), dd = LB.vers(lat, 6.1);
+    return (dd.x - g.x) / arcSphere(lat, 0.2);
   };
-  verifierVrai('échelle 1 sur le parallèle du bas', Math.abs(echelle(44) - 1) < 0.00001);
-  verifierVrai('échelle 1 sur celui du haut', Math.abs(echelle(49) - 1) < 0.00001);
-  verifierVrai('et moins de 1 entre les deux', echelle(46.5) < 0.9995);
+  verifierVrai('échelle 1 à l’équateur', Math.abs(echelle(0.0001) - 1) < 0.00001);
+  verifierVrai('et 1/cos(φ) au milieu de la France',
+    Math.abs(echelle(46.5) - 1 / Math.cos(46.5 * Math.PI / 180)) < 0.00001);
+
+  /* facteurSol fait le chemin inverse : combien de mètres au sol vaut un
+     mètre de Mercator. C'est lui qui rend l'échelle de la carte honnête. */
+  const y = LB.vers(46.5, 6).y;
+  verifierVrai('un mètre de Mercator vaut 0,69 m au sol au milieu de la France',
+    Math.abs(LB.facteurSol(y) - Math.cos(46.5 * Math.PI / 180)) < 0.00001);
 
   /* Le décodeur et l'encodeur doivent rester d'accord. Le séparateur est un
      saut de ligne, hors de l'alphabet « ? » à « ~ » : la barre verticale en
      faisait partie et coupait les contours au milieu. */
-  const pts = t.w.BCUI._carte.decoder(CARRE(700000, 6600000, 8000));
+  const pts = t.w.BCUI._carte.decoder(CARRE(264000, 5870000, 8000));
   verifier('cinq points relus', 10, pts.length);
-  verifierVrai('au bon endroit', Math.abs(pts[0] - 955000) <= 5 &&
-    Math.abs(pts[1] - 6665000) <= 5);
+  verifierVrai('au bon endroit', Math.abs(pts[0] - 520000) <= 5 &&
+    Math.abs(pts[1] - 5900000) <= 5);
   verifierVrai('et le carré est fermé',
     Math.abs(pts[8] - pts[0]) <= 5 && Math.abs(pts[9] - pts[1]) <= 5);
   verifier('aucune erreur', [], t.erreurs);
@@ -7148,7 +7148,7 @@ scenario('Carte : le fond se dessine, et le chantier se place d’un doigt', asy
   const LB = t.w.BCUI._carte.LB;
   const revenu = LB.vers(c.gps.lat, c.gps.lon);
   verifierVrai('et c’est bien le point visé',
-    Math.abs(revenu.x - 700000) < 500 && Math.abs(revenu.y - 6600000) < 500);
+    Math.abs(revenu.x - 267000) < 500 && Math.abs(revenu.y - 5877000) < 500);
   verifierVrai('le mode « poser » s’est refermé',
     !/Appuyez sur la carte/.test(t.$('#carte-aide').textContent));
   verifier('aucune erreur', [], t.erreurs);
@@ -7165,6 +7165,9 @@ scenario('Carte : sans fond, elle marche quand même et le dit', async () => {
       gps: { lat: 44.1167, lon: 3.2833 } }]
   }));
   t.clic('[data-vue="carte"]'); await t.pause(400);
+  /* Sans réseau et sans contours, il reste les points : c'est ce cas-là
+     qu'on éprouve, donc on demande les contours seuls. */
+  t.clic('[data-fondcarte="contours"]'); await t.pause(300);
 
   /* JSDOM ne va chercher aucun script : ni chargé, ni en erreur. On joue
      l'erreur que le navigateur enverrait si le fichier manquait — c'est le
@@ -7180,7 +7183,7 @@ scenario('Carte : sans fond, elle marche quand même et le dit', async () => {
   verifierVrai('sans contour', !t.$('#carte-plan path'));
   verifierVrai('mais avec le chantier', !!t.$('#carte-plan [data-cartept="c1"]'));
   verifierVrai('et l’écran dit pourquoi',
-    /Fond de carte indisponible/.test(t.$('#carte-aide').textContent));
+    /Contours indisponibles/.test(t.$('#carte-aide').textContent));
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -7202,7 +7205,7 @@ scenario('Carte : le zoom a des bornes des deux côtés', async () => {
 
   for (let i = 0; i < 40; i++) t.clic('#carte-plus');
   await t.pause(300);
-  verifierVrai('on ne descend pas sous trois mètres par pixel', echelle() >= 3);
+  verifierVrai('on ne descend pas sous un mètre par pixel', echelle() >= 1);
   for (let i = 0; i < 80; i++) t.clic('#carte-moins');
   await t.pause(300);
   verifierVrai('et on ne monte pas au-dessus de quatre kilomètres', echelle() <= 4000);
@@ -7210,6 +7213,104 @@ scenario('Carte : le zoom a des bornes des deux côtés', async () => {
   /* « Tout voir » revient au cadrage d'origine. */
   t.clic('#carte-tout'); await t.pause(300);
   verifier('« Tout voir » recadre comme au départ', depart, echelle());
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Carte : les tuiles de l’IGN se posent sous les contours', async () => {
+  /* « Il n'y a pas de fond photo aérienne, pas de fond de carte IGN. Là je ne
+     peux pas me repérer avec cette carte. »
+
+     Il a raison, et j'avais tort d'être aussi catégorique : la carte des piles
+     charge des tuiles depuis des mois. La règle n'était pas « jamais de
+     réseau » mais « ça doit marcher sans réseau ». */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'calendrier',
+    chantiers: [{ id: 'c1', proprietaire: 'Martin', statut: 'encours', aDevis: false,
+      temps: [], jours: [], lignes: [], maj: Date.now(),
+      gps: { lat: 46.6012, lon: 2.4035 } }]
+  }), { avant: w => { w.COMMUNES = FOND_ESSAI; } });
+  t.clic('[data-vue="carte"]'); await t.pause(500);
+
+  /* Trois fonds au choix, la photo aérienne par défaut. */
+  const chips = t.$$('#carte-fonds .chip').map(b => b.textContent);
+  verifier('trois fonds', ['Photo aérienne', 'Carte IGN', 'Contours seuls'], chips);
+  verifierVrai('la photo est le fond de départ',
+    t.$('[data-fondcarte="photo"]').classList.contains('actif'));
+
+  const tuiles = () => t.$$('#carte-cadre img');
+  verifierVrai('des tuiles sont demandées', tuiles().length > 0);
+  const src = tuiles()[0].getAttribute('src');
+  verifierVrai('à la Géoplateforme', /^https:\/\/data\.geopf\.fr\/wmts\?/.test(src));
+  verifierVrai('en photo aérienne', /LAYER=ORTHOIMAGERY\.ORTHOPHOTOS/.test(src));
+  verifierVrai('dans la grille des tuiles du web', /TILEMATRIXSET=PM/.test(src));
+  /* Une tuile porte son niveau, sa ligne et sa colonne : sans les trois, elle
+     ne désigne rien. */
+  verifierVrai('avec niveau, ligne et colonne',
+    /TILEMATRIX=\d+/.test(src) && /TILEROW=\d+/.test(src) && /TILECOL=\d+/.test(src));
+  /* Et le niveau doit coller à l'échelle affichée : figé, il donnerait une
+     photo floue ou dix fois trop détaillée, sans que rien ne le dise. Le
+     calcul est refait ici, à part, depuis la largeur du monde. */
+  const mPix = t.w.BCUI._carte.cadre().m;
+  const attendu = Math.round(Math.log(2 * Math.PI * 6378137 / (256 * mPix)) / Math.LN2);
+  verifier('le niveau colle à l’échelle', String(attendu),
+    (/TILEMATRIX=(\d+)/.exec(src) || [])[1]);
+
+  /* Les contours restent dessinés par-dessus : c'est eux qui restent quand le
+     réseau manque. */
+  verifierVrai('les contours sont toujours là', !!t.$('#carte-plan path'));
+
+  t.clic('[data-fondcarte="ign"]'); await t.pause(400);
+  verifierVrai('la carte IGN se choisit',
+    /LAYER=GEOGRAPHICALGRIDSYSTEMS\.PLANIGNV2/.test(tuiles()[0].getAttribute('src')));
+  verifier('et le choix est retenu', 'ign', (t.stock('cfg') || {}).fondCarte);
+
+  t.clic('[data-fondcarte="contours"]'); await t.pause(400);
+  verifier('« contours seuls » ne demande plus rien au réseau', 0, tuiles().length);
+  verifierVrai('mais la carte reste dessinée', !!t.$('#carte-plan path'));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Carte : « Ma position » y va, au lieu d’y poser un point', async () => {
+  /* « Il faudrait juste un bouton pour pouvoir zoomer sur soi-même. » Le
+     bouton posait un point bleu quelque part et n'y allait pas : sur une
+     carte de six départements, autant ne rien poser. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'calendrier',
+    chantiers: [{ id: 'c1', proprietaire: 'Loin', statut: 'encours', aDevis: false,
+      temps: [], jours: [], lignes: [], maj: Date.now(),
+      gps: { lat: 45.60, lon: 4.10 } }]
+  }), {
+    avant: w => {
+      w.COMMUNES = FOND_ESSAI;
+      /* Un GPS qui répond, à cent kilomètres du chantier semé. */
+      w.navigator.geolocation = {
+        getCurrentPosition: ok => ok({ coords: { latitude: 46.6012, longitude: 2.4035 } })
+      };
+    }
+  });
+  t.clic('[data-vue="carte"]'); await t.pause(500);
+
+  const LB = t.w.BCUI._carte.LB;
+  /* cadre() rend l'objet vivant, pas une copie : le relire après coup
+     donnerait les mêmes valeurs des deux côtés, et la comparaison serait
+     toujours vraie. On garde les nombres. */
+  const av = t.w.BCUI._carte.cadre();
+  const avant = { cx: av.cx, cy: av.cy, m: av.m };
+  const moi = LB.vers(46.6012, 2.4035);
+  verifierVrai('la carte ne me regarde pas encore',
+    Math.abs(avant.cx - moi.x) > 10000);
+
+  t.clic('#carte-ici'); await t.pause(600);
+  const apres = t.w.BCUI._carte.cadre();
+  verifierVrai('la carte est venue sur moi',
+    Math.abs(apres.cx - moi.x) < 100 && Math.abs(apres.cy - moi.y) < 100);
+  /* Et elle s'est serrée : y aller sans zoomer laisserait un point bleu perdu
+     au milieu d'un département. */
+  verifierVrai('et elle s’est serrée', apres.m < avant.m);
+  verifierVrai('assez pour reconnaître un chemin',
+    apres.m * LB.facteurSol(apres.cy) <= 3.01);
   verifier('aucune erreur', [], t.erreurs);
 });
 

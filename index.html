@@ -1615,6 +1615,7 @@ if (froid && s > 0) montrer(s);
           <button class="btn btn-min" id="carte-tout">Tout voir</button>
           <button class="btn btn-min" id="carte-poser">Poser un chantier</button>
         </div>
+        <div class="chips" id="carte-fonds" style="margin-top:8px"></div>
         <p class="muted" style="font-size:11.5px;margin:7px 0 0" id="carte-aide"></p>
         <div id="carte-liste"></div>
       </div>
@@ -7924,6 +7925,12 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.81', quoi: [
+    { t: 'Photo aerienne et carte IGN sur la carte, quand vous avez du reseau', vue: 'carte' },
+    { t: 'Sans reseau, les contours de communes restent : ils sont dans l appareil', vue: 'carte' },
+    { t: '« Ma position » vous y emmene, au lieu d y poser un point', vue: 'carte' },
+    { t: 'Et le pincement ne begaye plus quand vous dezoomez large', vue: 'carte' }
+  ] },
   { v: '4.80', quoi: [
     { t: 'Une vraie carte : les communes de six departements, hors ligne', vue: 'carte' },
     { t: 'Glissez pour vous deplacer, pincez pour zoomer', vue: 'carte' },
@@ -7943,16 +7950,6 @@ var NOTES_MAJ = [
     { t: 'Un nom nouveau se range par type : proprietaire, gestionnaire, ETF, autre', vue: 'carnet' },
     { t: 'Et le n° SIREN ne se demande que la ou il a un sens', vue: 'carnet' },
     { t: 'Trois endroits cherchaient un lieu de chantier qui n existe pas', vue: 'calendrier' }
-  ] },
-  { v: '4.76', quoi: [
-    { t: 'Notez votre propre cadence : une tige toutes les dix minutes', vue: 'rendements' },
-    { t: 'Elle se lit a cote de ce que vos chantiers ont mesure, avec l ecart', vue: 'rendements' },
-    { t: 'Et vous dites sur quel chantier vous l avez constatee', vue: 'rendements' },
-    { t: '« En retard » devient « jours passes » : c est ce que le calcul dit', vue: 'carnet' },
-    { t: 'Chaque ligne du carnet porte le HT, le TTC, le taux et la TVA', vue: 'carnet' },
-    { t: 'Et en tete : facture, encaisse, devis signes, premier donneur d ordre', vue: 'carnet' },
-    { t: 'Un chantier pas fini d etre planifie n est plus dit en retard', vue: 'carnet' },
-    { t: 'Le prelevement du calendrier annonce enfin son nom et son montant', vue: 'calendrier' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -8887,7 +8884,17 @@ function brancher() {
 
   /* --- carte des chantiers --- */
   $('#carte-ici').addEventListener('click', function () {
-    releverPosition(this, function (p) { A.ici = p; renderCarteChantiers(); });
+    releverPosition(this, function (p) {
+      A.ici = p;
+      var m = LB.vers(p.lat, p.lon), v = cadreCarte();
+      v.cx = m.x; v.cy = m.y;
+      /* Assez serré pour reconnaître un chemin : deux cents mètres de large
+         au sol. Y aller sans changer d'échelle laisserait un point bleu
+         perdu au milieu d'un département. */
+      var vise = 3 / LB.facteurSol(m.y);
+      if (v.m > vise) v.m = vise;
+      renderCarteChantiers();
+    });
   });
   $('#carte-svg').addEventListener('click', function (e) {
     var g = e.target.closest('[data-cartept]');
@@ -8900,6 +8907,13 @@ function brancher() {
     A.carte = null; renderCarteChantiers();
   });
   $('#carte-poser').addEventListener('click', ouvrirPoseCarte);
+  $('#carte-fonds').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-fondcarte]');
+    if (!b) return;
+    A.cfg.fondCarte = b.dataset.fondcarte;
+    sauverCfg();
+    renderCarteChantiers();
+  });
   brancherGestesCarte();
   $('#carte-liste').addEventListener('click', function (e) {
     var b = e.target.closest('[data-carteouvrir]');
@@ -10725,52 +10739,72 @@ function brancherVeille() {
    « Est-ce qu'on ne pourrait pas juste avoir un fond de carte et pouvoir
    poser des points ? »
 
-   Un fond de carte ordinaire, ce sont des tuiles d'image servies par un
-   serveur : réseau et dépendance, les deux choses que Sylve refuse — et
-   c'est ce refus qui la fait marcher au fond d'une parcelle. Mais ses
-   fichiers IGN ne sont pas des images : ce sont des tracés, et un tracé
-   s'embarque. 2 880 contours de communes sur six départements, 322 Ko.
+   Ses fichiers IGN ne sont pas des images : ce sont des tracés, et un tracé
+   s'embarque. 2 906 contours de communes sur six départements, 344 Ko :
+   c'est ce qui reste quand le réseau manque. Les tuiles de l'IGN se posent
+   dessous quand il y en a — voir FONDS_TUILES.
 
    Ils vivent dans communes.js, chargé à la demande : les parcourir au
    démarrage coûterait une seconde pour un écran qu'on ouvre rarement. */
 var FOND = { etat: 'rien', contours: null };
 
-/* Lambert 93 (EPSG:2154), la projection des fichiers de l'IGN : conique
-   conforme sécante sur l'ellipsoïde GRS80. RGF93 et WGS84 se confondent à
-   moins d'un mètre — aucune translation de datum, ça ne se voit pas à
-   l'échelle d'un chantier. */
+/* Les fonds de la Géoplateforme de l'IGN, en accès libre. Ce sont ceux
+   qu'il a lui-même relevés dans son fichier de cartographie.
+
+   Le réseau n'est plus interdit — il ne l'a jamais vraiment été, la carte
+   des piles charge des tuiles depuis des mois — mais il reste facultatif :
+   une tuile qui n'arrive pas laisse voir les contours en dessous, et rien
+   ne casse. C'est la différence entre « demande du réseau » et « en profite
+   quand il y en a ». */
+var FONDS_TUILES = [
+  { c: 'photo', n: 'Photo aérienne',
+    couche: 'ORTHOIMAGERY.ORTHOPHOTOS', format: 'image/jpeg', max: 19 },
+  { c: 'ign', n: 'Carte IGN',
+    couche: 'GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2', format: 'image/png', max: 19 },
+  { c: 'contours', n: 'Contours seuls' }
+];
+function fondTuiles() {
+  var c = (A.cfg && A.cfg.fondCarte) || 'photo';
+  for (var i = 0; i < FONDS_TUILES.length; i++) {
+    if (FONDS_TUILES[i].c === c && FONDS_TUILES[i].couche) return FONDS_TUILES[i];
+  }
+  return null;
+}
+function urlTuile(f, z, x, y) {
+  return 'https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0' +
+    '&LAYER=' + f.couche + '&STYLE=normal&TILEMATRIXSET=PM&FORMAT=' +
+    encodeURIComponent(f.format) +
+    '&TILEMATRIX=' + z + '&TILEROW=' + y + '&TILECOL=' + x;
+}
+/* Le niveau de tuile dont l'échelle colle le mieux à celle qu'on affiche.
+   La largeur du monde en Mercator vaut 2 π R ; à un niveau z elle tient sur
+   256 × 2^z pixels. */
+var TOUR_MERCATOR = 2 * Math.PI * 6378137;
+function niveauTuile(m, max) {
+  var z = Math.round(Math.log(TOUR_MERCATOR / (256 * m)) / Math.LN2);
+  return Math.max(0, Math.min(max || 19, z));
+}
+
+/* Web Mercator (EPSG:3857) : la projection de toutes les tuiles du web, et
+   celle dans laquelle les contours sortent du convertisseur. Sphérique et
+   sans excentricité — c'est la définition, pas une approximation.
+
+   Elle étire vers les pôles : un pixel ne vaut pas la même distance au sol
+   selon la latitude. D'où `solParPixel`, qui rend l'échelle vraie plutôt
+   que la mesure de Mercator. */
 var LB = (function () {
-  var A = 6378137, E = 0.081819191042816;
-  var LAT0 = 46.5 * Math.PI / 180, LON0 = 3 * Math.PI / 180;
-  var LAT1 = 44 * Math.PI / 180, LAT2 = 49 * Math.PI / 180;
-  var X0 = 700000, Y0 = 6600000;
-  var pm = function (p) { var s2 = Math.sin(p); return Math.cos(p) / Math.sqrt(1 - E * E * s2 * s2); };
-  var pt = function (p) {
-    var s2 = Math.sin(p);
-    return Math.tan(Math.PI / 4 - p / 2) / Math.pow((1 - E * s2) / (1 + E * s2), E / 2);
-  };
-  var N = Math.log(pm(LAT1) / pm(LAT2)) / Math.log(pt(LAT1) / pt(LAT2));
-  var F = pm(LAT1) / (N * Math.pow(pt(LAT1), N));
-  var RHO0 = A * F * Math.pow(pt(LAT0), N);
+  var A = 6378137, r = Math.PI / 180;
   return {
     vers: function (lat, lon) {
-      var p = lat * Math.PI / 180, l = lon * Math.PI / 180;
-      var rho = A * F * Math.pow(pt(p), N), g = N * (l - LON0);
-      return { x: X0 + rho * Math.sin(g), y: Y0 + RHO0 - rho * Math.cos(g) };
+      return { x: A * lon * r, y: A * Math.log(Math.tan(Math.PI / 4 + lat * r / 2)) };
     },
     depuis: function (x, y) {
-      var dx = x - X0, dy = RHO0 - (y - Y0);
-      var rho = Math.sqrt(dx * dx + dy * dy) * (N < 0 ? -1 : 1);
-      var t = Math.pow(rho / (A * F), 1 / N);
-      var lon = Math.atan2(dx, dy) / N + LON0;
-      /* La latitude ne se ferme pas : on itère. L'écart tombe sous le
-         micromètre dès le quatrième tour. */
-      var p = Math.PI / 2 - 2 * Math.atan(t);
-      for (var i = 0; i < 8; i++) {
-        var s2 = Math.sin(p);
-        p = Math.PI / 2 - 2 * Math.atan(t * Math.pow((1 - E * s2) / (1 + E * s2), E / 2));
-      }
-      return { lat: p * 180 / Math.PI, lon: lon * 180 / Math.PI };
+      return { lat: (2 * Math.atan(Math.exp(y / A)) - Math.PI / 2) / r, lon: x / A / r };
+    },
+    /* Combien de mètres au sol vaut un mètre de Mercator à cette latitude :
+       environ 0,69 au milieu de la France, Mercator étirant de 1,45. */
+    facteurSol: function (y) {
+      return Math.cos((2 * Math.atan(Math.exp(y / A)) - Math.PI / 2));
     }
   };
 })();
@@ -17882,7 +17916,8 @@ function cadreCarte() {
   var pts = chantiersLocalises();
   if (!pts.length) {
     /* Rien de posé : on ouvre sur le centre des six départements. */
-    return (A.carte = { cx: 700000, cy: 6600000, m: 900 });
+    /* Le milieu des six départements, en Mercator : 46,6° N, 2,4° E. */
+    return (A.carte = { cx: 267000, cy: 5877000, m: 1300 });
   }
   var xs = [], ys = [];
   pts.forEach(function (p) {
@@ -17904,6 +17939,15 @@ function chantiersLocalises() {
           C.montant(c) ? eur(C.montant(c)) : ''].filter(Boolean).join(' · ') };
     });
 }
+var carteEnVol = false;
+function redessinerCarte() {
+  if (carteEnVol) return;
+  carteEnVol = true;
+  requestAnimationFrame(function () {
+    carteEnVol = false;
+    renderCarteChantiers();
+  });
+}
 function renderCarteChantiers() {
   var z = $('#carte-svg'); if (!z) return;
   /* Le fond se charge à la première ouverture, puis se garde. */
@@ -17917,7 +17961,7 @@ function renderCarteChantiers() {
    à l'écran alors que le fond est simplifié à cent mètres. */
 function zoomerCarte(f) {
   var v = cadreCarte();
-  v.m = Math.min(4000, Math.max(3, v.m * f));
+  v.m = Math.min(4000, Math.max(1, v.m * f));
   renderCarteChantiers();
 }
 /* Le doigt déplace la carte, deux doigts la zooment. On travaille en
@@ -17957,11 +18001,14 @@ function brancherGestesCarte() {
       var d = pointDessin(e, p); if (!d) return;
       v.cx = depart.cx - (d.x - depart.d.x) * v.m;
       v.cy = depart.cy + (d.y - depart.d.y) * v.m;
-      renderCarteChantiers();
+      redessinerCarte();
     } else if (n.length === 2 && ecart0 > 0) {
       var a = doigts[n[0]], b = doigts[n[1]];
       var ec = Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2));
-      if (ec > 0) { v.m = Math.min(4000, Math.max(3, m0 * ecart0 / ec)); renderCarteChantiers(); }
+      if (ec > 0) {
+        v.m = Math.min(4000, Math.max(1, m0 * ecart0 / ec));
+        redessinerCarte();
+      }
     }
   });
   var lacher = function (e) {
@@ -18020,38 +18067,84 @@ function dessinerCarteChantiers(z) {
   var pts = chantiersLocalises();
   var v = cadreCarte();
   var W = 320, H = 240;
-  /* Lambert 93 est une projection plane : un mètre vaut un mètre dans les
-     deux sens, et l'échelle se réduit à un seul nombre. */
+  /* Mercator est conforme : localement, l'échelle est la même dans les deux
+     sens et tient en un seul nombre. Mais c'est un mètre de carte, pas de
+     terrain — au milieu de la France il en vaut 0,69, et c'est LB.facteurSol qui le dit. */
   var px = function (x) { return W / 2 + (x - v.cx) / v.m; };
   var py = function (y) { return H / 2 - (y - v.cy) / v.m; };
 
+  /* Les tuiles vont derrière le SVG, dans une couche d'images : un
+     <image> SVG par tuile marcherait aussi, mais le navigateur gère bien
+     mieux le cache et le chargement paresseux sur de vraies <img>. */
+  var ft = fondTuiles(), tuiles = '';
+  if (ft) {
+    var niv = niveauTuile(v.m, ft.max);
+    var T = TOUR_MERCATOR / Math.pow(2, niv);    /* mètres par tuile */
+    var demi = TOUR_MERCATOR / 2;
+    /* Le coin haut-gauche du cadre, en mètres Mercator. */
+    var tg0 = v.cx - W / 2 * v.m, th0 = v.cy + H / 2 * v.m;
+    var x0 = Math.floor((tg0 + demi) / T), y0 = Math.floor((demi - th0) / T);
+    var nx = Math.ceil((v.cx + W / 2 * v.m + demi) / T) - x0;
+    var ny = Math.ceil((demi - (v.cy - H / 2 * v.m)) / T) - y0;
+    var cote = T / v.m;                          /* taille d'une tuile à l'écran */
+    var lim = Math.pow(2, niv);
+    /* Une garde bête mais utile : à un zoom absurde on demanderait des
+       milliers de tuiles d'un coup. */
+    if (nx * ny <= 60) {
+      for (var i = 0; i < nx; i++) {
+        for (var j = 0; j < ny; j++) {
+          var tx = x0 + i, ty = y0 + j;
+          if (tx < 0 || ty < 0 || tx >= lim || ty >= lim) continue;
+          tuiles += '<img src="' + esc(urlTuile(ft, niv, tx, ty)) + '" alt="" ' +
+            'loading="lazy" style="position:absolute;width:' + cote.toFixed(2) +
+            'px;height:' + cote.toFixed(2) + 'px;left:' +
+            ((tx * T - demi - tg0) / v.m).toFixed(2) + 'px;top:' +
+            ((th0 - (demi - ty * T)) / v.m).toFixed(2) + 'px">';
+        }
+      }
+    }
+  }
+
   var fond = '';
   if (FOND.etat === 'pret') {
-    /* On ne dessine que ce qui traverse le cadre : sur 2 880 contours,
-       l'écran n'en voit qu'une poignée, et les parcourir tous à chaque
-       redessin ferait ramer le zoom. */
+    /* On ne trace que ce qui traverse le cadre : sur près de trois mille
+       contours, l'écran n'en voit qu'une poignée, et les tracer tous à
+       chaque redessin ferait ramer le zoom. */
     var mx = v.m * W / 2 * 1.2, my = v.m * H / 2 * 1.2;
     var g0 = v.cx - mx, d0 = v.cx + mx, b0 = v.cy - my, h0 = v.cy + my;
     var traces = [];
     FOND.contours.forEach(function (c) {
-      var dedans = false, d = '', i;
+      var d = '', i;
+      var xa = Infinity, xb = -Infinity, ya = Infinity, yb = -Infinity;
       for (i = 0; i < c.length; i += 2) {
-        if (c[i] >= g0 && c[i] <= d0 && c[i + 1] >= b0 && c[i + 1] <= h0) { dedans = true; break; }
+        if (c[i] < xa) xa = c[i];
+        if (c[i] > xb) xb = c[i];
+        if (c[i + 1] < ya) ya = c[i + 1];
+        if (c[i + 1] > yb) yb = c[i + 1];
       }
-      if (!dedans) return;
+      /* Deux rectangles qui se touchent, pas un sommet dans le cadre : une
+         commune qui ENTOURE l'écran n'a aucun sommet dedans, et c'est
+         justement celle près de laquelle on se tient à fort zoom. */
+      if (xb < g0 || xa > d0 || yb < b0 || ya > h0) return;
+      /* Plus petite que quatre pixels, elle ne se voit pas : la dessiner
+         coûte un tracé pour rien, et sur près de trois mille c'est ce qui
+         faisait bégayer le pincement. */
+      if ((xb - xa) / v.m < 4 && (yb - ya) / v.m < 4) return;
       for (i = 0; i < c.length; i += 2) {
         d += (i ? 'L' : 'M') + px(c[i]).toFixed(1) + ' ' + py(c[i + 1]).toFixed(1);
       }
       traces.push(d + 'Z');
     });
     fond = traces.length
-      ? '<path d="' + traces.join('') + '" fill="none" stroke="#B8AB95" stroke-width="0.6"/>'
+      ? '<path d="' + traces.join('') + '" fill="none" stroke="' +
+        (ft ? '#FFE9A8' : '#8A9382') + '" stroke-width="' + (ft ? 1 : 0.8) +
+        '" opacity="' + (ft ? 0.85 : 1) + '"/>'
       : '';
   }
 
-  var svg = '<svg id="carte-plan" viewBox="0 0 ' + W + ' ' + H + '" width="100%" ' +
-    'style="max-width:420px;background:var(--carte2);border-radius:11px;' +
-    'border:1px solid var(--trait);touch-action:none">' + fond;
+  var svg = '<svg id="carte-plan" viewBox="0 0 ' + W + ' ' + H + '" ' +
+    'preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;' +
+    'height:100%;touch-action:none">' + fond;
 
   pts.forEach(function (p) {
     var l = LB.vers(p.gps.lat, p.gps.lon);
@@ -18070,7 +18163,7 @@ function dessinerCarteChantiers(z) {
   }
   /* Une échelle, sinon on ne sait pas si l'on regarde un canton ou une
      région. Un trait de cinquante pixels, arrondi à un compte rond. */
-  var metres = v.m * 50;
+  var metres = v.m * 50 * LB.facteurSol(v.cy);
   var rond = Math.pow(10, Math.floor(Math.log(metres) / Math.LN10));
   rond = metres / rond >= 5 ? rond * 5 : metres / rond >= 2 ? rond * 2 : rond;
   svg += '<g><line x1="10" y1="' + (H - 12) + '" x2="' + (10 + rond / v.m).toFixed(0) +
@@ -18078,18 +18171,34 @@ function dessinerCarteChantiers(z) {
     '<text x="10" y="' + (H - 16) + '" font-size="8.5" fill="#22301C">' +
     xmlEsc(G.fmtDistance(rond)) + '</text></g>';
   svg += '</svg>';
-  z.innerHTML = svg;
+  /* Les tuiles dessous, le dessin dessus, dans un cadre de proportions
+     fixes : sans lui les images et le SVG ne se caleraient pas. */
+  z.innerHTML = '<div id="carte-cadre" style="position:relative;width:100%;' +
+    'max-width:420px;aspect-ratio:' + W + '/' + H + ';overflow:hidden;' +
+    'background:var(--carte2);border-radius:11px;border:1px solid var(--trait)">' +
+    tuiles + svg + '</div>';
 
+  var choix = $('#carte-fonds');
+  if (choix) {
+    var actif = (A.cfg && A.cfg.fondCarte) || 'photo';
+    choix.innerHTML = FONDS_TUILES.map(function (f) {
+      return '<button class="chip' + (f.c === actif ? ' actif' : '') +
+        '" data-fondcarte="' + f.c + '">' + esc(f.n) + '</button>';
+    }).join('');
+  }
   var aide = $('#carte-aide');
   if (aide) {
     aide.textContent = A.cartePose
       ? 'Appuyez sur la carte à l’endroit du chantier.'
       : FOND.etat === 'charge' ? 'Chargement du fond de carte…'
         : FOND.etat === 'absent'
-          ? 'Fond de carte indisponible : les chantiers restent placés les uns par ' +
+          ? 'Contours indisponibles : les chantiers restent placés les uns par ' +
             'rapport aux autres.'
-          : 'Glissez pour vous déplacer, pincez pour zoomer. Appuyez sur un point ' +
-            'pour ouvrir sa fiche.';
+          : ft
+            ? 'Photo et carte viennent de l’IGN : elles demandent du réseau. Sans ' +
+              'réseau, les contours de communes restent, eux sont dans l’appareil.'
+            : 'Glissez pour vous déplacer, pincez pour zoomer. Appuyez sur un point ' +
+              'pour ouvrir sa fiche.';
   }
 
   var tri = G.parDistance(pts, A.ici, 'gps');
@@ -20008,7 +20117,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.80.0-20260909-2200';
+var VERSION = '4.81.0-20260910-0030';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
