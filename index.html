@@ -335,6 +335,9 @@ body:not(.m-ent) .mod-ent{display:none}
    dire en toutes lettres ne l'a pas sauvé. Ce qui est à traiter se lit dans
    la zone « À traiter », qui le dit déjà et que l'on comprend. */
 .alerte small{color:var(--doux);font-size:12px}
+/* Une note garde ses retours à la ligne : « j'ai ce chantier, ce chantier,
+   ce chantier » s'écrit en liste. */
+.note-texte{display:block;white-space:pre-line;margin-top:2px}
 .kpi small{font-size:11px;color:var(--doux)}
 
 /* ---------------------------------------------------------- accueil --- */
@@ -1490,7 +1493,6 @@ if (froid && s > 0) montrer(s);
              chercher en arrivant, et en dessous il tombait sous la ligne
              d'horizon d'un écran de téléphone. -->
         <div id="ent-bilan"></div>
-        <div id="ent-alertes"></div>
         <div class="tuiles">
           <button class="tuile" data-module="chantiers"><span class="ic rond"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><path d="M12 20.6s6.1-5.9 6.1-10A6.1 6.1 0 0 0 5.9 10.6c0 4.1 6.1 10 6.1 10Z"/><circle cx="12" cy="10.4" r="2.3"/></svg></span>
             <span><b>Chantiers</b><small id="e-ch-s">En cours, terminés, à venir</small></span>
@@ -1513,7 +1515,11 @@ if (froid && s > 0) montrer(s);
           <button class="tuile" data-module="vehicule"><span class="ic rond"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><path d="M3.5 15.6V9.4h9.6l3.3 3h4.1v3.2"/><path d="M9.6 16.2h4.6"/><circle cx="7.3" cy="16.2" r="1.8"/><circle cx="16.6" cy="16.2" r="1.8"/></svg></span>
             <span><b>Véhicule</b><small id="e-vh-s">Carnet d'entretien, échéances</small></span>
             <span class="chiffre"><b id="e-vh-n">—</b><span>km</span></span></button>
-                </div>
+        </div>
+        <!-- Les notes sous les tuiles : on arrive sur les modules sans
+             défiler, et les notes se lisent en descendant. « À traiter »
+             n'est plus ici — le carnet des chantiers le porte déjà. -->
+        <div id="ent-notes"></div>
       </div>
     </section>
 
@@ -1608,6 +1614,11 @@ if (froid && s > 0) montrer(s);
       <div class="carte">
         <div class="carte-titre"><h2>Carte des chantiers</h2>
           <button class="btn btn-min" id="carte-ici">Ma position</button></div>
+        <div style="display:flex;gap:7px;margin:0 0 8px">
+          <input type="search" id="carte-rech" autocomplete="off" placeholder="Aller à une commune…"
+                 style="flex:1;min-width:0;width:auto">
+          <button class="btn btn-min" id="carte-chercher">Chercher</button></div>
+        <div id="carte-resultats"></div>
         <div id="carte-svg"></div>
         <div class="btn-rang" style="margin-top:9px">
           <button class="btn btn-min" id="carte-moins">−</button>
@@ -4686,6 +4697,13 @@ function filtre(chantiers, quoi) {
      partent pas : un client qui rappelle pour finir une parcelle, un
      dépannage. */
   if (quoi === 'avecdevis') return l.filter(function (c) { return aDevis(c); });
+  if (quoi === 'clos') return l.filter(function (c) { return !statutOuvert(c.statut); });
+  /* « Uniquement ce qui est à faire ou en cours, pour voir ce qui me reste à
+     faire et m'organiser. » Un chantier terminé ou facturé ne demande plus
+     de journée, même s'il reste ouvert tant qu'il n'est pas payé. */
+  if (quoi === 'afaire') {
+    return l.filter(function (c) { return c.statut === 'accepte' || c.statut === 'encours'; });
+  }
   return l.filter(function (c) { return c.statut === quoi; });
 }
 /* Chercher un chantier par ce dont on se souvient : le nom, qui l'a donné,
@@ -7925,6 +7943,13 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.82', quoi: [
+    { t: 'Carte : chercher une commune, et le doigt ne se bloque plus au bout d un moment', vue: 'carte' },
+    { t: 'Les contours de communes sont partis : photo aerienne ou carte IGN', vue: 'carte' },
+    { t: 'Mes notes vont a la ligne, et passent sous les tuiles de Mon entreprise' },
+    { t: 'Carnet : les filtres dans votre ordre, et « En cours ou a planifier »', vue: 'carnet' },
+    { t: 'Ma journee : plus de case non facturee, et « Hors production » pour l affutage', vue: 'calendrier' }
+  ] },
   { v: '4.81', quoi: [
     { t: 'Photo aerienne et carte IGN sur la carte, quand vous avez du reseau', vue: 'carte' },
     { t: 'Sans reseau, les contours de communes restent : ils sont dans l appareil', vue: 'carte' },
@@ -7944,12 +7969,6 @@ var NOTES_MAJ = [
     { t: 'Le prix de journee attend que le chantier soit fini pour se montrer', vue: 'chantier' },
     { t: 'Rendements : plus de pastilles, les lignes s alignent enfin', vue: 'rendements' },
     { t: 'Et un tri : alphabetique, du plus recent, du plus de chantiers', vue: 'rendements' }
-  ] },
-  { v: '4.77', quoi: [
-    { t: '« Proprietaire » devient « Client » : tous ne sont pas proprietaires', vue: 'carnet' },
-    { t: 'Un nom nouveau se range par type : proprietaire, gestionnaire, ETF, autre', vue: 'carnet' },
-    { t: 'Et le n° SIREN ne se demande que la ou il a un sens', vue: 'carnet' },
-    { t: 'Trois endroits cherchaient un lieu de chantier qui n existe pas', vue: 'calendrier' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -8907,6 +8926,18 @@ function brancher() {
     A.carte = null; renderCarteChantiers();
   });
   $('#carte-poser').addEventListener('click', ouvrirPoseCarte);
+  $('#carte-chercher').addEventListener('click', function () {
+    chercherCommune($('#carte-rech').value);
+  });
+  $('#carte-rech').addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    chercherCommune(this.value);
+  });
+  $('#carte-resultats').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-commune]'); if (!b) return;
+    allerCommune(communesTrouvees[Number(b.dataset.commune)]);
+  });
   $('#carte-fonds').addEventListener('click', function (e) {
     var b = e.target.closest('[data-fondcarte]');
     if (!b) return;
@@ -9036,7 +9067,7 @@ function brancher() {
     renderFiltreChantiers(); renderListeChantiers();
     allerModule('chantiers', 'carnet');
   });
-  $('#ent-alertes').addEventListener('click', function (e) {
+  $('#ent-notes').addEventListener('click', function (e) {
     var sup = e.target.closest('[data-notesup]');
     if (sup) {
       var n = notes().filter(function (x) { return x.id === sup.dataset.notesup; })[0];
@@ -9046,9 +9077,7 @@ function brancher() {
     }
     var note = e.target.closest('[data-note]');
     if (note) { ouvrirNote(note.dataset.note); return; }
-    if (e.target.closest('#ent-note-plus')) { ouvrirNote(null); return; }
-    var b = e.target.closest('[data-alerte]');
-    if (b) ouvrirChantier(b.dataset.alerte);
+    if (e.target.closest('#ent-note-plus')) ouvrirNote(null);
   });
   /* Chaque bulle du bilan mène à la liste qui la détaille : le chiffre seul
      ne sert à rien si l'on doit ensuite chercher de quoi il parle. */
@@ -10736,39 +10765,27 @@ function brancherVeille() {
 }
 
 /* ==========================================================  FOND DE CARTE
-   « Est-ce qu'on ne pourrait pas juste avoir un fond de carte et pouvoir
-   poser des points ? »
-
-   Ses fichiers IGN ne sont pas des images : ce sont des tracés, et un tracé
-   s'embarque. 2 906 contours de communes sur six départements, 344 Ko :
-   c'est ce qui reste quand le réseau manque. Les tuiles de l'IGN se posent
-   dessous quand il y en a — voir FONDS_TUILES.
-
-   Ils vivent dans communes.js, chargé à la demande : les parcourir au
-   démarrage coûterait une seconde pour un écran qu'on ouvre rarement. */
-var FOND = { etat: 'rien', contours: null };
-
-/* Les fonds de la Géoplateforme de l'IGN, en accès libre. Ce sont ceux
+   Les fonds de la Géoplateforme de l'IGN, en accès libre. Ce sont ceux
    qu'il a lui-même relevés dans son fichier de cartographie.
 
-   Le réseau n'est plus interdit — il ne l'a jamais vraiment été, la carte
-   des piles charge des tuiles depuis des mois — mais il reste facultatif :
-   une tuile qui n'arrive pas laisse voir les contours en dessous, et rien
-   ne casse. C'est la différence entre « demande du réseau » et « en profite
-   quand il y en a ». */
+   Ils demandent du réseau, et c'est accepté : sans réseau, la carte montre
+   encore les chantiers placés les uns par rapport aux autres, et rien ne
+   casse. Les contours de communes, qui tenaient hors ligne, ont été retirés
+   à sa demande en 4.82 : « ça sert à rien ». */
 var FONDS_TUILES = [
   { c: 'photo', n: 'Photo aérienne',
     couche: 'ORTHOIMAGERY.ORTHOPHOTOS', format: 'image/jpeg', max: 19 },
   { c: 'ign', n: 'Carte IGN',
-    couche: 'GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2', format: 'image/png', max: 19 },
-  { c: 'contours', n: 'Contours seuls' }
+    couche: 'GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2', format: 'image/png', max: 19 }
 ];
+/* Un téléphone réglé sur « contours seuls » avant la 4.82 retombe sur la
+   photo : un choix qui n'existe plus ne doit pas laisser la carte vide. */
 function fondTuiles() {
   var c = (A.cfg && A.cfg.fondCarte) || 'photo';
   for (var i = 0; i < FONDS_TUILES.length; i++) {
-    if (FONDS_TUILES[i].c === c && FONDS_TUILES[i].couche) return FONDS_TUILES[i];
+    if (FONDS_TUILES[i].c === c) return FONDS_TUILES[i];
   }
-  return null;
+  return FONDS_TUILES[0];
 }
 function urlTuile(f, z, x, y) {
   return 'https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0' +
@@ -10785,12 +10802,12 @@ function niveauTuile(m, max) {
   return Math.max(0, Math.min(max || 19, z));
 }
 
-/* Web Mercator (EPSG:3857) : la projection de toutes les tuiles du web, et
-   celle dans laquelle les contours sortent du convertisseur. Sphérique et
-   sans excentricité — c'est la définition, pas une approximation.
+/* Web Mercator (EPSG:3857) : la projection de toutes les tuiles du web.
+   Sphérique et sans excentricité — c'est la définition, pas une
+   approximation.
 
    Elle étire vers les pôles : un pixel ne vaut pas la même distance au sol
-   selon la latitude. D'où `solParPixel`, qui rend l'échelle vraie plutôt
+   selon la latitude. D'où `facteurSol`, qui rend l'échelle vraie plutôt
    que la mesure de Mercator. */
 var LB = (function () {
   var A = 6378137, r = Math.PI / 180;
@@ -10809,56 +10826,61 @@ var LB = (function () {
   };
 })();
 
-/* L'écriture des polylignes de Google : l'écart au point précédent, par pas
-   de dix mètres, en groupes de cinq bits décalés de 63.
-   L'alphabet va de « ? » à « ~ » — le séparateur des contours doit rester
-   hors de cette plage, sinon il les coupe au milieu. C'est un saut de
-   ligne, et le convertisseur porte le même avertissement. */
-function decoderContour(txt) {
-  var out = [], i = 0, x = 0, y = 0, res, dec, b;
-  while (i < txt.length) {
-    res = 0; dec = 0;
-    do { b = txt.charCodeAt(i++) - 63; res |= (b & 0x1f) << dec; dec += 5; } while (b >= 0x20);
-    x += ((res & 1) ? ~(res >> 1) : (res >> 1));
-    res = 0; dec = 0;
-    do { b = txt.charCodeAt(i++) - 63; res |= (b & 0x1f) << dec; dec += 5; } while (b >= 0x20);
-    y += ((res & 1) ? ~(res >> 1) : (res >> 1));
-    out.push(x * 10, y * 10);
-  }
-  return out;
+/* « Une barre de recherche pour rechercher une ville ou une commune. » Le
+   géocodage de l'IGN, le même fournisseur que les tuiles : sans réseau il
+   n'y aurait de toute façon pas de photo à regarder. */
+function urlRechercheCommune(q) {
+  return 'https://data.geopf.fr/geocodage/search?q=' + encodeURIComponent(q) +
+    '&type=municipality&limit=5';
 }
-
-/* Chargé une fois, à la demande. La promesse est gardée : deux ouvertures
-   rapprochées ne téléchargent pas deux fois. */
-var fondPromis = null;
-function chargerFond() {
-  if (fondPromis) return fondPromis;
-  if (window.COMMUNES) {
-    FOND.contours = String(window.COMMUNES).split(String.fromCharCode(10)).map(decoderContour);
-    FOND.etat = 'pret';
-    return (fondPromis = Promise.resolve(true));
+var communesTrouvees = [];
+function chercherCommune(q) {
+  var z = $('#carte-resultats'); if (!z) return Promise.resolve();
+  var dire = function (t) {
+    z.innerHTML = '<p class="muted" style="font-size:12px;margin:0 0 8px">' + esc(t) + '</p>';
+  };
+  q = String(q || '').trim();
+  if (q.length < 2) { z.innerHTML = ''; return Promise.resolve(); }
+  /* Un vieux navigateur sans fetch lèverait une erreur avant la promesse,
+     que rien ne rattraperait. */
+  if (typeof fetch !== 'function') {
+    dire('Ce navigateur ne sait pas interroger l’IGN.');
+    return Promise.resolve();
   }
-  FOND.etat = 'charge';
-  fondPromis = new Promise(function (ok) {
-    var sc = document.createElement('script');
-    sc.src = 'communes.js';
-    sc.onload = function () {
-      if (!window.COMMUNES) { FOND.etat = 'absent'; ok(false); return; }
-      FOND.contours = String(window.COMMUNES).split(String.fromCharCode(10)).map(decoderContour);
-      FOND.etat = 'pret';
-      ok(true);
-    };
-    /* Sylve.html ouvert seul n'a pas le fichier à côté : on le dit plutôt
-       que de laisser un cadre vide. */
-    sc.onerror = function () { FOND.etat = 'absent'; ok(false); };
-    /* Un chargement qui n'aboutit ni ne rate laisserait « Chargement… »
-       pour toujours. Au bout de huit secondes on renonce et on le dit. */
-    setTimeout(function () {
-      if (FOND.etat === 'charge') { FOND.etat = 'absent'; renderCarteChantiers(); ok(false); }
-    }, 8000);
-    document.head.appendChild(sc);
+  dire('Recherche…');
+  return fetch(urlRechercheCommune(q)).then(function (r) {
+    if (!r.ok) throw new Error('réponse ' + r.status);
+    return r.json();
+  }).then(function (j) {
+    communesTrouvees = ((j && j.features) || []).filter(function (f) {
+      return f && f.geometry && f.geometry.coordinates;
+    }).map(function (f) {
+      var p = f.properties || {};
+      /* Le service rend la longitude d'abord : c'est l'ordre du GeoJSON. */
+      return { nom: p.name || p.label || q, dep: p.depcode || '',
+        lon: Number(f.geometry.coordinates[0]), lat: Number(f.geometry.coordinates[1]) };
+    });
+    if (!communesTrouvees.length) { dire('Aucune commune de ce nom.'); return; }
+    /* Une seule réponse : on y va, plutôt que de faire choisir dans une
+       liste d'un. */
+    if (communesTrouvees.length === 1) { allerCommune(communesTrouvees[0]); return; }
+    z.innerHTML = '<div class="chips" style="margin:0 0 8px">' +
+      communesTrouvees.map(function (c, i) {
+        return '<button class="chip" data-commune="' + i + '">' + esc(c.nom) +
+          (c.dep ? ' (' + esc(c.dep) + ')' : '') + '</button>';
+      }).join('') + '</div>';
+  }).catch(function () {
+    dire('Recherche impossible : elle interroge l’IGN, il faut du réseau.');
   });
-  return fondPromis;
+}
+function allerCommune(c) {
+  if (!c) return;
+  var m = LB.vers(c.lat, c.lon), v = cadreCarte();
+  v.cx = m.x; v.cy = m.y;
+  /* Une douzaine de mètres au sol par pixel : la commune tient à l'écran. */
+  v.m = 12 / LB.facteurSol(m.y);
+  var z = $('#carte-resultats'); if (z) z.innerHTML = '';
+  renderCarteChantiers();
 }
 
 /* ------------------------------------------------------------- le carnet */
@@ -10923,19 +10945,27 @@ function renderFiltreChantiers() {
     return '<option value="' + o[0] + '"' + (f === o[0] ? ' selected' : '') + '>' +
       esc(o[1]) + ' (' + o[2] + ')</option>';
   };
-  var tete = [['ouverts', 'Chantiers ouverts', C.filtre(A.chantiers, 'ouverts').length],
-    ['tous', 'Tous', A.chantiers.length]];
-  if (incomplets) tete.push(['acompleter', 'À compléter', incomplets]);
-  var avecDevis = C.filtre(A.chantiers, 'avecdevis').length;
+  /* Dans l'ordre qu'il a dicté : tout, avec devis, ouverts, clos, puis ce
+     qui reste à faire. */
+  var nf = function (q) { return C.filtre(A.chantiers, q).length; };
+  var tete = [['tous', 'Tous', A.chantiers.length]];
+  var avecDevis = nf('avecdevis');
   if (avecDevis) tete.push(['avecdevis', 'Avec devis', avecDevis]);
+  tete.push(['ouverts', 'Chantiers ouverts', nf('ouverts')],
+    ['clos', 'Chantiers clos', nf('clos')],
+    ['afaire', 'En cours ou à planifier', nf('afaire')]);
+  if (incomplets) tete.push(['acompleter', 'À compléter', incomplets]);
   var ouv = [], clos = [];
   C.STATUTS.forEach(function (st) {
     var n = C.filtre(A.chantiers, st.c).length;
     if (!n) return;
     (C.statutOuvert(st.c) ? ouv : clos).push([st.c, st.n, n]);
   });
+  /* Le groupe s'appelait « En cours » et rangeait les facturés dedans :
+     « dans en cours, j'ai encore tous les chantiers que j'ai finis ». Il
+     porte le nom du filtre qu'il détaille. */
   s.innerHTML = tete.map(opt).join('') +
-    (ouv.length ? '<optgroup label="En cours">' + ouv.map(opt).join('') + '</optgroup>' : '') +
+    (ouv.length ? '<optgroup label="Ouverts">' + ouv.map(opt).join('') + '</optgroup>' : '') +
     (clos.length ? '<optgroup label="Clos">' + clos.map(opt).join('') + '</optgroup>' : '');
 }
 function renderTriChantiers() {
@@ -15089,7 +15119,7 @@ function renderEntreprise() {
 
   renderMarqueEntreprise();
   renderEntBilan();
-  renderATraiter();
+  renderNotesEnt();
 }
 
 /* Six chiffres qui disent ce qu'il reste à faire, pas ce qui est déjà fait —
@@ -15195,37 +15225,24 @@ function notes() {
   A.cfg.notes = A.cfg.notes || [];
   return A.cfg.notes;
 }
-function renderATraiter() {
-  var z = $('#ent-alertes'); if (!z) return;
-  var al = C.alertes(A.chantiers, A.cfg, Date.now()).filter(function (a) {
-    return ['retard', 'afacturer', 'impaye'].indexOf(a.type) >= 0;
-  });
+function renderNotesEnt() {
+  var z = $('#ent-notes'); if (!z) return;
   var mes = notes();
   z.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;' +
     'gap:9px;margin:22px 0 8px">' +
-    '<p class="eyebrow" style="margin:0">À traiter</p>' +
+    '<p class="eyebrow" style="margin:0">Mes notes</p>' +
     '<button class="btn-min" id="ent-note-plus">+ note</button></div>' +
-    al.map(function (x) {
-      /* Qui, combien, depuis quand : d'un impayé, c'est tout ce qu'on veut
-         savoir sans ouvrir la fiche. */
-      var m = C.montant(x.chantier);
-      return '<button class="alerte" data-alerte="' + x.chantier.id + '">' +
-        '<span class="ic" style="background:' + (COUL_ALERTE[x.type] || '#7A8471') + '"></span>' +
-        '<span><b>' + esc(TITRE_ALERTE[x.type] || '') + ' — ' + esc(C.nomChantier(x.chantier)) +
-        (m ? ' · ' + eur(m) : '') + '</b>' +
-        '<small>' + esc(x.texte) +
-        (x.chantier.donneur ? ' · ' + esc(x.chantier.donneur) : '') + '</small></span></button>';
-    }).join('') +
     mes.map(function (n) {
       return '<div class="alerte" data-note="' + esc(n.id) + '">' +
         '<span class="ic" style="background:' + esc(n.couleur || '#6F6A5C') + '"></span>' +
         '<span><b>' + esc(n.titre || 'Note') + '</b>' +
-        (n.texte ? '<small>' + esc(n.texte) + '</small>' : '') + '</span>' +
+        (n.texte ? '<small class="note-texte">' + esc(n.texte) + '</small>' : '') + '</span>' +
         '<button class="fermer" data-notesup="' + esc(n.id) + '" title="Effacer cette note" ' +
         'aria-label="Effacer">×</button></div>';
     }).join('') +
-    (al.length || mes.length ? '' : '<p class="muted" style="font-size:12.5px;margin:0">' +
-      'Rien en retard. « + note » pour vous écrire ce qu’il reste à faire.</p>');
+    (mes.length ? '' : '<p class="muted" style="font-size:12.5px;margin:0">' +
+      '« + note » pour vous écrire ce qu’il ne faut pas oublier : un chantier qui se ' +
+      'prépare, un appel à passer.</p>');
 }
 function ouvrirNote(id) {
   var l = notes();
@@ -15235,9 +15252,12 @@ function ouvrirNote(id) {
     '<div class="champ"><label class="eyebrow" for="nt-titre">Quoi ?</label>' +
     '<input type="text" id="nt-titre" class="gros" autocomplete="off" ' +
     'placeholder="rappeler le gestionnaire" value="' + esc(n ? n.titre || '' : '') + '"></div>' +
-    '<div class="champ"><label class="eyebrow" for="nt-texte">Précision</label>' +
-    '<input type="text" id="nt-texte" autocomplete="off" ' +
-    'placeholder="pour la parcelle du haut" value="' + esc(n ? n.texte || '' : '') + '"></div>' +
+    /* Un champ d'une ligne ne laissait rien écrire de plus qu'une phrase :
+       « je puisse avoir plus de place, faire des retours à la ligne ». */
+    '<div class="champ"><label class="eyebrow" for="nt-texte">Le détail</label>' +
+    '<textarea id="nt-texte" rows="6" ' +
+    'placeholder="une ligne par chantier, par exemple">' + esc(n ? n.texte || '' : '') +
+    '</textarea></div>' +
     '<p class="eyebrow" style="margin:12px 0 6px">Couleur</p>' +
     '<div class="chips" id="nt-couls">' + COUL_NOTE.map(function (x) {
       return '<button type="button" class="chip" data-ntcoul="' + x.c + '" title="' + x.n +
@@ -15264,7 +15284,7 @@ function ouvrirNote(id) {
     n.texte = $('#nt-texte').value.trim();
     n.couleur = coul;
     Promise.resolve(sauverCfg()).then(function () {
-      fermerModale(); renderATraiter();
+      fermerModale(); renderNotesEnt();
       toast(id ? 'Note modifiée.' : 'Note ajoutée.');
     });
   });
@@ -15272,17 +15292,16 @@ function ouvrirNote(id) {
 function effacerNote(id) {
   A.cfg.notes = notes().filter(function (x) { return x.id !== id; });
   Promise.resolve(sauverCfg()).then(function () {
-    fermerModale(); renderATraiter(); toast('Note effacée.');
+    fermerModale(); renderNotesEnt(); toast('Note effacée.');
   });
 }
 
 function renderAlertes() {
   var z = $('#bandeau-alertes'); if (!z) return;
-  /* Le même « À traiter » que sur l'écran Entreprise : deux listes portant
-     le même titre et ne disant pas la même chose, c'est ce qui l'a perdu.
-     Les journées à placer et le travail qui approche vivent dans les bulles
-     et sur le calendrier ; ici on ne garde que ce qui porte un nom de
-     chantier et attend une action. */
+  /* Le seul « À traiter » depuis la 4.82 : l'écran Entreprise le répétait,
+     et il l'y trouvait de trop. Les journées à placer et le travail qui
+     approche vivent dans les bulles et sur le calendrier ; ici on ne garde
+     que ce qui porte un nom de chantier et attend une action. */
   var al = C.alertes(A.chantiers, A.cfg, Date.now()).filter(function (a2) {
     return ['retard', 'afacturer', 'impaye'].indexOf(a2.type) >= 0;
   });
@@ -15290,9 +15309,14 @@ function renderAlertes() {
   if (!al.length) { z.innerHTML = ''; majPastilleEntreprise(); return; }
   z.innerHTML = '<div class="carte"><div class="carte-titre"><h2>À traiter (' + al.length + ')</h2></div>' +
     al.map(function (a) {
+      /* Qui, combien, depuis quand : d'un impayé, c'est tout ce qu'on veut
+         savoir sans ouvrir la fiche. Le montant vivait sur l'écran
+         Entreprise ; il suit l'alerte ici. */
+      var m = C.montant(a.chantier);
       return '<button class="alerte" data-alerte="' + a.chantier.id + '">' +
         '<span class="ic" style="background:' + (COUL_ALERTE[a.type] || '#7A8471') + '"></span>' +
-        '<span><b>' + esc(TITRE_ALERTE[a.type] || '') + ' — ' + esc(C.nomChantier(a.chantier)) + '</b>' +
+        '<span><b>' + esc(TITRE_ALERTE[a.type] || '') + ' — ' + esc(C.nomChantier(a.chantier)) +
+        (m ? ' · ' + eur(m) : '') + '</b>' +
         '<small>' + esc(a.texte) + (a.chantier.donneur ? ' · ' + esc(a.chantier.donneur) : '') + '</small></span></button>';
     }).join('') + '</div>';
   majPastilleEntreprise();
@@ -16378,13 +16402,8 @@ function ouvrirJournee(id, modele) {
     (!id && dj ? '<button class="btn btn-min" id="mj-hier" style="margin-bottom:11px">' +
       'Comme le ' + esc(dateCourte(dj.date)) +
       (dj.lieu ? ' — ' + esc(dj.lieu) : '') + '</button>' : '') +
-    '<label class="ligne-check" style="display:flex;align-items:flex-start;gap:8px;font-size:13.5px;' +
-    'padding:9px 11px;background:var(--carte2);border-radius:9px;margin-bottom:11px">' +
-    '<input type="checkbox" id="mj-nonfact"' + (src && src.nonFacture ? ' checked' : '') +
-    ' style="margin-top:2px"><span>Journée non facturée' +
-    '<span class="muted" style="display:block;font-size:11.5px">Chantier observé ou travail pour ' +
-    'soi : le temps et les quantités nourrissent les rendements, sans entrer dans le chiffre ' +
-    'd’affaires. Les kilomètres deviennent facultatifs.</span></span></label>' +
+    /* La case « Journée non facturée » a disparu : « ça ne sert plus à
+       rien », dit deux fois. Une journée déjà marquée garde sa marque. */
     '<div class="champ"><label class="eyebrow" for="mj-date">Date</label>' +
     '<input type="date" id="mj-date" value="' +
     jourIso((j && j.date) || (modele && modele.date)) + '"></div>' +
@@ -16404,7 +16423,12 @@ function ouvrirJournee(id, modele) {
     '</div>' +
     '<label class="eyebrow" style="margin-top:6px;display:block">Ce que j’ai fait</label>' +
     '<div id="mj-postes"></div>' +
-    '<label class="eyebrow" style="margin-top:11px;display:block">Trajet et temps morts</label>' +
+    /* Ce qu'il demandait existait sous un nom qui ne le disait pas : une
+       tronçonneuse à régler, une chaîne à affûter, ce n'est pas un « temps
+       mort » à ses yeux. Les heures des prestations sont les productives. */
+    '<label class="eyebrow" style="margin-top:11px;display:block">Hors production</label>' +
+    '<p class="muted" style="font-size:11.5px;margin:0 0 6px">Trajet, affûtage, réglage, ' +
+    'panne : le temps passé sur la journée sans avancer le travail.</p>' +
     '<div class="grille g3">' +
     '<div class="champ" style="margin:0"><label class="eyebrow" for="mj-nonprod">Heures</label>' +
     '<input type="text" id="mj-nonprod" inputmode="decimal" value="' +
@@ -16435,13 +16459,13 @@ function ouvrirJournee(id, modele) {
     var pers = C.nb($('#mj-pers').value) || 1;
     var jrs = tot / C.HEURES_JOUR(A.cfg);
     var ch = $('#mj-ch').value ? chantier($('#mj-ch').value) : null;
-    var nf = $('#mj-nonfact').checked;
+    var nf = !!(j && j.nonFacture);
     var pj = ch ? C.prixJourVise(ch, A.cfg) : C.nb(A.cfg && A.cfg.prixJourVise);
     z.innerHTML = '<b class="num" style="font-size:19px">' + E.fmt(tot, 2) + ' h</b>' +
       ' — ' + E.fmt(jrs, 2) + ' journée' + (jrs > 1 ? 's' : '') +
       (nf ? ' <span class="retard">non facturée</span>' : '') +
       '<div class="muted" style="font-size:12.5px;margin-top:3px">' +
-      E.fmt(prod, 2) + ' h productives' + (np ? ' · ' + E.fmt(np, 2) + ' h de trajet' : '') +
+      E.fmt(prod, 2) + ' h productives' + (np ? ' · ' + E.fmt(np, 2) + ' h hors production' : '') +
       (pers > 1 ? ' · ' + pers + ' personnes' : '') +
       (nf ? ' · compte pour le rendement seulement'
           : pj ? ' · ' + eur(C.arr(jrs * pj, 2)) + ' à ' + eur(pj) + '/j' : '') + '</div>' +
@@ -16465,7 +16489,6 @@ function ouvrirJournee(id, modele) {
     renderPostes(); apercu();
   });
   ['#mj-nonprod', '#mj-pers'].forEach(function (x) { $(x).addEventListener('input', apercu); });
-  $('#mj-nonfact').addEventListener('change', apercu);
   $('#mj-ch').addEventListener('change', function () {
     var c = $('#mj-ch').value ? chantier($('#mj-ch').value) : null;
     if (!c) { apercu(); return; }
@@ -16519,7 +16542,7 @@ function ouvrirJournee(id, modele) {
       date: versDate($('#mj-date').value) || Date.now(),
       chantier: $('#mj-ch').value || null, lieu: $('#mj-lieu').value.trim(),
       commune: $('#mj-commune').value.trim(),
-      nonFacture: !!$('#mj-nonfact').checked,
+      nonFacture: !!(j && j.nonFacture),
       km: C.nb($('#mj-km').value) || 0, nonProd: np,
       personnes: C.nb($('#mj-pers').value) || 1,
       fin: !!$('#mj-fin').checked, note: $('#mj-note').value.trim(),
@@ -17915,8 +17938,8 @@ function cadreCarte() {
   if (A.carte) return A.carte;
   var pts = chantiersLocalises();
   if (!pts.length) {
-    /* Rien de posé : on ouvre sur le centre des six départements. */
-    /* Le milieu des six départements, en Mercator : 46,6° N, 2,4° E. */
+    /* Rien de posé : on ouvre sur le milieu de six départements, en
+       Mercator — 46,6° N, 2,4° E. */
     return (A.carte = { cx: 267000, cy: 5877000, m: 1300 });
   }
   var xs = [], ys = [];
@@ -17950,15 +17973,11 @@ function redessinerCarte() {
 }
 function renderCarteChantiers() {
   var z = $('#carte-svg'); if (!z) return;
-  /* Le fond se charge à la première ouverture, puis se garde. */
-  if (FOND.etat === 'rien') {
-    chargerFond().then(function () { renderCarteChantiers(); });
-  }
   return dessinerCarteChantiers(z);
 }
 /* Zoomer, c'est changer le nombre de mètres par pixel. Les bornes évitent
-   les deux absurdités : la France entière dans un timbre, ou trois arbres
-   à l'écran alors que le fond est simplifié à cent mètres. */
+   les deux absurdités : la France entière dans un timbre, ou plus fin que la
+   photo aérienne n'a de détail. */
 function zoomerCarte(f) {
   var v = cadreCarte();
   v.m = Math.min(4000, Math.max(1, v.m * f));
@@ -17975,26 +17994,43 @@ function pointDessin(ev, svg) {
 }
 function brancherGestesCarte() {
   var z = $('#carte-svg'); if (!z) return;
-  var doigts = {}, depart = null, ecart0 = 0, m0 = 0;
+  var doigts = {}, depart = null, ecart0 = 0, m0 = 0, bouge = false;
   var svg = function () { return $('#carte-plan'); };
-  z.addEventListener('pointerdown', function (e) {
-    var p = svg(); if (!p) return;
-    doigts[e.pointerId] = { x: e.clientX, y: e.clientY };
-    var n = Object.keys(doigts);
+  /* On repart des doigts encore posés à chaque changement : après un
+     pincement, le doigt qui reste doit déplacer la carte sans être levé. */
+  var reprendre = function () {
+    var n = Object.keys(doigts), p = svg();
+    depart = null; ecart0 = 0;
+    if (!p) return;
     if (n.length === 1) {
-      var d = pointDessin(e, p);
+      var d = pointDessin({ clientX: doigts[n[0]].x, clientY: doigts[n[0]].y }, p);
       var v = cadreCarte();
       depart = d ? { d: d, cx: v.cx, cy: v.cy } : null;
     } else if (n.length === 2) {
       var a = doigts[n[0]], b = doigts[n[1]];
       ecart0 = Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2));
       m0 = cadreCarte().m;
-      depart = null;
     }
+  };
+  z.addEventListener('pointerdown', function (e) {
+    if (!svg()) return;
+    /* LE DOIGT FANTÔME. La carte se redessine sous le doigt : quand il se
+       lève, c'est parfois sur un dessin déjà remplacé, et l'événement ne
+       remonte plus jusqu'ici. Le doigt restait compté — un seul doigt
+       passait pour un pincement, deux pour trois, et plus rien ne bougeait
+       « au bout d'un moment ». Le premier doigt d'un geste repart de zéro. */
+    if (e.isPrimary) { doigts = {}; bouge = false; }
+    doigts[e.pointerId] = { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY };
+    /* Et le doigt est retenu par le cadre, qui n'est jamais remplacé : son
+       lever arrive ici même quand le dessin a changé entre-temps. */
+    try { if (z.setPointerCapture) z.setPointerCapture(e.pointerId); } catch (err) { /* rien */ }
+    reprendre();
   });
   z.addEventListener('pointermove', function (e) {
-    if (!doigts[e.pointerId]) return;
-    doigts[e.pointerId] = { x: e.clientX, y: e.clientY };
+    var f = doigts[e.pointerId];
+    if (!f) return;
+    f.x = e.clientX; f.y = e.clientY;
+    if (Math.abs(f.x - f.x0) + Math.abs(f.y - f.y0) > 8) bouge = true;
     var n = Object.keys(doigts), p = svg(); if (!p) return;
     var v = cadreCarte();
     if (n.length === 1 && depart) {
@@ -18012,11 +18048,21 @@ function brancherGestesCarte() {
     }
   });
   var lacher = function (e) {
+    if (!doigts[e.pointerId]) return;
     delete doigts[e.pointerId];
-    if (!Object.keys(doigts).length) { depart = null; ecart0 = 0; }
+    reprendre();
   };
   z.addEventListener('pointerup', lacher);
   z.addEventListener('pointercancel', lacher);
+  z.addEventListener('lostpointercapture', lacher);
+  /* Un glissement qui s'achève sur un point n'ouvre pas sa fiche, et ne pose
+     pas le chantier qu'on est en train de placer. */
+  z.addEventListener('click', function (e) {
+    if (!bouge) return;
+    bouge = false;
+    e.stopImmediatePropagation();
+    e.preventDefault();
+  }, true);
   /* La molette pour l'ordinateur : le pincement n'y existe pas. */
   z.addEventListener('wheel', function (e) {
     if (!svg()) return;
@@ -18105,46 +18151,9 @@ function dessinerCarteChantiers(z) {
     }
   }
 
-  var fond = '';
-  if (FOND.etat === 'pret') {
-    /* On ne trace que ce qui traverse le cadre : sur près de trois mille
-       contours, l'écran n'en voit qu'une poignée, et les tracer tous à
-       chaque redessin ferait ramer le zoom. */
-    var mx = v.m * W / 2 * 1.2, my = v.m * H / 2 * 1.2;
-    var g0 = v.cx - mx, d0 = v.cx + mx, b0 = v.cy - my, h0 = v.cy + my;
-    var traces = [];
-    FOND.contours.forEach(function (c) {
-      var d = '', i;
-      var xa = Infinity, xb = -Infinity, ya = Infinity, yb = -Infinity;
-      for (i = 0; i < c.length; i += 2) {
-        if (c[i] < xa) xa = c[i];
-        if (c[i] > xb) xb = c[i];
-        if (c[i + 1] < ya) ya = c[i + 1];
-        if (c[i + 1] > yb) yb = c[i + 1];
-      }
-      /* Deux rectangles qui se touchent, pas un sommet dans le cadre : une
-         commune qui ENTOURE l'écran n'a aucun sommet dedans, et c'est
-         justement celle près de laquelle on se tient à fort zoom. */
-      if (xb < g0 || xa > d0 || yb < b0 || ya > h0) return;
-      /* Plus petite que quatre pixels, elle ne se voit pas : la dessiner
-         coûte un tracé pour rien, et sur près de trois mille c'est ce qui
-         faisait bégayer le pincement. */
-      if ((xb - xa) / v.m < 4 && (yb - ya) / v.m < 4) return;
-      for (i = 0; i < c.length; i += 2) {
-        d += (i ? 'L' : 'M') + px(c[i]).toFixed(1) + ' ' + py(c[i + 1]).toFixed(1);
-      }
-      traces.push(d + 'Z');
-    });
-    fond = traces.length
-      ? '<path d="' + traces.join('') + '" fill="none" stroke="' +
-        (ft ? '#FFE9A8' : '#8A9382') + '" stroke-width="' + (ft ? 1 : 0.8) +
-        '" opacity="' + (ft ? 0.85 : 1) + '"/>'
-      : '';
-  }
-
   var svg = '<svg id="carte-plan" viewBox="0 0 ' + W + ' ' + H + '" ' +
     'preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;' +
-    'height:100%;touch-action:none">' + fond;
+    'height:100%;touch-action:none">';
 
   pts.forEach(function (p) {
     var l = LB.vers(p.gps.lat, p.gps.lon);
@@ -18163,10 +18172,13 @@ function dessinerCarteChantiers(z) {
   }
   /* Une échelle, sinon on ne sait pas si l'on regarde un canton ou une
      région. Un trait de cinquante pixels, arrondi à un compte rond. */
-  var metres = v.m * 50 * LB.facteurSol(v.cy);
+  var sol = v.m * LB.facteurSol(v.cy);          /* mètres au sol par pixel */
+  var metres = sol * 50;
   var rond = Math.pow(10, Math.floor(Math.log(metres) / Math.LN10));
   rond = metres / rond >= 5 ? rond * 5 : metres / rond >= 2 ? rond * 2 : rond;
-  svg += '<g><line x1="10" y1="' + (H - 12) + '" x2="' + (10 + rond / v.m).toFixed(0) +
+  /* Le trait se mesure au sol, comme son libellé : divisé par les mètres de
+     carte, il annonçait « 500 m » sur trois cent quarante-cinq. */
+  svg += '<g><line x1="10" y1="' + (H - 12) + '" x2="' + (10 + rond / sol).toFixed(0) +
     '" y2="' + (H - 12) + '" stroke="#22301C" stroke-width="1.5"/>' +
     '<text x="10" y="' + (H - 16) + '" font-size="8.5" fill="#22301C">' +
     xmlEsc(G.fmtDistance(rond)) + '</text></g>';
@@ -18180,7 +18192,7 @@ function dessinerCarteChantiers(z) {
 
   var choix = $('#carte-fonds');
   if (choix) {
-    var actif = (A.cfg && A.cfg.fondCarte) || 'photo';
+    var actif = fondTuiles().c;
     choix.innerHTML = FONDS_TUILES.map(function (f) {
       return '<button class="chip' + (f.c === actif ? ' actif' : '') +
         '" data-fondcarte="' + f.c + '">' + esc(f.n) + '</button>';
@@ -18190,15 +18202,8 @@ function dessinerCarteChantiers(z) {
   if (aide) {
     aide.textContent = A.cartePose
       ? 'Appuyez sur la carte à l’endroit du chantier.'
-      : FOND.etat === 'charge' ? 'Chargement du fond de carte…'
-        : FOND.etat === 'absent'
-          ? 'Contours indisponibles : les chantiers restent placés les uns par ' +
-            'rapport aux autres.'
-          : ft
-            ? 'Photo et carte viennent de l’IGN : elles demandent du réseau. Sans ' +
-              'réseau, les contours de communes restent, eux sont dans l’appareil.'
-            : 'Glissez pour vous déplacer, pincez pour zoomer. Appuyez sur un point ' +
-              'pour ouvrir sa fiche.';
+      : 'Glissez pour vous déplacer, pincez pour zoomer. La photo et la carte ' +
+        'viennent de l’IGN : sans réseau, seuls vos chantiers restent affichés.';
   }
 
   var tri = G.parDistance(pts, A.ici, 'gps');
@@ -20094,10 +20099,9 @@ function brancherReglagesDemarrage() {
 
 
 window.BCUI = { toast: toast,
-  /* La projection et le décodeur s'éprouvent seuls : une carte fausse ne se
-     voit qu'à l'écran, et trop tard. */
-  _carte: { LB: LB, decoder: decoderContour, fond: function () { return FOND; },
-    cadre: function () { return A.carte; } },
+  /* La projection s'éprouve seule : une carte fausse ne se voit qu'à
+     l'écran, et trop tard. */
+  _carte: { LB: LB, cadre: function () { return A.carte; } },
   _importCsv: function (txt) { A.imp = C.analyseCsv(txt); renderImportResultat(); },
   _setCal: function (mois, jour) { A.calMois = mois; A.calJour = jour; renderCalendrier(); },
   _setChantier: function (id, maj) { var c = chantier(id); if (!c) return; Object.keys(maj).forEach(function (k) { c[k] = maj[k]; }); c.maj = Date.now(); sauverChantiers().then(function () { renderCarnet(); renderFiche(); renderAccueil(); }); },
@@ -20117,7 +20121,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.81.0-20260910-0030';
+var VERSION = '4.82.0-20260915-1834';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

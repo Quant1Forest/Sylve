@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.81.0-20260910-0030**
+Version courante : **4.82.0-20260915-1834**
 
 ---
 
@@ -51,7 +51,7 @@ npm run controle   # vérificateur + service worker + tests + reconstruction + c
 ```
 
 Doit afficher **« Bon pour livraison »**, puis **« le service worker tient »**
-(24 vérifications), puis la suite au vert — 1738 à ce jour — puis
+(24 vérifications), puis la suite au vert — 1766 à ce jour — puis
 **« Sylve.html est conforme »**.
 
 Compter **moins de deux minutes**. Ça a été dix, et deux choses l'expliquaient :
@@ -209,9 +209,8 @@ l'ancien code. Le vérificateur refuse de passer si les deux divergent.
 | `Sylve.html` | Version autonome, fabriquée par `outils/construire.js`. Ne jamais l'éditer à la main. |
 | `sw.js` | Service worker. Sa constante `VERSION` doit être identique à celle de `index.html`. |
 | `manifest.webmanifest` | Nom, couleurs, icônes de la PWA. |
-| `communes.js` | Fond de carte : 2 906 contours de communes en Web Mercator, 344 Ko. Fabriqué par `outils/convertir-communes.js`, chargé à la demande, mis en cache par le service worker. Les tuiles IGN, venues d'une autre origine, n'y passent pas. |
 | `icone-*.png` | Icônes d'installation. La version *maskable* garde toute son encre dans la zone de rognage d'Android. |
-| `outils/` | Vérificateur, tests, tests du service worker, construction, conformité du fichier autonome, reprise du carnet, vocabulaire des magasins, **conversion du fond de carte**. |
+| `outils/` | Vérificateur, tests, tests du service worker, construction, conformité du fichier autonome, reprise du carnet, vocabulaire des magasins. |
 
 Les fichiers d'origine du logo ne sont pas dans le dépôt : ils sont gardés à
 part. Le dépôt étant public, il ne contient que ce qui est servi, plus de quoi
@@ -298,6 +297,12 @@ travailler.
   produisait du Lambert**. Les contours sont tombés en Belgique ; c'est le
   croisement avec la projection qui l'a dit. Un script qui refuse protège,
   et le rapiéçage défait précisément ce qu'il protégeait.
+- **`git stash` rend les fichiers en fins de ligne Windows.** Le dépôt les
+  garde en `LF`, mais la copie de travail ressort en `CRLF` : un script de
+  retouche dont l'ancre porte un saut de ligne ne trouve plus rien. Il refuse,
+  et c'est bien — mais on cherche longtemps pourquoi. Remettre les fichiers en
+  `LF` avant de continuer ; mieux, comparer à l'état publié avec
+  `git show HEAD:fichier` plutôt que de remiser.
 - **Ne jamais réécrire un fichier avec `Set-Content` sous PowerShell 5.1.**
   `Get-Content -Raw` lit en ANSI, `Set-Content -Encoding utf8` réécrit en
   UTF-8 : chaque accent traverse deux fois l'encodage et ressort en `Ã©`,
@@ -527,7 +532,19 @@ prêt, cotisations, et **frais bancaires** depuis la 4.37 (services bancaires
 exonérés). Le libellé du montant suit : « Montant TTC » n'a pas de sens sans
 TVA, c'est « Montant » tout court.
 
-## L'écran Entreprise : bulles au-dessus, notes en dessous
+## L'écran Entreprise : bulles, tuiles, puis ses notes
+
+**Depuis la 4.82 : bulles, tuiles, puis « Mes notes ».** *« Quand j'arrive,
+j'ai directement tous mes onglets, je ne suis pas obligé de défiler. Et il y a
+la même partie À traiter dans le carnet. »* « À traiter » a quitté l'écran ;
+celui du carnet porte désormais le montant de chaque alerte, qui ne vivait
+qu'ici. Ce qui suit décrit l'état d'avant, et reste vrai pour les bulles.
+
+**Une note va à la ligne** (`<textarea>`, `white-space: pre-line` sur
+`.note-texte`) : *« j'ai ce chantier, ce chantier, ce chantier »* s'écrit en
+liste. La règle CSS vise une **classe seule** : JSDOM ne résout pas un
+sélecteur descendant dans `getComputedStyle`, et le scénario lit le style
+calculé.
 
 Le regroupement des sept tuiles en trois titres a été **écarté** après
 maquette : un appui de plus à chaque navigation, pour toujours, et la barre
@@ -1571,6 +1588,19 @@ saisi après coup n'est pas arrivé aujourd'hui. **Repli sur `cree`**, donc rien
 compléter » : *« sélectionner uniquement les chantiers qui ont eu un devis, et
 pouvoir aussi les trier ».*
 
+**Les filtres dans l'ordre qu'il a dicté** (4.82) : *Tous*, *Avec devis*,
+*Chantiers ouverts*, *Chantiers clos*, *En cours ou à planifier*, puis *À
+compléter* et les statuts un par un.
+
+- **« En cours ou à planifier »** (`afaire`) : `accepte` et `encours`. *« Pour
+  voir ce qui me reste à faire et m'organiser. »* Un chantier terminé ou
+  facturé ne demande plus de journée.
+- **« Ouverts » n'a pas changé de sens** : un facturé non payé y reste,
+  l'argent n'est pas rentré. C'est `statutOuvert()`, qui sert ailleurs.
+- **Le groupe « En cours » s'appelle « Ouverts ».** Il rangeait les facturés
+  sous le nom d'un statut : *« dans en cours, j'ai encore tous les chantiers
+  que j'ai finis »*.
+
 ## La tête du carnet, dans ses mots
 
 *« Engagé tous statuts, ça c'est un peu bizarre. Devis sans réponse… »* Les
@@ -1607,6 +1637,24 @@ dépassement d’échéance.
 l’alerte d’impayé notées plus haut : elles ne font pas doublon, elles ne
 répondent pas à la même question.
 
+## Ma journée : productif et hors production
+
+*« Je devrais pouvoir faire une distinction : si j'y passe la journée, je mets
+8 heures. Mais j'ai eu un problème de tronçonneuse, j'ai dû affûter : en
+heures productives, j'ai peut-être passé que 7 heures. »*
+
+**Ça existait** : les heures des prestations sont les productives, `nonProd`
+porte le reste, et l'aperçu disait déjà « 7 h productives ». Mais le champ
+s'appelait « Trajet et temps morts », et une chaîne à affûter n'est pas un
+temps mort à ses yeux. Il s'appelle **« Hors production »**, avec ce qu'il
+couvre écrit dessous — trajet, affûtage, réglage, panne. Encore un manque de
+visibilité, pas d'absence.
+
+**La case « Journée non facturée » est partie** : *« ça sert plus à rien »*,
+dit deux fois. Une journée déjà marquée **garde sa marque** et l'aperçu la
+signale : sans case pour la voir, l'effacer en silence changerait ses
+rendements. `nonFacture` reste au vocabulaire.
+
 ## Ma journée doit se remplir toute seule
 
 *« En fin de journée je suis crevé, j’ai la flemme d’aller chercher des
@@ -1630,8 +1678,8 @@ infos. Il faut que ce soit le plus efficace possible. »*
 
 **`kmHabituels()` répond à une demande impossible.** *« Est-ce qu’il n’y aurait
 pas un moyen de mettre deux communes et que ça estime les kilomètres ? »*
-Pas sans une carte, et l’application n’en a aucune — elle tourne hors ligne,
-sans dépendance. Mais elle a sa propre mémoire : c’est la même route à chaque
+Pas sans calcul d’itinéraire, et l’application n’en fait pas. Mais elle a sa
+propre mémoire : c’est la même route à chaque
 fois, donc on propose ce qui a été noté la dernière fois pour ce chantier-là.
 À défaut, les kilomètres d’un temps saisi sur sa fiche.
 
@@ -1660,29 +1708,29 @@ déjà saisie.
 
 ## Ce qu’il a signalé et qui n’est pas fait
 
-Tournée du 2 septembre, complétée le 9, par ordre de maturité :
+Tournée du 2 septembre, complétée le 9 et le 15, par ordre de maturité :
 
-- **L’écran Entreprise est lourd.** *« Je voulais un truc épuré et je me
-  retrouve avec six bulles, le jour qui vient, À traiter, mes notes, et après
-  il faut que je descende pour aller dans Chantiers. »* Et les alertes se
-  **répètent** : « À traiter » réapparaît dans le module Chantiers, et un
-  chantier « en retard » y figure alors que l’accueil réclame déjà ses
-  journées non notées. **Une même chose doit s’afficher une fois.** À
-  reprendre sur maquette, avec la question suivante.
-- **Où vivent les notes.** Il tourne autour depuis trois séances : *« il
-  faudrait que je puisse me noter des notes, mais que je choisisse si ça
-  l’affiche dans À traiter ou pas »*. Une case sur la note réglerait la
-  moitié du problème ; l’autre moitié est celle de l’écran ci-dessus.
+- **L’écran Entreprise est lourd** — à moitié réglé le 15 septembre, par lui :
+  « À traiter » en est parti (le carnet le porte) et les notes passent sous
+  les tuiles. Restent les six bulles au-dessus des tuiles : il n’en a rien
+  dit, elles sont restées.
+- **La photo d’un ticket qui remplit la dépense.** *« Je prends en photo ma
+  facture, et ça me remplit automatiquement toutes les lignes : le
+  fournisseur, ce qu’il y a sur le ticket, le TTC, la TVA. La catégorie, ce
+  sera à moi de choisir. »* Possible, pas hors ligne : il faut un service qui
+  lit l’image, donc du réseau, une clé à lui saisie sur le téléphone, et
+  quelques centimes par ticket. **Question posée le 15 septembre, sans
+  réponse** : ne rien construire avant. La clé ne doit jamais entrer dans le
+  dépôt.
 - **Le prix de revient par travaux.** *« On le fera plus tard, mais tu peux le
   garder en note. »* Savoir ce que coûte réellement une journée de dégagement :
   amortissement de la débroussailleuse, mélange, huile, déplacement. De quoi
   situer un type de travaux par rapport à un autre. Le module Véhicule fait
   déjà ce raisonnement pour l’utilitaire — c’est le même, étendu au matériel.
-- **Les bulles de Mon entreprise disent le compte, pas le détail.** *« Les
-  bulles sont déjà cliquables, mais… »* Proposé : « 2 factures en attente,
-  dont 1 en retard », et un appui qui mène à la liste — ou droit à la fiche
-  s'il n'y en a qu'une. Même chose pour les devis signés. C'est ce qui
-  permettrait d'alléger « À traiter ». Pas encore validé.
+- **Les bulles de Mon entreprise mènent à la liste, jamais à la fiche.**
+  *« Les bulles sont déjà cliquables, mais… »* Le compte « dont 1 en retard »
+  existe déjà. Proposé en plus : un appui qui mène droit à la fiche quand il
+  n'y en a qu'une. Pas encore validé.
 
 ## Les achats à venir
 
@@ -1866,174 +1914,125 @@ même nom le reprend.
 Limite connue : renommer un client orpheline son numéro. Rare, et le jour où
 ça gêne, l’écran des listes éditera les deux ensemble.
 
-## La carte : des tracés, pas des images
+## La carte : photo aérienne ou carte IGN
 
 *« Est-ce qu'on ne pourrait pas juste avoir un fond de carte et pouvoir
 sélectionner des points, dire : ce chantier, c'était à tel endroit ? »*
 
-Ce qui a rendu la chose possible, ce sont **ses fichiers**. Un shapefile n'est
-pas une image : ce sont des **tracés**, et un tracé s'embarque. C'est ce qui
-reste quand le réseau manque, au fond d'une parcelle.
+Deux fonds, tous deux de la **Géoplateforme de l'IGN**, en accès libre —
+celle qu'il avait notée dans son propre fichier de cartographie :
 
-Le raisonnement d'origine allait plus loin — « un fond de carte ordinaire, ce
-sont des tuiles : réseau et dépendance, les deux choses que Sylve refuse » —
-**et il était faux**. Voir *Le réseau : une chance, jamais une condition*.
+`FONDS_TUILES` : *Photo aérienne* (`ORTHOIMAGERY.ORTHOPHOTOS`, par défaut) et
+*Carte IGN* (`GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2`), en WMTS, grille `PM`. Le
+choix vit dans `A.cfg.fondCarte`. Il les a vues marcher sur son téléphone le
+15 septembre. Le service worker ne garde pas les tuiles : il ignore ce qui
+vient d'une autre origine.
 
-`outils/convertir-communes.js` lit la couche COMMUNE du PARCELLAIRE-EXPRESS de
-l'IGN, simplifie en Douglas–Peucker à 100 m, reprojette en Web Mercator et
-écrit `communes.js` : **2 906 contours, 2,7 millions de points ramenés à
-91 000, 344 Ko.**
+**Un chantier se pose d'un doigt** : on le choisit, on touche la carte, le
+point est converti en latitude/longitude et enregistré dans `c.gps` — le même
+champ que le relevé GPS et que les coordonnées collées.
 
-- **Les fichiers de l'IGN ne doivent jamais entrer dans le dépôt** — 248 Mo
-  pour le parcellaire d'un seul département, et le SCAN 25 se compte en gigaoctets.
-  Même règle que le classeur comptable.
-- **Le fichier produit vit à côté**, mis en cache par le service worker : il
-  ne bouge presque jamais, et le mettre dans `index.html` le ferait
-  retransférer à chaque mise à jour. Il se charge **à la première ouverture
-  de l'écran Carte**, pas au démarrage.
-- **Conséquence assumée : `Sylve.html` ouvert seul n'a pas de fond.** L'écran
-  le dit — laisser un cadre vide ferait chercher la panne ailleurs — et un
-  délai de garde de huit secondes évite un « Chargement… » éternel.
+**« Ma position » y va et se serre** à trois mètres au sol par pixel.
 
-**Trois mesures avant de choisir l'écriture** — on ne devine pas :
-
-| Écriture | Poids |
-|---|---|
-| décimal au mètre | 790 Ko |
-| décimal à dix mètres | 617 Ko |
-| **varint en base 64** | **322 Ko** |
-
-Celle des polylignes de Google : l'écart au point précédent, par pas de dix
-mètres, en groupes de cinq bits décalés de 63. Dix mètres parce que cent
-mètres de tolérance et une précision au mètre ne vont pas ensemble — on
-paierait des chiffres que la simplification a déjà jetés.
-
-**LE PIÈGE DU SÉPARATEUR.** L'alphabet du varint va de « ? » (63) à « ~ »
-(126) : **la barre verticale en fait partie.** L'avoir prise pour séparer les
-contours les coupait au milieu — 6 379 morceaux au lieu de 2 880, et des
-communes au large de l'Atlantique. Le séparateur est un saut de ligne, et le
-convertisseur comme le décodeur portent l'avertissement.
-
-**C'est un croisement qui l'a trouvé, pas l'écran** : la projection dit où
-tombent les six départements, le rectangle des contours dit autre chose, et
-les deux ne pouvaient pas avoir raison. Deux sources écrites pour des raisons
-différentes — la règle du projet, encore une fois.
-
-## Web Mercator, et la garde qui ne servait à rien
-
-Les fichiers IGN sont en **Lambert 93** (EPSG:2154), les tuiles du web en
-**Web Mercator** (EPSG:3857), ses positions en latitude et longitude. **Deux
-projections ne se superposent jamais** : dès que les tuiles sont arrivées, la
-carte a dû passer en Mercator. Le trajet depuis Lambert se fait une fois, dans
-le convertisseur, sur son poste ; `LB.vers()` et `LB.depuis()` ne parlent plus
-que Mercator. Le nom `LB` est resté.
-
-- **On simplifie en Lambert, puis on reprojette.** Lambert est plane : cent
-  mètres de tolérance y valent cent mètres au sol. En Mercator, au milieu de la France, cent
-  mètres de carte n'en valent que soixante-neuf.
-- **Mercator se ferme** : l'inverse est exact, sans itération. RGF93 et WGS84
-  se confondent à moins d'un mètre, aucune translation de datum.
-- **`LB.facteurSol(y)`** dit combien de mètres au sol vaut un mètre de carte à
-  cette hauteur — cos φ. C'est lui qui rend honnêtes l'échelle affichée et
-  « trois mètres par pixel ». Il s'appelait d'abord `etirement`, qui disait
-  l'inverse de ce qu'il rend.
-
-**Et une leçon sur les gardes**, née avec Lambert. Le sabotage du parallèle de
-référence — 44° changé en 45° — **n'avait rien fait crier** : l'erreur n'était
-que de 40 à 200 mètres, invisible pour toute vérification géographique large.
-Il avait fallu chercher la propriété qui **définit** la projection — l'échelle
-vaut exactement 1 sur les deux parallèles de référence. Mercator a la sienne :
-**l'échelle horizontale vaut 1/cos φ**. Le scénario l'éprouve contre la
-longueur vraie d'un arc de parallèle sur la sphère, écrite à part pour que les
-deux sources restent indépendantes.
-
-**Deuxième garde qui ne prouvait rien** : le scénario vérifiait qu'« un tracé
-existe ». Avec les contours collés en un seul par un mauvais séparateur, le
-dessin reste plausible. Il **compte** maintenant les contours et leurs points.
-C'est le même piège que le graphique des ventes en 4.42 : *un contrôle qui
-vérifie qu'un dessin existe ne prouve rien.*
-
-## Ce que la carte sait faire
-
-- **Glisser, pincer, molette.** Le cadrage tient en trois nombres — centre en
-  Mercator, mètres par pixel. Mercator est conforme : l'échelle est la même
-  dans les deux sens et tient en un seul nombre, mais c'est un nombre **de
-  carte**, pas de terrain.
-- **Le zoom va de 1 à 4 000 m de carte par pixel.** La borne basse était à 3 :
-  avec la photo aérienne on veut voir le chemin, et les contours simplifiés à
-  cent mètres n'ont plus à fixer la limite.
-- **« Ma position » y va et se serre** à trois mètres au sol par pixel. Le
-  bouton posait un point bleu sans y aller : sur une carte de six
-  départements, autant ne rien poser.
-- **Un redessin par image, pas par événement** (`redessinerCarte()`, sur
-  `requestAnimationFrame`). Le doigt envoie plus d'événements que l'écran
-  n'affiche d'images : redessiner à chacun, c'est ce qui faisait bégayer le
-  pincement quand il dézoomait large.
-- **Seuls les contours qui touchent le cadre sont tracés**, et pas ceux de
-  moins de quatre pixels : dézoomé, deux mille communes minuscules coûtaient
-  un tracé chacune pour rien.
-- **Poser un chantier** : on choisit le chantier, on touche la carte, le point
-  est converti en latitude/longitude et enregistré dans `c.gps` — le même
-  champ que le relevé GPS et que les coordonnées collées.
-
-**LE PIÈGE DU CADRE.** La première version gardait les contours qui avaient
-**un sommet dans le cadre**. Une commune qui *entoure* l'écran n'en a aucun : à
-fort zoom, la limite près de laquelle on se tient disparaissait. On compare
-maintenant deux rectangles. Remettre l'ancienne règle fait crier deux
-vérifications du scénario des tuiles.
-
-**Et un nom d'une lettre qui en écrasait un autre.** Le niveau des tuiles
-s'appelait `z`, comme le conteneur de la carte dans la même fonction. `var` ne
-connaît pas les blocs : le second a écrasé le premier, et la carte ne
-s'affichait plus du tout — *Cannot create property 'innerHTML' on number
-'14'*. Un scénario l'a attrapé. **En ES5, un `var` déclaré dans un `if` vit
-dans toute la fonction** : avant d'en poser un, chercher le nom dans la
-fonction entière. D'où `niv`, `tg0`, `th0`.
-
-**Côté tests** : `cadre()` rend l'objet vivant, pas une copie. Pour comparer
-avant et après un geste, garder les nombres — sinon on compare une valeur à
-elle-même.
+**On cherche une commune** (`chercherCommune`) : le géocodage de l'IGN
+(`data.geopf.fr/geocodage/search`, `type=municipality`), le même fournisseur
+que les tuiles. Une seule réponse, on y va ; plusieurs, on choisit, avec le
+département. Sans réseau, l'écran le dit. **Le service rend la longitude
+d'abord** — c'est l'ordre du GeoJSON, et c'est le sabotage qu'on éprouve.
 
 ## Le réseau : une chance, jamais une condition
 
 *« Il n'y a pas de fond photo aérienne, il n'y a pas de fond de carte IGN. En
-fait là je ne peux pas me repérer avec cette carte. Est-ce qu'on ne pourrait
-pas faire le lien avec des fonds de cartes en WMS ? »*
+fait là je ne peux pas me repérer avec cette carte. »*
 
-**Ce fichier disait non, et il avait tort.** « Ce sont des images, elles
-demandent du réseau, la réponse reste non » : la règle avait été durcie sans
-être relue. La carte des piles de bois charge des tuiles OpenStreetMap depuis
-des mois. La règle n'a jamais été *pas de réseau*, mais **ça doit marcher sans
-réseau** — et ce n'est pas la même chose.
+Ce fichier a dit longtemps « des images, elles demandent du réseau, la réponse
+reste non ». **Il avait tort** : la règle avait été durcie sans être relue. La
+carte des piles de bois charge des tuiles OpenStreetMap depuis des mois. La
+règle n'a jamais été *pas de réseau*, mais **ça doit marcher sans réseau** —
+et ce n'est pas la même chose. Sans réseau, la carte montre encore les
+chantiers placés les uns par rapport aux autres, et l'écran le dit.
 
-D'où deux couches qui ne dépendent pas l'une de l'autre :
+## Les contours de communes : faits en 4.80, retirés en 4.82
 
-- **les tuiles**, dessous, quand il y a du réseau — la Géoplateforme de l'IGN,
-  en accès libre, celle qu'il avait notée dans son propre fichier de
-  cartographie ;
-- **les contours de communes**, dessus, en jaune pâle sur la photo — dans
-  l'appareil, toujours là. Une tuile qui n'arrive pas laisse voir les
-  contours, et rien ne casse.
+Pendant deux versions, un fond **hors ligne** — 2 906 contours de communes de
+six départements, tirés de ses shapefiles IGN, 344 Ko dans `communes.js`
+— s'est dessiné sous les chantiers, puis par-dessus la photo. Il l'a retiré :
+*« on va enlever la partie qui délimite les communes, ça sert à rien »*, et
+avec lui le choix « Contours seuls ». Un téléphone resté réglé dessus
+retombe sur la photo (`fondTuiles()`).
 
-`FONDS_TUILES` : *Photo aérienne* (`ORTHOIMAGERY.ORTHOPHOTOS`, par défaut),
-*Carte IGN* (`GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2`), *Contours seuls*, qui ne
-demande rien au réseau. Le choix vit dans `A.cfg.fondCarte`. Les tuiles sont
-en WMTS, grille `PM` — Web Mercator, et c'est ce qui a imposé la projection.
-Le service worker ne les garde pas : il ignore ce qui vient d'une autre
-origine.
+`communes.js` et `outils/convertir-communes.js` ont quitté le dépôt ; ils
+restent dans l'historique (commit `d923d9a`) si l'on y revient. Trois choses
+à savoir alors :
 
-**Ce qui n'est pas vérifié d'ici.** Les scénarios contrôlent l'adresse d'une
-tuile — couche, grille, niveau, ligne, colonne — pas que le serveur réponde :
-le banc d'essai n'a pas de réseau. Les deux noms de couche viennent du
-catalogue standard de la Géoplateforme. S'il y en a un de faux, il le verra
-sur son téléphone : **un fond vide sous les contours**. C'est le premier
-retour à guetter.
+- **Les fichiers de l'IGN ne doivent jamais entrer dans le dépôt** — 248 Mo
+  pour le parcellaire d'un seul département, et le SCAN 25 se compte en gigaoctets.
+  Même règle que le classeur comptable.
+- **Le séparateur des contours doit rester hors de l'alphabet du varint** (« ? »
+  à « ~ ») : la barre verticale en faisait partie et coupait les contours au
+  milieu. C'est un croisement avec la projection qui l'avait trouvé.
+- **Une commune qui entoure l'écran n'a aucun sommet dedans** : on compare des
+  rectangles, pas des sommets, sinon la limite près de laquelle on se tient
+  disparaît à fort zoom.
 
-**`niveauTuile()`** choisit le niveau dont l'échelle colle le mieux à celle
-qu'on affiche, et une garde refuse de demander plus de soixante tuiles d'un
-coup. Son sabotage — un niveau figé — **n'a d'abord rien fait crier** : le
-scénario vérifiait qu'un niveau figurait dans l'adresse, pas lequel. Il refait
-maintenant le calcul à part, depuis la largeur du monde.
+## Web Mercator, et les gardes qui ne servaient à rien
+
+Les tuiles du web sont en **Web Mercator** (EPSG:3857), ses positions en
+latitude et longitude. `LB.vers()` et `LB.depuis()` font le trajet ; le nom
+`LB` est resté de Lambert 93, la première projection. **Mercator est
+conforme** : l'échelle est la même dans les deux sens et tient en un seul
+nombre — mais c'est un mètre **de carte**. **`LB.facteurSol(y)`** dit combien
+de mètres au sol il vaut à cette hauteur, cos φ : environ 0,69 au milieu de la France.
+
+**Le trait d'échelle l'oubliait.** Son libellé comptait au sol, sa longueur en
+mètres de carte : un trait annoncé « 500 m » en couvrait trois cent
+quarante-cinq. Corrigé en 4.82 ; le scénario recalcule le sol par pixel depuis
+la latitude, à part de `facteurSol`.
+
+**Une propriété qui définit vaut mieux qu'une vérification large.** Le
+sabotage du parallèle de référence de Lambert — 44° changé en 45° — n'avait
+rien fait crier : 40 à 200 mètres d'erreur, invisibles de loin. Il avait fallu
+éprouver la propriété qui **définit** la projection. Mercator a la sienne :
+**l'échelle horizontale vaut 1/cos φ**, éprouvée contre la longueur vraie d'un
+arc de parallèle écrite à part.
+
+**Deux gardes n'ont rien dit au premier sabotage**, et c'est le scénario qu'il
+a fallu durcir : le niveau de tuile (on vérifiait qu'un niveau figurait dans
+l'adresse, pas lequel) et, en 4.82, la reprise du doigt après un pincement
+(aucun scénario ne levait un seul des deux doigts).
+
+## Les gestes : le doigt fantôme
+
+*« Avec les deux doigts ça marche bien, mais au bout d'un moment ça marche
+plus. Je crois que je suis arrivé sur un angle, et je ne peux plus bouger avec
+mon doigt. Je peux zoomer, dézoomer. »*
+
+**La carte se redessine sous le doigt.** Quand il se lève, c'est parfois sur
+un dessin déjà remplacé : l'événement part d'un élément détaché du document et
+**ne remonte plus jusqu'au cadre**. Le doigt restait compté. Avec un doigt, la
+carte croyait à un pincement — plus de déplacement ; avec deux, elle en
+comptait trois — plus de zoom. Les deux symptômes qu'il décrivait, une seule
+cause.
+
+- **Le premier doigt d'un geste repart de zéro** (`e.isPrimary`) : c'est la
+  garde que le scénario éprouve, en levant un doigt sur un dessin détaché.
+- **Le cadre retient le doigt** (`setPointerCapture`) : il n'est jamais
+  remplacé, son lever arrive donc ici. JSDOM ne sait pas le simuler.
+- **Le doigt qui reste après un pincement déplace la carte** sans avoir à se
+  lever (`reprendre()`).
+- **Un glissement qui s'achève sur la carte n'est pas un appui** : il n'ouvre
+  pas la fiche d'un point et ne pose pas le chantier qu'on est en train de
+  placer.
+- **Un redessin par image**, pas par événement (`redessinerCarte()`).
+
+**Leçon générale : tout ce qui se redessine sous le doigt perd ses
+événements.** Écouter sur un conteneur stable, et ne jamais compter sur un
+lever pour nettoyer un état.
+
+**Et deux pièges déjà rencontrés sur cette carte.** Un `var z` déclaré dans un
+`if` vit dans toute la fonction en ES5 : il avait écrasé le conteneur de la
+carte, qui ne s'affichait plus. Et côté tests, `cadre()` rend l'objet vivant :
+pour comparer avant et après un geste, garder les nombres.
 
 ## Deux choses qu’on ne fait pas, et pourquoi
 
@@ -2306,37 +2305,6 @@ charge et son montant au survol, et le détail dans la fiche du jour.
   « Rien de posé ni de noté ce jour-là » comptait les chantiers et l'absence,
   pas les charges.
 
-## Les fonds de carte : ce qui est mesuré
-
-Il a des données IGN sur son poste. **Mesuré avant de promettre**, sur les
-`COMMUNE.SHP` du Parcellaire Express, simplifiés en Douglas–Peucker à 100 m et
-écrits en deltas d'entiers :
-
-| Département | Communes | Poids |
-|---|---|---|
-| A | 391 | 108 Ko |
-| B | 317 | 114 Ko |
-| C | 563 | 130 Ko |
-| D | 494 | 120 Ko |
-| E | 539 | 137 Ko |
-| F | 563 | 181 Ko |
-
-`Sylve.html` pèse environ 1 Mo : **un ou deux départements passent**, les six
-le doubleraient presque. À 200 m de tolérance on tombe à 79 Ko pour un département,
-au prix des petits contours.
-
-**Ce qui reste hors de portée**, et il faut le redire chaque fois : le SCAN 25
-et les orthophotos sont des **images** (plusieurs gigas par département), le
-parcellaire cadastral fait 248 Mo pour un seul département, et les WMS de
-`data.geopf.fr` demandent du réseau. Seul le **vecteur simplifié** entre dans
-un fichier hors ligne — les tuiles viennent en plus quand le réseau est là,
-jamais à la place.
-
-Le lecteur de shapefile et le simplificateur vivent dans
-`outils/convertir-communes.js` : il faut pouvoir refabriquer le fond, et c'est
-ce qui a permis de le repasser en Mercator. **Les fichiers IGN, eux, ne
-doivent jamais entrer dans le dépôt**, comme le classeur comptable.
-
 ## Garder l'écran allumé — le téléphone garde le dernier mot
 
 *« Est-ce que tu penses qu'il y aurait moyen que ça ne mette pas le mode
@@ -2547,11 +2515,8 @@ de sa part, **réglées depuis** :
   fois, **tranchée le 8 septembre : il le garde.** C’est un raccourci vers la
   vue des Chantiers (`moduleDeVue()` la rend à son premier propriétaire), pas
   un doublon de données. Ne plus rouvrir le sujet.
-- **La Carte** a son fond depuis la 4.80 : les communes de ses six
-  départements, hors ligne, et un chantier se pose d’un doigt. La photo
-  aérienne et la carte IGN s’y posent dessous depuis la 4.81, quand il y a du
-  réseau. Voir *La carte : des tracés, pas des images* et *Le réseau : une
-  chance, jamais une condition*.
+- **La Carte** porte la photo aérienne ou la carte IGN depuis la 4.81, et un
+  chantier s’y pose d’un doigt. Voir *La carte : photo aérienne ou carte IGN*.
 
 ## Le temps tient dans un seul bloc, et se compte en heures
 

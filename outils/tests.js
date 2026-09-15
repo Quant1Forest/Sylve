@@ -1216,7 +1216,10 @@ scenario('Navigation : ouvrir une fiche depuis « À traiter » laisse un retour
   }));
   /* On se met dans l'état exact : menu Entreprise ouvert par-dessus. */
   t.w.document.body.classList.add('accueil-ouvert');
-  t.w.ouvrirChantier ? t.w.ouvrirChantier('c1') : t.clic('#ent-alertes [data-alerte]');
+  /* « À traiter » ne vit plus que dans le carnet depuis la 4.82. Le clic doit
+     trouver l'alerte : un clic dans le vide laisserait le masque en place et
+     ferait croire à la régression. */
+  verifierVrai('l’alerte est là où l’on clique', t.clic('#bandeau-alertes [data-alerte="c1"]'));
   await t.pause(300);
   verifier('le masque des menus est levé', false,
     t.d.body.classList.contains('accueil-ouvert'));
@@ -1941,8 +1944,13 @@ scenario('Entreprise : le bilan est au-dessus des tuiles, et chaque bulle mène 
   verifierVrai('il est placé avant les tuiles',
     bilan.compareDocumentPosition(tuiles) & 4);
 
-  /* L'impayé garde son nom, son montant et son ancienneté dans « À traiter ». */
-  const at = t.$('#ent-alertes').textContent;
+  /* « À traiter » a quitté l'écran Entreprise : « il y a la même partie dans
+     le carnet ». Les tuiles viennent tout de suite après le bilan. */
+  verifier('plus d’alerte sur l’écran Entreprise', 0,
+    t.$$('#vue-entreprise [data-alerte]').length);
+  /* L'impayé garde son nom, son montant et son ancienneté dans « À traiter »
+     du carnet : le montant a suivi l'alerte. */
+  const at = t.$('#bandeau-alertes').textContent;
   verifierVrai('l’impayé est nommé', /Montjoie/.test(at));
   /* Le millier est séparé par une espace insécable, jamais par une ordinaire :
      un montant coupé en bout de ligne se lit comme deux nombres. */
@@ -1960,38 +1968,48 @@ scenario('Entreprise : le bilan est au-dessus des tuiles, et chaque bulle mène 
 });
 
 /* --------------------------------------------------------------------- */
-scenario('À traiter : des notes à soi-même, qui restent tant qu’on ne les efface pas', async () => {
+scenario('Mes notes : sous les tuiles, et elles vont à la ligne', async () => {
+  /* « Chantier à prévoir : il faudrait que je puisse avoir plus de place, ou
+     faire des retours à la ligne, pour me dire j'ai ce chantier, ce chantier,
+     ce chantier. » Et : « les notes, faudrait mieux les mettre à la fin »,
+     pour arriver sur les modules sans défiler. */
   const t = await ouvrir(Object.assign({}, VIDE, { module: 'entreprise' }));
-  verifierVrai('la zone invite à s’écrire une note',
-    /\+ note/.test(t.$('#ent-alertes').textContent));
+  const zone = () => t.$('#ent-notes');
+  verifierVrai('la zone invite à s’écrire une note', /\+ note/.test(zone().textContent));
+  verifierVrai('elle vient après les tuiles',
+    t.$('#vue-entreprise .tuiles').compareDocumentPosition(zone()) & 4);
 
   t.clic('#ent-note-plus'); await t.pause(300);
-  t.saisir('#nt-titre', 'Rappeler le gestionnaire');
-  t.saisir('#nt-texte', 'pour la parcelle du haut');
+  verifier('le détail s’écrit sur plusieurs lignes', 'TEXTAREA', t.$('#nt-texte').tagName);
+  const lignes = ['Coupe du haut, 3 jours', 'Plantation au printemps', 'Rappeler le gestionnaire'];
+  t.saisir('#nt-titre', 'Chantiers à prévoir');
+  t.saisir('#nt-texte', lignes.join('\n'));
   t.clic('[data-ntcoul="#B4231F"]'); await t.pause(120);
   t.clic('#nt-ok'); await t.pause(400);
 
-  const z = t.$('#ent-alertes');
-  verifierVrai('la note s’affiche', /Rappeler le gestionnaire/.test(z.textContent));
-  verifierVrai('avec sa précision', /parcelle du haut/.test(z.textContent));
-  verifierVrai('et sa couleur', /B4231F|rgb\(180, 35, 31\)/.test(z.innerHTML));
   /* Elle part dans les sauvegardes : elle vit donc dans la configuration. */
   const n = (t.stock('cfg') || {}).notes || [];
   verifier('une note est en base', 1, n.length);
-  verifier('son titre est retenu', 'Rappeler le gestionnaire', n[0].titre);
+  verifier('ses lignes sont gardées telles quelles', lignes, n[0].texte.split('\n'));
+  verifierVrai('la note s’affiche', /Chantiers à prévoir/.test(zone().textContent));
+  const detail = zone().querySelector('.note-texte');
+  verifier('et ses retours à la ligne se voient', 'pre-line',
+    t.w.getComputedStyle(detail).whiteSpace);
+  verifierVrai('avec sa couleur', /B4231F|rgb\(180, 35, 31\)/.test(zone().innerHTML));
 
-  /* Elle se rouvre pour être corrigée. */
+  /* Elle se rouvre pour être corrigée, lignes comprises. */
   t.clic('[data-note]'); await t.pause(300);
-  t.saisir('#nt-titre', 'Rappeler l’expert');
+  verifier('le détail revient entier', lignes.join('\n'), t.$('#nt-texte').value);
+  t.saisir('#nt-titre', 'Chantiers à venir');
   t.clic('#nt-ok'); await t.pause(400);
-  verifierVrai('la correction est prise', /Rappeler l’expert/.test(t.$('#ent-alertes').textContent));
+  verifierVrai('la correction est prise', /Chantiers à venir/.test(zone().textContent));
   verifier('sans en créer une seconde', 1, ((t.stock('cfg') || {}).notes || []).length);
 
   /* Et elle ne s'efface que sur demande. */
   t.w.confirm = () => true;
   t.clic('[data-notesup]'); await t.pause(400);
   verifier('effacée, il n’en reste rien', 0, ((t.stock('cfg') || {}).notes || []).length);
-  verifierVrai('et la zone le dit', /\+ note/.test(t.$('#ent-alertes').textContent));
+  verifierVrai('et la zone le dit', /\+ note/.test(zone().textContent));
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -4371,33 +4389,83 @@ scenario('Ligne : « + travaux » bascule en forfait et bloque la TVA mêlée', 
 });
 
 /* --------------------------------------------------------------------- */
-scenario('Carnet : les filtres se rangent en cours et clos', async () => {
-  /* Des dizaines de chantiers dont presque tous payés, et des statuts à plat :
-     « je n'arrive pas à savoir dans quelle grande catégorie ils
-     appartiennent ». Les mêmes groupes que le sélecteur de la fiche. */
+scenario('Carnet : les filtres dans l’ordre dicté, et ce qui reste à faire', async () => {
+  /* « Tout au-dessus. Après, les chantiers avec devis. Ensuite les chantiers
+     ouverts, ensuite les clos, et uniquement ce qui est en cours ou à
+     planifier » — « comme ça je peux voir ce qui me reste à faire, pour
+     m'organiser ». Le groupe « En cours » rangeait les facturés dedans : « dans
+     en cours, j'ai encore tous les chantiers que j'ai finis ». */
+  const ch = (id, statut, aDevis) => ({ id, statut, aDevis: !!aDevis, proprietaire: 'Client ' + id,
+    lignes: [], temps: [], jours: [], maj: Date.now() });
   const t = await ouvrir(Object.assign({}, VIDE, {
     module: 'chantiers',
-    chantiers: [
-      { id: 'a', nom: 'En cours', statut: 'encours', aDevis: false, lignes: [], temps: [], maj: Date.now() },
-      { id: 'b', nom: 'Payé', statut: 'paye', aDevis: false, lignes: [], temps: [], maj: Date.now() },
-      { id: 'c', nom: 'Facturé', statut: 'facture', aDevis: false, lignes: [], temps: [], maj: Date.now() }
-    ]
+    chantiers: [ch('a', 'encours'), ch('b', 'paye'), ch('c', 'facture'),
+      ch('d', 'accepte', true), ch('e', 'termine'), ch('f', 'sansuite')]
   }));
   t.clic('[data-vue="carnet"]'); await t.pause(350);
+  verifier('l’ordre qu’il a dicté', ['tous', 'avecdevis', 'ouverts', 'clos', 'afaire'],
+    t.$$('#c-filtre > option').map(o => o.value).slice(0, 5));
+
+  const garde = async q => {
+    t.choisir('#c-filtre', q); await t.pause(250);
+    return [...new Set(t.$$('#liste-chantiers [data-chouvrir]').map(b => b.dataset.chouvrir))].sort();
+  };
+  verifier('« en cours ou à planifier » : le travail qui reste', ['a', 'd'], await garde('afaire'));
+  verifier('« clos » : payé et sans suite', ['b', 'f'], await garde('clos'));
+  /* Facturé mais pas encore réglé reste ouvert : l'argent n'est pas rentré.
+     C'est ce que dit statutOuvert(), et il n'a pas bougé. */
+  verifier('« ouverts » garde le facturé tant qu’il n’est pas payé',
+    ['a', 'c', 'd', 'e'], await garde('ouverts'));
+
   const groupes = t.$$('#c-filtre optgroup').map(g => g.getAttribute('label'));
-  verifier('deux familles', ['En cours', 'Clos'], groupes);
+  verifier('deux familles, nommées comme les filtres', ['Ouverts', 'Clos'], groupes);
   const dans = lab => t.$$('#c-filtre optgroup')
     .filter(g => g.getAttribute('label') === lab)[0].textContent;
-  verifierVrai('le chantier en cours est dans « En cours »', /En cours/.test(dans('En cours')));
-  verifierVrai('le payé est dans « Clos »', /Payé/.test(dans('Clos')));
-  /* Facturé mais pas encore réglé reste une affaire en cours : l'argent n'est
-     pas rentré. C'est déjà ce que dit statutOuvert(), et le regroupement s'y
-     conforme plutôt que de ranger l'impayé avec les affaires soldées. */
-  verifierVrai('le facturé reste « En cours » tant qu’il n’est pas payé',
-    /Facturé/.test(dans('En cours')));
-  /* « Tous » et « Chantiers ouverts » restent en tête, hors groupe. */
-  verifierVrai('les entrées générales restent accessibles',
-    t.$$('#c-filtre > option').length >= 2);
+  verifierVrai('le facturé se range sous « Ouverts »', /Facturé/.test(dans('Ouverts')));
+  verifierVrai('le payé sous « Clos »', /Payé/.test(dans('Clos')));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Ma journée : plus de case « non facturée », et le hors production dit ce qu’il couvre', async () => {
+  /* « Journée non facturée au-dessus, ça on peut l'enlever, ça sert plus à
+     rien. » Et : « faire une distinction : j'y passe la journée, 8 heures ;
+     mais j'ai eu un problème de tronçonneuse, j'ai dû affûter, et en heures
+     productives j'ai peut-être passé que 7 heures. » Ça existait, sous le nom
+     « Trajet et temps morts » qui ne le disait pas. */
+  const midi = new Date(); midi.setHours(12, 0, 0, 0);
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'calendrier', cfg: { heuresJour: 8, journeesMigrees: true },
+    chantiers: [{ id: 'c1', proprietaire: 'Martin', statut: 'encours', aDevis: false,
+      temps: [], jours: [], maj: Date.now(),
+      lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 2, prix: 500, nature: 'prestation' }] }],
+    journees: [{ id: 'j1', date: midi.getTime(), chantier: 'c1', personnes: 1, nonProd: 0,
+      nonFacture: true, postes: [{ travaux: 'DEGAG', heures: 6, quantite: 0 }] }]
+  }));
+  await t.pause(300);
+  t.clic('[data-jour="' + t.w.BCC.minuit(Date.now()) + '"]'); await t.pause(450);
+  t.clic('#fj-travaille'); await t.pause(500);
+  verifierVrai('la journée s’ouvre', !!t.$('#mj-ok'));
+  verifier('la case « non facturée » a disparu', null, t.$('#mj-nonfact'));
+  const modale = t.texte('#modale');
+  verifierVrai('« hors production » nomme ce qu’il couvre',
+    /Hors production/.test(modale) && /affûtage/.test(modale));
+
+  /* Huit heures sur place, dont une à régler et affûter : sept productives. */
+  t.saisir('#mj-postes [data-psth="0"]', '7');
+  t.saisir('#mj-nonprod', '1');
+  const ap = t.texte('#mj-apercu');
+  verifierVrai('la journée fait huit heures', /8,00 h/.test(ap));
+  verifierVrai('dont sept productives', /7,00 h productives/.test(ap));
+  verifierVrai('et une hors production', /1,00 h hors production/.test(ap));
+  /* Une journée marquée avant la 4.82 garde sa marque, et l'aperçu la dit :
+     sans case pour la voir, l'effacer en silence changerait ses chiffres. */
+  verifierVrai('l’aperçu signale une journée déjà marquée', /non facturée/.test(ap));
+
+  t.clic('#mj-ok'); await t.pause(600);
+  const j = (t.stock('journees') || []).filter(x => x.id === 'j1')[0];
+  verifier('le hors production reste à part', 1, j.nonProd);
+  verifier('et la marque ancienne est gardée', true, j.nonFacture);
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -5863,8 +5931,9 @@ scenario('Bilan : une facture récente attend, elle n’est pas impayée', async
   const chaude = t.$$('#ent-bilan .bulle.chaud')
     .filter(b => /attente/.test(b.textContent))[0];
   verifierVrai('et elle ne chauffe pas pour si peu', !chaude);
+  const ba = t.texte('#bandeau-alertes');
   verifierVrai('« À traiter » ne réclame rien non plus',
-    !/Facture impayée/.test(t.texte('#ent-alertes')));
+    ba !== null && !/Facture impayée/.test(ba));
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -5883,7 +5952,7 @@ scenario('Bilan : passé l’échéance, la bulle chauffe et l’alerte le nomme
     .filter(b => /attente/.test(b.textContent))[0];
   verifierVrai('la bulle chauffe', !!chaude);
   verifierVrai('et dit combien sont en retard', /1 en retard/.test(t.texte('#ent-bilan')));
-  verifierVrai('« À traiter » le nomme', /Facture impayée/.test(t.texte('#ent-alertes')));
+  verifierVrai('« À traiter » le nomme', /Facture impayée/.test(t.texte('#bandeau-alertes')));
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -7012,35 +7081,9 @@ scenario('Réglages : un navigateur sans veille ferme le réglage', async () => 
 });
 
 /* --------------------------------------------------------------------- */
-/* Deux communes carrées, à côté l'une de l'autre, écrites comme le
-   convertisseur les écrit : deltas de dix mètres en varint base 64. Les
-   fabriquer ici plutôt que d'en recopier de vraies garde le scénario lisible
-   et indépendant du fichier de 322 Ko. */
-const varint = n => {
-  n = n < 0 ? ~(n << 1) : (n << 1);
-  let out = '';
-  while (n >= 0x20) { out += String.fromCharCode((0x20 | (n & 0x1f)) + 63); n >>= 5; }
-  return out + String.fromCharCode(n + 63);
-};
-const contour = pts => {
-  let px = 0, py = 0, m = '';
-  for (const p of pts) {
-    const x = Math.round(p[0] / 10), y = Math.round(p[1] / 10);
-    m += varint(x - px) + varint(y - py);
-    px = x; py = y;
-  }
-  return m;
-};
-/* Un point quelconque, en Web Mercator. */
-const CARRE = (x0, y0, c) => contour([[x0, y0], [x0 + c, y0], [x0 + c, y0 + c], [x0, y0 + c], [x0, y0]]);
-/* Calés sur le centre par défaut de la carte — 46,6° N, 2,4° E — pour que
-   les scénarios les voient sans avoir à se déplacer. */
-const FOND_ESSAI = CARRE(259000, 5873000, 8000) + String.fromCharCode(10) +
-  CARRE(267000, 5873000, 8000);
-
-scenario('Carte : Web Mercator tombe juste, et le fond se décode', async () => {
-  /* La carte est passée en Web Mercator : c'est la projection de toutes les
-     tuiles du web, et deux projections différentes ne se superposent jamais.
+scenario('Carte : Web Mercator tombe juste', async () => {
+  /* La carte est en Web Mercator : c'est la projection de toutes les tuiles
+     du web, et deux projections différentes ne se superposent jamais.
 
      Ses propriétés sont exactes par définition, pas approchées — c'est ce
      qui permet de les éprouver sans tolérance molle. */
@@ -7082,45 +7125,23 @@ scenario('Carte : Web Mercator tombe juste, et le fond se décode', async () => 
   const y = LB.vers(46.5, 6).y;
   verifierVrai('un mètre de Mercator vaut 0,69 m au sol au milieu de la France',
     Math.abs(LB.facteurSol(y) - Math.cos(46.5 * Math.PI / 180)) < 0.00001);
-
-  /* Le décodeur et l'encodeur doivent rester d'accord. Le séparateur est un
-     saut de ligne, hors de l'alphabet « ? » à « ~ » : la barre verticale en
-     faisait partie et coupait les contours au milieu. */
-  const pts = t.w.BCUI._carte.decoder(CARRE(264000, 5870000, 8000));
-  verifier('cinq points relus', 10, pts.length);
-  verifierVrai('au bon endroit', Math.abs(pts[0] - 520000) <= 5 &&
-    Math.abs(pts[1] - 5900000) <= 5);
-  verifierVrai('et le carré est fermé',
-    Math.abs(pts[8] - pts[0]) <= 5 && Math.abs(pts[9] - pts[1]) <= 5);
   verifier('aucune erreur', [], t.erreurs);
 });
 
 /* --------------------------------------------------------------------- */
-scenario('Carte : le fond se dessine, et le chantier se place d’un doigt', async () => {
+scenario('Carte : le chantier se place d’un doigt', async () => {
   /* « Est-ce qu'on ne pourrait pas juste avoir un fond de carte et pouvoir
      sélectionner des points, dire : ce chantier, c'était à tel endroit ? » */
   const t = await ouvrir(Object.assign({}, VIDE, {
     module: 'calendrier',
     chantiers: [{ id: 'c1', proprietaire: 'Martin', commune: 'Clairbois', statut: 'encours',
       aDevis: false, temps: [], jours: [], lignes: [], maj: Date.now() }]
-  }), {
-    /* Le fond est posé avant le démarrage : chargerFond() le prend tel quel
-       plutôt que d'aller chercher communes.js, que JSDOM ne sert pas. */
-    avant: w => { w.COMMUNES = FOND_ESSAI; }
-  });
+  }));
   t.clic('[data-vue="carte"]'); await t.pause(500);
 
-  verifier('le fond est prêt', 'pret', t.w.BCUI._carte.fond().etat);
-  /* Deux communes semées, deux contours relus. Se contenter d'« un tracé
-     existe » laissait passer un séparateur pris dans l'alphabet du varint :
-     les contours se collaient en un seul, et le dessin restait plausible. */
-  verifier('deux contours, pas un', 2, t.w.BCUI._carte.fond().contours.length);
-  verifier('cinq points chacun', [10, 10],
-    t.w.BCUI._carte.fond().contours.map(c => c.length));
   const plan = t.$('#carte-plan');
   verifierVrai('la carte est dessinée', !!plan);
-  verifierVrai('avec les contours du fond', !!plan.querySelector('path'));
-  verifierVrai('et une échelle', /\d/.test(plan.querySelector('text').textContent));
+  verifierVrai('avec une échelle', /\d/.test(plan.querySelector('text').textContent));
   /* Sans chantier localisé, la liste le dit et propose le geste. */
   verifierVrai('la liste invite à placer', /Poser un chantier/.test(t.texte('#carte-liste')));
 
@@ -7155,42 +7176,9 @@ scenario('Carte : le fond se dessine, et le chantier se place d’un doigt', asy
 });
 
 /* --------------------------------------------------------------------- */
-scenario('Carte : sans fond, elle marche quand même et le dit', async () => {
-  /* Sylve.html ouvert seul n'a pas communes.js à côté. Laisser un cadre vide
-     sans rien dire ferait chercher la panne ailleurs. */
-  const t = await ouvrir(Object.assign({}, VIDE, {
-    module: 'calendrier',
-    chantiers: [{ id: 'c1', proprietaire: 'Martin', statut: 'encours', aDevis: false,
-      temps: [], jours: [], lignes: [], maj: Date.now(),
-      gps: { lat: 44.1167, lon: 3.2833 } }]
-  }));
-  t.clic('[data-vue="carte"]'); await t.pause(400);
-  /* Sans réseau et sans contours, il reste les points : c'est ce cas-là
-     qu'on éprouve, donc on demande les contours seuls. */
-  t.clic('[data-fondcarte="contours"]'); await t.pause(300);
-
-  /* JSDOM ne va chercher aucun script : ni chargé, ni en erreur. On joue
-     l'erreur que le navigateur enverrait si le fichier manquait — c'est le
-     vrai chemin, pas un raccourci. */
-  const sc = [...t.d.head.querySelectorAll('script')]
-    .filter(x => /communes.js/.test(x.src || ''))[0];
-  verifierVrai('le fond a bien été demandé', !!sc);
-  sc.dispatchEvent(new t.w.Event('error'));
-  await t.pause(400);
-
-  verifier('le fond manque', 'absent', t.w.BCUI._carte.fond().etat);
-  verifierVrai('la carte est quand même dessinée', !!t.$('#carte-plan'));
-  verifierVrai('sans contour', !t.$('#carte-plan path'));
-  verifierVrai('mais avec le chantier', !!t.$('#carte-plan [data-cartept="c1"]'));
-  verifierVrai('et l’écran dit pourquoi',
-    /Contours indisponibles/.test(t.$('#carte-aide').textContent));
-  verifier('aucune erreur', [], t.erreurs);
-});
-
-/* --------------------------------------------------------------------- */
 scenario('Carte : le zoom a des bornes des deux côtés', async () => {
-  /* Sans bornes, deux absurdités : la France entière dans un timbre, ou
-     trois arbres à l'écran alors que le fond est simplifié à cent mètres. */
+  /* Sans bornes, deux absurdités : la France entière dans un timbre, ou plus
+     fin que la photo aérienne n'a de détail. */
   const t = await ouvrir(Object.assign({}, VIDE, {
     module: 'calendrier',
     chantiers: [{ id: 'c1', proprietaire: 'Martin', statut: 'encours', aDevis: false,
@@ -7217,24 +7205,21 @@ scenario('Carte : le zoom a des bornes des deux côtés', async () => {
 });
 
 /* --------------------------------------------------------------------- */
-scenario('Carte : les tuiles de l’IGN se posent sous les contours', async () => {
-  /* « Il n'y a pas de fond photo aérienne, pas de fond de carte IGN. Là je ne
-     peux pas me repérer avec cette carte. »
-
-     Il a raison, et j'avais tort d'être aussi catégorique : la carte des piles
-     charge des tuiles depuis des mois. La règle n'était pas « jamais de
-     réseau » mais « ça doit marcher sans réseau ». */
+scenario('Carte : photo aérienne ou carte IGN, et plus de contours', async () => {
+  /* « Le fait qu'on puisse changer photo aérienne, carte IGN, c'est très
+     bien. » Et les contours de communes : « on va les enlever, ça sert à
+     rien ». */
   const t = await ouvrir(Object.assign({}, VIDE, {
     module: 'calendrier',
     chantiers: [{ id: 'c1', proprietaire: 'Martin', statut: 'encours', aDevis: false,
       temps: [], jours: [], lignes: [], maj: Date.now(),
       gps: { lat: 46.6012, lon: 2.4035 } }]
-  }), { avant: w => { w.COMMUNES = FOND_ESSAI; } });
+  }));
   t.clic('[data-vue="carte"]'); await t.pause(500);
 
-  /* Trois fonds au choix, la photo aérienne par défaut. */
+  /* Deux fonds au choix, la photo aérienne par défaut. */
   const chips = t.$$('#carte-fonds .chip').map(b => b.textContent);
-  verifier('trois fonds', ['Photo aérienne', 'Carte IGN', 'Contours seuls'], chips);
+  verifier('deux fonds, « contours seuls » est parti', ['Photo aérienne', 'Carte IGN'], chips);
   verifierVrai('la photo est le fond de départ',
     t.$('[data-fondcarte="photo"]').classList.contains('actif'));
 
@@ -7256,18 +7241,36 @@ scenario('Carte : les tuiles de l’IGN se posent sous les contours', async () =
   verifier('le niveau colle à l’échelle', String(attendu),
     (/TILEMATRIX=(\d+)/.exec(src) || [])[1]);
 
-  /* Les contours restent dessinés par-dessus : c'est eux qui restent quand le
-     réseau manque. */
-  verifierVrai('les contours sont toujours là', !!t.$('#carte-plan path'));
+  verifierVrai('plus aucun contour de commune', !t.$('#carte-plan path'));
+  verifierVrai('le chantier est dessiné', !!t.$('#carte-plan [data-cartept="c1"]'));
+  /* Sans réseau, il ne reste que les points : l'écran le dit, pour qu'une
+     carte sans photo ne fasse pas chercher la panne ailleurs. */
+  verifierVrai('et l’écran dit ce que le réseau change',
+    /sans réseau, seuls vos chantiers/.test(t.$('#carte-aide').textContent));
 
   t.clic('[data-fondcarte="ign"]'); await t.pause(400);
   verifierVrai('la carte IGN se choisit',
     /LAYER=GEOGRAPHICALGRIDSYSTEMS\.PLANIGNV2/.test(tuiles()[0].getAttribute('src')));
   verifier('et le choix est retenu', 'ign', (t.stock('cfg') || {}).fondCarte);
+  verifier('aucune erreur', [], t.erreurs);
+});
 
-  t.clic('[data-fondcarte="contours"]'); await t.pause(400);
-  verifier('« contours seuls » ne demande plus rien au réseau', 0, tuiles().length);
-  verifierVrai('mais la carte reste dessinée', !!t.$('#carte-plan path'));
+/* --------------------------------------------------------------------- */
+scenario('Carte : un téléphone réglé sur « contours seuls » retombe sur la photo', async () => {
+  /* Le choix a disparu en 4.82, mais il est peut-être resté dans la
+     configuration d'un téléphone. Il ne doit pas laisser la carte vide. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'calendrier', cfg: { fondCarte: 'contours' },
+    chantiers: [{ id: 'c1', proprietaire: 'Martin', statut: 'encours', aDevis: false,
+      temps: [], jours: [], lignes: [], maj: Date.now(),
+      gps: { lat: 46.6012, lon: 2.4035 } }]
+  }));
+  t.clic('[data-vue="carte"]'); await t.pause(500);
+  verifierVrai('des tuiles sont demandées', t.$$('#carte-cadre img').length > 0);
+  verifierVrai('en photo aérienne',
+    /ORTHOIMAGERY/.test(t.$('#carte-cadre img').getAttribute('src')));
+  verifierVrai('et la photo est marquée choisie',
+    t.$('[data-fondcarte="photo"]').classList.contains('actif'));
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -7283,7 +7286,6 @@ scenario('Carte : « Ma position » y va, au lieu d’y poser un point', async (
       gps: { lat: 45.60, lon: 4.10 } }]
   }), {
     avant: w => {
-      w.COMMUNES = FOND_ESSAI;
       /* Un GPS qui répond, à cent kilomètres du chantier semé. */
       w.navigator.geolocation = {
         getCurrentPosition: ok => ok({ coords: { latitude: 46.6012, longitude: 2.4035 } })
@@ -7294,8 +7296,7 @@ scenario('Carte : « Ma position » y va, au lieu d’y poser un point', async (
 
   const LB = t.w.BCUI._carte.LB;
   /* cadre() rend l'objet vivant, pas une copie : le relire après coup
-     donnerait les mêmes valeurs des deux côtés, et la comparaison serait
-     toujours vraie. On garde les nombres. */
+     donnerait les mêmes valeurs des deux côtés. On garde les nombres. */
   const av = t.w.BCUI._carte.cadre();
   const avant = { cx: av.cx, cy: av.cy, m: av.m };
   const moi = LB.vers(46.6012, 2.4035);
@@ -7311,6 +7312,183 @@ scenario('Carte : « Ma position » y va, au lieu d’y poser un point', async (
   verifierVrai('et elle s’est serrée', apres.m < avant.m);
   verifierVrai('assez pour reconnaître un chemin',
     apres.m * LB.facteurSol(apres.cy) <= 3.01);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Carte : le trait d’échelle se mesure au sol, comme son libellé', async () => {
+  /* Le libellé comptait en mètres au sol, le trait en mètres de carte : chez
+     lui, un trait annoncé « 500 m » n'en couvrait que trois cent
+     quarante-cinq. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'calendrier',
+    chantiers: [{ id: 'c1', proprietaire: 'Martin', statut: 'encours', aDevis: false,
+      temps: [], jours: [], lignes: [], maj: Date.now(),
+      gps: { lat: 46.6012, lon: 2.4035 } }]
+  }));
+  t.clic('[data-vue="carte"]'); await t.pause(500);
+  const trait = t.$('#carte-plan line');
+  const libelle = trait.parentNode.querySelector('text').textContent;
+  const lu = /^([\d,]+) (k?m)$/.exec(libelle);
+  verifierVrai('le libellé se lit', !!lu);
+  const metres = parseFloat(lu[1].replace(',', '.')) * (lu[2] === 'km' ? 1000 : 1);
+  const px = Number(trait.getAttribute('x2')) - Number(trait.getAttribute('x1'));
+  /* Le sol par pixel est recalculé ici depuis la latitude, à part de
+     facteurSol : les deux sources restent indépendantes. */
+  const c = t.w.BCUI._carte.cadre();
+  const lat = t.w.BCUI._carte.LB.depuis(c.cx, c.cy).lat;
+  const solParPixel = c.m * Math.cos(lat * Math.PI / 180);
+  verifierVrai('le trait couvre au sol ce que dit son libellé',
+    Math.abs(px - metres / solParPixel) <= 0.6);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Carte : un doigt levé sur un dessin remplacé ne bloque plus rien', async () => {
+  /* « Au bout d'un moment ça marche plus. Je crois que je suis arrivé sur un
+     angle, et je ne peux plus bouger avec mon doigt. Je peux zoomer,
+     dézoomer. » La carte se redessine sous le doigt ; quand il se lève sur
+     l'ancien dessin, l'événement ne remonte plus, et le doigt restait compté. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'calendrier',
+    chantiers: [{ id: 'c1', proprietaire: 'Martin', statut: 'encours', aDevis: false,
+      temps: [], jours: [], lignes: [], maj: Date.now(),
+      gps: { lat: 46.6012, lon: 2.4035 } }]
+  }));
+  t.clic('[data-vue="carte"]'); await t.pause(500);
+  /* JSDOM ne mesure rien : chaque dessin, même refait, a sa taille réelle. */
+  t.w.Element.prototype.getBoundingClientRect = () => ({ left: 0, top: 0, width: 320, height: 240 });
+  const doigt = (type, cible, id, x, y, premier) => {
+    const e = new t.w.MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y });
+    Object.defineProperty(e, 'pointerId', { value: id });
+    Object.defineProperty(e, 'isPrimary', { value: premier });
+    cible.dispatchEvent(e);
+  };
+  const cadre = () => { const c = t.w.BCUI._carte.cadre(); return { cx: c.cx, cy: c.cy, m: c.m }; };
+
+  /* Premier geste : on glisse, et la carte se redessine sous le doigt… */
+  const ancien = t.$('#carte-plan');
+  doigt('pointerdown', ancien, 1, 100, 100, true);
+  doigt('pointermove', ancien, 1, 140, 100, true);
+  await t.pause(150);
+  verifierVrai('le dessin a bien été remplacé sous le doigt', t.$('#carte-plan') !== ancien);
+  /* … puis le doigt se lève sur l'ancien dessin, détaché du document :
+     l'événement ne remonte plus jusqu'au cadre. */
+  doigt('pointerup', ancien, 1, 140, 100, true);
+
+  /* Second geste, un seul doigt : la carte doit suivre. */
+  const avant = cadre();
+  const plan = t.$('#carte-plan');
+  doigt('pointerdown', plan, 2, 100, 100, true);
+  doigt('pointermove', plan, 2, 160, 100, true);
+  await t.pause(150);
+  const apres = cadre();
+  verifierVrai('un doigt déplace encore la carte', Math.abs(apres.cx - avant.cx) > 1);
+  verifier('sans zoomer par erreur', avant.m, apres.m);
+  doigt('pointerup', t.$('#carte-svg'), 2, 160, 100, true);
+
+  /* Deux doigts zooment toujours. */
+  const p2 = t.$('#carte-plan');
+  doigt('pointerdown', p2, 3, 100, 120, true);
+  doigt('pointerdown', p2, 4, 140, 120, false);
+  doigt('pointermove', p2, 4, 220, 120, false);
+  await t.pause(150);
+  verifierVrai('deux doigts écartés zooment', cadre().m < apres.m);
+  /* On lève un doigt du pincement : celui qui reste déplace la carte, sans
+     avoir à se lever lui aussi. */
+  doigt('pointerup', t.$('#carte-svg'), 4, 220, 120, false);
+  const pince = cadre();
+  doigt('pointermove', t.$('#carte-plan'), 3, 60, 120, true);
+  await t.pause(150);
+  verifierVrai('le doigt qui reste déplace la carte', Math.abs(cadre().cx - pince.cx) > 1);
+  doigt('pointerup', t.$('#carte-svg'), 3, 60, 120, true);
+
+  /* Un glissement qui s'achève pendant qu'on place un chantier ne le pose
+     pas : seul un appui franc le fait. */
+  t.clic('#carte-poser'); await t.pause(300);
+  t.choisir('#pc-ch', 'c1');
+  t.clic('#pc-ok'); await t.pause(300);
+  const gps0 = JSON.stringify((t.stock('chantiers') || [])[0].gps);
+  const p3 = t.$('#carte-plan');
+  doigt('pointerdown', p3, 5, 60, 60, true);
+  doigt('pointermove', p3, 5, 120, 90, true);
+  doigt('pointerup', t.$('#carte-svg'), 5, 120, 90, true);
+  t.$('#carte-plan').dispatchEvent(new t.w.MouseEvent('click',
+    { bubbles: true, clientX: 120, clientY: 90 }));
+  await t.pause(400);
+  verifier('un glissement ne pose pas le chantier', gps0,
+    JSON.stringify((t.stock('chantiers') || [])[0].gps));
+  const p4 = t.$('#carte-plan');
+  doigt('pointerdown', p4, 6, 160, 120, true);
+  doigt('pointerup', t.$('#carte-svg'), 6, 160, 120, true);
+  t.$('#carte-plan').dispatchEvent(new t.w.MouseEvent('click',
+    { bubbles: true, clientX: 160, clientY: 120 }));
+  await t.pause(500);
+  verifierVrai('un appui franc le pose',
+    JSON.stringify((t.stock('chantiers') || [])[0].gps) !== gps0);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Carte : chercher une commune y emmène', async () => {
+  /* « Est-ce que tu penses qu'il y a une possibilité de rajouter juste une
+     barre de recherche pour rechercher une ville ou une commune ? » */
+  const demandes = [];
+  let reponse = null;
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'calendrier' }), {
+    avant: w => {
+      /* Le banc d'essai n'a pas de réseau : on répond comme le service de
+         l'IGN, dans son format — la longitude d'abord. Sans réponse prévue,
+         la demande échoue, comme hors ligne. */
+      w.fetch = url => {
+        demandes.push(url);
+        if (!reponse) return Promise.reject(new Error('hors ligne'));
+        const r = reponse;
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(r) });
+      };
+    }
+  });
+  t.clic('[data-vue="carte"]'); await t.pause(500);
+  const LB = t.w.BCUI._carte.LB;
+  const commune = (nom, dep, lon, lat) => ({ type: 'Feature',
+    geometry: { type: 'Point', coordinates: [lon, lat] },
+    properties: { label: nom, name: nom, depcode: dep, type: 'municipality' } });
+
+  /* Deux communes du même nom : on choisit. */
+  reponse = { features: [commune('Saint-Paul', '06', 7.12, 43.70), commune('Saint-Paul', '40', -1.05, 43.75)] };
+  t.saisir('#carte-rech', 'saint-paul');
+  t.clic('#carte-chercher'); await t.pause(300);
+  verifier('une seule question au service', 1, demandes.length);
+  verifierVrai('au géocodage de l’IGN, pour une commune',
+    /^https:\/\/data\.geopf\.fr\/geocodage\/search\?q=saint-paul&type=municipality/.test(demandes[0]));
+  const choix = t.$$('#carte-resultats [data-commune]');
+  verifier('les deux sont proposées, avec leur département',
+    ['Saint-Paul (06)', 'Saint-Paul (40)'], choix.map(b => b.textContent));
+  choix[1].click(); await t.pause(300);
+  const v = t.w.BCUI._carte.cadre();
+  const vise = LB.vers(43.75, -1.05);
+  verifierVrai('la carte est allée sur la bonne',
+    Math.abs(v.cx - vise.x) < 1 && Math.abs(v.cy - vise.y) < 1);
+  verifierVrai('et assez près pour la voir entière',
+    Math.abs(v.m * LB.facteurSol(v.cy) - 12) < 0.01);
+  verifier('la liste s’efface', 0, t.$$('#carte-resultats [data-commune]').length);
+
+  /* Une seule réponse : on y va sans choisir, et la touche Entrée suffit. */
+  reponse = { features: [commune('Saint-Martin', '12', 2.57, 44.35)] };
+  t.saisir('#carte-rech', 'saint-martin');
+  t.$('#carte-rech').dispatchEvent(new t.w.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  await t.pause(300);
+  const l = LB.vers(44.35, 2.57), v2 = t.w.BCUI._carte.cadre();
+  verifierVrai('une seule commune : on y va directement',
+    Math.abs(v2.cx - l.x) < 1 && Math.abs(v2.cy - l.y) < 1);
+
+  /* Sans réseau, on le dit, et la carte reste où elle était. */
+  reponse = null;
+  const fige = v2.cx;
+  t.saisir('#carte-rech', 'nulle part');
+  t.clic('#carte-chercher'); await t.pause(300);
+  verifierVrai('sans réseau, l’écran le dit', /il faut du réseau/.test(t.texte('#carte-resultats')));
+  verifier('et la carte ne bouge pas', fige, t.w.BCUI._carte.cadre().cx);
   verifier('aucune erreur', [], t.erreurs);
 });
 
