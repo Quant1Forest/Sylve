@@ -1797,13 +1797,9 @@ Tournée du 2 septembre, complétée le 9 et le 15, par ordre de maturité :
   amortissement de la débroussailleuse, mélange, huile, déplacement. De quoi
   situer un type de travaux par rapport à un autre. Le module Véhicule fait
   déjà ce raisonnement pour l’utilitaire — c’est le même, étendu au matériel.
-- **L'historique du dépôt garde ce que les fichiers actuels n'ont plus** :
-  kilométrages du véhicule et dépenses de carburant (écrits en 4.65, retirés
-  en `74bc29d`), la capacité d'impôt par défaut, les noms de communes des
-  tests, les contours de six départements (`communes.js`), et **son
-  adresse e-mail comme auteur de chaque commit**. *« Sur l'historique, oui, ce
-  serait bien de pouvoir les enlever. »* La réécriture est préparée, pas
-  publiée : elle remplace tout l'historique en ligne et attend son feu vert.
+- **L'historique du dépôt a été nettoyé le 17 septembre**, à sa demande :
+  *« c'est uniquement pour enlever les infos personnelles »*. Voir *L'historique
+  réécrit*.
 
 ## Les achats à venir
 
@@ -1976,6 +1972,35 @@ attendues — puis appliquée aux nouveaux.
 exemple s'invente, rond et quelconque. Un défaut qui dépend de sa situation
 n'existe pas : le champ reste vide et l'écran dit ce qui manque.
 
+## L'historique réécrit
+
+*« Nettoyer l'historique, ça remplace tout. Oui, vas-y. C'est uniquement pour
+enlever les infos personnelles, on est d'accord. »* Fait le 17 septembre :
+chaque commit a été repris pour en retirer ce que les fichiers actuels
+n'avaient déjà plus — ses chiffres, ses lieux, les contours de communes — et
+**son adresse e-mail d'auteur**, remplacée par l'adresse anonyme que GitHub
+donne à chaque compte.
+
+- **Rien d'autre n'a bougé.** L'état final des fichiers est identique, octet
+  pour octet, à celui d'avant : c'est la vérification qui fait foi, pas la
+  relecture du script.
+- **Tous les numéros de commit ont changé.** Une note qui en cite un d'avant
+  le 17 septembre pointe dans le vide.
+- **La liste des remplacements est elle-même une donnée personnelle** : elle
+  nomme ce qu'elle retire. Elle n'entre jamais dans le dépôt, pas plus que la
+  sauvegarde de l'historique d'avant, gardée chez lui.
+- **Une copie du dépôt faite avant cette date ne doit plus pousser** : elle
+  remettrait l'ancien historique en ligne. On la retélécharge.
+- **Les commits suivent l'adresse anonyme** (`git config user.email` du
+  dépôt). Sans elle, le prochain commit aurait remis l'adresse en clair.
+
+**La répétition générale avait dit « zéro trouvé » — à tort.** Elle cherchait
+les mots mêmes que le script remplaçait : elle ne pouvait trouver que ce qu'on
+savait déjà. Une seconde recherche, écrite à part avec des noms de lieux de son
+secteur, a trouvé une commune restée dans les tests. **Une vérification qui
+relit la liste du correcteur se confirme elle-même** — c'est la règle du
+projet, appliquée à un script jetable.
+
 ## Ce que la fiche de chantier n'exige pas
 
 **Le téléphone du propriétaire est facultatif.** *« Est-ce que c'est vraiment
@@ -2092,9 +2117,10 @@ six départements, tirés de shapefiles IGN, 344 Ko dans `communes.js`
 avec lui le choix « Contours seuls ». Un téléphone resté réglé dessus
 retombe sur la photo (`fondTuiles()`).
 
-`communes.js` et `outils/convertir-communes.js` ont quitté le dépôt ; ils
-restent dans l'historique (commit `d923d9a`) si l'on y revient. Trois choses
-à savoir alors :
+`communes.js` et `outils/convertir-communes.js` ont quitté le dépôt **et son
+historique** : ils situaient sa région. Seule la sauvegarde d'avant le
+nettoyage, gardée chez lui hors du dépôt, les porte encore. Trois choses à
+savoir si l'on y revient :
 
 - **Les fichiers de l'IGN ne doivent jamais entrer dans le dépôt** — 248 Mo
   pour le parcellaire d'un seul département, et le SCAN 25 se compte en gigaoctets.
