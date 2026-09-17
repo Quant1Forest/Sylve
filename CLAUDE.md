@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.83.0-20260915-2015**
+Version courante : **4.84.0-20260916-2028**
 
 ---
 
@@ -51,7 +51,7 @@ npm run controle   # vérificateur + service worker + tests + reconstruction + c
 ```
 
 Doit afficher **« Bon pour livraison »**, puis **« le service worker tient »**
-(33 vérifications), puis la suite au vert — 1805 à ce jour — puis
+(33 vérifications), puis la suite au vert — 1850 à ce jour — puis
 **« Sylve.html est conforme »**.
 
 Compter **moins de deux minutes**. Ça a été dix, et deux choses l'expliquaient :
@@ -1398,8 +1398,17 @@ forêt, type de travaux**. Le reste se remplit bloc par bloc sur la fiche.
   le sien ; depuis la 4.75 le nom ne se stocke plus du tout — voir *Le nom du
   chantier ne se stocke plus*. Le champ a disparu des deux formulaires.
 - **Le type de travaux ouvre la première ligne** du bloc Travaux, avec son
-  unité, sans quantité ni prix. Demandé par lui : « en général à la création je
+  unité, sans prix. Demandé par lui : « en général à la création je
   sais déjà le type de travaux effectués ».
+- **Avec ou sans devis se choisit à la création, et c'est obligatoire** (4.84).
+  *« Je crée un chantier, je n'ai pas de devis, et je n'ai pas de statut
+  adapté. »* Avec : `devis` (« Devis à envoyer »). Sans : `accepte`, qui se lit
+  « À planifier » quand `aDevis` est faux. Tout chantier naissait en « Devis à
+  envoyer ».
+- **Une estimation rapide** (4.84) : « Journées à prévoir » (`joursEstimes`)
+  et, si les travaux ne se comptent pas à la journée, la surface ou la
+  quantité dans leur unité, posée sur la première ligne. Les deux facultatifs,
+  rien d'inventé quand ils sont vides.
 - **`formEnteteCh()` et `renderCeDevis()` ont été retirées** : elles ne
   servaient plus qu'à ce formulaire. Les helpers partagés restent —
   `brancherCeJours`, `brancherEssenceCh`, `brancherOffreListe`,
@@ -1617,7 +1626,8 @@ compléter* et les statuts un par un.
 - **Les familles de travaux** (4.83) forment un groupe à part : un chantier y
   figure dès qu'**une** de ses lignes relève de la famille, et la famille suit
   ses réglages (`travauxPerso[code].cat`), pas le rangement livré. Une famille
-  sans chantier ne s'affiche pas.
+  sans chantier ne s'affiche pas. **Tout en bas** depuis la 4.84 : *« c'est le
+  truc que je vais utiliser le moins souvent »*.
 - **« Ouverts » n'a pas changé de sens** : un facturé non payé y reste,
   l'argent n'est pas rentré. C'est `statutOuvert()`, qui sert ailleurs.
 - **Le groupe « En cours » s'appelle « Ouverts ».** Il rangeait les facturés
@@ -1757,6 +1767,17 @@ Tournée du 2 septembre, complétée le 9 et le 15, par ordre de maturité :
   « À traiter » en est parti (le carnet le porte) et les notes passent sous
   les tuiles. Restent les six bulles au-dessus des tuiles : il n’en a rien
   dit, elles sont restées.
+- **Épurer les chiffres de Finances.** *« Il y a tellement de chiffres qu'on ne
+  sait plus regarder. Les chiffres en gros, le texte en petit, plus de marge,
+  plus de blanc. »* Le passage à la ligne des montants est corrigé en 4.84
+  (`ligneCA` : le montant qui compte en gros, d'où il vient en petit, sans
+  coupure). Le reste est un travail d'ensemble : **à faire sur maquette**.
+- **Mesurer une surface sur la carte.** *« Quand je rentre ma journée : rentrer
+  la surface depuis la carte — je zoome, je trace mon polygone, et ça
+  m'enregistre ma surface. »* Et le même geste pour **détourer un chantier**
+  au lieu d'y poser un point. Demandé le 16 septembre, pas commencé : le
+  tracé au doigt, la surface vraie (Mercator étire les surfaces de 1/cos² φ)
+  et où la ranger demandent un lot à part.
 - **La photo d’un ticket qui remplit la dépense.** *« Je prends en photo ma
   facture, et ça me remplit automatiquement toutes les lignes : le
   fournisseur, ce qu’il y a sur le ticket, le TTC, la TVA. La catégorie, ce
@@ -1767,18 +1788,15 @@ Tournée du 2 septembre, complétée le 9 et le 15, par ordre de maturité :
   service en ligne de Kimi envoie la photo à son éditeur. Trois voies
   proposées — lecture du texte dans le téléphone (rien ne sort, moins fiable),
   un service européen, ou un service américain qui s’engage à ne pas
-  entraîner ses modèles dessus. **Pas choisi : ne rien construire avant.** Une
+  entraîner ses modèles dessus. **Il a choisi d'essayer la première, et
+  Mistral le tente ensuite ; l'accord pour télécharger Tesseract n'est pas
+  encore donné — ne rien construire avant.** Une
   clé de service ne doit jamais entrer dans le dépôt.
 - **Le prix de revient par travaux.** *« On le fera plus tard, mais tu peux le
   garder en note. »* Savoir ce que coûte réellement une journée de dégagement :
   amortissement de la débroussailleuse, mélange, huile, déplacement. De quoi
   situer un type de travaux par rapport à un autre. Le module Véhicule fait
   déjà ce raisonnement pour l’utilitaire — c’est le même, étendu au matériel.
-- **La carte sans réseau.** *« Si je charge la carte avec du réseau, est-ce
-  que sans réseau je pourrais quand même l'avoir ? »* Pas aujourd'hui : le
-  service worker ignore les tuiles (autre origine), seul le cache du
-  navigateur en garde parfois. Proposé le 15 septembre : garder les tuiles
-  déjà vues, avec une taille plafonnée. Pas encore validé.
 - **L'historique du dépôt garde ce que les fichiers actuels n'ont plus** :
   kilométrages du véhicule et dépenses de carburant (écrits en 4.65, retirés
   en `74bc29d`), la capacité d'impôt par défaut, les noms de communes des
@@ -2040,6 +2058,13 @@ les plus anciennes partent.
 - **Rien ne se télécharge d'avance** : c'est ce qu'il a regardé qui reste. Pour
   une zone sans réseau, la parcourir chez soi avant.
 
+**La fiche ouvre la carte** (4.84) : *« associer la carte au chantier,
+accéder à la carte depuis ma fiche, ou avoir un emplacement pour le
+positionner »*. Le bloc « Le chantier » dit s'il est placé et propose **Voir
+sur la carte** ou **Placer / Déplacer** (`montrerSurCarte`). Un chantier non
+placé ouvre la carte **sur sa commune**, cherchée par le même géocodage
+(`centrerSurCommune`) — sans réseau, la carte s'ouvre où elle était.
+
 **On cherche une commune** (`chercherCommune`) : le géocodage de l'IGN
 (`data.geopf.fr/geocodage/search`, `type=municipality`), le même fournisseur
 que les tuiles. Une seule réponse, on y va ; plusieurs, on choisit, avec le
@@ -2252,6 +2277,26 @@ où le taux réduit s’applique. Défaut d’argent, silencieux.
 propriétaire.** Elle rejoint donc le téléphone dans `A.cfg.contacts`, indexée
 par le nom, et se reporte dès qu’il retape le même — une fois par
 propriétaire, pas une fois par chantier.
+
+**En 4.84, elle ne se pose plus qu’à un endroit : sous le champ du client.**
+*« Il me demande s'il a un numéro de SIREN, et juste en dessous c'est aussi
+marqué : il me redemande. »* La case du bas redisait la question — et c'était
+pire qu'une redite : **restée décochée, elle écrasait le « oui » donné sous le
+champ**. Le chantier partait à 20 % et le client perdait son SIREN. Même
+défaut dans « Le chantier » de la fiche, dont la case reste (c'est là qu'on
+corrige un chantier) mais relit désormais la réponse.
+
+- **Le chantier créé lit la réponse du client** (`sirenDe`) ; la création
+  n'écrit plus rien dans `contacts`.
+- **Un client déjà connu dont on ignore la réponse** se voit poser la question
+  sous le champ, en quittant le champ (`brancherOffreListe(…, { connus: true })`).
+  C'est ce que la case du bas faisait pour les noms d'avant les types.
+- **La réponse se dit au formulaire** : `brancherOffreListe` déclenche un
+  `change` sur le champ après la réponse, et le formulaire relit. Créé par
+  `document.createEvent`, pas `new Event`, pour le vieux matériel.
+
+**Leçon : deux endroits pour une même réponse ne font pas qu'encombrer, ils
+se contredisent** — et c'est le dernier écrit qui gagne, pas le bon.
 
 ## Le rappel entre aussi dans le calendrier
 
@@ -2534,6 +2579,27 @@ et c'est une petite liste qu'il enrichit lui-même.
 **Piège de vocabulaire à connaître** : `UNITES` ne contient pas de « tige ».
 Une tige se compte en `unite`, affichée « u ». Un scénario qui sème
 `unite: 'tige'` produit un rendement incalculable, sans rien dire.
+
+## Ce qui reste à planifier, chantier par chantier
+
+*« J'ai besoin de pouvoir dire : ok, j'ai trois chantiers à planifier, sur tel
+chantier j'ai estimé deux jours, l'autre trois, l'autre un. Là je sais que
+j'ai douze jours à planifier, mais ces chantiers… »* La bulle donnait le total ;
+**`#cal-aplanifier`**, en tête du calendrier, dit de quoi il est fait (4.84).
+
+- **Les mêmes chantiers que la bulle** (`devis`, `envoye`, `accepte`,
+  `encours` avec un reste à placer), **plus les engagés sans estimation**,
+  marqués « à estimer » : c'est justement celui qu'on oublie, et son bouton
+  ouvre la fiche.
+- **Les engagés d'abord**, un devis sans réponse ensuite, marqué comme tel.
+- **« Placer » ouvre le placement** du chantier (`A.planifie`), et la liste
+  s'efface le temps de placer : le bandeau du chantier prend la place.
+
+**Deux sabotages n'ont d'abord rien dit sur ce lot**, et c'est encore le
+scénario qu'il a fallu corriger, pas le code : la carte ouverte « sur le
+chantier » était déjà centrée sur lui — c'était le seul placé ; et les
+familles « tout en bas » l'étaient d'office sans chantier clos. Un second
+chantier placé loin, un chantier payé, et les gardes ont crié.
 
 ## Il ne planifie qu’une semaine ou deux à l’avance
 

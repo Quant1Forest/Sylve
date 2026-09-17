@@ -1698,6 +1698,7 @@ if (froid && s > 0) montrer(s);
         </div>
         <div id="cal-planif"></div>
         <div id="cal-trancher"></div>
+        <div id="cal-aplanifier"></div>
         <div id="cal-grille"></div>
         <div class="legende" style="margin-top:10px">
           <span><i style="background:#2E7D46"></i>confirmé</span>
@@ -7986,6 +7987,13 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.84', quoi: [
+    { t: 'Nouveau chantier : avec ou sans devis, et une estimation en jours ou en surface', vue: 'carnet' },
+    { t: 'Le SIREN ne se demande plus qu une fois, sous le champ du client', vue: 'carnet' },
+    { t: 'La fiche du chantier ouvre la carte : voir ou placer le chantier', vue: 'carnet' },
+    { t: 'Calendrier : la liste de ce qui reste a planifier, chantier par chantier', vue: 'calendrier' },
+    { t: 'Finances : les montants ne passent plus a la ligne', vue: 'finances' }
+  ] },
   { v: '4.83', quoi: [
     { t: 'Ma journee : le temps total, les heures productives et le trajet', vue: 'calendrier' },
     { t: 'Carte : les zones deja regardees restent visibles sans reseau', vue: 'carte' },
@@ -8010,10 +8018,6 @@ var NOTES_MAJ = [
     { t: 'Une vraie carte : les communes de six departements, hors ligne', vue: 'carte' },
     { t: 'Glissez pour vous deplacer, pincez pour zoomer', vue: 'carte' },
     { t: 'Et « Poser un chantier » place un point d un doigt', vue: 'carte' }
-  ] },
-  { v: '4.79', quoi: [
-    { t: 'Un reglage pour garder l ecran allume quand Sylve est devant', vue: 'reglages' },
-    { t: 'Il dit ce que le telephone a repondu : un mode d economie peut refuser', vue: 'reglages' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent
@@ -8563,6 +8567,8 @@ function brancher() {
     if (e.target.closest('#f-note')) { ouvrirNoteCh(id); return; }
     if (e.target.closest('#f-jours')) { ouvrirJourneesCh(id); return; }
     if (e.target.closest('#f-statut')) { ouvrirStatut(id); return; }
+    var fc = e.target.closest('[data-fcarte]');
+    if (fc) { montrerSurCarte(c, fc.dataset.fcarte === 'placer'); return; }
     if (e.target.closest('#f-fichech')) {
       A.fch = id;
       /* Le filtre doit pouvoir montrer ce chantier-là, quel que soit son
@@ -9059,6 +9065,16 @@ function brancher() {
          à refaire tout le chemin pour retrouver son chantier. */
       if (c) ouvrirChantier(c.id);
     }
+  });
+  $('#cal-aplanifier').addEventListener('click', function (e) {
+    var p = e.target.closest('[data-aplacer]'), es = e.target.closest('[data-aestimer]');
+    if (es) { ouvrirChantier(es.dataset.aestimer); return; }
+    if (!p) return;
+    var c = chantier(p.dataset.aplacer); if (!c) return;
+    A.planifie = c.id;
+    var pl = C.journeesPlacees(c);
+    A.calMois = pl.length ? C.minuit(pl[pl.length - 1].d) : Date.now();
+    renderCalendrier();
   });
   $('#cal-trancher').addEventListener('click', function () {
     var l = C.joursAResoudre(A.chantiers, A.cfg, absences(), Date.now());
@@ -10937,6 +10953,34 @@ function chercherCommune(q) {
     dire('Recherche impossible : elle interroge l’IGN, il faut du réseau.');
   });
 }
+/* La carte ouverte depuis la fiche : sur le chantier s'il est placé, sinon
+   sur sa commune — trouvée par le même géocodage que la recherche. Sans
+   réseau, la carte s'ouvre où elle était, et le doigt fait le reste. */
+function montrerSurCarte(c, placer) {
+  var v = cadreCarte();
+  var place = c.gps && c.gps.lat != null;
+  A.cartePose = placer ? c.id : null;
+  if (place) {
+    var m = LB.vers(c.gps.lat, c.gps.lon);
+    v.cx = m.x; v.cy = m.y;
+    v.m = Math.min(v.m, 8 / LB.facteurSol(m.y));
+  }
+  renderCarteChantiers();
+  allerModule('calendrier', 'carte');
+  if (!place && c.commune) centrerSurCommune(c.commune);
+  if (placer) toast('Appuyez sur la carte à l’endroit du chantier.');
+}
+function centrerSurCommune(nom) {
+  if (!nom || typeof fetch !== 'function') return Promise.resolve(false);
+  return fetch(urlRechercheCommune(nom)).then(function (r) {
+    return r.ok ? r.json() : null;
+  }).then(function (j) {
+    var f = j && j.features && j.features[0];
+    if (!f || !f.geometry || !f.geometry.coordinates) return false;
+    allerCommune({ lon: Number(f.geometry.coordinates[0]), lat: Number(f.geometry.coordinates[1]) });
+    return true;
+  }).catch(function () { return false; });
+}
 function allerCommune(c) {
   if (!c) return;
   var m = LB.vers(c.lat, c.lon), v = cadreCarte();
@@ -11019,6 +11063,8 @@ function renderFiltreChantiers() {
     ['clos', 'Chantiers clos', nf('clos')],
     ['afaire', 'En cours ou à planifier', nf('afaire')]);
   if (incomplets) tete.push(['acompleter', 'À compléter', incomplets]);
+  /* Les familles tout en bas : « c'est le truc que je vais utiliser le moins
+     souvent ». */
   var fams = C.CAT_TRAVAUX.map(function (x) { return ['fam:' + x.c, x.n, nf('fam:' + x.c)]; })
     .filter(function (o) { return o[2] > 0; });
   var ouv = [], clos = [];
@@ -11031,9 +11077,9 @@ function renderFiltreChantiers() {
      « dans en cours, j'ai encore tous les chantiers que j'ai finis ». Il
      porte le nom du filtre qu'il détaille. */
   s.innerHTML = tete.map(opt).join('') +
-    (fams.length ? '<optgroup label="Familles de travaux">' + fams.map(opt).join('') + '</optgroup>' : '') +
     (ouv.length ? '<optgroup label="Ouverts">' + ouv.map(opt).join('') + '</optgroup>' : '') +
-    (clos.length ? '<optgroup label="Clos">' + clos.map(opt).join('') + '</optgroup>' : '');
+    (clos.length ? '<optgroup label="Clos">' + clos.map(opt).join('') + '</optgroup>' : '') +
+    (fams.length ? '<optgroup label="Familles de travaux">' + fams.map(opt).join('') + '</optgroup>' : '');
 }
 function renderTriChantiers() {
   var s = $('#c-tri'); if (!s) return;
@@ -11787,6 +11833,16 @@ function renderFiche() {
     esc([c.donneur || c.client ? 'via ' + (c.donneur || c.client) : '',
       c.proprietaire ? c.proprietaire + (c.siren ? ' (SIREN)' : '') : '',
       c.foret, c.parcelles ? 'parc. ' + c.parcelles : '', c.commune].filter(Boolean).join(' · ') || 'sans donneur d’ordre') + '</p>' +
+    /* « Associer la carte au chantier : accéder à la carte depuis ma fiche,
+       ou avoir un emplacement pour le positionner. » */
+    '<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:9px">' +
+    (c.gps && c.gps.lat != null
+      ? '<span class="muted" style="font-size:12.5px">Placé sur la carte</span>' +
+        '<button class="btn btn-min" data-fcarte="voir">Voir sur la carte</button>' +
+        '<button class="btn btn-min" data-fcarte="placer">Déplacer</button>'
+      : '<span class="muted" style="font-size:12.5px">Pas encore sur la carte</span>' +
+        '<button class="btn btn-min" data-fcarte="placer">Placer sur la carte</button>') +
+    '</div>' +
     '<div style="margin-top:9px">' + badgeStatut(c) +
     (dateStatut(c) ? ' <span class="muted" style="font-size:12px">' + esc(dateStatut(c)) + '</span>' : '') +
     (C.enRetard(c, Date.now()) ? ' <span class="retard">jours passés</span>' : '') + '</div>' +
@@ -12144,14 +12200,27 @@ function ouvrirEnteteCh() {
     '<div class="champ"><label class="eyebrow" for="ce-trav">Type de travaux</label>' +
     '<select id="ce-trav">' + optionsTravaux('', { vide: true }) + '</select>' +
     '<p class="muted" style="font-size:11.5px;margin:5px 0 0">Une première ligne sera ' +
-    'ouverte dans les travaux, sans quantité ni prix : vous la chiffrerez ensuite.</p></div>' +
-    /* Le taux réduit dépend du propriétaire, pas du chantier : sans cette
-       case à la création, tout chantier neuf partait à 20 %. */
-    '<label class="ligne-check" style="display:flex;align-items:flex-start;gap:8px;' +
-    'font-size:13.5px;margin:0 0 13px"><input type="checkbox" id="ce-siren" ' +
-    'style="margin-top:2px"><span>Identifié producteur agricole (n° SIREN)' +
-    '<span class="muted" style="display:block;font-size:11.5px">Ouvre le taux réduit de ' +
-    'TVA sur les travaux qui y donnent droit. Retenu pour ce propriétaire.</span></span></label>' +
+    'ouverte dans les travaux : vous la chiffrerez ensuite.</p></div>' +
+    /* « Il faudrait que je puisse choisir chantier avec devis, oui ou non :
+       comme ça, ça me change directement le bon statut. » Un chantier sans
+       devis naissait en « Devis à envoyer », sans statut qui lui convienne.
+       Le choix est obligatoire : c'est lui qui décide du statut de départ. */
+    '<p class="eyebrow" style="margin:2px 0 6px">Avec un devis ?</p>' +
+    '<div class="chips" id="ce-devis">' +
+    '<button type="button" class="chip" data-cedevis="oui" aria-pressed="false">Avec devis</button>' +
+    '<button type="button" class="chip" data-cedevis="non" aria-pressed="false">Sans devis</button>' +
+    '</div>' +
+    '<p class="muted" style="font-size:11.5px;margin:5px 0 12px">Avec : il part en « Devis ' +
+    'à envoyer ». Sans : il part directement en « À planifier ».</p>' +
+    /* « Il faut que je puisse estimer rapidement le nombre de jours à prévoir,
+       ou la surface. » Les deux restent facultatifs. */
+    '<div class="grille g2">' +
+    '<div class="champ"><label class="eyebrow" for="ce-jours">Journées à prévoir</label>' +
+    '<input type="text" id="ce-jours" inputmode="decimal" placeholder="estimation"></div>' +
+    '<div class="champ" id="ce-qte-champ" hidden><label class="eyebrow" for="ce-qte" ' +
+    'id="ce-qte-l">Quantité</label>' +
+    '<input type="text" id="ce-qte" inputmode="decimal"></div>' +
+    '</div>' +
     '<div class="champ"><p class="eyebrow" style="margin:0 0 4px">Il s’appellera</p>' +
     '<p class="gros" id="ce-nom-apercu" style="margin:0;font-weight:600"></p>' +
     '<p class="muted" style="font-size:11.5px;margin:5px 0 0">Composé des travaux, du ' +
@@ -12161,7 +12230,32 @@ function ouvrirEnteteCh() {
     '<button class="btn primaire" id="ce-ok">Créer le chantier</button></div>');
 
   brancherOffreListe('ce-donneur', 'clients');
-  brancherOffreListe('ce-proprio', 'proprios');
+  /* Le SIREN ne se demande plus qu'à un endroit : sous le champ du client.
+     La case du bas redisait la même question — et, décochée, elle écrasait
+     la réponse qu'on venait d'y donner. Un client déjà connu dont on ignore
+     la réponse se voit poser la question au même endroit. */
+  brancherOffreListe('ce-proprio', 'proprios', { connus: true });
+  var avecDevis = null;
+  $('#ce-devis').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-cedevis]'); if (!b) return;
+    avecDevis = b.dataset.cedevis === 'oui';
+    $$('#ce-devis [data-cedevis]').forEach(function (x) {
+      x.setAttribute('aria-pressed', String(x === b));
+    });
+  });
+  /* La quantité parle l'unité des travaux : des hectares, des plants. À la
+     journée, c'est le champ d'à côté qui répond. */
+  var suivreQuantite = function () {
+    var t = $('#ce-trav').value, u = t ? C.uniteDe(t) : '';
+    var montre = !!t && u !== 'jour';
+    $('#ce-qte-champ').hidden = !montre;
+    if (montre) {
+      $('#ce-qte-l').textContent = (u === 'ha' ? 'Surface' : 'Quantité') +
+        ' (' + C.courtUnite(u) + ')';
+    }
+  };
+  $('#ce-trav').addEventListener('change', suivreQuantite);
+  suivreQuantite();
   var compose = function () {
     return C.nomAutoChantier($('#ce-trav').value,
       $('#ce-proprio').value.trim(), $('#ce-com').value.trim());
@@ -12172,18 +12266,6 @@ function ouvrirEnteteCh() {
   ['#ce-proprio', '#ce-com'].forEach(function (x) {
     $(x).addEventListener('input', recomposer);
   });
-  /* Un propriétaire déjà connu rapporte sa réponse : on ne repose pas la
-     question à chaque chantier. */
-  var reprendreSiren = function () {
-    var n = $('#ce-proprio').value.trim();
-    if (n && contacts()[n] && contacts()[n].siren != null) $('#ce-siren').checked = sirenDe(n);
-    var ouvre = sirenPossible(n);
-    $('#ce-siren').closest('.ligne-check').hidden = !ouvre;
-    if (!ouvre) $('#ce-siren').checked = false;
-  };
-  $('#ce-proprio').addEventListener('change', reprendreSiren);
-  $('#ce-proprio').addEventListener('blur', reprendreSiren);
-  $('#ce-proprio').addEventListener('input', reprendreSiren);
   $('#ce-trav').addEventListener('change', recomposer);
   recomposer();
 
@@ -12193,23 +12275,32 @@ function ouvrirEnteteCh() {
         'nomme le chantier.');
       return;
     }
+    if (avecDevis === null) {
+      toast('Avec ou sans devis ? C’est ce qui décide de son statut.');
+      return;
+    }
     var trav = $('#ce-trav').value;
+    var jours = C.nb($('#ce-jours').value), qte = C.nb($('#ce-qte').value);
+    var proprio = $('#ce-proprio').value.trim();
     var c = {
-      id: uid(), cree: Date.now(), maj: Date.now(), statut: 'devis', aDevis: true,
+      id: uid(), cree: Date.now(), maj: Date.now(),
+      statut: avecDevis ? 'devis' : 'accepte', aDevis: avecDevis,
       /* Aujourd'hui à midi, corrigeable : un chantier saisi après coup n'est
          pas arrivé aujourd'hui. Midi, comme toutes les dates du fichier. */
       dateEntree: C.minuit(Date.now()) + 12 * 3600000,
-      siren: $('#ce-siren').checked,
+      /* La réponse vit sur le client : elle a été donnée sous le champ, ou
+         lors d'un chantier précédent. Rien ne la réécrit ici. */
+      siren: sirenDe(proprio),
       donneur: $('#ce-donneur').value.trim(),
-      proprietaire: $('#ce-proprio').value.trim(),
+      proprietaire: proprio,
       commune: $('#ce-com').value.trim(), foret: $('#ce-foret').value.trim(),
-      lignes: trav ? [{ travail: trav, unite: C.uniteDe(trav), quantite: '', prix: '',
+      lignes: trav ? [{ travail: trav, unite: C.uniteDe(trav),
+        quantite: !$('#ce-qte-champ').hidden && qte > 0 ? qte : '', prix: '',
         nature: C.estFourniture(trav) ? 'vente' : 'prestation', note: '' }] : [],
       temps: [], jours: []
     };
+    if (jours > 0) c.joursEstimes = jours;
     A.chantiers.push(c);
-    poserSiren(c.proprietaire, c.siren);
-    Promise.resolve(sauverCfg());
     horodaterStatut(c);
     sauverChantiers().then(function () {
       fermerModale(); renderCarnet(); renderAccueil(); renderRendements(); renderCalendrier();
@@ -12223,14 +12314,36 @@ function ouvrirEnteteCh() {
    de valider le chantier : à la validation, le nom est tapé depuis longtemps,
    la fenêtre bloquante tombe de nulle part et coupe la saisie. Ici c'est une
    ligne sous le champ, qu'on tape ou qu'on ignore. */
-function brancherOffreListe(champId, cle) {
+function brancherOffreListe(champId, cle, options) {
   var champ = $('#' + champId), offre = $('#' + champId + '-offre');
   if (!champ || !offre) return;
+  /* Une réponse donnée sous le champ doit se voir dans le reste du
+     formulaire : une case restée décochée écrasait le SIREN qu'on venait de
+     poser. On le dit au champ, et chaque formulaire relit. */
+  var prevenir = function () {
+    var ev = document.createEvent('Event');
+    ev.initEvent('change', true, true);
+    champ.dispatchEvent(ev);
+  };
   var montrer = function () {
     var nom = champ.value.trim();
     var connu = nom && listeDe(cle).some(function (x) {
       return String(x).toLowerCase() === nom.toLowerCase();
     });
+    if (connu && options && options.connus && cle === 'proprios' && !typeDe(nom) &&
+      !(contacts()[nom] && contacts()[nom].siren != null)) {
+      /* Déjà posée pour ce nom : la redessiner effacerait le choix en cours. */
+      if (offre.dataset.question === nom) return;
+      offre.dataset.question = nom;
+      demanderTypeClient(offre, nom, function () {
+        offre.dataset.question = '';
+        offre.className = 'offre-liste visible faite';
+        offre.textContent = '« ' + nom + ' » : noté.';
+        prevenir();
+      });
+      return;
+    }
+    offre.dataset.question = '';
     if (!nom || connu) { offre.className = 'offre-liste'; offre.innerHTML = ''; return; }
     offre.className = 'offre-liste visible';
     offre.innerHTML = '« ' + esc(nom) + ' » n’est pas dans vos ' +
@@ -12240,6 +12353,7 @@ function brancherOffreListe(champId, cle) {
   champ.addEventListener('blur', montrer);
   champ.addEventListener('input', function () {
     /* Tant qu'il tape, on se tait : l'offre reviendra quand il aura fini. */
+    offre.dataset.question = '';
     if (offre.classList.contains('visible')) { offre.className = 'offre-liste'; offre.innerHTML = ''; }
   });
   offre.addEventListener('click', function (e) {
@@ -12254,6 +12368,7 @@ function brancherOffreListe(champId, cle) {
         offre.textContent = '« ' + nom + ' » ajouté à vos ' +
           LISTES[cle].nom.toLowerCase() +
           (typeDe(nom) ? ' — ' + nomTypeClient(typeDe(nom)).toLowerCase() : '') + '.';
+        prevenir();
       });
     };
     /* Un lieu n'a pas de type ; une personne, si. Et c'est le moment de le
@@ -12381,12 +12496,19 @@ function ouvrirIdentiteCh(id) {
     '<button class="btn primaire" id="ic-ok">Valider</button></div>');
   brancherOffreListe('ic-donneur', 'clients');
   brancherOffreListe('ic-proprio', 'proprios');
-  var suivreSiren = function () {
-    var ouvre = sirenPossible($('#ic-proprio').value.trim());
+  var suivreSiren = function (e) {
+    var n = $('#ic-proprio').value.trim();
+    var ouvre = sirenPossible(n);
+    /* Une réponse posée sous le champ reporte ici : sans ça, la case restée
+       décochée la réécrivait à l'enregistrement. */
+    if (e && e.type === 'change' && contacts()[n] && contacts()[n].siren != null) {
+      $('#ic-siren').checked = sirenDe(n);
+    }
     $('#ic-siren').closest('.ligne-check').hidden = !ouvre;
     if (!ouvre) $('#ic-siren').checked = false;
   };
   $('#ic-proprio').addEventListener('input', suivreSiren);
+  $('#ic-proprio').addEventListener('change', suivreSiren);
   suivreSiren();
   var suivreNom = function () {
     var l = (c.lignes || []).filter(function (x) {
@@ -14263,9 +14385,54 @@ function premierJourPose(c) {
   return pl.length ? pl[0].d : null;
 }
 
+/* « J'ai besoin de pouvoir dire : j'ai trois chantiers à planifier, sur tel
+   chantier j'ai estimé deux jours, l'autre trois, l'autre un. Là je sais que
+   j'ai douze jours à planifier, mais ces chantiers-là… » La bulle donnait le
+   total ; la liste dit de quoi il est fait, et chaque ligne ouvre le
+   placement. Un chantier engagé sans estimation y figure aussi : c'est
+   justement celui qu'on oublie. */
+function chantiersAPlanifier() {
+  return (A.chantiers || []).filter(function (c) {
+    return ['devis', 'envoye', 'accepte', 'encours'].indexOf(c.statut) >= 0;
+  }).map(function (c) {
+    return { c: c, reste: C.resteAPlacer(c) };
+  }).filter(function (x) {
+    return x.reste == null ? x.c.statut === 'accepte' || x.c.statut === 'encours' : x.reste > 0;
+  }).sort(function (a, b) {
+    /* Ce qui est engagé d'abord : un devis sans réponse peut attendre. */
+    var ea = C.statutEngage(a.c.statut) ? 0 : 1, eb = C.statutEngage(b.c.statut) ? 0 : 1;
+    return ea - eb || (b.reste || 0) - (a.reste || 0);
+  });
+}
+function renderAPlanifier() {
+  var z = $('#cal-aplanifier'); if (!z) return;
+  /* Pendant un placement, le bandeau du chantier en cours prend la place. */
+  var l = A.planifie ? [] : chantiersAPlanifier();
+  if (!l.length) { z.innerHTML = ''; return; }
+  var total = l.reduce(function (s, x) { return s + (x.reste || 0); }, 0);
+  z.innerHTML = '<div class="carte2" style="margin-bottom:11px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">' +
+    '<b style="font-size:13.5px">À planifier</b>' +
+    '<span class="muted num" style="font-size:12.5px;white-space:nowrap">' +
+    (total ? esc(C.fmtJours(total)) + ' sur ' : '') + l.length + ' chantier' +
+    (l.length > 1 ? 's' : '') + '</span></div>' +
+    l.map(function (x) {
+      var engage = C.statutEngage(x.c.statut);
+      return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0 0">' +
+        '<span style="flex:1;min-width:0"><span style="display:block;font-size:13.5px">' +
+        esc(C.nomChantier(x.c)) + '</span>' +
+        '<small class="muted">' + (engage ? '' : 'devis en attente · ') +
+        (x.reste == null ? 'à estimer' : esc(C.fmtJours(x.reste)) + ' à placer') + '</small></span>' +
+        (x.reste == null
+          ? '<button class="btn btn-min" data-aestimer="' + x.c.id + '">Estimer</button>'
+          : '<button class="btn btn-min" data-aplacer="' + x.c.id + '">Placer</button>') +
+        '</div>';
+    }).join('') + '</div>';
+}
 function renderCalendrier() {
   var g = $('#cal-grille'); if (!g) return;
   renderBandeauPlanif();
+  renderAPlanifier();
   var cur = A.calMois ? new Date(A.calMois) : new Date();
   var an = cur.getFullYear(), mo = cur.getMonth();
   A.calMois = new Date(an, mo, 1).getTime();
@@ -15634,12 +15801,20 @@ function renderFinances() {
       '</div><p class="muted" style="font-size:11.5px;margin:10px 0 0">Taux calculé sur les devis tranchés ' +
       '(les devis en attente n’entrent pas dans le calcul).</p></div>' : '');
 }
+/* « Ça va à la ligne, et j'aime pas » : « 12 000 € → 6 000 € » se coupait en
+   deux sur un téléphone, et on ne savait plus lequel lire. Le montant ne se
+   coupe plus ; celui qui compte en gros, celui d'où il vient en petit,
+   dessous. */
 function ligneCA(nom, brut, apres, taux) {
   if (!brut) return '';
-  return '<div style="display:flex;justify-content:space-between;align-items:baseline;padding:5px 0">' +
-    '<span>' + esc(nom) + ' <span class="muted" style="font-size:11.5px">− ' + taux + '</span></span>' +
-    '<span><span class="muted num" style="font-size:12.5px">' + eur(brut) + ' → </span>' +
-    '<b class="num">' + eur(apres) + '</b></span></div>';
+  return '<div class="ligne-ca" style="display:flex;justify-content:space-between;' +
+    'align-items:flex-start;gap:12px;padding:6px 0">' +
+    '<span>' + esc(nom) + '<span class="muted" style="display:block;font-size:11.5px">' +
+    'abattement ' + taux + '</span></span>' +
+    '<span class="ca-montants" style="text-align:right;white-space:nowrap">' +
+    '<b class="num">' + eur(apres) + '</b>' +
+    '<span class="muted num" style="display:block;font-size:11.5px">sur ' + eur(brut) +
+    '</span></span></div>';
 }
 
 /* ----------------------------------------------------------- dépenses */
@@ -20245,7 +20420,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.83.0-20260915-2015';
+var VERSION = '4.84.0-20260916-2028';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

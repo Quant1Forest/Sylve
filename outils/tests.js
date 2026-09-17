@@ -2477,6 +2477,7 @@ scenario('Carnet : la date d’entrée se pose seule et se corrige', async () =>
   await t.pause(200);
   verifier('le nom se montre avant d’être créé', 'Martin, Clairbois',
     t.$('#ce-nom-apercu').textContent);
+  t.clic('[data-cedevis="oui"]');
   t.clic('#ce-ok'); await t.pause(700);
 
   const c = (t.stock('chantiers') || [])[0];
@@ -2734,6 +2735,7 @@ scenario('Listes : le nom se propose en quittant le champ, pas à la validation'
   let demande = null;
   t.w.confirm = m => { demande = m; return false; };
   t.saisir('#ce-proprio', 'Vaux');
+  t.clic('[data-cedevis="oui"]');
   t.clic('#ce-ok'); await t.pause(450);
   verifier('la validation ne demande plus rien', null, demande);
   verifier('et le chantier est enregistré', 1, (t.stock('chantiers') || []).length);
@@ -4445,11 +4447,18 @@ scenario('Carnet : filtrer par famille de travaux', async () => {
     /* Le dégagement est rangé en gestion dans ses réglages : c'est ce
        rangement-là que le filtre doit suivre, pas celui livré. */
     cfg: { travauxPerso: { DEGAG: { cat: 'gestion' } } },
-    chantiers: [ch('p', ['PLANT']), ch('s', ['DEGAG']), ch('m', ['PLANT', 'PROTEC']), ch('v', [])]
+    /* Un chantier payé : sans groupe « Clos », les familles seraient en
+       dernier quoi qu'il arrive. */
+    chantiers: [ch('p', ['PLANT']), ch('s', ['DEGAG']), ch('m', ['PLANT', 'PROTEC']), ch('v', []),
+      Object.assign(ch('z', []), { statut: 'paye' })]
   }));
   t.clic('[data-vue="carnet"]'); await t.pause(350);
   const groupe = t.$$('#c-filtre optgroup').filter(g => g.getAttribute('label') === 'Familles de travaux')[0];
   verifierVrai('un groupe « Familles de travaux »', !!groupe);
+  /* « Il faudrait que les familles de travaux arrivent tout en bas : c'est le
+     truc que je vais utiliser le moins souvent. » */
+  verifier('tout en bas de la liste', 'Familles de travaux',
+    t.$$('#c-filtre optgroup').slice(-1)[0].getAttribute('label'));
   const valeurs = groupe ? [...groupe.querySelectorAll('option')].map(o => o.value) : [];
   verifierVrai('la plantation y est', valeurs.indexOf('fam:plantation') >= 0);
   verifierVrai('une famille sans chantier n’y est pas', valeurs.indexOf('fam:exploitation') < 0);
@@ -4996,6 +5005,7 @@ scenario('Création : cinq champs, et le nom qui se montre', async () => {
     'Dégagement manuel — Dupont, Valbrune', t.$('#ce-nom-apercu').textContent);
 
   t.saisir('#ce-donneur', 'Cabinet Dubois');
+  t.clic('[data-cedevis="oui"]');
   t.clic('#ce-ok'); await t.pause(550);
   const c = (t.stock('chantiers') || [])[0];
   /* Rien n'est stocké sous « nom » : le nom se lit, il ne s'écrit pas. */
@@ -7023,31 +7033,36 @@ scenario('Clients : un nom nouveau se range par type, et le SIREN suit', async (
 });
 
 /* --------------------------------------------------------------------- */
-scenario('Clients : sans type, on ne retire rien — le SIREN reste proposé', async () => {
-  /* Les chantiers déjà saisis n'ont aucun type. Tant qu'on ne
-     sait pas ce qu'est quelqu'un, on ne lui retire rien : la case reste. */
+scenario('Clients : un client connu dont on ignore la réponse se la voit demander sous le champ', async () => {
+  /* Les chantiers déjà saisis n'ont aucun type. La case du bas qui posait la
+     question pour eux a disparu en 4.84 : elle redisait celle du champ, et
+     l'écrasait. C'est donc sous le champ qu'elle se pose — une fois par nom. */
   const t = await ouvrir(Object.assign({}, VIDE, {
     module: 'chantiers',
-    proprios: ['Ancien sans type', 'Cabinet gestionnaire'],
-    cfg: { contacts: { 'Cabinet gestionnaire': { type: 'gestion' } } }
+    proprios: ['Ancien sans type', 'Cabinet gestionnaire', 'Déjà répondu'],
+    cfg: { contacts: { 'Cabinet gestionnaire': { type: 'gestion' }, 'Déjà répondu': { siren: false } } }
   }));
-  const C0 = t.w;
   t.clic('[data-vue="carnet"]'); await t.pause(250);
   t.clic('#c-nouveau'); await t.pause(400);
+  verifier('la case du bas a disparu', null, t.$('#ce-siren'));
 
-  t.saisir('#ce-proprio', 'Ancien sans type'); await t.pause(250);
-  verifierVrai('un nom sans type garde la question',
-    !t.$('#ce-siren').closest('.ligne-check').hidden);
+  const quitter = async (nom) => {
+    t.saisir('#ce-proprio', nom);
+    t.$('#ce-proprio').dispatchEvent(new t.w.Event('blur'));
+    await t.pause(250);
+    return t.$('#ce-proprio-offre').textContent.trim();
+  };
+  verifierVrai('un nom connu sans réponse se voit poser la question',
+    /c’est qui/.test(await quitter('Ancien sans type')));
+  t.choisir('#tc-type', 'proprio'); await t.pause(150);
+  cocher(t, '#tc-siren', true);
+  t.clic('#tc-ok'); await t.pause(400);
+  const ct = ((t.stock('cfg') || {}).contacts || {})['Ancien sans type'] || {};
+  verifier('sa réponse est rangée sous son nom', true, ct.siren);
+  verifierVrai('et le champ le confirme', /noté/.test(t.$('#ce-proprio-offre').textContent));
 
-  t.saisir('#ce-proprio', 'Cabinet gestionnaire'); await t.pause(250);
-  verifierVrai('un gestionnaire ne l’a plus',
-    t.$('#ce-siren').closest('.ligne-check').hidden);
-
-  /* Un nom déjà connu ne repose pas la question du type. */
-  t.$('#ce-proprio').dispatchEvent(new t.w.Event('blur'));
-  await t.pause(250);
-  verifierVrai('et rien ne redemande son type',
-    !t.$('#ce-proprio-offre').textContent.trim());
+  verifier('un gestionnaire n’a pas de question', '', await quitter('Cabinet gestionnaire'));
+  verifier('ni un client qui a déjà répondu', '', await quitter('Déjà répondu'));
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -8077,32 +8092,220 @@ scenario('Calendrier : les jours restés à trancher s’annoncent dans l’agen
 });
 
 /* --------------------------------------------------------------------- */
-scenario('Chantier : le SIREN se demande à la création et se retient', async () => {
-  /* « Quand je crée un nouveau chantier et un nouveau propriétaire, il ne me
-     demande pas s'il a un numéro de SIREN. » Sans la case, tout chantier neuf
-     partait à 20 % de TVA là où le taux réduit s'applique. */
+scenario('Chantier : le SIREN se demande une fois, sous le champ, et n’est plus écrasé', async () => {
+  /* « Il me demande s'il a un numéro de SIREN, et juste en dessous c'est
+     aussi marqué : il me redemande. » Pire : la case du bas, restée
+     décochée, écrasait le « oui » donné sous le champ — le chantier partait
+     à 20 % de TVA et le client perdait son SIREN. */
   const t = await ouvrir(Object.assign({}, VIDE, { module: 'chantiers' }));
   t.clic('[data-vue="carnet"]'); await t.pause(250);
   t.clic('#c-nouveau'); await t.pause(450);
-  verifierVrai('la case est là', t.$('#ce-siren'));
-  verifier('décochée par défaut', false, t.$('#ce-siren').checked);
-
   t.saisir('#ce-proprio', 'Martin');
+  t.$('#ce-proprio').dispatchEvent(new t.w.Event('blur'));
+  await t.pause(200);
+  t.clic('#ce-proprio-offre [data-offre]'); await t.pause(300);
+  t.choisir('#tc-type', 'proprio'); await t.pause(150);
+  cocher(t, '#tc-siren', true);
+  t.clic('#tc-ok'); await t.pause(400);
   t.saisir('#ce-com', 'Clairbois');
-  cocher(t, '#ce-siren', true);
+  t.clic('[data-cedevis="oui"]');
   t.clic('#ce-ok'); await t.pause(600);
   const c = (t.stock('chantiers') || [])[0];
-  verifier('le chantier la porte', true, c.siren);
-  verifier('et elle est retenue pour ce propriétaire', true,
+  verifier('le chantier porte le SIREN donné sous le champ', true, c.siren);
+  verifier('et le client le garde', true,
     (((t.stock('cfg') || {}).contacts || {})['Martin'] || {}).siren);
 
-  /* Le chantier suivant pour le même propriétaire ne repose pas la question. */
+  /* Le chantier suivant pour le même client ne repose rien, et reprend. */
   t.clic('[data-chretour]'); await t.pause(300);
   t.clic('#c-nouveau'); await t.pause(450);
   t.saisir('#ce-proprio', 'Martin');
-  t.$('#ce-proprio').dispatchEvent(new t.w.Event('change', { bubbles: true }));
+  t.$('#ce-proprio').dispatchEvent(new t.w.Event('blur'));
   await t.pause(250);
-  verifier('la réponse est reprise', true, t.$('#ce-siren').checked);
+  verifier('aucune question pour un client qui a répondu', '',
+    t.$('#ce-proprio-offre').textContent.trim());
+  t.saisir('#ce-com', 'Montjoie');
+  t.clic('[data-cedevis="non"]');
+  t.clic('#ce-ok'); await t.pause(600);
+  const c2 = (t.stock('chantiers') || []).filter(x => x.commune === 'Montjoie')[0];
+  verifier('le second chantier reprend la réponse', true, c2 && c2.siren);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Fiche : un client ajouté depuis « Le chantier » garde son SIREN', async () => {
+  /* Le même écrasement existait dans le formulaire « Le chantier » : la
+     réponse donnée sous le champ ne cochait pas la case du chantier, qui la
+     réécrivait à l'enregistrement. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers', proprios: ['Ancien'],
+    chantiers: [{ id: 'c1', proprietaire: 'Ancien', commune: 'Clairbois', statut: 'encours',
+      aDevis: false, siren: false, lignes: [], temps: [], jours: [], maj: Date.now() }]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(350);
+  t.clic('#f-identite'); await t.pause(350);
+  t.saisir('#ic-proprio', 'Nouveau client');
+  t.$('#ic-proprio').dispatchEvent(new t.w.Event('blur'));
+  await t.pause(200);
+  t.clic('#ic-proprio-offre [data-offre]'); await t.pause(300);
+  t.choisir('#tc-type', 'proprio'); await t.pause(150);
+  cocher(t, '#tc-siren', true);
+  t.clic('#tc-ok'); await t.pause(400);
+  verifier('la case du chantier suit la réponse', true, t.$('#ic-siren').checked);
+  t.clic('#ic-ok'); await t.pause(500);
+  const c = (t.stock('chantiers') || [])[0];
+  verifier('le chantier la garde', true, c.siren);
+  verifier('et le client aussi', true,
+    (((t.stock('cfg') || {}).contacts || {})['Nouveau client'] || {}).siren);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Création : avec ou sans devis, et une estimation', async () => {
+  /* « Je crée un chantier, je n'ai pas de devis, et je n'ai pas de statut
+     adapté. » Et : « il faut que je puisse estimer rapidement le nombre de
+     jours à prévoir, ou la surface ». */
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'chantiers' }));
+  t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.clic('#c-nouveau'); await t.pause(400);
+  t.saisir('#ce-proprio', 'Martin');
+  t.choisir('#ce-trav', 'DEGAG'); await t.pause(200);
+
+  /* Sans choix, rien ne se crée : c'est lui qui décide du statut. */
+  t.clic('#ce-ok'); await t.pause(400);
+  verifier('sans choix du devis, rien n’est créé', 0, (t.stock('chantiers') || []).length);
+
+  verifierVrai('la surface se demande dans l’unité des travaux',
+    !t.$('#ce-qte-champ').hidden && /Surface \(ha\)/.test(t.$('#ce-qte-l').textContent));
+  t.saisir('#ce-qte', '2,5');
+  t.saisir('#ce-jours', '3');
+  t.clic('[data-cedevis="non"]');
+  verifier('le choix se voit', 'true', t.$('[data-cedevis="non"]').getAttribute('aria-pressed'));
+  t.clic('#ce-ok'); await t.pause(600);
+  const c = (t.stock('chantiers') || [])[0];
+  verifierVrai('le chantier est créé', !!c);
+  verifier('sans devis, il part en « à planifier »', 'accepte', c.statut);
+  verifier('et le sait', false, c.aDevis);
+  verifier('les journées estimées sont retenues', 3, c.joursEstimes);
+  verifier('et la surface ouvre la ligne de travaux', 2.5, c.lignes[0].quantite);
+  verifierVrai('la fiche le dit « À planifier »', /À planifier/.test(t.texte('#vue-chantier')));
+
+  /* Avec devis, il part en « Devis à envoyer ». */
+  t.clic('[data-chretour]'); await t.pause(300);
+  t.clic('#c-nouveau'); await t.pause(400);
+  t.saisir('#ce-proprio', 'Dupont');
+  t.clic('[data-cedevis="oui"]');
+  t.clic('#ce-ok'); await t.pause(600);
+  const d = (t.stock('chantiers') || []).filter(x => x.proprietaire === 'Dupont')[0];
+  verifier('avec devis, il part en « devis à envoyer »', 'devis', d && d.statut);
+  verifier('et le sait aussi', true, d && d.aDevis);
+  verifier('sans journées tapées, rien n’est inventé', undefined, d && d.joursEstimes);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Fiche : voir ou placer le chantier sur la carte', async () => {
+  /* « Associer la carte au chantier : accéder à la carte depuis ma fiche, ou
+     avoir un emplacement pour le positionner. » */
+  let demande = null;
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [
+      { id: 'p', proprietaire: 'Placé', statut: 'encours', aDevis: false, lignes: [], temps: [],
+        jours: [], maj: Date.now(), gps: { lat: 44.95, lon: 3.11 } },
+      /* Un second chantier placé loin : sans lui, la carte s'ouvrirait déjà
+         centrée sur le premier, et le recentrage ne se prouverait pas. */
+      { id: 'q', proprietaire: 'Loin', statut: 'encours', aDevis: false, lignes: [], temps: [],
+        jours: [], maj: Date.now(), gps: { lat: 48.5, lon: 7.5 } },
+      { id: 'n', proprietaire: 'Non placé', commune: 'Saint-Paul', statut: 'encours', aDevis: false,
+        lignes: [], temps: [], jours: [], maj: Date.now() }
+    ]
+  }), {
+    avant: w => {
+      w.fetch = url => {
+        demande = url;
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ features: [{
+          geometry: { coordinates: [7.12, 43.70] }, properties: { name: 'Saint-Paul' } }] }) });
+      };
+    }
+  });
+  const LB = t.w.BCUI._carte.LB;
+  t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.clic('[data-chouvrir="p"]'); await t.pause(350);
+  verifierVrai('la fiche dit qu’il est placé', /Placé sur la carte/.test(t.texte('#vue-chantier')));
+  t.clic('[data-fcarte="voir"]'); await t.pause(500);
+  verifierVrai('la carte s’ouvre', t.$('#vue-carte').classList.contains('actif'));
+  const v = t.w.BCUI._carte.cadre(), m = LB.vers(44.95, 3.11);
+  verifierVrai('centrée sur le chantier', Math.abs(v.cx - m.x) < 1 && Math.abs(v.cy - m.y) < 1);
+  verifierVrai('et assez près pour le voir', v.m * LB.facteurSol(v.cy) <= 8.01);
+  verifierVrai('sans rien poser', !/Appuyez sur la carte/.test(t.texte('#carte-aide')));
+
+  /* Un chantier pas encore placé : la carte va sur sa commune, prête à poser. */
+  t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.clic('[data-chouvrir="n"]'); await t.pause(350);
+  verifierVrai('la fiche propose de le placer', !!t.$('[data-fcarte="placer"]'));
+  t.clic('[data-fcarte="placer"]'); await t.pause(500);
+  verifierVrai('la carte attend l’appui', /Appuyez sur la carte/.test(t.texte('#carte-aide')));
+  verifierVrai('sa commune a été cherchée', /q=Saint-Paul/.test(demande || ''));
+  const v2 = t.w.BCUI._carte.cadre(), c2 = LB.vers(43.70, 7.12);
+  verifierVrai('et la carte y est allée', Math.abs(v2.cx - c2.x) < 1 && Math.abs(v2.cy - c2.y) < 1);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Calendrier : la liste de ce qui reste à planifier', async () => {
+  /* « J'ai besoin de pouvoir dire : j'ai trois chantiers à planifier, sur tel
+     chantier j'ai estimé deux jours, l'autre trois, l'autre un. » */
+  const auj = new Date(); auj.setHours(12, 0, 0, 0);
+  const ch = (id, statut, extra) => Object.assign({ id, statut, aDevis: statut === 'devis',
+    proprietaire: 'Client ' + id, lignes: [], temps: [], jours: [], maj: Date.now() }, extra);
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'calendrier',
+    chantiers: [
+      ch('a', 'accepte', { joursEstimes: 2 }),
+      ch('b', 'encours', { joursEstimes: 4, jours: [{ d: auj.getTime(), p: 1 }] }),
+      ch('d', 'devis', { joursEstimes: 1 }),
+      ch('e', 'accepte'),
+      ch('f', 'facture', { joursEstimes: 4 }),
+      ch('g', 'encours', { joursEstimes: 1, jours: [{ d: auj.getTime(), p: 1 }] })
+    ]
+  }));
+  await t.pause(300);
+  const z = () => t.$('#cal-aplanifier');
+  const txt = z().textContent.replace(/\s+/g, ' ');
+  verifierVrai('la liste est là', /À planifier/.test(txt));
+  const lignes = t.$$('#cal-aplanifier [data-aplacer], #cal-aplanifier [data-aestimer]')
+    .map(b => (b.dataset.aplacer || b.dataset.aestimer));
+  verifier('les engagés d’abord, le devis ensuite ; ni le facturé, ni le tout placé',
+    ['b', 'a', 'e', 'd'], lignes);
+  verifierVrai('chaque chantier dit ce qui lui reste', /3 journées à placer/.test(txt) && /2 journées à placer/.test(txt) && /1 journée à placer/.test(txt));
+  verifierVrai('un chantier engagé sans estimation est signalé', /à estimer/.test(txt));
+  verifierVrai('le devis est marqué comme tel', /devis en attente/.test(txt));
+  verifierVrai('et le total se lit', /6 journées sur 4 chantiers/.test(txt));
+
+  t.clic('[data-aplacer="a"]'); await t.pause(300);
+  verifierVrai('« Placer » ouvre le placement du chantier',
+    /Placement — Client a/.test(t.texte('#cal-planif')));
+  verifier('et la liste s’efface le temps de placer', '', z().innerHTML);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Finances : les montants ne passent plus à la ligne', async () => {
+  /* « Là je suis sur prestation de service, j'ai fait un chiffre assez
+     élevé, et après il y a un retour à la ligne. Ça m'embrouille. » */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'finances',
+    chantiers: [{ id: 'c1', statut: 'facture', aDevis: false, proprietaire: 'Client', temps: [],
+      jours: [], maj: Date.now(), numeroFacture: 'F-1', dateFacture: Date.now(),
+      lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 1, prix: 123456, nature: 'prestation' }] }]
+  }));
+  await t.pause(300);
+  const l = t.$('#fi-corps .ligne-ca .ca-montants');
+  verifierVrai('la ligne est là', !!l);
+  verifier('ses montants ne se coupent pas', 'nowrap', t.w.getComputedStyle(l).whiteSpace);
+  verifierVrai('le chiffre qui compte, puis d’où il vient',
+    /61 728 €\s*sur 123 456 €/.test(l.textContent.replace(/ /g, ' ')));
   verifier('aucune erreur', [], t.erreurs);
 });
 
