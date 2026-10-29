@@ -1973,48 +1973,128 @@ scenario('Entreprise : le bilan est au-dessus des tuiles, et chaque bulle mène 
 });
 
 /* --------------------------------------------------------------------- */
-scenario('Mes notes : sous les tuiles, et elles vont à la ligne', async () => {
+scenario('Mes notes : sous les tuiles, des éléments à cocher', async () => {
   /* « Chantier à prévoir : il faudrait que je puisse avoir plus de place, ou
-     faire des retours à la ligne, pour me dire j'ai ce chantier, ce chantier,
-     ce chantier. » Et : « les notes, faudrait mieux les mettre à la fin »,
-     pour arriver sur les modules sans défiler. */
+     faire des retours à la ligne » — puis, en 4.85, « comme une liste de
+     courses » : chaque élément a sa case. Et : « les notes, faudrait mieux les
+     mettre à la fin », pour arriver sur les modules sans défiler. */
   const t = await ouvrir(Object.assign({}, VIDE, { module: 'entreprise' }));
   const zone = () => t.$('#ent-notes');
+  const base = () => ((t.stock('cfg') || {}).notes || []);
+  const entrer = async (v) => {
+    const c = t.$('[data-nt-ajout]'); c.value = v;
+    c.dispatchEvent(new t.w.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    await t.pause(250);
+  };
   verifierVrai('la zone invite à s’écrire une note', /\+ note/.test(zone().textContent));
   verifierVrai('elle vient après les tuiles',
     t.$('#vue-entreprise .tuiles').compareDocumentPosition(zone()) & 4);
 
   t.clic('#ent-note-plus'); await t.pause(300);
-  verifier('le détail s’écrit sur plusieurs lignes', 'TEXTAREA', t.$('#nt-texte').tagName);
-  const lignes = ['Coupe du haut, 3 jours', 'Plantation au printemps', 'Rappeler le gestionnaire'];
   t.saisir('#nt-titre', 'Chantiers à prévoir');
-  t.saisir('#nt-texte', lignes.join('\n'));
   t.clic('[data-ntcoul="#B4231F"]'); await t.pause(120);
   t.clic('#nt-ok'); await t.pause(400);
-
-  /* Elle part dans les sauvegardes : elle vit donc dans la configuration. */
-  const n = (t.stock('cfg') || {}).notes || [];
-  verifier('une note est en base', 1, n.length);
-  verifier('ses lignes sont gardées telles quelles', lignes, n[0].texte.split('\n'));
+  verifier('une note est en base', 1, base().length);
   verifierVrai('la note s’affiche', /Chantiers à prévoir/.test(zone().textContent));
-  const detail = zone().querySelector('.note-texte');
-  verifier('et ses retours à la ligne se voient', 'pre-line',
-    t.w.getComputedStyle(detail).whiteSpace);
   verifierVrai('avec sa couleur', /B4231F|rgb\(180, 35, 31\)/.test(zone().innerHTML));
 
-  /* Elle se rouvre pour être corrigée, lignes comprises. */
+  /* Saisie rapide : Entrée crée l'élément et garde le champ pour le suivant. */
+  await entrer('Coupe du haut');
+  await entrer('Plantation au printemps');
+  await entrer('Rappeler le gestionnaire');
+  verifier('trois éléments', ['Coupe du haut', 'Plantation au printemps', 'Rappeler le gestionnaire'],
+    base()[0].items.map(x => x.texte));
+  verifier('le champ attend le suivant', 'INPUT', t.d.activeElement.tagName);
+  verifier('et il est vide', '', t.$('[data-nt-ajout]').value);
+  await entrer('   ');
+  verifier('un champ vide ne crée rien', 3, base()[0].items.length);
+
+  /* Cocher : barré, et il descend en bas de la note. */
+  const premier = base()[0].items[0].id;
+  const coche = t.$('[data-nt-coche="' + premier + '"]');
+  coche.checked = true; coche.dispatchEvent(new t.w.Event('change', { bubbles: true }));
+  await t.pause(250);
+  verifier('coché en base', true, base()[0].items[0].fait);
+  const textes = () => t.$$('#ent-notes .note-i .note-texte').map(e => e.textContent);
+  verifier('il descend en bas', ['Plantation au printemps', 'Rappeler le gestionnaire', 'Coupe du haut'], textes());
+  verifierVrai('et il est barré', /line-through/.test(
+    t.w.getComputedStyle(t.$('#ent-notes .note-i.fait .note-texte')).textDecoration) ||
+    t.$('#ent-notes .note-i.fait'));
+
+  /* Décocher le remet à sa place. */
+  const c2 = t.$('[data-nt-coche="' + premier + '"]');
+  c2.checked = false; c2.dispatchEvent(new t.w.Event('change', { bubbles: true }));
+  await t.pause(250);
+  verifier('décoché, il remonte', 'Coupe du haut', textes()[0]);
+
+  /* Supprimer un élément. */
+  t.clic('[data-nt-supitem="' + premier + '"]'); await t.pause(250);
+  verifier('un élément de moins', 2, base()[0].items.length);
+
+  /* Le titre se rouvre pour être corrigé, sans toucher aux éléments. */
   t.clic('[data-note]'); await t.pause(300);
-  verifier('le détail revient entier', lignes.join('\n'), t.$('#nt-texte').value);
   t.saisir('#nt-titre', 'Chantiers à venir');
   t.clic('#nt-ok'); await t.pause(400);
   verifierVrai('la correction est prise', /Chantiers à venir/.test(zone().textContent));
-  verifier('sans en créer une seconde', 1, ((t.stock('cfg') || {}).notes || []).length);
+  verifier('sans en créer une seconde', 1, base().length);
+  verifier('et les éléments restent', 2, base()[0].items.length);
 
-  /* Et elle ne s'efface que sur demande. */
+  /* Supprimer la note : elle passe par la corbeille, et revient. */
   t.w.confirm = () => true;
-  t.clic('[data-notesup]'); await t.pause(400);
-  verifier('effacée, il n’en reste rien', 0, ((t.stock('cfg') || {}).notes || []).length);
+  t.clic('[data-notesup]'); await t.pause(450);
+  verifier('plus aucune note', 0, base().length);
   verifierVrai('et la zone le dit', /\+ note/.test(zone().textContent));
+  t.clic('#s-recuperer'); await t.pause(450);
+  verifierVrai('elle est dans la corbeille', /Chantiers à venir/.test(t.texte('#s-recup')));
+  t.clic('[data-repecher]'); await t.pause(500);
+  verifier('récupérée', 1, base().length);
+  verifier('avec ses éléments', 2, base()[0].items.length);
+  verifierVrai('et visible à l’écran', /Chantiers à venir/.test(zone().textContent));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Mes notes : les anciennes notes deviennent un premier élément', async () => {
+  /* Avant la 4.85 une note portait un texte seul. Rien ne doit se perdre. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'entreprise',
+    cfg: { notes: [
+      { id: 'n1', titre: 'Chantiers à prévoir', texte: 'Coupe du haut\nPlantation', couleur: '#B4231F', cree: 1 },
+      { id: 'n2', titre: 'Sans détail', texte: '', couleur: '#1F5FA9', cree: 2 }
+    ] }
+  }));
+  const z = t.$('#ent-notes');
+  verifier('deux notes', 2, t.$$('#ent-notes .note-c').length);
+  const items = t.$$('#ent-notes [data-note-id="n1"] .note-i');
+  verifier('un seul élément repris', 1, items.length);
+  verifierVrai('avec tout l’ancien texte', /Coupe du haut/.test(items[0].textContent) &&
+    /Plantation/.test(items[0].textContent));
+  verifier('non coché', false, items[0].querySelector('input').checked);
+  verifier('une note sans détail n’a aucun élément', 0, t.$$('#ent-notes [data-note-id="n2"] .note-i').length);
+  /* Et la première écriture garde la forme nouvelle, sans l'ancien champ. */
+  t.$('[data-nt-ajout="n2"]').value = 'Appeler';
+  t.$('[data-nt-ajout="n2"]').dispatchEvent(new t.w.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+  await t.pause(300);
+  const n = (t.stock('cfg') || {}).notes;
+  verifier('l’ancien texte est parti dans les éléments', [undefined, undefined], n.map(x => x.texte));
+  verifier('le premier élément est gardé en base', 'Coupe du haut\nPlantation', n[0].items[0].texte);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Réglages : « Ce qui a changé » en bas de Général, la corbeille s’explique', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE));
+  t.clic('#a-reglages'); await t.pause(300);
+  const maj = t.$('#c-notes-maj');
+  verifierVrai('la zone existe', maj);
+  const autres = t.$$('#regl-corps [data-sec="general"]').filter(e => e !== maj && !e.contains(maj));
+  const dernier = autres.filter(e => !(e.dataset.sous === 'maj'));
+  verifierVrai('elle vient après toutes les autres cartes de Général',
+    dernier.every(e => e.compareDocumentPosition(maj) & 4));
+  t.clic('#s-recuperer'); await t.pause(450);
+  verifierVrai('la corbeille dit ce qu’elle fait',
+    /Ce que vous supprimez arrive ici/.test(t.texte('#s-recup')) &&
+    /restaurer pendant 30 jours/.test(t.texte('#s-recup')));
   verifier('aucune erreur', [], t.erreurs);
 });
 

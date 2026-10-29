@@ -337,7 +337,20 @@ body:not(.m-ent) .mod-ent{display:none}
 .alerte small{color:var(--doux);font-size:12px}
 /* Une note garde ses retours à la ligne : « j'ai ce chantier, ce chantier,
    ce chantier » s'écrit en liste. */
-.note-texte{display:block;white-space:pre-line;margin-top:2px}
+.note-texte{display:block;white-space:pre-line;flex:1;min-width:0;font-size:13.5px}
+.note-c{border:1px solid var(--trait);background:var(--carte);border-radius:11px;
+  padding:10px 12px;margin-bottom:7px}
+.note-t{display:flex;align-items:flex-start;gap:9px}
+.note-t .ic{flex:none;width:8px;height:8px;border-radius:50%;margin-top:7px}
+.note-titre{flex:1;text-align:left;background:none;border:0;padding:0;font:inherit;
+  font-weight:700;font-size:13.5px;color:inherit;cursor:pointer}
+.note-c .fermer{flex:none;margin:-6px -8px -6px auto;padding:6px 9px;font:inherit;font-size:17px;
+  line-height:1;background:none;border:0;color:var(--gris-clair);cursor:pointer}
+.note-i{display:flex;align-items:flex-start;gap:9px;padding:7px 0 0}
+.note-i input{flex:none;width:20px;height:20px;margin:0}
+.note-i.fait .note-texte{text-decoration:line-through;color:var(--doux)}
+.note-ajout{width:100%;margin-top:8px;font:inherit;font-size:13px;padding:7px 9px;
+  border:1px dashed var(--trait);border-radius:8px;background:transparent;color:inherit}
 .kpi small{font-size:11px;color:var(--doux)}
 
 /* ---------------------------------------------------------- accueil --- */
@@ -1234,9 +1247,6 @@ if (froid && s > 0) montrer(s);
           reste légère. Elle apparaît sur cet écran d’entreprise et au démarrage.</p>
       </div>
 
-      <p class="eyebrow reg-titre" data-sec="general" data-sous="maj" style="margin:22px 0 8px">Ce qui a changé</p>
-      <div class="carte" data-sec="general" data-sous="maj" id="c-notes-maj"></div>
-
       <p class="eyebrow reg-titre" data-sec="general" data-sous="appli" style="margin:22px 0 8px">L’application</p>
       <div class="carte" data-sec="general" data-sous="appli" id="c-appli">
         <h2>Application</h2>
@@ -1438,6 +1448,9 @@ if (froid && s > 0) montrer(s);
           <button class="btn danger btn-min" id="r-reset-cfg">Rétablir les listes de cubage</button>
         </div>
       </div>
+
+      <p class="eyebrow reg-titre" data-sec="general" data-sous="maj" style="margin:22px 0 8px">Ce qui a changé</p>
+      <div class="carte" data-sec="general" data-sous="maj" id="c-notes-maj"></div>
       </div><!-- /regl-corps -->
     </section>
 
@@ -7282,7 +7295,14 @@ var CORBEILLE = {
   fournisseur: { nom: 'Fournisseur', liste: 'fournisseurs', sauver: function () { return sauverFournisseurs(); } },
   commande:    { nom: 'Commande',    liste: 'commandes',    sauver: function () { return sauverCommandes(); } },
   sortie:      { nom: 'Mouvement',   liste: 'sorties',      sauver: function () { return sauverSorties(); } },
-  journee:     { nom: 'Journée',     liste: 'journees',     sauver: function () { return sauverJournees(); } }
+  journee:     { nom: 'Journée',     liste: 'journees',     sauver: function () { return sauverJournees(); } },
+  /* Les notes vivent dans A.cfg, pas dans une liste de A : elles se reposent elles-mêmes. */
+  note:        { nom: 'Note', reposer: function (o) {
+    var l = notes();
+    if (o && o.id && l.some(function (x) { return x.id === o.id; })) o.id = uid();
+    l.push(o);
+    return sauverCfg();
+  } }
 };
 
 function corbeille() {
@@ -7318,7 +7338,13 @@ function jeterObjet(type, objet, nom, detail) {
 }
 function repecherObjet(e) {
   var d = CORBEILLE[e.type];
-  if (!d || !d.liste) { toast('Type inconnu.'); return Promise.resolve(); }
+  if (!d || !(d.liste || d.reposer)) { toast('Type inconnu.'); return Promise.resolve(); }
+  if (d.reposer) {
+    return d.reposer(e.o).then(function () { return Store.del(e.cle); }).then(function () {
+      renderNotesEnt(); renderSauvegarde();
+      toast(d.nom + ' récupérée.');
+    });
+  }
   var l = A[d.liste] = A[d.liste] || [];
   var o = e.o;
   /* Si un objet porte déjà cet identifiant, on en donne un neuf plutôt que
@@ -7747,9 +7773,9 @@ function renderRecup() {
     var pou = r[0];
     var snaps = r[1].filter(function (k) { return k.indexOf('bordcub.snap.') === 0; }).sort().reverse();
     var COUL = { bordereau: '#7A8471', chantier: '#2E4A3C', depense: '#8A5A2B', pile: '#5B3A1E',
-      charge: '#B98A00', produit: '#C4611B', fournisseur: '#7A8471', commande: '#2E7D46', sortie: '#8A5A2B' };
-    var h = '<p class="muted" style="font-size:12px;margin:12px 0 6px">Corbeille — tout est ' +
-      'récupérable pendant ' + B.JOURS_POUBELLE + ' jours, puis effacé</p>';
+      charge: '#B98A00', produit: '#C4611B', fournisseur: '#7A8471', commande: '#2E7D46', sortie: '#8A5A2B', note: '#1F5FA9' };
+    var h = '<p class="muted" style="font-size:12px;margin:12px 0 6px">Ce que vous supprimez arrive ici. ' +
+      'Vous pouvez le restaurer pendant ' + B.JOURS_POUBELLE + ' jours ; ensuite il est effacé automatiquement.</p>';
     h += pou.length ? pou.map(function (p) {
       var d = CORBEILLE[p.type] || {};
       var reste = B.JOURS_POUBELLE - Math.floor((Date.now() - p.suppr) / 86400000);
@@ -7987,6 +8013,12 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.85', quoi: [
+    { t: 'Mes notes se cochent : un element par ligne, barre et descendu une fois fait' },
+    { t: 'Une note supprimee passe par la corbeille, vous pouvez la retrouver', vue: 'reglages' },
+    { t: 'Reglages : « Ce qui a change » est tout en bas de General' , vue: 'reglages' },
+    { t: 'La corbeille explique ce qu elle garde, et combien de temps' , vue: 'reglages' }
+  ] },
   { v: '4.84', quoi: [
     { t: 'Nouveau chantier : avec ou sans devis, et une estimation en jours ou en surface', vue: 'carnet' },
     { t: 'Le SIREN ne se demande plus qu une fois, sous le champ du client', vue: 'carnet' },
@@ -9145,14 +9177,37 @@ function brancher() {
   $('#ent-notes').addEventListener('click', function (e) {
     var sup = e.target.closest('[data-notesup]');
     if (sup) {
-      var n = notes().filter(function (x) { return x.id === sup.dataset.notesup; })[0];
-      if (n && !confirm('Effacer « ' + (n.titre || 'cette note') + ' » ?')) return;
+      var n = noteParId(sup.dataset.notesup);
+      if (n && !confirm('Supprimer « ' + (n.titre || 'cette note') + ' » ?\n\nElle restera récupérable ' +
+        B.JOURS_POUBELLE + ' jours dans Réglages ▸ Fichiers ▸ Corbeille.')) return;
       effacerNote(sup.dataset.notesup);
+      return;
+    }
+    var si = e.target.closest('[data-nt-supitem]');
+    if (si) {
+      var carte = si.closest('[data-note-id]');
+      majNote(carte.dataset.noteId, function (nn) {
+        nn.items = nn.items.filter(function (x) { return x.id !== si.dataset.ntSupitem; });
+      });
       return;
     }
     var note = e.target.closest('[data-note]');
     if (note) { ouvrirNote(note.dataset.note); return; }
     if (e.target.closest('#ent-note-plus')) ouvrirNote(null);
+  });
+  $('#ent-notes').addEventListener('change', function (e) {
+    var c = e.target.closest('[data-nt-coche]'); if (!c) return;
+    var carte = c.closest('[data-note-id]');
+    majNote(carte.dataset.noteId, function (nn) {
+      nn.items.forEach(function (x) { if (x.id === c.dataset.ntCoche) x.fait = c.checked; });
+    });
+  });
+  /* Entrée crée l'élément et garde le champ ouvert pour le suivant. */
+  $('#ent-notes').addEventListener('keydown', function (e) {
+    var c = e.target.closest ? e.target.closest('[data-nt-ajout]') : null;
+    if (!c || e.key !== 'Enter') return;
+    e.preventDefault();
+    ajouterItemNote(c);
   });
   /* Chaque bulle du bilan mène à la liste qui la détaille : le chiffre seul
      ne sert à rien si l'on doit ensuite chercher de quoi il parle. */
@@ -15448,10 +15503,27 @@ var COUL_NOTE = [
   { c: '#B98A00', n: 'or' }, { c: '#2E7D46', n: 'vert' },
   { c: '#1F5FA9', n: 'bleu' }, { c: '#6F6A5C', n: 'gris' }
 ];
+/* Une note est une liste : des éléments à cocher, comme une liste de courses.
+   Avant la 4.85 elle portait un seul texte ; il devient son premier élément,
+   non coché, la première fois qu'on la lit. */
 function notes() {
   A.cfg = A.cfg || {};
   A.cfg.notes = A.cfg.notes || [];
+  A.cfg.notes.forEach(function (n) {
+    if (Array.isArray(n.items)) return;
+    n.items = n.texte ? [{ id: uid(), texte: n.texte, fait: false }] : [];
+    delete n.texte;
+  });
   return A.cfg.notes;
+}
+function noteParId(id) {
+  return notes().filter(function (x) { return x.id === id; })[0] || null;
+}
+/* Les éléments cochés descendent en bas ; l'ordre de saisie est gardé dans la
+   base, de sorte qu'en décochant un élément il reprend sa place. */
+function itemsAffiches(n) {
+  var a = n.items || [];
+  return a.filter(function (x) { return !x.fait; }).concat(a.filter(function (x) { return x.fait; }));
 }
 function renderNotesEnt() {
   var z = $('#ent-notes'); if (!z) return;
@@ -15461,12 +15533,22 @@ function renderNotesEnt() {
     '<p class="eyebrow" style="margin:0">Mes notes</p>' +
     '<button class="btn-min" id="ent-note-plus">+ note</button></div>' +
     mes.map(function (n) {
-      return '<div class="alerte" data-note="' + esc(n.id) + '">' +
-        '<span class="ic" style="background:' + esc(n.couleur || '#6F6A5C') + '"></span>' +
-        '<span><b>' + esc(n.titre || 'Note') + '</b>' +
-        (n.texte ? '<small class="note-texte">' + esc(n.texte) + '</small>' : '') + '</span>' +
-        '<button class="fermer" data-notesup="' + esc(n.id) + '" title="Effacer cette note" ' +
-        'aria-label="Effacer">×</button></div>';
+      return '<div class="note-c" data-note-id="' + esc(n.id) + '">' +
+        '<div class="note-t"><span class="ic" style="background:' + esc(n.couleur || '#6F6A5C') + '"></span>' +
+        '<button class="note-titre" data-note="' + esc(n.id) + '" title="Modifier la note">' +
+        esc(n.titre || 'Note') + '</button>' +
+        '<button class="fermer" data-notesup="' + esc(n.id) + '" title="Supprimer cette note" ' +
+        'aria-label="Supprimer la note">×</button></div>' +
+        itemsAffiches(n).map(function (it) {
+          return '<div class="note-i' + (it.fait ? ' fait' : '') + '">' +
+            '<input type="checkbox" data-nt-coche="' + esc(it.id) + '"' + (it.fait ? ' checked' : '') +
+            ' aria-label="Fait">' +
+            '<span class="note-texte">' + esc(it.texte) + '</span>' +
+            '<button class="fermer" data-nt-supitem="' + esc(it.id) + '" title="Supprimer cet élément" ' +
+            'aria-label="Supprimer l’élément">×</button></div>';
+        }).join('') +
+        '<input type="text" class="note-ajout" data-nt-ajout="' + esc(n.id) + '" autocomplete="off" ' +
+        'enterkeyhint="next" placeholder="ajouter un élément…"></div>';
     }).join('') +
     (mes.length ? '' : '<p class="muted" style="font-size:12.5px;margin:0">' +
       '« + note » pour vous écrire ce qu’il ne faut pas oublier : un chantier qui se ' +
@@ -15474,18 +15556,12 @@ function renderNotesEnt() {
 }
 function ouvrirNote(id) {
   var l = notes();
-  var n = id ? l.filter(function (x) { return x.id === id; })[0] : null;
+  var n = id ? noteParId(id) : null;
   var coul = (n && n.couleur) || COUL_NOTE[4].c;
   modale(id ? 'Modifier la note' : 'Une note à moi-même',
     '<div class="champ"><label class="eyebrow" for="nt-titre">Quoi ?</label>' +
     '<input type="text" id="nt-titre" class="gros" autocomplete="off" ' +
     'placeholder="rappeler le gestionnaire" value="' + esc(n ? n.titre || '' : '') + '"></div>' +
-    /* Un champ d'une ligne ne laissait rien écrire de plus qu'une phrase :
-       « je puisse avoir plus de place, faire des retours à la ligne ». */
-    '<div class="champ"><label class="eyebrow" for="nt-texte">Le détail</label>' +
-    '<textarea id="nt-texte" rows="6" ' +
-    'placeholder="une ligne par chantier, par exemple">' + esc(n ? n.texte || '' : '') +
-    '</textarea></div>' +
     '<p class="eyebrow" style="margin:12px 0 6px">Couleur</p>' +
     '<div class="chips" id="nt-couls">' + COUL_NOTE.map(function (x) {
       return '<button type="button" class="chip" data-ntcoul="' + x.c + '" title="' + x.n +
@@ -15493,8 +15569,10 @@ function ouvrirNote(id) {
         '<span class="pastille" style="width:12px;height:12px;background:' + x.c +
         ';display:inline-block;vertical-align:-1px"></span></button>';
     }).join('') + '</div>' +
+    (id ? '' : '<p class="muted" style="font-size:12px;margin:10px 0 0">Les éléments à cocher ' +
+      's’ajoutent ensuite, dans la note.</p>') +
     '<div class="btn-rang" style="margin-top:12px">' +
-    (id ? '<button class="btn danger btn-min" id="nt-sup">Effacer</button>' : '') +
+    (id ? '<button class="btn danger btn-min" id="nt-sup">Supprimer</button>' : '') +
     '<button class="btn primaire" id="nt-ok">Enregistrer</button></div>');
   $('#nt-couls').addEventListener('click', function (e) {
     var b = e.target.closest('[data-ntcoul]'); if (!b) return;
@@ -15507,9 +15585,8 @@ function ouvrirNote(id) {
   $('#nt-ok').addEventListener('click', function () {
     var titre = $('#nt-titre').value.trim();
     if (!titre) { toast('Écrivez au moins de quoi il s’agit.'); return; }
-    if (!n) { n = { id: uid(), cree: Date.now() }; l.push(n); }
+    if (!n) { n = { id: uid(), cree: Date.now(), items: [] }; l.push(n); }
     n.titre = titre;
-    n.texte = $('#nt-texte').value.trim();
     n.couleur = coul;
     Promise.resolve(sauverCfg()).then(function () {
       fermerModale(); renderNotesEnt();
@@ -15517,11 +15594,37 @@ function ouvrirNote(id) {
     });
   });
 }
+/* Par la corbeille, comme le reste : une liste de courses perdue d'un doigt
+   maladroit se récupère. */
 function effacerNote(id) {
-  A.cfg.notes = notes().filter(function (x) { return x.id !== id; });
-  Promise.resolve(sauverCfg()).then(function () {
-    fermerModale(); renderNotesEnt(); toast('Note effacée.');
+  var n = noteParId(id); if (!n) return Promise.resolve();
+  var faits = (n.items || []).filter(function (x) { return x.fait; }).length;
+  var detail = (n.items || []).length
+    ? faits + '/' + n.items.length + ' fait' + (faits > 1 ? 's' : '') : '';
+  return jeterObjet('note', n, n.titre || 'Note', detail).then(function () {
+    A.cfg.notes = notes().filter(function (x) { return x.id !== id; });
+    return sauverCfg();
+  }).then(function () {
+    fermerModale(); renderNotesEnt(); toast('Note mise à la corbeille.');
   });
+}
+function majNote(id, f, refocus) {
+  var n = noteParId(id); if (!n) return;
+  f(n);
+  Promise.resolve(sauverCfg()).then(function () {
+    renderNotesEnt();
+    if (refocus) {
+      var c = $('#ent-notes [data-nt-ajout="' + id + '"]');
+      if (c) c.focus();
+    }
+  });
+}
+function ajouterItemNote(champ) {
+  var t = champ.value.trim(); if (!t) return;
+  champ.value = '';
+  majNote(champ.dataset.ntAjout, function (n) {
+    n.items.push({ id: uid(), texte: t, fait: false });
+  }, true);
 }
 
 function renderAlertes() {
@@ -20420,7 +20523,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.84.0-20260916-2028';
+var VERSION = '4.85.0-20261029-1900';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 
