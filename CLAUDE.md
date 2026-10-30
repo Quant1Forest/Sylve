@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
 ligne.
 
-Version courante : **4.84.0-20260916-2028**
+Version courante : **4.85.1-20261030-1850**
 
 ---
 
@@ -253,6 +253,7 @@ mention d'un autre fichier.
 | `docs/carte.md` | Fonds IGN, tuiles hors ligne, Mercator, gestes |
 | `docs/cubage-bois.md` | Types de bordereau, ABCD, réfactions |
 | `docs/design-navigation.md` | Palette, écran Entreprise, modules, réglages, typographie, marque, notes de mise à jour, retour arrière, écran allumé |
+| `docs/inventaire-ecrans.md` | Inventaire des écrans, chemin par chemin |
 | `docs/depot-public.md` | Rien de personnel dans le dépôt, historique réécrit |
 | `docs/archives/` | Sujets clos et anciens points de situation |
 

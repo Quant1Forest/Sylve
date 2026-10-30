@@ -3999,7 +3999,11 @@ function jourCle(ts) {
   return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
 }
 function minuit(ts) { var d = new Date(ts); d.setHours(0, 0, 0, 0); return d.getTime(); }
-function ajouteJours(ts, n) { return minuit(ts) + n * JOUR; }
+/* Un jour est une case du calendrier : les jours de changement d'heure en
+   font 23 ou 25 heures, et ajouter 86 400 000 ms décalait toute la suite d'un
+   cran (la veille disparaissait de la fenêtre des journées à trancher). */
+function ajouteJours(ts, n) { var d = new Date(ts); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + n); return d.getTime(); }
+function lendemain(ts) { return ajouteJours(ts, 1); }
 function estWeekend(ts) { var j = new Date(ts).getDay(); return j === 0 || j === 6; }
 
 /* Journées prévues d'un chantier.
@@ -4134,7 +4138,7 @@ function journeesPrevues(ch, cfg) {
     var f = minuit(ch.fin), garde = 0;
     while (d <= f && garde++ < 400) {
       if (!ouvresSeuls || !estWeekend(d)) out.push(d);
-      d += JOUR;
+      d = lendemain(d);
     }
     return out;
   }
@@ -4142,7 +4146,7 @@ function journeesPrevues(ch, cfg) {
   if (!n) return [d];
   while (out.length < n && garde2++ < 400) {
     if (!ouvresSeuls || !estWeekend(d)) out.push(d);
-    d += JOUR;
+    d = lendemain(d);
   }
   return out;
 }
@@ -4154,7 +4158,7 @@ function fermeteDe(ch) { return statutEngage(ch.statut) ? 'ferme' : 'provisoire'
 function occupation(chantiers, debut, fin, cfg) {
   var jours = {};
   var d = minuit(debut), f = minuit(fin), garde = 0;
-  while (d <= f && garde++ < 800) { jours[jourCle(d)] = { ts: d, prevus: [], reels: [] }; d += JOUR; }
+  while (d <= f && garde++ < 800) { jours[jourCle(d)] = { ts: d, prevus: [], reels: [] }; d = lendemain(d); }
   (chantiers || []).forEach(function (ch) {
     if (['sansuite'].indexOf(ch.statut) >= 0) return;
     journeesPrevues(ch, cfg).forEach(function (j) {
@@ -8011,6 +8015,11 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.85.1', quoi: [
+    { t: 'Les messages de suppression donnent le bon chemin vers la corbeille', vue: 'reglages' },
+    { t: 'Le rappel de sauvegarde de l accueil ouvre la carte Sauvegarde des Reglages', vue: 'reglages' },
+    { t: 'Journees a trancher : la veille n est plus oubliee apres un changement d heure' }
+  ] },
   { v: '4.85', quoi: [
     { t: 'Mes notes se cochent : un element par ligne, barre et descendu une fois fait' },
     { t: 'Une note supprimee passe par la corbeille, vous pouvez la retrouver', vue: 'reglages' },
@@ -8520,7 +8529,7 @@ function brancher() {
       var id = s.dataset.supprimer;
       var e2 = A.index.filter(function (x) { return x.id === id; })[0];
       if (!confirm('Supprimer « ' + ((e2 && e2.meta && e2.meta.foret) || 'ce bordereau') +
-        ' » ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Fichiers ▸ Corbeille.')) return;
+        ' » ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Général ▸ Sauvegarde ▸ Corbeille.')) return;
       A.index = A.index.filter(function (x) { return x.id !== id; });
       jeter(id).then(function () { return ecrire('bordcub.index', A.index); }).then(function () {
         if (A.bord && A.bord.id === id) { A.bord = null; Store.del('bordcub.actif'); majBandeau(); }
@@ -8641,7 +8650,7 @@ function brancher() {
       return;
     }
     if (e.target.closest('#f-sup')) {
-      if (!confirm('Supprimer « ' + (C.nomChantier(c)) + ' » ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Fichiers ▸ Corbeille.')) return;
+      if (!confirm('Supprimer « ' + (C.nomChantier(c)) + ' » ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Général ▸ Sauvegarde ▸ Corbeille.')) return;
       A.chantiers = A.chantiers.filter(function (x) { return x.id !== id; });
       A.chOuvert = null;
       jeterObjet('chantier', c, C.nomChantier(c),
@@ -8986,7 +8995,7 @@ function brancher() {
     }
     else if (s) {
       var c = charge(s.dataset.chgsup);
-      if (!c || !confirm('Supprimer « ' + (c.libelle || '') + ' » ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Fichiers ▸ Corbeille.')) return;
+      if (!c || !confirm('Supprimer « ' + (c.libelle || '') + ' » ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Général ▸ Sauvegarde ▸ Corbeille.')) return;
       A.charges = A.charges.filter(function (x) { return x.id !== c.id; });
       jeterObjet('charge', c, c.libelle || 'Charge', eur(FIN.nb(c.montant)))
         .then(sauverCharges).then(synchroniserDepensesCharges).then(function () {
@@ -9177,7 +9186,7 @@ function brancher() {
     if (sup) {
       var n = noteParId(sup.dataset.notesup);
       if (n && !confirm('Supprimer « ' + (n.titre || 'cette note') + ' » ?\n\nElle restera récupérable ' +
-        B.JOURS_POUBELLE + ' jours dans Réglages ▸ Fichiers ▸ Corbeille.')) return;
+        B.JOURS_POUBELLE + ' jours dans Réglages ▸ Général ▸ Sauvegarde ▸ Corbeille.')) return;
       effacerNote(sup.dataset.notesup);
       return;
     }
@@ -9266,7 +9275,7 @@ function brancher() {
     }
     if (s) {
       var d = depense(s.dataset.depsup);
-      if (!d || !confirm('Supprimer cette dépense de ' + eur(FIN.nb(d.ttc)) + ' ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Fichiers ▸ Corbeille.')) return;
+      if (!d || !confirm('Supprimer cette dépense de ' + eur(FIN.nb(d.ttc)) + ' ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Général ▸ Sauvegarde ▸ Corbeille.')) return;
       A.depenses = A.depenses.filter(function (x) { return x.id !== d.id; });
       jeterObjet('depense', d, (d.fournisseur || 'Dépense'), eur(FIN.nb(d.ttc)))
         .then(sauverDepenses).then(function () {
@@ -9297,7 +9306,7 @@ function brancher() {
     else if (o) ouvrirPile(o.dataset.pile);
     else if (s2) {
       var p = pile(s2.dataset.pilesup);
-      if (!p || !confirm('Supprimer la pile « ' + (p.nom || '') + ' » ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Fichiers ▸ Corbeille.')) return;
+      if (!p || !confirm('Supprimer la pile « ' + (p.nom || '') + ' » ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Général ▸ Sauvegarde ▸ Corbeille.')) return;
       A.piles = A.piles.filter(function (x) { return x.id !== p.id; });
       jeterObjet('pile', p, p.nom || 'Pile', E.fmt(H.restant(p), 2) + ' st')
         .then(sauverPiles).then(function () {
@@ -9323,9 +9332,7 @@ function brancher() {
   });
   $('#a-sauvegarde').addEventListener('click', function (e) {
     if (!e.target.closest('#a-sauver')) return;
-    document.body.classList.remove('accueil-ouvert');
-    A.module = moduleValide(A.module);
-    majOnglets(); aller('fichiers');
+    allerReglages('general');
     var c = $('#c-sauvegarde');
     if (c) c.scrollIntoView({ block: 'center' });
   });
@@ -16931,7 +16938,7 @@ function ouvrirJournee(id, modele) {
   });
   if (id) $('#mj-sup').addEventListener('click', function () {
     if (!confirm('Supprimer cette journée ?\n\nIl restera récupérable ' +
-      B.JOURS_POUBELLE + ' jours dans Réglages ▸ Fichiers ▸ Corbeille.')) return;
+      B.JOURS_POUBELLE + ' jours dans Réglages ▸ Général ▸ Sauvegarde ▸ Corbeille.')) return;
     A.journees = A.journees.filter(function (x) { return x.id !== id; });
     jeterObjet('journee', j, dateCourte(j.date) + (j.lieu ? ' — ' + j.lieu : ''),
       E.fmt(C.heuresJournee(j), 1) + ' h')
@@ -19530,7 +19537,7 @@ function ouvrirCommande(id, artPref) {
     });
   });
   if (id) $('#cm-sup').addEventListener('click', function () {
-    if (!confirm('Supprimer cette commande ? Le stock sera recalculé sans elle.\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Fichiers ▸ Corbeille.')) return;
+    if (!confirm('Supprimer cette commande ? Le stock sera recalculé sans elle.\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Général ▸ Sauvegarde ▸ Corbeille.')) return;
     A.commandes = A.commandes.filter(function (x) { return x.id !== id; });
     jeterObjet('commande', c, c.num || 'Commande',
       (c.lignes || []).length + ' ligne' + ((c.lignes || []).length > 1 ? 's' : ''))
@@ -19695,7 +19702,7 @@ function ouvrirSortieStock(id, perte, artPref) {
     });
   });
   if (id) $('#so-sup').addEventListener('click', function () {
-    if (!confirm('Supprimer ce mouvement ? Le stock sera recalculé sans lui.\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Fichiers ▸ Corbeille.')) return;
+    if (!confirm('Supprimer ce mouvement ? Le stock sera recalculé sans lui.\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Général ▸ Sauvegarde ▸ Corbeille.')) return;
     A.sorties = A.sorties.filter(function (x) { return x.id !== id; });
     jeterObjet('sortie', s, s.num || s.client || (s.perte ? 'Perte' : 'Sortie'),
       (s.lignes || []).length + ' ligne' + ((s.lignes || []).length > 1 ? 's' : ''))
@@ -20521,7 +20528,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.85.0-20261029-1900';
+var VERSION = '4.85.1-20261030-1850';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

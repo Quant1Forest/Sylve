@@ -8,6 +8,10 @@
    Dépendance : npm install jsdom
    ===================================================================== */
 'use strict';
+/* Fuseau avec changement d'heure, posé avant toute date : la suite ne dépend
+   plus du poste (UTC n'a jamais de changement d'heure et cachait un décalage
+   d'un jour dans la fenêtre des journées à trancher). */
+process.env.TZ = 'Europe/Paris';
 const fs = require('fs');
 const path = require('path');
 const { JSDOM } = require('jsdom');
@@ -274,6 +278,9 @@ scenario('Sauvegarde : le rappel compte toutes les données', async () => {
   }));
   verifierVrai('le rappel est sur l\'accueil', t.$('#a-sauver'));
   verifierVrai('il dit ce qu\'il y a à sauvegarder', /chantier/.test(t.texte('#a-journee') + t.texte('#a-sauvegarde')));
+  t.clic('#a-sauver'); await t.pause(400);
+  verifierVrai('il ouvre les Réglages', t.$('#vue-reglages.actif'));
+  verifierVrai('sur la carte Sauvegarde', t.$('#c-sauvegarde') && !t.$('#c-sauvegarde').hidden);
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -6404,6 +6411,9 @@ scenario('Calendrier : cliquer un jour ouvre sa fiche, et on peut y poser un cha
   }));
   await t.pause(300);
   const cible = t.w.BCC.minuit(JCAL(3));
+  /* La grille n'affiche que le mois courant : en fin de mois, le jour visé est
+     dans le suivant. */
+  if (!t.$('[data-jour="' + cible + '"]')) { t.clic('#cal-suiv'); await t.pause(250); }
   t.clic('[data-jour="' + cible + '"]'); await t.pause(450);
   verifierVrai('la fiche du jour s’ouvre', /Libre/.test(t.texte('#modale')));
   verifierVrai('elle propose de poser un chantier', t.$('#fj-poser'));

@@ -515,7 +515,7 @@ Ordre : ce qui touche l'usage quotidien d'abord.
   « Ma journée de travail » ; Calendrier → « Relances et calendrier » ;
   Finances et **Achats** → « Financier » (les achats n'ont pas de zone à eux) ;
   Stock → « Stock et fournitures » ; Véhicule → « Véhicule ».
-- **Messages qui nomment un chemin inexistant** : neuf confirmations de
+- **Messages qui nomment un chemin inexistant** (corrigé en 4.85.1) : neuf confirmations de
   suppression disent « Réglages ▸ Fichiers ▸ Corbeille ». Il n'y a plus de
   pastille « Fichiers » dans les réglages ; la corbeille est dans Réglages ▸
   Général ▸ Sauvegarde.
