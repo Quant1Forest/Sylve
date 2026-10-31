@@ -105,9 +105,9 @@ function alertes(chantiers, cfg, maintenant) {
     }
     if (ch.statut === 'termine' && ch.dateFin) {
       var j3 = Math.round((minuit(now) - minuit(ch.dateFin)) / JOUR);
-      if (j3 >= 15) {
+      if (j3 >= 1) {
         out.push({ type: 'afacturer', chantier: ch, gravite: 2, jours: j3,
-          texte: 'terminé il y a ' + j3 + ' jours, pas encore facturé' });
+          texte: 'terminé il y a ' + j3 + ' jour' + (j3 > 1 ? 's' : '') + ', pas encore facturé' });
       }
     }
   });

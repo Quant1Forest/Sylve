@@ -9326,6 +9326,166 @@ scenario('Cadre : chaque élément de l’accueil et de Mon entreprise a son nou
 });
 
 /* --------------------------------------------------------------------- */
+/* Lot 5b2 (4.87.1) : les remontées tranchées le 31/10. */
+scenario('Facture à faire : dès le lendemain de « Terminé », pas le jour même', async () => {
+  const lig = [{ travail: 'DEGAG', unite: 'ha', quantite: 2, prix: 500, nature: 'prestation' }];
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    chantiers: [
+      chA('c1', { nom: 'Ce matin', commune: 'Ce matin', statut: 'termine', dateFin: JA(0), lignes: lig }),
+      chA('c2', { nom: 'Hier', commune: 'Hier', statut: 'termine', dateFin: JA(-1), lignes: lig }),
+      chA('c3', { nom: 'Il y a dix jours', commune: 'Dix jours', statut: 'termine', dateFin: JA(-10), lignes: lig })]
+  }));
+  const al = t.w.BCC.alertes(t.stock('chantiers'), t.stock('cfg') || {}, Date.now())
+    .filter(a => a.type === 'afacturer');
+  verifier('l’alerte du carnet : hier et avant, pas ce matin', ['c2', 'c3'],
+    al.map(a => a.chantier.id).sort());
+  verifierVrai('« 1 jour » au singulier', /terminé il y a 1 jour, pas/.test(al.filter(a => a.chantier.id === 'c2')[0].texte));
+  verifierVrai('Aujourd’hui : la ligne d’hier est là', !!ligneAuj(t, 'afacturer:c2'));
+  verifierVrai('et celle d’il y a dix jours', !!ligneAuj(t, 'afacturer:c3'));
+  verifierVrai('mais pas celle du jour même', !ligneAuj(t, 'afacturer:c1'));
+  /* Les deux écrans disent la même chose : le carnet l'a dans « À traiter ». */
+  await parBarre(t, 'chantiers'); t.clic('[data-vue="carnet"]'); await t.pause(300);
+  const at = t.texte('#bandeau-alertes');
+  verifierVrai('« À traiter » du carnet nomme Hier', /Hier/.test(at));
+  verifierVrai('et ne nomme pas Ce matin', !/Ce matin/.test(at));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Argent ▸ Bilan : « à facturer » dit combien, et mène au carnet filtré', async () => {
+  const lig = p => [{ travail: 'DEGAG', unite: 'ha', quantite: 1, prix: p, nature: 'prestation' }];
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    chantiers: [
+      chA('c1', { nom: 'Vaux', commune: 'Vaux', statut: 'termine', dateFin: JA(-3), lignes: lig(1000) }),
+      chA('c2', { nom: 'Marchand', commune: 'Marchand', statut: 'termine', dateFin: JA(-1), lignes: lig(500) }),
+      chA('c3', { nom: 'Sans ligne', commune: 'Sans ligne', statut: 'termine', dateFin: JA(-1) }),
+      chA('c4', { nom: 'Déjà parti', commune: 'Déjà parti', statut: 'facture', numeroFacture: 'F-1', dateFacture: JA(-5), lignes: lig(900) }),
+      chA('c5', { nom: 'Encore à faire', commune: 'Encore à faire', statut: 'encours', lignes: lig(700) })]
+  }));
+  const C = t.w.BCC, E = t.w.BC;
+  const somme = C.arr(t.stock('chantiers').filter(c => c.statut === 'termine')
+    .reduce((s, c) => s + C.montant(c), 0), 2);
+  verifier('la somme attendue (les lignes des terminés)', 1500, somme);
+  await parBarre(t, 'argent');
+  const bilan = sansBlancs(t.texte('#fi-corps'));
+  const attendu = sansBlancs(E.fmt(somme, 0) + ' €à facturer · 3 chantiers');
+  verifierVrai('le Bilan dit « ' + attendu + ' » : ' + bilan.slice(0, 200), bilan.indexOf(attendu) >= 0);
+  t.clic('#fi-afacturer'); await t.pause(450);
+  verifier('un appui ouvre le carnet', 'vue-carnet', vueActive(t));
+  verifier('filtré sur les chantiers terminés', 'termine', t.$('#c-filtre').value);
+  verifier('les trois, et eux seuls', ['Marchand', 'Sans ligne', 'Vaux'],
+    ['Vaux', 'Marchand', 'Sans ligne', 'Déjà parti', 'Encore à faire']
+      .filter(n => new RegExp(n).test(t.texte('#liste-chantiers'))).sort());
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Argent ▸ Bilan : rien à facturer, pas de tuile', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    chantiers: [chA('c1', { nom: 'Vaux', statut: 'encours' })]
+  }));
+  await parBarre(t, 'argent');
+  verifierVrai('pas de « à facturer »', !t.$('#fi-afacturer') && !/à facturer/.test(t.texte('#fi-corps')));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Stock : « à recommander » compte le réservé, comme Aujourd’hui et le ☰ (S2)', async () => {
+  const art = (id, nom, seuil, mv) => ({ id, nom, type: 'protection', unite: 'unite', seuil, maj: Date.now(), mouvements: mv });
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    chantiers: [chA('c1', { nom: 'Vaux', statut: 'accepte' })],
+    articles: [
+      art('a1', 'Gaine', 100, [{ sens: 'entree', qte: 50, prix: 1, date: JA(-10) }]),
+      art('a2', 'Tuteur', 50, [{ sens: 'entree', qte: 200, prix: 1, date: JA(-10) },
+        { sens: 'sortie', etat: 'engage', qte: 300, chantier: 'c1', date: JA(-1) }]),
+      art('a3', 'Répulsif', 10, [{ sens: 'entree', qte: 500, prix: 1, date: JA(-10) }])]
+  }));
+  const nAuj = /À recommander : (\d+)/.exec(texteLignes(t, 'stock'));
+  t.clic('#b-menu'); await t.pause(200);
+  const nMenu = /(\d+) à recommander/.exec(t.texte('#modale [data-menu="stock"]'));
+  t.clic('#modale-x'); await t.pause(150);
+  await parMenu(t, 'stock');
+  const kpi = t.texte('#stock-resume .kpi');
+  const nStock = /(\d+)\s*à recommander/.exec(kpi);
+  verifierVrai('les trois comptes existent', !!nAuj && !!nMenu && !!nStock);
+  verifier('Stock dit 2', '2', nStock && nStock[1]);
+  verifier('le même chiffre qu’Aujourd’hui et que le ☰', [nAuj[1], nMenu[1]], [nStock[1], nStock[1]]);
+  const liste = t.texte('#stock-alertes');
+  verifierVrai('la liste nomme la gaine (sous le seuil) : ' + liste, /Gaine/.test(liste) && /seuil à 100/.test(liste));
+  verifierVrai('et le tuteur dont les chantiers signés prennent trop', /Tuteur/.test(liste) && /il en manque 100/.test(liste));
+  verifierVrai('pas le tranquille', !/Répulsif/.test(liste));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Messages : la corbeille se dit « ☰ ▸ Corbeille », d’un seul texte', async () => {
+  /* Neuf confirmations de suppression citaient l'ancien chemin. Le texte est
+     dans une constante : l'application ne dit plus que celui-là. */
+  verifier('plus aucun ancien chemin dans l’application', 0,
+    html.split('Général ▸ Sauvegarde ▸ Corbeille').length - 1);
+  verifier('le nouveau chemin est défini une fois', 1, html.split("CHEMIN_CORBEILLE = '☰ ▸ Corbeille'").length - 1);
+  verifier('et aucun message ne le récrit à la main', 0, html.split("' jours dans ☰").length - 1);
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    chantiers: [chA('c1', { nom: 'Éclaircie Chapelle', statut: 'encours' })],
+    cfg: { notes: [{ id: 'n1', titre: 'Courses', couleur: '#B4231F', items: [], cree: Date.now() }] }
+  }));
+  const demandes = [];
+  t.w.confirm = m => { demandes.push(m); return false; };
+  t.clic('[data-notesup]'); await t.pause(200);
+  verifierVrai('la note le dit : ' + demandes[0], /30 jours dans ☰ ▸ Corbeille\./.test(demandes[0] || ''));
+  await parBarre(t, 'chantiers'); t.clic('[data-vue="carnet"]'); await t.pause(250);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(300);
+  t.clic('#f-sup'); await t.pause(200);
+  verifierVrai('le chantier aussi : ' + demandes[1], /30 jours dans ☰ ▸ Corbeille\./.test(demandes[1] || ''));
+  verifier('rien n’a été supprimé (confirmations refusées)', 1, t.stock('chantiers').length);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Note : créée depuis un autre écran, on dit où elle est', async () => {
+  const t = await ouvrir(VIDE);
+  await plusNote(t);
+  t.saisir('#nt-titre', 'Ici même'); t.clic('#nt-ok'); await t.pause(400);
+  verifier('depuis Aujourd’hui : le message simple', 'Note ajoutée.', t.texte('#toast'));
+  await parBarre(t, 'agenda');
+  await plusNote(t);
+  t.saisir('#nt-titre', 'Depuis l’agenda'); t.clic('#nt-ok'); await t.pause(400);
+  verifierVrai('depuis l’Agenda : ' + t.texte('#toast'), /^Note ajoutée dans Aujourd.hui\.$/.test(t.texte('#toast')));
+  verifier('les deux notes sont bien là', 2, ((t.stock('cfg') || {}).notes || []).length);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Fiche : « Poser des dates » ouvre l’Agenda sur le mois du premier jour posé', async () => {
+  /* Cause : journeesPlacees rend des {d, p}, et la fiche passait l'objet à
+     minuit() au lieu de sa date : NaN, donc le mois en cours. */
+  const jour = JA(45);
+  const d = new Date(jour);
+  const mois = d.toLocaleDateString('fr-FR', { month: 'long' }).toLowerCase() + ' ' + d.getFullYear();
+  const aujourdhui = new Date();
+  verifierVrai('le jour posé est bien dans un autre mois que celui en cours',
+    d.getMonth() !== aujourdhui.getMonth() || d.getFullYear() !== aujourdhui.getFullYear());
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'chantiers',
+    chantiers: [
+      chA('c1', { nom: 'Posé loin', statut: 'accepte', aDevis: false, joursEstimes: 3, jours: [{ d: jour, p: 1 }] }),
+      chA('c2', { nom: 'Rien posé', statut: 'accepte', aDevis: false, joursEstimes: 3 })]
+  }));
+  t.clic('[data-vue="carnet"]'); await t.pause(300);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+  t.clic('#f-planifier'); await t.pause(450);
+  verifier('l’Agenda est ouvert', 'vue-calendrier', vueActive(t));
+  verifier('sur le mois du jour posé', mois, t.texte('#cal-titre').toLowerCase());
+  const enCours = aujourdhui.toLocaleDateString('fr-FR', { month: 'long' }).toLowerCase() + ' ' + aujourdhui.getFullYear();
+  /* Sans journée posée : le mois en cours. */
+  await parBarre(t, 'chantiers'); t.clic('[data-vue="carnet"]'); await t.pause(300);
+  t.clic('[data-chouvrir="c2"]'); await t.pause(400);
+  t.clic('#f-planifier'); await t.pause(450);
+  verifier('sans jour posé : le mois en cours', enCours, t.texte('#cal-titre').toLowerCase());
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
 /* Un troisième argument ne joue que les scénarios dont le nom le contient.
    Sert à éprouver un contrôle en le cassant exprès : rejouer les quarante
    autres pour vérifier qu'un seul crie coûte deux minutes pour rien.

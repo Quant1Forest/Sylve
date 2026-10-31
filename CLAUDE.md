@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML servi, recollé depuis `sources/` sans rien transformer ; aucune
 dépendance, tout fonctionne hors ligne.
 
-Version courante : **4.87.0-20261031-2104**
+Version courante : **4.87.1-20261031-2230**
 
 ---
 
@@ -75,7 +75,7 @@ npm run controle   # fabrication + vérificateur + service worker + tests + conf
 
 Doit afficher **« index.html fabriqué »**, puis **« Bon pour livraison »**,
 puis **« le service worker tient »** (33 vérifications), puis la suite au
-vert — 2325 à ce jour — puis **« Sylve.html est conforme »**.
+vert — 2364 à ce jour — puis **« Sylve.html est conforme »**.
 
 Compter **trois minutes** : 187 à 221 s mesurées au lot 4b, 260 s au lot 5b (selon la charge
 du poste ; 17 minutes avant, en séquentiel). Les scénarios se jouent en
@@ -202,7 +202,7 @@ Débordements à connaître : `prix-de-revient.js` finit par les réglages
 Chantiers, Veille et Démarrage, puis l'appel d'`init` ; `carte.js` par les
 fenêtres « numéro de facture » et « motif de refus ».
 
-**La navigation (lots 5a et 5b, 4.86.0 et 4.87.0)** — détail dans
+**La navigation (lots 5a, 5b et 5b2, 4.86.0 à 4.87.1)** — détail dans
 `docs/design-navigation.md`, *Le cadre du lot 5a* et *L'écran Aujourd'hui* :
 
 - Démarrage → **Aujourd'hui** (vue `accueil`) : saisie · En retard · Bientôt ·
@@ -218,6 +218,7 @@ fenêtres « numéro de facture » et « motif de refus ».
 - Tout passe par `aller()`, qui finit par `majCadre()` : bandeau, barre,
   flèche, `accueil-ouvert` et crans d'historique suivent seuls.
 - Dans les tests : `parBarre(t, 'agenda')`, `parMenu(t, 'reglages')`.
+- **5b2** : « Facture à faire » dès le lendemain de « Terminé » (alerte du carnet comprise) ; chemin de la corbeille dans une constante, `B.CHEMIN_CORBEILLE`.
 
 ---
 

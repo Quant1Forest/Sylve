@@ -370,7 +370,7 @@ function ouvrirJournee(id, modele) {
   });
   if (id) $('#mj-sup').addEventListener('click', function () {
     if (!confirm('Supprimer cette journée ?\n\nIl restera récupérable ' +
-      B.JOURS_POUBELLE + ' jours dans Réglages ▸ Général ▸ Sauvegarde ▸ Corbeille.')) return;
+      B.JOURS_POUBELLE + ' jours dans ' + B.CHEMIN_CORBEILLE + '.')) return;
     A.journees = A.journees.filter(function (x) { return x.id !== id; });
     jeterObjet('journee', j, dateCourte(j.date) + (j.lieu ? ' — ' + j.lieu : ''),
       E.fmt(C.heuresJournee(j), 1) + ' h')

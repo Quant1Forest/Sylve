@@ -298,7 +298,7 @@ function ouvrirCommande(id, artPref) {
     });
   });
   if (id) $('#cm-sup').addEventListener('click', function () {
-    if (!confirm('Supprimer cette commande ? Le stock sera recalculé sans elle.\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Général ▸ Sauvegarde ▸ Corbeille.')) return;
+    if (!confirm('Supprimer cette commande ? Le stock sera recalculé sans elle.\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans ' + B.CHEMIN_CORBEILLE + '.')) return;
     A.commandes = A.commandes.filter(function (x) { return x.id !== id; });
     jeterObjet('commande', c, c.num || 'Commande',
       (c.lignes || []).length + ' ligne' + ((c.lignes || []).length > 1 ? 's' : ''))
@@ -463,7 +463,7 @@ function ouvrirSortieStock(id, perte, artPref) {
     });
   });
   if (id) $('#so-sup').addEventListener('click', function () {
-    if (!confirm('Supprimer ce mouvement ? Le stock sera recalculé sans lui.\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Général ▸ Sauvegarde ▸ Corbeille.')) return;
+    if (!confirm('Supprimer ce mouvement ? Le stock sera recalculé sans lui.\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans ' + B.CHEMIN_CORBEILLE + '.')) return;
     A.sorties = A.sorties.filter(function (x) { return x.id !== id; });
     jeterObjet('sortie', s, s.num || s.client || (s.perte ? 'Perte' : 'Sortie'),
       (s.lignes || []).length + ' ligne' + ((s.lignes || []).length > 1 ? 's' : ''))

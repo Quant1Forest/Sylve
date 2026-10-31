@@ -775,6 +775,13 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.87.1', quoi: [
+    { t: 'Facture à faire dès le lendemain de « Travaux terminés »' },
+    { t: 'Argent ▸ Bilan : le total « à facturer », un appui ouvre les chantiers concernés', vue: 'finances' },
+    { t: 'Stock : « à recommander » compte aussi ce que les chantiers signés vont prendre', vue: 'stock2' },
+    { t: 'Les messages de suppression disent ☰ ▸ Corbeille ; une note créée ailleurs dit où elle est' },
+    { t: 'Poser des dates ouvre l’Agenda sur le mois du premier jour posé', vue: 'carnet' }
+  ] },
   { v: '4.87', quoi: [
     { t: 'Aujourd’hui devient un vrai écran : en retard, bientôt, vos notes, chantiers en cours, prélèvements, derniers jours' },
     { t: 'Chaque ligne se masque d’un × jusqu’au lendemain ; elle revient tant que ce n’est pas réglé' },

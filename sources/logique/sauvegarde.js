@@ -7,6 +7,9 @@
 var JOUR = 86400000;
 var MAX_INSTANTANES = 7;      // une semaine de photos quotidiennes
 var JOURS_POUBELLE = 30;      // délai avant effacement réel
+/* Le chemin que disent les confirmations de suppression : un seul texte, pour
+   qu'un déplacement de la corbeille ne laisse pas neuf messages faux. */
+var CHEMIN_CORBEILLE = '☰ ▸ Corbeille';
 
 function jour(ts) {
   var d = new Date(ts);
@@ -129,6 +132,7 @@ function octets(n) {
 
 window.BCB = {
   JOUR: JOUR, MAX_INSTANTANES: MAX_INSTANTANES, JOURS_POUBELLE: JOURS_POUBELLE,
+  CHEMIN_CORBEILLE: CHEMIN_CORBEILLE,
   jour: jour, cleInstantane: cleInstantane, clePoubelle: clePoubelle,
   rotation: rotation, aPurger: aPurger,
   construireSauvegarde: construireSauvegarde, lireSauvegarde: lireSauvegarde,

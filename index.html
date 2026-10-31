@@ -4483,9 +4483,9 @@ function alertes(chantiers, cfg, maintenant) {
     }
     if (ch.statut === 'termine' && ch.dateFin) {
       var j3 = Math.round((minuit(now) - minuit(ch.dateFin)) / JOUR);
-      if (j3 >= 15) {
+      if (j3 >= 1) {
         out.push({ type: 'afacturer', chantier: ch, gravite: 2, jours: j3,
-          texte: 'terminé il y a ' + j3 + ' jours, pas encore facturé' });
+          texte: 'terminé il y a ' + j3 + ' jour' + (j3 > 1 ? 's' : '') + ', pas encore facturé' });
       }
     }
   });
@@ -6333,6 +6333,9 @@ window.BCS = S;
 var JOUR = 86400000;
 var MAX_INSTANTANES = 7;      // une semaine de photos quotidiennes
 var JOURS_POUBELLE = 30;      // délai avant effacement réel
+/* Le chemin que disent les confirmations de suppression : un seul texte, pour
+   qu'un déplacement de la corbeille ne laisse pas neuf messages faux. */
+var CHEMIN_CORBEILLE = '☰ ▸ Corbeille';
 
 function jour(ts) {
   var d = new Date(ts);
@@ -6455,6 +6458,7 @@ function octets(n) {
 
 window.BCB = {
   JOUR: JOUR, MAX_INSTANTANES: MAX_INSTANTANES, JOURS_POUBELLE: JOURS_POUBELLE,
+  CHEMIN_CORBEILLE: CHEMIN_CORBEILLE,
   jour: jour, cleInstantane: cleInstantane, clePoubelle: clePoubelle,
   rotation: rotation, aPurger: aPurger,
   construireSauvegarde: construireSauvegarde, lireSauvegarde: lireSauvegarde,
@@ -7969,6 +7973,13 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.87.1', quoi: [
+    { t: 'Facture à faire dès le lendemain de « Travaux terminés »' },
+    { t: 'Argent ▸ Bilan : le total « à facturer », un appui ouvre les chantiers concernés', vue: 'finances' },
+    { t: 'Stock : « à recommander » compte aussi ce que les chantiers signés vont prendre', vue: 'stock2' },
+    { t: 'Les messages de suppression disent ☰ ▸ Corbeille ; une note créée ailleurs dit où elle est' },
+    { t: 'Poser des dates ouvre l’Agenda sur le mois du premier jour posé', vue: 'carnet' }
+  ] },
   { v: '4.87', quoi: [
     { t: 'Aujourd’hui devient un vrai écran : en retard, bientôt, vos notes, chantiers en cours, prélèvements, derniers jours' },
     { t: 'Chaque ligne se masque d’un × jusqu’au lendemain ; elle revient tant que ce n’est pas réglé' },
@@ -8488,7 +8499,7 @@ function brancher() {
       var id = s.dataset.supprimer;
       var e2 = A.index.filter(function (x) { return x.id === id; })[0];
       if (!confirm('Supprimer « ' + ((e2 && e2.meta && e2.meta.foret) || 'ce bordereau') +
-        ' » ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Général ▸ Sauvegarde ▸ Corbeille.')) return;
+        ' » ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans ' + B.CHEMIN_CORBEILLE + '.')) return;
       A.index = A.index.filter(function (x) { return x.id !== id; });
       jeter(id).then(function () { return ecrire('bordcub.index', A.index); }).then(function () {
         if (A.bord && A.bord.id === id) { A.bord = null; Store.del('bordcub.actif'); majBandeau(); }
@@ -8529,6 +8540,11 @@ function brancher() {
   $('#e-xlsx').addEventListener('click', exportXlsx);
   $('#e-csv').addEventListener('click', exportCsv);
   $('#e-json').addEventListener('click', exportJson);
+  $('#fi-corps').addEventListener('click', function (e) {
+    if (!e.target.closest('#fi-afacturer')) return;
+    A.filtreCh = 'termine'; A.rechCh = ''; $('#c-rech').value = '';
+    allerModule('chantiers', 'carnet');
+  });
   /* --- chantiers --- */
   $('#c-nouveau').addEventListener('click', function () { ouvrirEnteteCh(null); });
   $('#c-filtre').addEventListener('change', function () { A.filtreCh = this.value; renderListeChantiers(); });
@@ -8581,7 +8597,8 @@ function brancher() {
     if (e.target.closest('#f-planifier')) {
       A.planifie = id;
       var pl = C.journeesPlacees(c);
-      A.calMois = pl.length ? C.minuit(pl[0]) : (c.debut || Date.now());
+      /* journeesPlacees rend des {d, p} : c'est .d qui est la date. */
+      A.calMois = pl.length ? C.minuit(pl[0].d) : Date.now();
       renderCalendrier(); allerModule('calendrier', 'calendrier');
       return;
     }
@@ -8609,7 +8626,7 @@ function brancher() {
       return;
     }
     if (e.target.closest('#f-sup')) {
-      if (!confirm('Supprimer « ' + (C.nomChantier(c)) + ' » ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Général ▸ Sauvegarde ▸ Corbeille.')) return;
+      if (!confirm('Supprimer « ' + (C.nomChantier(c)) + ' » ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans ' + B.CHEMIN_CORBEILLE + '.')) return;
       A.chantiers = A.chantiers.filter(function (x) { return x.id !== id; });
       A.chOuvert = null;
       jeterObjet('chantier', c, C.nomChantier(c),
@@ -8954,7 +8971,7 @@ function brancher() {
     }
     else if (s) {
       var c = charge(s.dataset.chgsup);
-      if (!c || !confirm('Supprimer « ' + (c.libelle || '') + ' » ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Général ▸ Sauvegarde ▸ Corbeille.')) return;
+      if (!c || !confirm('Supprimer « ' + (c.libelle || '') + ' » ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans ' + B.CHEMIN_CORBEILLE + '.')) return;
       A.charges = A.charges.filter(function (x) { return x.id !== c.id; });
       jeterObjet('charge', c, c.libelle || 'Charge', eur(FIN.nb(c.montant)))
         .then(sauverCharges).then(synchroniserDepensesCharges).then(function () {
@@ -9141,7 +9158,7 @@ function brancher() {
     }
     if (s) {
       var d = depense(s.dataset.depsup);
-      if (!d || !confirm('Supprimer cette dépense de ' + eur(FIN.nb(d.ttc)) + ' ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Général ▸ Sauvegarde ▸ Corbeille.')) return;
+      if (!d || !confirm('Supprimer cette dépense de ' + eur(FIN.nb(d.ttc)) + ' ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans ' + B.CHEMIN_CORBEILLE + '.')) return;
       A.depenses = A.depenses.filter(function (x) { return x.id !== d.id; });
       jeterObjet('depense', d, (d.fournisseur || 'Dépense'), eur(FIN.nb(d.ttc)))
         .then(sauverDepenses).then(function () {
@@ -9172,7 +9189,7 @@ function brancher() {
     else if (o) ouvrirPile(o.dataset.pile);
     else if (s2) {
       var p = pile(s2.dataset.pilesup);
-      if (!p || !confirm('Supprimer la pile « ' + (p.nom || '') + ' » ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Général ▸ Sauvegarde ▸ Corbeille.')) return;
+      if (!p || !confirm('Supprimer la pile « ' + (p.nom || '') + ' » ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans ' + B.CHEMIN_CORBEILLE + '.')) return;
       A.piles = A.piles.filter(function (x) { return x.id !== p.id; });
       jeterObjet('pile', p, p.nom || 'Pile', E.fmt(H.restant(p), 2) + ' st')
         .then(sauverPiles).then(function () {
@@ -15988,7 +16005,9 @@ function ouvrirNote(id) {
     n.couleur = coul;
     Promise.resolve(sauverCfg()).then(function () {
       fermerModale(); renderNotes();
-      toast(id ? 'Note modifiée.' : 'Note ajoutée.');
+      /* Créée par le + depuis un autre écran, elle n'est pas sous les yeux :
+         on dit où elle est. */
+      toast(id ? 'Note modifiée.' : A.vue === 'accueil' ? 'Note ajoutée.' : 'Note ajoutée dans Aujourd’hui.');
     });
   });
 }
@@ -16030,7 +16049,7 @@ function brancherNotes() {
     if (sup) {
       var n = noteParId(sup.dataset.notesup);
       if (n && !confirm('Supprimer « ' + (n.titre || 'cette note') + ' » ?\n\nElle restera récupérable ' +
-        B.JOURS_POUBELLE + ' jours dans Réglages ▸ Général ▸ Sauvegarde ▸ Corbeille.')) return;
+        B.JOURS_POUBELLE + ' jours dans ' + B.CHEMIN_CORBEILLE + '.')) return;
       effacerNote(sup.dataset.notesup);
       return;
     }
@@ -16136,6 +16155,16 @@ function renderFinances() {
   var res = FIN.resultat(A.chantiers, A.depenses, b);
   var tr = FIN.tauxReussite(A.chantiers, C.aDevis);
 
+  /* « À facturer » ne dépend pas de la période choisie : c'est ce qui attend
+     aujourd'hui, un chantier terminé et pas encore facturé, quel que soit
+     le mois regardé. Un appui mène au carnet filtré sur ces chantiers. */
+  var tot = C.totaux(A.chantiers, A.cfg);
+  var tuileAF = tot.nAFacturer
+    ? '<button class="carte2" id="fi-afacturer" style="text-align:left;cursor:pointer"><b class="num">' +
+      eur(tot.aFacturer) + '</b><small>à facturer · ' + tot.nAFacturer + ' chantier' +
+      (tot.nAFacturer > 1 ? 's' : '') + '</small></button>'
+    : '';
+
   var tauxCol = Object.keys(bal.collectee.parTaux).sort();
   var tauxDed = Object.keys(bal.deductible.parTaux).sort();
 
@@ -16145,7 +16174,7 @@ function renderFinances() {
       '<div class="carte2"><b class="num">' + eur(ca.total) + '</b><small>facturé (HT)</small></div>' +
       '<div class="carte2"><b class="num">' + eur(ca.encaisse) + '</b><small>encaissé</small></div>' +
       (ca.aEncaisser ? '<div class="carte2"><b class="num">' + eur(ca.aEncaisser) + '</b><small>en attente</small></div>' : '') +
-      '</div>' +
+      tuileAF + '</div>' +
       '<div style="margin-top:13px">' +
       ligneCA('Prestation de service', ca.prestation, ca.prestationApres, '50 %') +
       ligneCA('Vente de fournitures', ca.vente, ca.venteApres, '71 %') +
@@ -16153,7 +16182,8 @@ function renderFinances() {
       '<b>Base après abattement</b><b class="num" style="font-size:18px">' + eur(ca.totalApres) + '</b></div></div>' +
       '<p class="muted" style="font-size:11.5px;margin:10px 0 0">Abattements du micro-BIC. ' +
       'Ce calcul prépare la déclaration, il ne la remplace pas.</p>'
-      : '<div class="vide"><p>Aucune facture sur cette période.</p></div>') +
+      : '<div class="vide"><p>Aucune facture sur cette période.</p></div>' +
+        (tuileAF ? '<div class="kpi">' + tuileAF + '</div>' : '')) +
     '</div>' +
 
     '<div class="carte"><h2>Balance de TVA</h2>' +
@@ -17274,7 +17304,7 @@ function ouvrirJournee(id, modele) {
   });
   if (id) $('#mj-sup').addEventListener('click', function () {
     if (!confirm('Supprimer cette journée ?\n\nIl restera récupérable ' +
-      B.JOURS_POUBELLE + ' jours dans Réglages ▸ Général ▸ Sauvegarde ▸ Corbeille.')) return;
+      B.JOURS_POUBELLE + ' jours dans ' + B.CHEMIN_CORBEILLE + '.')) return;
     A.journees = A.journees.filter(function (x) { return x.id !== id; });
     jeterObjet('journee', j, dateCourte(j.date) + (j.lieu ? ' — ' + j.lieu : ''),
       E.fmt(C.heuresJournee(j), 1) + ' h')
@@ -17759,7 +17789,8 @@ function renderStockFournitures() {
     return;
   }
   var val = ST.valeurTotale(A.articles);
-  var bas = ST.articlesSousSeuil(A.articles);
+  /* Le compte est celui d'Aujourd'hui et du ☰ (S2) : le réservé y entre. */
+  var rec = ST.aRecommander(A.articles);
   var ruptures = A.articles.filter(function (a) { return ST.etatStock(a) === 'rupture'; });
   var attendu = A.articles.reduce(function (s, a) { return s + ST.quantiteAttendue(a); }, 0);
 
@@ -17771,7 +17802,7 @@ function renderStockFournitures() {
       '</b><small>en commande</small></div>' : '') +
     (ruptures.length ? '<div class="carte2" style="border-color:#B4231F"><b class="num">' +
       ruptures.length + '</b><small>en rupture</small></div>' : '') +
-    (bas.length ? '<div class="carte2" style="border-color:#B98A00"><b class="num">' + bas.length +
+    (rec.length ? '<div class="carte2" style="border-color:#B98A00"><b class="num">' + rec.length +
       '</b><small>à recommander</small></div>' : '') +
     '</div>' + ouDortLArgent(A.articles);
 
@@ -17841,15 +17872,17 @@ function renderStockFournitures() {
     (prevu ? ' « À prévoir » retire en plus les chantiers seulement envisagés.' : '') +
     '</p>';
 
-  var al = ruptures.concat(bas.filter(function (a) { return ST.etatStock(a) === 'faible'; }));
-  $('#stock-alertes').innerHTML = al.length
-    ? '<div class="carte"><h2>À recommander</h2>' + al.map(function (a) {
-        var q = ST.quantite(a);
+  $('#stock-alertes').innerHTML = rec.length
+    ? '<div class="carte"><h2>À recommander</h2>' + rec.map(function (x) {
+        var a = x.article, q = ST.quantite(a);
         return '<button class="alerte" data-artfiche="' + a.id + '">' +
           '<i class="ic" style="background:' + (q <= 0 ? '#B4231F' : '#B98A00') + '"></i>' +
           '<span><b>' + esc(a.nom || '') + '</b><small>' +
-          (q <= 0 ? 'rupture' : E.fmt(q, 0) + ' ' + ST.courtUniteArt(a.unite) +
-            ' — seuil à ' + E.fmt(ST.nb(a.seuil), 0)) +
+          (x.raison === 'manque'
+            ? 'il en manque ' + E.fmt(x.manque, x.manque % 1 ? 2 : 0) + ' ' + ST.courtUniteArt(a.unite) +
+              ' pour les chantiers signés'
+            : q <= 0 ? 'rupture' : E.fmt(q, 0) + ' ' + ST.courtUniteArt(a.unite) +
+              ' — seuil à ' + E.fmt(ST.nb(a.seuil), 0)) +
           (a.fournisseur ? ' · ' + esc(nomFournisseur(a.fournisseur)) : '') +
           '</small></span></button>';
       }).join('') + '</div>'
@@ -19857,7 +19890,7 @@ function ouvrirCommande(id, artPref) {
     });
   });
   if (id) $('#cm-sup').addEventListener('click', function () {
-    if (!confirm('Supprimer cette commande ? Le stock sera recalculé sans elle.\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Général ▸ Sauvegarde ▸ Corbeille.')) return;
+    if (!confirm('Supprimer cette commande ? Le stock sera recalculé sans elle.\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans ' + B.CHEMIN_CORBEILLE + '.')) return;
     A.commandes = A.commandes.filter(function (x) { return x.id !== id; });
     jeterObjet('commande', c, c.num || 'Commande',
       (c.lignes || []).length + ' ligne' + ((c.lignes || []).length > 1 ? 's' : ''))
@@ -20022,7 +20055,7 @@ function ouvrirSortieStock(id, perte, artPref) {
     });
   });
   if (id) $('#so-sup').addEventListener('click', function () {
-    if (!confirm('Supprimer ce mouvement ? Le stock sera recalculé sans lui.\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Général ▸ Sauvegarde ▸ Corbeille.')) return;
+    if (!confirm('Supprimer ce mouvement ? Le stock sera recalculé sans lui.\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans ' + B.CHEMIN_CORBEILLE + '.')) return;
     A.sorties = A.sorties.filter(function (x) { return x.id !== id; });
     jeterObjet('sortie', s, s.num || s.client || (s.perte ? 'Perte' : 'Sortie'),
       (s.lignes || []).length + ' ligne' + ((s.lignes || []).length > 1 ? 's' : ''))
@@ -20848,7 +20881,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.87.0-20261031-2104';
+var VERSION = '4.87.1-20261031-2230';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

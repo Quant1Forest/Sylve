@@ -444,7 +444,9 @@ function ouvrirNote(id) {
     n.couleur = coul;
     Promise.resolve(sauverCfg()).then(function () {
       fermerModale(); renderNotes();
-      toast(id ? 'Note modifiée.' : 'Note ajoutée.');
+      /* Créée par le + depuis un autre écran, elle n'est pas sous les yeux :
+         on dit où elle est. */
+      toast(id ? 'Note modifiée.' : A.vue === 'accueil' ? 'Note ajoutée.' : 'Note ajoutée dans Aujourd’hui.');
     });
   });
 }
@@ -486,7 +488,7 @@ function brancherNotes() {
     if (sup) {
       var n = noteParId(sup.dataset.notesup);
       if (n && !confirm('Supprimer « ' + (n.titre || 'cette note') + ' » ?\n\nElle restera récupérable ' +
-        B.JOURS_POUBELLE + ' jours dans Réglages ▸ Général ▸ Sauvegarde ▸ Corbeille.')) return;
+        B.JOURS_POUBELLE + ' jours dans ' + B.CHEMIN_CORBEILLE + '.')) return;
       effacerNote(sup.dataset.notesup);
       return;
     }

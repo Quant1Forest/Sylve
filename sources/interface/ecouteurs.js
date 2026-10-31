@@ -228,7 +228,7 @@ function brancher() {
       var id = s.dataset.supprimer;
       var e2 = A.index.filter(function (x) { return x.id === id; })[0];
       if (!confirm('Supprimer « ' + ((e2 && e2.meta && e2.meta.foret) || 'ce bordereau') +
-        ' » ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Général ▸ Sauvegarde ▸ Corbeille.')) return;
+        ' » ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans ' + B.CHEMIN_CORBEILLE + '.')) return;
       A.index = A.index.filter(function (x) { return x.id !== id; });
       jeter(id).then(function () { return ecrire('bordcub.index', A.index); }).then(function () {
         if (A.bord && A.bord.id === id) { A.bord = null; Store.del('bordcub.actif'); majBandeau(); }
@@ -269,6 +269,11 @@ function brancher() {
   $('#e-xlsx').addEventListener('click', exportXlsx);
   $('#e-csv').addEventListener('click', exportCsv);
   $('#e-json').addEventListener('click', exportJson);
+  $('#fi-corps').addEventListener('click', function (e) {
+    if (!e.target.closest('#fi-afacturer')) return;
+    A.filtreCh = 'termine'; A.rechCh = ''; $('#c-rech').value = '';
+    allerModule('chantiers', 'carnet');
+  });
   /* --- chantiers --- */
   $('#c-nouveau').addEventListener('click', function () { ouvrirEnteteCh(null); });
   $('#c-filtre').addEventListener('change', function () { A.filtreCh = this.value; renderListeChantiers(); });
@@ -321,7 +326,8 @@ function brancher() {
     if (e.target.closest('#f-planifier')) {
       A.planifie = id;
       var pl = C.journeesPlacees(c);
-      A.calMois = pl.length ? C.minuit(pl[0]) : (c.debut || Date.now());
+      /* journeesPlacees rend des {d, p} : c'est .d qui est la date. */
+      A.calMois = pl.length ? C.minuit(pl[0].d) : Date.now();
       renderCalendrier(); allerModule('calendrier', 'calendrier');
       return;
     }
@@ -349,7 +355,7 @@ function brancher() {
       return;
     }
     if (e.target.closest('#f-sup')) {
-      if (!confirm('Supprimer « ' + (C.nomChantier(c)) + ' » ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Général ▸ Sauvegarde ▸ Corbeille.')) return;
+      if (!confirm('Supprimer « ' + (C.nomChantier(c)) + ' » ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans ' + B.CHEMIN_CORBEILLE + '.')) return;
       A.chantiers = A.chantiers.filter(function (x) { return x.id !== id; });
       A.chOuvert = null;
       jeterObjet('chantier', c, C.nomChantier(c),
@@ -694,7 +700,7 @@ function brancher() {
     }
     else if (s) {
       var c = charge(s.dataset.chgsup);
-      if (!c || !confirm('Supprimer « ' + (c.libelle || '') + ' » ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Général ▸ Sauvegarde ▸ Corbeille.')) return;
+      if (!c || !confirm('Supprimer « ' + (c.libelle || '') + ' » ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans ' + B.CHEMIN_CORBEILLE + '.')) return;
       A.charges = A.charges.filter(function (x) { return x.id !== c.id; });
       jeterObjet('charge', c, c.libelle || 'Charge', eur(FIN.nb(c.montant)))
         .then(sauverCharges).then(synchroniserDepensesCharges).then(function () {
@@ -881,7 +887,7 @@ function brancher() {
     }
     if (s) {
       var d = depense(s.dataset.depsup);
-      if (!d || !confirm('Supprimer cette dépense de ' + eur(FIN.nb(d.ttc)) + ' ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Général ▸ Sauvegarde ▸ Corbeille.')) return;
+      if (!d || !confirm('Supprimer cette dépense de ' + eur(FIN.nb(d.ttc)) + ' ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans ' + B.CHEMIN_CORBEILLE + '.')) return;
       A.depenses = A.depenses.filter(function (x) { return x.id !== d.id; });
       jeterObjet('depense', d, (d.fournisseur || 'Dépense'), eur(FIN.nb(d.ttc)))
         .then(sauverDepenses).then(function () {
@@ -912,7 +918,7 @@ function brancher() {
     else if (o) ouvrirPile(o.dataset.pile);
     else if (s2) {
       var p = pile(s2.dataset.pilesup);
-      if (!p || !confirm('Supprimer la pile « ' + (p.nom || '') + ' » ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans Réglages ▸ Général ▸ Sauvegarde ▸ Corbeille.')) return;
+      if (!p || !confirm('Supprimer la pile « ' + (p.nom || '') + ' » ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans ' + B.CHEMIN_CORBEILLE + '.')) return;
       A.piles = A.piles.filter(function (x) { return x.id !== p.id; });
       jeterObjet('pile', p, p.nom || 'Pile', E.fmt(H.restant(p), 2) + ' st')
         .then(sauverPiles).then(function () {

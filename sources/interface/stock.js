@@ -450,7 +450,8 @@ function renderStockFournitures() {
     return;
   }
   var val = ST.valeurTotale(A.articles);
-  var bas = ST.articlesSousSeuil(A.articles);
+  /* Le compte est celui d'Aujourd'hui et du ☰ (S2) : le réservé y entre. */
+  var rec = ST.aRecommander(A.articles);
   var ruptures = A.articles.filter(function (a) { return ST.etatStock(a) === 'rupture'; });
   var attendu = A.articles.reduce(function (s, a) { return s + ST.quantiteAttendue(a); }, 0);
 
@@ -462,7 +463,7 @@ function renderStockFournitures() {
       '</b><small>en commande</small></div>' : '') +
     (ruptures.length ? '<div class="carte2" style="border-color:#B4231F"><b class="num">' +
       ruptures.length + '</b><small>en rupture</small></div>' : '') +
-    (bas.length ? '<div class="carte2" style="border-color:#B98A00"><b class="num">' + bas.length +
+    (rec.length ? '<div class="carte2" style="border-color:#B98A00"><b class="num">' + rec.length +
       '</b><small>à recommander</small></div>' : '') +
     '</div>' + ouDortLArgent(A.articles);
 
@@ -532,15 +533,17 @@ function renderStockFournitures() {
     (prevu ? ' « À prévoir » retire en plus les chantiers seulement envisagés.' : '') +
     '</p>';
 
-  var al = ruptures.concat(bas.filter(function (a) { return ST.etatStock(a) === 'faible'; }));
-  $('#stock-alertes').innerHTML = al.length
-    ? '<div class="carte"><h2>À recommander</h2>' + al.map(function (a) {
-        var q = ST.quantite(a);
+  $('#stock-alertes').innerHTML = rec.length
+    ? '<div class="carte"><h2>À recommander</h2>' + rec.map(function (x) {
+        var a = x.article, q = ST.quantite(a);
         return '<button class="alerte" data-artfiche="' + a.id + '">' +
           '<i class="ic" style="background:' + (q <= 0 ? '#B4231F' : '#B98A00') + '"></i>' +
           '<span><b>' + esc(a.nom || '') + '</b><small>' +
-          (q <= 0 ? 'rupture' : E.fmt(q, 0) + ' ' + ST.courtUniteArt(a.unite) +
-            ' — seuil à ' + E.fmt(ST.nb(a.seuil), 0)) +
+          (x.raison === 'manque'
+            ? 'il en manque ' + E.fmt(x.manque, x.manque % 1 ? 2 : 0) + ' ' + ST.courtUniteArt(a.unite) +
+              ' pour les chantiers signés'
+            : q <= 0 ? 'rupture' : E.fmt(q, 0) + ' ' + ST.courtUniteArt(a.unite) +
+              ' — seuil à ' + E.fmt(ST.nb(a.seuil), 0)) +
           (a.fournisseur ? ' · ' + esc(nomFournisseur(a.fournisseur)) : '') +
           '</small></span></button>';
       }).join('') + '</div>'

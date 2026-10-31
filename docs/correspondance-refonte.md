@@ -44,6 +44,9 @@ Statuts :
   accueil et Mon entreprise sont retirés, chaque élément à l'endroit dit ici
   (preuve élément par élément : `docs/inventaire-ecrans.md`, *Où sont allés
   l'accueil et Mon entreprise*).
+- **Lot 5b2 (4.87.1)** : retouches d'Aujourd'hui tranchées le 31/10 — « Facture à
+  faire » dès le lendemain, total « à facturer » dans Argent ▸ Bilan, Stock
+  aligné sur S2, messages de corbeille et de note, « Poser des dates » sur le bon mois.
 
 ---
 
@@ -93,8 +96,8 @@ venir** · **Derniers jours**.
 | Bulle « journées à planifier » | Bientôt : « À programmer : N j à placer » par chantier engagé (« temps à estimer » s'il n'a pas d'estimation) → Agenda en mode placement, retour à Aujourd'hui à la fin | en partie (lot 5b) : lignes en place, mode placement actuel (« Fini de placer » ramène encore à la fiche, P2 : lot c) ; « temps à estimer » ouvre la fiche, comme « À planifier » de l'Agenda — validé (31/10, P1, P2) |
 | Bulle « devis signés » | Même ligne « À programmer » (signé = à programmer) ; liste complète dans Chantiers | fait (lot 5b) — proposé |
 | Bulle « chantiers en cours » | Bloc « Chantiers en cours » (points d'étape, montant, situation) | fait (lot 5b) : tous les chantiers non soldés, comme la V2 — validé (V2 ; confirmé le 31/10 : on garde ce titre et ce contenu) |
-| Bulle « factures en attente » (+ « N en retard ») | En retard : « Facture impayée » quand l'échéance est dépassée ; total « Facturé, pas encore payé » dans Argent ▸ Mois | en partie (lot 5b) : la ligne est en place ; le total est le « en attente » du Bilan d'Argent (Argent ▸ Mois : lot d) — validé (V2) |
-| Alerte du Carnet « à facturer » | En retard : « Facture à faire » (chantier terminé non facturé) | fait (lot 5b) : même seuil que l'alerte (15 jours) ; l'alerte du carnet reste — validé (V2) |
+| Bulle « factures en attente » (+ « N en retard ») | En retard : « Facture impayée » quand l'échéance est dépassée ; total « Facturé, pas encore payé » dans Argent ▸ Mois | en partie (lot 5b) : la ligne est en place ; le total est le « en attente » du Bilan d'Argent (Argent ▸ Mois : lot d), à côté duquel « À facturer : N chantiers · X € » est revenu au 5b2 (appui → carnet filtré « Travaux terminés ») — validé (V2) |
+| Alerte du Carnet « à facturer » | En retard : « Facture à faire » (chantier terminé non facturé) | fait (lot 5b, seuil au 5b2) : dès le lendemain de « Travaux terminés » (1 jour, au lieu de 15), pour la ligne comme pour l'alerte du carnet, qui restent alignées ; l'alerte du carnet reste — validé (V2 ; 31/10) |
 | Bulle « chiffre d'affaires » | Argent ▸ Mois | en partie (lot 5b) : bulle retirée, le même chiffre est dans Argent ▸ Bilan (année) ; Argent ▸ Mois : lot d — validé (30/10) |
 | Bulle « TVA déductible » | Argent ▸ TVA | en partie (lot 5b) : bulle retirée, le même chiffre est dans Argent ▸ Bilan (année) ; Argent ▸ TVA : lot d — validé (30/10) |
 | Ligne « Aujourd'hui / Demain / Dans N jours » (travail posé à 7 jours) | Bientôt : « N jours prévus · lun. 2 → mer. 4 » | fait (lot 5b) : une ligne par chantier, avec le donneur d'ordre — validé (V2) |
@@ -466,6 +469,8 @@ La fonction reste toujours accessible ; seule la porte en double part.
 - **D4** — Fournisseur proposé d'après les dépenses passées (liste qui se remplit seule, rien à régler).
 - **D5** — Supprimer une dépense : dans sa feuille ; la ligne de la liste s'ouvre d'un appui.
 - **C1** — Chantier à l'étape Infos : une ligne « Devis à faire » dans Bientôt, « pas encore repéré » en petit ; plus de « Repérage à faire ».
+- **C1, confirmé le 31/10 (5b2)** — « Devis à faire » = statut « Devis à envoyer », même si le devis est rédigé, tant qu'il n'est pas envoyé. Rien à changer.
+- **Chantier « en retard », confirmé le 31/10 (5b2)** — reste seulement dans « À traiter » du carnet, pas dans Aujourd'hui.
 - **C2** — « Noter le repérage » en une fois : date, position, peuplement, ce que j'ai vu.
 - **S1** — Le stock baisse à « Travaux terminés » (comportement actuel), pas à la facture.
 - **S2** — « À recommander » compte aussi le réservé : disponible sous zéro = alerte, même au-dessus du seuil.

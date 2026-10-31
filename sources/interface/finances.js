@@ -74,6 +74,16 @@ function renderFinances() {
   var res = FIN.resultat(A.chantiers, A.depenses, b);
   var tr = FIN.tauxReussite(A.chantiers, C.aDevis);
 
+  /* « À facturer » ne dépend pas de la période choisie : c'est ce qui attend
+     aujourd'hui, un chantier terminé et pas encore facturé, quel que soit
+     le mois regardé. Un appui mène au carnet filtré sur ces chantiers. */
+  var tot = C.totaux(A.chantiers, A.cfg);
+  var tuileAF = tot.nAFacturer
+    ? '<button class="carte2" id="fi-afacturer" style="text-align:left;cursor:pointer"><b class="num">' +
+      eur(tot.aFacturer) + '</b><small>à facturer · ' + tot.nAFacturer + ' chantier' +
+      (tot.nAFacturer > 1 ? 's' : '') + '</small></button>'
+    : '';
+
   var tauxCol = Object.keys(bal.collectee.parTaux).sort();
   var tauxDed = Object.keys(bal.deductible.parTaux).sort();
 
@@ -83,7 +93,7 @@ function renderFinances() {
       '<div class="carte2"><b class="num">' + eur(ca.total) + '</b><small>facturé (HT)</small></div>' +
       '<div class="carte2"><b class="num">' + eur(ca.encaisse) + '</b><small>encaissé</small></div>' +
       (ca.aEncaisser ? '<div class="carte2"><b class="num">' + eur(ca.aEncaisser) + '</b><small>en attente</small></div>' : '') +
-      '</div>' +
+      tuileAF + '</div>' +
       '<div style="margin-top:13px">' +
       ligneCA('Prestation de service', ca.prestation, ca.prestationApres, '50 %') +
       ligneCA('Vente de fournitures', ca.vente, ca.venteApres, '71 %') +
@@ -91,7 +101,8 @@ function renderFinances() {
       '<b>Base après abattement</b><b class="num" style="font-size:18px">' + eur(ca.totalApres) + '</b></div></div>' +
       '<p class="muted" style="font-size:11.5px;margin:10px 0 0">Abattements du micro-BIC. ' +
       'Ce calcul prépare la déclaration, il ne la remplace pas.</p>'
-      : '<div class="vide"><p>Aucune facture sur cette période.</p></div>') +
+      : '<div class="vide"><p>Aucune facture sur cette période.</p></div>' +
+        (tuileAF ? '<div class="kpi">' + tuileAF + '</div>' : '')) +
     '</div>' +
 
     '<div class="carte"><h2>Balance de TVA</h2>' +
