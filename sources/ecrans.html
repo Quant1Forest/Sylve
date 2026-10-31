@@ -1,0 +1,871 @@
+<div id="app">
+
+  <!-- ========================================================= bandeau -->
+  <header class="bandeau no-print">
+    <div class="bandeau-in">
+      <button class="bandeau-btn" id="b-accueil" title="Accueil Sylve" aria-label="Accueil"></button>
+      <button class="bandeau-btn" id="b-retour" title="Revenir au menu" aria-label="Retour" hidden>←</button>
+      <div class="bandeau-nav">
+        <select id="b-module" aria-label="Changer de partie"></select>
+      </div>
+      <div class="bandeau-ctx" id="b-ctx"></div>
+      <!-- Les réglages étaient un onglet parmi les autres, en bas et
+           différent d'un module à l'autre : on s'y perdait. Ici ils sont
+           au même endroit partout, et ne mangent plus une place dans la
+           barre du bas. -->
+      <button class="bandeau-btn" id="b-reglages" title="Réglages" aria-label="Réglages">
+        <svg viewBox="0 0 24 24" class="pic" aria-hidden="true" style="width:17px;height:17px;vertical-align:-3px"><path d="M6 4v6.2M6 14.2v5.8M12 4v3.2M12 11.2v8.8M18 4v9.2M18 17.2v2.8"/><circle cx="6" cy="12.2" r="2"/><circle cx="12" cy="9.2" r="2"/><circle cx="18" cy="15.2" r="2"/></svg>
+      </button>
+    </div>
+    <div class="bandeau-sous mod-cubage" id="b-bordereau">
+      <span class="pastille" id="b-pastille"></span>
+      <div class="bandeau-id">
+        <div class="bandeau-t" id="b-titre">Aucun bordereau</div>
+        <div class="bandeau-s" id="b-sous">Créez ou ouvrez un bordereau pour commencer</div>
+      </div>
+      <div class="bandeau-tot"><b class="num" id="b-total">—</b><span>m³ marchand</span></div>
+      <button class="bandeau-btn" id="b-entete" title="Modifier l'en-tête du bordereau">En-tête</button>
+    </div>
+  </header>
+
+  <!-- ========================================================== onglets -->
+  <nav class="onglets no-print" id="onglets" role="tablist" aria-label="Sections">
+    <button role="tab" data-vue="saisie"    aria-selected="true"><span class="ic">✎</span>Saisie</button>
+    <button role="tab" data-vue="bordereau" aria-selected="false"><span class="ic">▤</span>Bordereau</button>
+    <button role="tab" data-vue="syntheses" aria-selected="false"><span class="ic">∑</span>Synthèses</button>
+    <button role="tab" data-vue="fichiers"  aria-selected="false"><span class="ic">▣</span>Bordereaux</button>
+    <button role="tab" data-vue="reglages"  aria-selected="false"><span class="ic">⚙</span>Réglages</button>
+  </nav>
+
+  <main>
+    <!-- ======================================================== saisie -->
+    <section class="vue actif" id="vue-saisie" role="tabpanel">
+      <div class="saisie-grille">
+        <div>
+          <div class="carte">
+            <div class="ruban" id="ruban"></div>
+
+            <div class="champ">
+              <label class="eyebrow" for="f-num">N° de plaquette</label>
+              <input type="text" id="f-num" class="gros" inputmode="decimal" autocomplete="off">
+            </div>
+
+            <div class="champ">
+              <span class="eyebrow lab">Essence</span>
+              <div class="chips" id="f-ess"></div>
+            </div>
+
+            <div class="champ">
+              <span class="eyebrow lab">Qualité</span>
+              <div class="chips" id="f-qual"></div>
+            </div>
+
+            <div class="grille g2">
+              <div class="champ">
+                <label class="eyebrow" for="f-lon">Longueur (m)</label>
+                <div class="pas">
+                  <button type="button" data-pas="f-lon:-0.5" aria-label="Diminuer la longueur">−</button>
+                  <input type="text" id="f-lon" class="gros" inputmode="decimal" autocomplete="off">
+                  <button type="button" data-pas="f-lon:0.5" aria-label="Augmenter la longueur">+</button>
+                </div>
+              </div>
+              <div class="champ">
+                <label class="eyebrow" for="f-dia">Ø médian (cm)</label>
+                <div class="pas">
+                  <button type="button" data-pas="f-dia:-1" aria-label="Diminuer le diamètre">−</button>
+                  <input type="text" id="f-dia" class="gros" inputmode="decimal" autocomplete="off">
+                  <button type="button" data-pas="f-dia:1" aria-label="Augmenter le diamètre">+</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="champ">
+              <div class="chips">
+                <button type="button" class="chip" id="f-bp" aria-pressed="false">Bille de pied</button>
+                <input type="text" id="f-d130" inputmode="decimal" placeholder="Ø à 1,30 m" autocomplete="off"
+                       style="width:130px;flex:none" aria-label="Diamètre à 1,30 m">
+              </div>
+            </div>
+
+            <details class="repli" id="f-plus">
+              <summary>Réfaction, parcelle, remarque</summary>
+              <div>
+                <div class="grille g2">
+                  <div class="champ">
+                    <label class="eyebrow" for="f-refl">Réfaction (m)</label>
+                    <input type="text" id="f-refl" inputmode="decimal" autocomplete="off">
+                  </div>
+                  <div class="champ">
+                    <label class="eyebrow" for="f-refn">Nature du défaut</label>
+                    <input type="text" id="f-refn" autocomplete="off" placeholder="D+D, P, …">
+                  </div>
+                </div>
+                <!-- Les codes de défaut du type de bordereau courant. Le champ
+                     reste libre : ils font gagner la frappe, ils ne l'enferment
+                     pas. -->
+                <div class="chips" id="f-motifs" style="margin:-3px 0 11px"></div>
+                <div class="grille g2">
+                  <div class="champ">
+                    <label class="eyebrow" for="f-parc">Parcelle</label>
+                    <input type="text" id="f-parc" autocomplete="off">
+                  </div>
+                  <div class="champ">
+                    <label class="eyebrow" for="f-obs">Date / remarque</label>
+                    <input type="text" id="f-obs" autocomplete="off">
+                  </div>
+                </div>
+              </div>
+            </details>
+          </div>
+        </div>
+
+        <div>
+          <div class="carte" id="apercu-carte">
+            <h2>Volume du billon</h2>
+            <div class="stat-rang">
+              <div class="stat"><span class="eyebrow">Bûcheron sur</span><b class="num" id="a-vsur">—</b></div>
+              <div class="stat"><span class="eyebrow">Bûcheron sous</span><b class="num" id="a-vsous">—</b></div>
+              <div class="stat"><span class="eyebrow">Marchand sous</span><b class="num" id="a-vmarch">—</b></div>
+              <div class="stat"><span class="eyebrow">Classe Ø</span><b class="num" id="a-cl">—</b></div>
+            </div>
+            <div id="a-avis" style="margin-top:11px"></div>
+            <div class="btn-rang" style="margin-top:13px">
+              <button class="btn primaire" id="f-billon">Billon suivant</button>
+              <button class="btn primaire" id="f-grume">Grume suivante</button>
+            </div>
+            <div class="btn-rang" style="margin-top:9px">
+              <button class="btn" id="f-valider">Enregistrer</button>
+              <button class="btn" id="f-annuler" hidden>Annuler la modification</button>
+              <button class="btn danger" id="f-defaire">Défaire le dernier</button>
+            </div>
+          </div>
+
+          <div class="carte">
+            <div class="carte-titre"><h2>Dernières saisies</h2>
+              <button class="btn-min" data-aller="bordereau">Tout voir</button></div>
+            <div class="tab-boite"><table id="t-dernieres"><tbody></tbody></table></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================== bordereau -->
+    <section class="vue" id="vue-bordereau" role="tabpanel">
+      <div class="carte no-print">
+        <div class="carte-titre">
+          <h2>Billons saisis</h2>
+          <button class="btn-min" id="b-nuls">Contrôler les billons nuls</button>
+          <button class="btn-min" id="b-imprimer">Imprimer</button>
+        </div>
+        <div class="stat-rang" id="b-stats"></div>
+        <div class="champ" style="margin:11px 0 0">
+          <input type="search" id="b-filtre" placeholder="Filtrer : n°, essence, qualité, parcelle, remarque…">
+        </div>
+      </div>
+      <div class="carte" style="padding:0;overflow:hidden">
+        <div class="tab-boite" style="max-height:66vh"><table id="t-bordereau"></table></div>
+      </div>
+    </section>
+
+    <!-- ===================================================== synthèses -->
+    <section class="vue" id="vue-syntheses" role="tabpanel">
+      <div class="sous-onglets no-print" id="s-onglets" role="tablist">
+        <button role="tab" data-s="synthese"   aria-selected="true">Synthèse</button>
+        <button role="tab" data-s="financiere" aria-selected="false">Financière</button>
+        <button role="tab" data-s="bucheron"   aria-selected="false">Bûcheron</button>
+        <button role="tab" data-s="martelage"  aria-selected="false">Martelage</button>
+      </div>
+      <div id="s-contenu"></div>
+    </section>
+
+    <!-- ====================================================== fichiers -->
+    <section class="vue" id="vue-fichiers" role="tabpanel">
+      <!-- propre au cubage -->
+      <div class="mod-cubage">
+        <!-- L'écran d'arrivée du module : reprendre le bordereau en cours, ou
+             choisir le cubage du suivant. Le bouton « Nouveau bordereau » qui
+             était ici fabriquait un comtois sans le dire — c'est justement ce
+             qu'on ne voyait pas. Ce sont les tuiles qui créent, désormais. -->
+        <div id="cub-choix"></div>
+        <div class="carte">
+          <div class="carte-titre"><h2>Mes bordereaux</h2></div>
+          <div id="liste-bordereaux"></div>
+        </div>
+        <div class="carte">
+          <h2>Exporter un bordereau</h2>
+          <p class="muted" style="font-size:12.5px;margin:0 0 10px" id="f-cub-actif"></p>
+          <div class="btn-rang">
+            <button class="btn" id="e-xlsx">Excel (5 feuilles)</button>
+            <button class="btn" id="e-csv">CSV</button>
+            <button class="btn" id="e-json">Fichier .json</button>
+          </div>
+          <div class="btn-rang" style="margin-top:9px">
+            <button class="btn" id="i-coller">Coller depuis Excel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- propre au bois de chauffage -->
+      <div class="mod-bois">
+        <div class="carte">
+          <h2>Exporter le stock</h2>
+          <p class="muted" style="font-size:12.5px;margin:0 0 10px">Un tableau de toutes les piles :
+            une colonne par essence avec sa proportion, volume, séchage, sorties.</p>
+          <div class="btn-rang">
+            <button class="btn" id="b-xlsx">Excel</button>
+            <button class="btn" id="b-csv">CSV</button>
+          </div>
+        </div>
+        <div id="bois-analyses"></div>
+      </div>
+
+    </section>
+
+    <!-- ====================================================== réglages -->
+    <section class="vue" id="vue-reglages" role="tabpanel">
+      <div class="carte">
+        <div class="carte-titre"><h2>Réglages</h2></div>
+        <div class="chips" id="regl-nav">
+          <button class="chip" data-regl="general" aria-pressed="true">Général</button>
+          <button class="chip" data-regl="ent" aria-pressed="false">Entreprise</button>
+          <button class="chip" data-regl="cubage" aria-pressed="false">Cubage</button>
+          <button class="chip" data-regl="bois" aria-pressed="false">Bois de chauffage</button>
+        </div>
+      </div>
+      <div id="regl-corps">
+      <div data-sec="cubage">
+      <div class="carte">
+        <h2>Mode de calcul</h2>
+        <div class="chips" id="r-mode">
+          <button class="chip" data-mode="historique" aria-pressed="true">Historique</button>
+          <button class="chip" data-mode="corrige" aria-pressed="false">Corrigé</button>
+        </div>
+        <p class="muted" style="font-size:12.5px;margin:10px 0 0" id="r-mode-txt"></p>
+      </div>
+      <div class="carte">
+        <h2>Seuils des billons de valeur nulle</h2>
+        <div class="grille g3">
+          <div class="champ"><label class="eyebrow" for="r-slon">Longueur mini (m)</label>
+            <input type="text" id="r-slon" inputmode="decimal"></div>
+          <div class="champ"><label class="eyebrow" for="r-ssap">Ø mini sapin (cm)</label>
+            <input type="text" id="r-ssap" inputmode="decimal"></div>
+          <div class="champ"><label class="eyebrow" for="r-sepc">Ø mini épicéa (cm)</label>
+            <input type="text" id="r-sepc" inputmode="decimal"></div>
+        </div>
+        <p class="muted" style="font-size:12.5px;margin:0" id="r-seuils-txt"></p>
+      </div>
+      <div class="carte">
+        <div class="carte-titre"><h2>Essences et taux d'écorce</h2>
+          <button class="btn-min" id="r-ess-add">Ajouter</button></div>
+        <div class="tab-boite" style="max-height:340px"><table id="t-essences"></table></div>
+      </div>
+      <div class="carte">
+        <div class="carte-titre"><h2>Qualités</h2></div>
+        <div class="sous-onglets" id="r-cl-onglets" role="tablist"></div>
+        <div class="tab-boite" style="max-height:340px"><table id="t-qualites"></table></div>
+        <button class="btn-min" id="r-qual-add" style="margin-top:9px">Ajouter une qualité</button>
+      </div>
+      </div><!-- /mod-cubage -->
+      <p class="eyebrow reg-titre" data-sec="general" data-sous="marque" style="margin:4px 0 8px">Mon entreprise</p>
+      <div class="carte" data-sec="general" data-sous="marque" id="c-marque">
+        <div class="champ"><label class="eyebrow" for="r-ent-nom">Nom de l’entreprise</label>
+          <input type="text" id="r-ent-nom" autocomplete="off" placeholder="Mon entreprise"></div>
+        <div class="grille g2">
+          <div class="champ"><label class="eyebrow" for="r-ent-siret">SIRET</label>
+            <input type="text" id="r-ent-siret" inputmode="numeric" autocomplete="off"></div>
+          <div class="champ"><label class="eyebrow" for="r-ent-tel">Téléphone</label>
+            <input type="text" id="r-ent-tel" inputmode="tel" autocomplete="off"></div>
+        </div>
+        <div class="champ"><label class="eyebrow" for="r-ent-adr">Adresse</label>
+          <input type="text" id="r-ent-adr" autocomplete="off"></div>
+        <p class="muted" style="font-size:11.5px;margin:-4px 0 12px">Repris sur la fiche de chantier, où l’entreprise intervenante doit être identifiée.</p>
+        <p class="eyebrow" style="margin:14px 0 7px">Logo</p>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <span class="logo-ent" id="r-ent-apercu" hidden></span>
+          <label class="btn btn-min" style="cursor:pointer;margin:0">Choisir une image
+            <input type="file" id="r-ent-fichier" accept="image/*" hidden></label>
+          <button class="btn-min" id="r-ent-retirer" hidden>Retirer</button>
+        </div>
+        <p class="muted" style="font-size:11.5px;margin:9px 0 0">L’image est réduite à
+          256 pixels avant d’être gardée : elle part dans vos sauvegardes, autant qu’elle
+          reste légère. Elle apparaît sur cet écran d’entreprise et au démarrage.</p>
+      </div>
+
+      <p class="eyebrow reg-titre" data-sec="general" data-sous="appli" style="margin:22px 0 8px">L’application</p>
+      <div class="carte" data-sec="general" data-sous="appli" id="c-appli">
+        <h2>Application</h2>
+        <p class="muted" style="font-size:12.5px;margin:0 0 10px" id="r-appli-etat"></p>
+        <div class="btn-rang">
+          <button class="btn primaire" id="r-installer" hidden>Installer sur l'écran d'accueil</button>
+          <button class="btn" id="r-persist" hidden>Protéger les données</button>
+          <button class="btn" id="r-maj">Vérifier les mises à jour</button>
+        </div>
+        <p class="eyebrow" style="margin:16px 0 6px">Écran de démarrage</p>
+        <div class="carte2" style="padding:10px 11px">
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px;margin-bottom:7px">
+            <span>Durée <b class="num" id="r-dem-val"></b></span>
+            <button class="btn-min" id="r-dem-voir" style="flex:none">Voir</button>
+          </div>
+          <input type="range" id="r-dem" min="0" max="3" step="0.2" style="width:100%"
+            aria-label="Durée de l'écran de démarrage, en secondes">
+        </div>
+        <p class="muted" style="font-size:12px;margin:8px 0 0" id="r-dem-aide"></p>
+        <label class="ligne-check" style="display:flex;align-items:flex-start;gap:8px;
+               font-size:13.5px;margin:16px 0 0">
+          <input type="checkbox" id="r-veille" style="margin-top:2px">
+          <span>Garder l’écran allumé
+            <span class="muted" style="display:block;font-size:11.5px" id="r-veille-aide">
+              Tant que Sylve est ouvert et à l’écran. Le téléphone garde le dernier
+              mot : un mode d’économie de batterie peut refuser.</span></span>
+        </label>
+        <p class="muted" style="font-size:12px;margin:10px 0 0" id="r-version"></p>
+      </div>
+      <p class="eyebrow reg-titre" data-sec="ent" data-sous="journee" style="margin:4px 0 8px">Ma journée de travail</p>
+      <div class="carte" data-sec="ent" data-sous="journee" id="c-ch-regl">
+        <div class="grille g2">
+          <div class="champ"><label class="eyebrow" for="r-hj">Heures dans une journée</label>
+            <input type="text" id="r-hj" inputmode="decimal" autocomplete="off"></div>
+          <div class="champ"><label class="eyebrow" for="r-pj">Prix de journée visé (€)</label>
+            <input type="text" id="r-pj" inputmode="decimal" autocomplete="off"></div>
+        </div>
+        <p class="muted" style="font-size:12px;margin:10px 0 0">
+          Sert à convertir les heures en jours-homme et à comparer le prix de journée
+          réellement obtenu sur chaque chantier.
+        </p>
+      </div>
+
+      <p class="eyebrow reg-titre" data-sec="ent" data-sous="vehicule" style="margin:22px 0 8px">Véhicule</p>
+      <div class="carte" data-sec="ent" data-sous="vehicule">
+        <div class="grille g2">
+          <div class="champ"><label class="eyebrow" for="r-l100">Consommation (L/100 km)</label>
+            <input type="text" id="r-l100" inputmode="decimal" autocomplete="off"></div>
+          <div class="champ"><label class="eyebrow" for="r-pl">Prix du litre (€)</label>
+            <input type="text" id="r-pl" inputmode="decimal" autocomplete="off"></div>
+        </div>
+        <p class="muted" style="font-size:12px;margin:10px 0 0">
+          Le carburant d'un chantier est estimé d'après les kilomètres que vous saisissez.
+        </p>
+      </div>
+
+      <p class="eyebrow reg-titre" data-sec="ent" data-sous="alertes" style="margin:22px 0 8px">Relances et calendrier</p>
+      <div class="carte" data-sec="ent" data-sous="alertes">
+        <div class="grille g2">
+          <div class="champ"><label class="eyebrow" for="r-rd">Relancer un devis après (jours)</label>
+            <input type="text" id="r-rd" inputmode="numeric" autocomplete="off"></div>
+          <div class="champ"><label class="eyebrow" for="r-rf">Relancer une facture après (jours)</label>
+            <input type="text" id="r-rf" inputmode="numeric" autocomplete="off"></div>
+        </div>
+        <p class="muted" style="font-size:12px;margin:9px 0 0">
+          Le délai du devis ne sert que faute de validité saisie : un devis qui porte une
+          date de fin est relancé d'après elle.
+        </p>
+        <label class="ligne-check" style="margin-top:10px;display:flex;align-items:center;gap:8px;font-size:13.5px">
+          <input type="checkbox" id="r-we"> Compter les week-ends comme jours travaillables
+        </label>
+      </div>
+
+      <p class="eyebrow reg-titre" data-sec="ent" data-sous="listes" style="margin:22px 0 8px">Listes déroulantes</p>
+      <div class="carte" data-sec="ent" data-sous="listes">
+        <p class="muted" style="font-size:12.5px;margin:0 0 11px">
+          Tout ce qui vous est proposé ailleurs dans l'application se règle ici. Un nom saisi
+          à la volée n'est jamais ajouté sans vous le demander.
+        </p>
+        <div class="sous-onglets" id="rl-nav" role="tablist"></div>
+        <div id="rl-liste" style="margin-top:11px"></div>
+        <button class="btn-min" id="rl-add" style="margin-top:9px">Ajouter</button>
+      </div>
+      <p class="eyebrow reg-titre" data-sec="ent" data-sous="stock" style="margin:22px 0 8px">Stock et fournitures</p>
+      <div class="carte" data-sec="ent" data-sous="stock" id="c-four-regl">
+        <div class="carte-titre"><h2>Fournisseurs</h2>
+          <button class="btn-min" id="rf-add">Ajouter</button></div>
+        <p class="muted" style="font-size:12.5px;margin:0 0 10px">
+          Ce carnet alimente la liste déroulante des commandes.
+        </p>
+        <div id="rf-liste"></div>
+      </div>
+      <div class="carte" data-sec="ent" data-sous="stock" id="c-prod-regl">
+        <div class="carte-titre"><h2>Produits</h2>
+          <button class="btn-min" id="rp-add">Ajouter</button></div>
+        <p class="muted" style="font-size:12.5px;margin:0 0 10px">
+          Le catalogue de ce que vous achetez et revendez. Décrit une fois ici, un produit
+          se retrouve ensuite dans les commandes, les sorties et le prix de revient.
+        </p>
+        <div id="rp-liste"></div>
+      </div>
+      <p class="eyebrow reg-titre" data-sec="ent" data-sous="fin" style="margin:22px 0 8px">Financier</p>
+      <div class="carte" data-sec="ent" data-sous="fin">
+        <div class="grille g2">
+          <div class="champ"><label class="eyebrow" for="r-cot">Cotisations (%)</label>
+            <input type="text" id="r-cot" inputmode="decimal" autocomplete="off"></div>
+          <div class="champ"><label class="eyebrow" for="r-imp">Impôt sur le revenu (%)</label>
+            <input type="text" id="r-imp" inputmode="decimal" autocomplete="off"></div>
+          <div class="champ"><label class="eyebrow" for="r-abv">Abattement vente (%)</label>
+            <input type="text" id="r-abv" inputmode="decimal" autocomplete="off"></div>
+          <div class="champ"><label class="eyebrow" for="r-cfe">CFE annuelle (€)</label>
+            <input type="text" id="r-cfe" inputmode="decimal" autocomplete="off"
+              placeholder="montant de votre avis"></div>
+          <div class="champ"><label class="eyebrow" for="r-cfeca">Chiffre d'affaires de référence (€)</label>
+            <input type="text" id="r-cfeca" inputmode="decimal" autocomplete="off"
+              placeholder="celui d'une année type"></div>
+        </div>
+        <p class="muted" style="font-size:12px;margin:9px 0 0">
+          Servent au prix de revient et à l'estimation des prélèvements. Ce sont vos taux :
+          Sylve n'en connaît aucun.
+        </p>
+        <p class="muted" style="font-size:12px;margin:12px 0 0;padding:9px 11px;background:var(--carte2);border-radius:9px">
+          Taux de TVA issus de l'annexe BOFiP du secteur de la sylviculture (BOI-ANNX-000509,
+          28/05/2025) et de l'article 279 b septies du CGI. Le taux de 10 % ne s'applique qu'aux
+          prestations rendues à un exploitant agricole ou forestier identifié, et prend fin au
+          1<sup>er</sup> janvier 2029. Sylve ne remplace pas votre comptable : les taux signalés
+          « à confirmer » divergent selon les sources.
+        </p>
+      </div>
+
+      <p class="eyebrow reg-titre" data-sec="ent" data-sous="import" style="margin:22px 0 8px">Import de données</p>
+      <div class="carte" data-sec="ent" data-sous="import" id="c-import">
+        <div class="carte-titre"><h2>Reprendre l'historique</h2></div>
+        <p class="muted" style="font-size:12.5px;margin:0 0 10px">
+          Vos anciens chantiers alimentent les rendements et l'estimatif. Saisissez-les
+          un par un dans le carnet, ou importez-les ici depuis un tableur. Le stock a
+          son propre bouton d'import, dans l'inventaire.
+        </p>
+        <div class="btn-rang">
+          <button class="btn" id="imp-modele">Télécharger le modèle</button>
+          <label class="btn" style="cursor:pointer">Importer un CSV
+            <input type="file" accept=".csv,text/csv" id="imp-fichier" hidden></label>
+        </div>
+        <div id="imp-resultat"></div>
+      </div>
+
+      <div class="carte" data-sec="bois" id="c-bois-regl">
+        <h2>Seuils d'humidité</h2>
+        <p class="muted" style="font-size:12px;margin:0 0 10px">Tels que lus à l'humidimètre. Quatre états : vert, en séchage, sec, très sec.</p>
+        <div class="grille g3">
+          <div class="champ"><label class="eyebrow" for="r-sv">Vert au-dessus de (%)</label>
+            <input type="text" id="r-sv" inputmode="decimal" autocomplete="off"></div>
+          <div class="champ"><label class="eyebrow" for="r-ss">Sec en dessous de (%)</label>
+            <input type="text" id="r-ss" inputmode="decimal" autocomplete="off"></div>
+          <div class="champ"><label class="eyebrow" for="r-sts">Très sec sous (%)</label>
+            <input type="text" id="r-sts" inputmode="decimal" autocomplete="off"></div>
+        </div>
+        <p class="eyebrow" style="margin:16px 0 6px">Humidité de départ</p>
+        <p class="muted" style="font-size:12px;margin:0 0 8px">
+          Ce dont part une pile neuve, selon ce qu'on y met. Le bois mort resté sur pied
+          a déjà perdu une partie de son eau : sa pile sèche donc plus vite.
+        </p>
+        <div class="grille g2">
+          <div class="champ"><label class="eyebrow" for="r-dv">Bois vert (%)</label>
+            <input type="text" id="r-dv" inputmode="decimal" autocomplete="off"></div>
+          <div class="champ"><label class="eyebrow" for="r-ds">Bois mort (%)</label>
+            <input type="text" id="r-ds" inputmode="decimal" autocomplete="off"></div>
+        </div>
+        <p class="muted" style="font-size:12px;margin:10px 0 0">
+          Le stock est compté en stères empilés : une pile mesurée en bûches de 1 m ou 1,30 m
+          donne directement son volume en stères. La recoupe éventuelle à la vente ne change
+          pas le stock.
+        </p>
+      </div>
+      <p class="eyebrow reg-titre" data-sec="general" data-sous="sauvegarde" style="margin:22px 0 8px">Sauvegarde</p>
+      <div class="carte" data-sec="general" id="c-sauvegarde">
+        <div class="carte-titre"><h2>Sauvegarde générale</h2>
+          <button class="btn primaire btn-min" id="s-tout">Tout sauvegarder</button></div>
+        <p class="muted" style="font-size:12.5px;margin:0 0 10px" id="s-etat"></p>
+        <div class="btn-rang">
+          <button class="btn" id="s-restaurer">Restaurer un fichier</button>
+          <button class="btn" id="s-recuperer">Corbeille…</button>
+        </div>
+        <div id="s-recup" hidden></div>
+        <p class="muted" style="font-size:12px;margin:11px 0 0">
+          Une seule sauvegarde pour toute l'application — chantiers, journées, stock,
+          finances, bordereaux et réglages dans un même fichier. C'est aussi par là qu'on
+          restaure une sauvegarde reçue d'ailleurs.
+        </p>
+      </div>
+      <div class="carte" data-sec="general">
+        <h2>Remise à zéro</h2>
+        <p class="muted" style="font-size:12.5px;margin:0 0 11px">
+          Rétablit les essences, les qualités et les seuils de cubage tels qu'ils étaient
+          à l'installation. Vos bordereaux, vos chantiers, votre stock et vos autres
+          réglages ne sont pas touchés.
+        </p>
+        <div class="btn-rang">
+          <button class="btn danger btn-min" id="r-reset-cfg">Rétablir les listes de cubage</button>
+        </div>
+      </div>
+
+      <p class="eyebrow reg-titre" data-sec="general" data-sous="maj" style="margin:22px 0 8px">Ce qui a changé</p>
+      <div class="carte" data-sec="general" data-sous="maj" id="c-notes-maj"></div>
+      </div><!-- /regl-corps -->
+    </section>
+
+    <!-- ======================================================= accueil -->
+    <section class="vue" id="vue-accueil" role="tabpanel">
+      <div class="accueil">
+        <div class="marque">
+          <span class="marque-logo" role="img" aria-label="Sylve"></span>
+          <div style="flex:1"><h1>Sylve</h1>
+            <p id="a-sous">Gestion d'entreprise et outils de terrain</p></div>
+          <button class="tuile" id="a-reglages" title="Réglages"
+            style="width:auto;flex:none;padding:11px 13px">⚙</button>
+        </div>
+        <div id="a-sauvegarde"></div>
+        <div id="a-journees"></div>
+        <div id="a-echeances"></div>
+        <div id="a-devis"></div>
+        <p class="eyebrow" style="margin:22px 0 8px">Entreprise</p>
+        <div class="tuiles">
+          <button class="tuile" data-module="entreprise">
+            <span class="ic"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><path d="M8.6 4H6.6A1.6 1.6 0 0 0 5 5.6v13.8A1.6 1.6 0 0 0 6.6 21h10.8a1.6 1.6 0 0 0 1.6-1.6V5.6A1.6 1.6 0 0 0 17.4 4h-2"/><rect x="8.6" y="2.4" width="6.8" height="3.4" rx="1.1"/><path d="M8.7 10.6h6.6M8.7 14h6.6M8.7 17.4h3.8"/></svg></span>
+            <span><b>Mon entreprise</b><small>Chantiers, devis, rendements, finances</small></span>
+            <span class="chiffre"><b id="a-ent-n">—</b><span>chantiers ouverts</span></span>
+          </button>
+        </div>
+        <div id="a-journee"></div>
+
+        <p class="eyebrow" style="margin:24px 0 8px">Outils de terrain</p>
+        <div class="tuiles">
+          <button class="tuile" data-module="cubage">
+            <span class="ic"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><circle cx="12" cy="12" r="8.4"/><path d="M4.5 12h15"/><path d="M7.1 9.5 4.6 12l2.5 2.5M16.9 9.5 19.4 12l-2.5 2.5"/></svg></span>
+            <span><b>Cubage</b><small id="a-cub-s">Bordereaux de cubage</small></span>
+            <span class="chiffre"><b id="a-cub-n">—</b><span>m³</span></span>
+          </button>
+          <button class="tuile" data-module="bois">
+            <span class="ic"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><circle cx="7.6" cy="15.6" r="4.3"/><circle cx="16.4" cy="15.6" r="4.3"/><circle cx="12" cy="7.6" r="4.3"/></svg></span>
+            <span><b>Bois de chauffage</b><small id="a-bois-s">Piles, séchage, stock</small></span>
+            <span class="chiffre"><b id="a-bois-n">—</b><span>stères</span></span>
+          </button>
+                </div>
+      </div>
+    </section>
+
+    <!-- ===================================================== entreprise -->
+    <section class="vue" id="vue-entreprise" role="tabpanel">
+      <div class="accueil">
+        <div class="marque">
+          <button class="tuile" data-module="accueil" style="width:auto;padding:9px 13px">↩</button>
+          <span class="logo-ent" id="ent-logo" hidden></span>
+          <div><h1 style="font-size:24px" id="ent-nom">Mon entreprise</h1><p>Chantiers sylvicoles</p></div>
+        </div>
+        <!-- Le bilan passe au-dessus des tuiles : c'est ce qu'on vient
+             chercher en arrivant, et en dessous il tombait sous la ligne
+             d'horizon d'un écran de téléphone. -->
+        <div id="ent-bilan"></div>
+        <div class="tuiles">
+          <button class="tuile" data-module="chantiers"><span class="ic rond"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><path d="M12 20.6s6.1-5.9 6.1-10A6.1 6.1 0 0 0 5.9 10.6c0 4.1 6.1 10 6.1 10Z"/><circle cx="12" cy="10.4" r="2.3"/></svg></span>
+            <span><b>Chantiers</b><small id="e-ch-s">En cours, terminés, à venir</small></span>
+            <span class="chiffre"><b id="e-ch-n">—</b><span>ouverts</span></span></button>
+          <button class="tuile" data-module="calendrier"><span class="ic rond"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><rect x="4" y="5.6" width="16" height="14" rx="2"/><path d="M4 10.2h16M8.6 3.6v3.8M15.4 3.6v3.8"/></svg></span>
+            <span><b>Calendrier</b><small id="e-cal-s">Programmation, journées placées</small></span>
+            <span class="chiffre"><b id="e-cal-n">—</b><span>j. ce mois</span></span></button>
+          <button class="tuile" data-module="rendements"><span class="ic rond"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><path d="M4.6 19.6h14.8"/><path d="M7.7 19.6v-5.2M12 19.6v-8.8M16.3 19.6v-12.4"/></svg></span>
+            <span><b>Rendements</b><small id="e-rd-s">Temps passé par type de travaux</small></span>
+            <span class="chiffre"><b id="e-rd-n">—</b><span>références</span></span></button>
+          <button class="tuile" data-module="stock"><span class="ic rond"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><path d="M4.7 8.5 12 4.8l7.3 3.7v7L12 19.2l-7.3-3.7Z"/><path d="M4.7 8.5 12 12.2l7.3-3.7M12 12.2v7"/></svg></span>
+            <span><b>Stock et fournitures</b><small id="e-st-s">Protections, tuteurs, marges</small></span>
+            <span class="chiffre"><b id="e-st-n">—</b><span>en stock</span></span></button>
+          <button class="tuile" data-module="finances"><span class="ic rond"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><path d="M16.4 7.6a5.7 5.7 0 0 0-8.5 4.5 5.7 5.7 0 0 0 8.5 4.5"/><path d="M6.3 10.6h6.8M6.3 13.6h6.8"/></svg></span>
+            <span><b>Finances</b><small id="e-fi-s">Bilan, recettes, dépenses, analyses</small></span>
+            <span class="chiffre"><b id="e-fi-n">—</b><span>facturé</span></span></button>
+          <button class="tuile" data-module="achats"><span class="ic rond"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><path d="M4.4 8.4h15.2l-1.5 9.1a1.6 1.6 0 0 1-1.6 1.3H7.5a1.6 1.6 0 0 1-1.6-1.3z"/><path d="M8.9 8.4V6.6a3.1 3.1 0 0 1 6.2 0v1.8"/></svg></span>
+            <span><b>Achats à venir</b><small id="e-ac-s">Ce que vous comptez acheter</small></span>
+            <span class="chiffre"><b id="e-ac-n">—</b><span>à prévoir</span></span></button>
+          <button class="tuile" data-module="vehicule"><span class="ic rond"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><path d="M3.5 15.6V9.4h9.6l3.3 3h4.1v3.2"/><path d="M9.6 16.2h4.6"/><circle cx="7.3" cy="16.2" r="1.8"/><circle cx="16.6" cy="16.2" r="1.8"/></svg></span>
+            <span><b>Véhicule</b><small id="e-vh-s">Carnet d'entretien, échéances</small></span>
+            <span class="chiffre"><b id="e-vh-n">—</b><span>km</span></span></button>
+        </div>
+        <!-- Les notes sous les tuiles : on arrive sur les modules sans
+             défiler, et les notes se lisent en descendant. « À traiter »
+             n'est plus ici — le carnet des chantiers le porte déjà. -->
+        <div id="ent-notes"></div>
+      </div>
+    </section>
+
+    <!-- ====================================================== chantiers -->
+    <section class="vue" id="vue-carnet" role="tabpanel">
+      <div id="bandeau-alertes"></div>
+      <div class="carte">
+        <div class="carte-titre"><h2>Carnet</h2>
+          <button class="btn primaire btn-min" id="c-nouveau">Nouveau chantier</button></div>
+        <div id="carnet-totaux"></div>
+      </div>
+      <div class="carte">
+        <div class="carte-titre"><h2>Chantiers</h2></div>
+        <div class="champ" style="margin-bottom:8px">
+          <input type="search" id="c-rech" autocomplete="off"
+                 placeholder="Rechercher : nom, donneur, commune, n° de facture…">
+        </div>
+        <div style="display:flex;gap:7px;margin-bottom:11px;flex-wrap:wrap">
+          <div class="champ" style="flex:1;min-width:150px;max-width:230px;margin:0">
+            <select id="c-filtre"></select>
+          </div>
+          <div class="champ" style="flex:1;min-width:150px;max-width:230px;margin:0">
+            <select id="c-tri"></select>
+          </div>
+          <button class="btn-min" id="c-sens" style="flex:none"></button>
+        </div>
+        <div id="liste-chantiers"></div>
+      </div>
+    </section>
+
+    <section class="vue" id="vue-stock2" role="tabpanel">
+      <div class="carte">
+        <div class="carte-titre"><h2>Inventaire</h2>
+          <div class="btn-rang" style="margin:0">
+            <button class="btn btn-min" id="art-importer">Importer</button>
+          </div></div>
+        <div id="stock-resume"></div>
+      </div>
+      <div class="carte">
+        <div class="carte-titre"><h2>État du stock</h2>
+          <button class="lien-regl" data-versregl="stock">Réglages ▸ Produits</button></div>
+        <div id="stock-table"></div>
+      </div>
+      <div id="stock-alertes"></div>
+    </section>
+
+    <section class="vue" id="vue-revient" role="tabpanel">
+      <div class="carte">
+        <div class="carte-titre"><h2>Rentabilité</h2>
+          <button class="lien-regl" id="rev-hyp">Hypothèses</button></div>
+        <p class="muted" style="font-size:12.5px;margin:0 0 11px">
+          Ce qu'un produit coûte vraiment, ce que l'État prendra, ce qu'il vous reste.
+        </p>
+        <div class="chips" id="rev-nav">
+          <button class="chip" data-rev="simul" aria-pressed="true">Simulateur</button>
+          <button class="chip" data-rev="couts" aria-pressed="false">Coûts</button>
+          <button class="chip" data-rev="perf" aria-pressed="false">Performance</button>
+          <button class="chip" data-rev="annee" aria-pressed="false">Par année</button>
+        </div>
+        <div id="rev-form" style="margin-top:12px"></div>
+      </div>
+      <div id="rev-resultat"></div>
+    </section>
+
+    <section class="vue" id="vue-commandes" role="tabpanel">
+      <div class="carte">
+        <div class="carte-titre"><h2>Entrées et sorties</h2>
+          <button class="btn primaire btn-min" id="cmd-nouvelle">Enregistrer</button></div>
+        <div class="chips" id="mvt-nav">
+          <button class="chip" data-mvt="achats" aria-pressed="true">Entrées</button>
+          <button class="chip" data-mvt="sorties" aria-pressed="false">Sorties</button>
+          <button class="chip" data-mvt="pertes" aria-pressed="false">Pertes</button>
+        </div>
+        <p class="muted" style="font-size:12.5px;margin:11px 0 0" id="mvt-aide"></p>
+      </div>
+      <div class="carte"><div id="liste-commandes"></div></div>
+    </section>
+
+    <section class="vue" id="vue-charges" role="tabpanel">
+      <div class="carte">
+        <div class="carte-titre"><h2>Charges fixes</h2>
+          <button class="btn primaire btn-min" id="chg-nouvelle">+ Charge</button></div>
+        <p class="muted" style="font-size:12.5px;margin:0 0 10px">
+          Prêt, assurances, logiciels : décrits une fois, leurs échéances se suivent toutes seules.
+        </p>
+        <div id="charges-resume"></div>
+      </div>
+      <div class="carte"><h2>Échéances</h2><div id="charges-echeances"></div></div>
+    </section>
+
+    <section class="vue" id="vue-carte" role="tabpanel">
+      <div class="carte">
+        <div class="carte-titre"><h2>Carte des chantiers</h2>
+          <button class="btn btn-min" id="carte-ici">Ma position</button></div>
+        <div style="display:flex;gap:7px;margin:0 0 8px">
+          <input type="search" id="carte-rech" autocomplete="off" placeholder="Aller à une commune…"
+                 style="flex:1;min-width:0;width:auto">
+          <button class="btn btn-min" id="carte-chercher">Chercher</button></div>
+        <div id="carte-resultats"></div>
+        <div id="carte-svg"></div>
+        <div class="btn-rang" style="margin-top:9px">
+          <button class="btn btn-min" id="carte-moins">−</button>
+          <button class="btn btn-min" id="carte-plus">+</button>
+          <button class="btn btn-min" id="carte-tout">Tout voir</button>
+          <button class="btn btn-min" id="carte-poser">Poser un chantier</button>
+        </div>
+        <div class="chips" id="carte-fonds" style="margin-top:8px"></div>
+        <p class="muted" style="font-size:11.5px;margin:7px 0 0" id="carte-aide"></p>
+        <div id="carte-liste"></div>
+      </div>
+    </section>
+
+    <section class="vue" id="vue-analyses" role="tabpanel">
+      <div class="carte">
+        <div class="carte-titre"><h2>Analyses</h2></div>
+        <div class="chips" id="ana-onglets">
+          <button class="chip" data-ana="ensemble" aria-pressed="true">Vue d'ensemble</button>
+          <button class="chip" data-ana="recettes" aria-pressed="false">Recettes</button>
+          <button class="chip" data-ana="depenses" aria-pressed="false">Dépenses</button>
+          <button class="chip" data-ana="declarations" aria-pressed="false">Déclarations</button>
+        </div>
+        <div class="grille g3" style="margin-top:11px">
+          <div class="champ"><label class="eyebrow" for="an-type">Vue</label>
+            <select id="an-type"><option value="mois">Mois</option>
+              <option value="trimestre">Trimestre</option>
+              <option value="annee" selected>Année</option></select></div>
+          <div class="champ"><label class="eyebrow" for="an-indice">Période</label>
+            <select id="an-indice"></select></div>
+          <div class="champ"><label class="eyebrow" for="an-annee">Année</label>
+            <select id="an-annee"></select></div>
+        </div>
+      </div>
+      <div id="ana-corps"></div>
+    </section>
+
+    <section class="vue" id="vue-finances" role="tabpanel">
+      <div class="carte">
+        <div class="carte-titre"><h2>Période</h2></div>
+        <div class="grille g3">
+          <div class="champ"><label class="eyebrow" for="fi-type">Vue</label>
+            <select id="fi-type"><option value="mois">Mois</option>
+              <option value="trimestre">Trimestre</option>
+              <option value="annee" selected>Année</option></select></div>
+          <div class="champ"><label class="eyebrow" for="fi-indice">Période</label>
+            <select id="fi-indice"></select></div>
+          <div class="champ"><label class="eyebrow" for="fi-annee">Année</label>
+            <select id="fi-annee"></select></div>
+        </div>
+      </div>
+      <div id="fi-corps"></div>
+    </section>
+
+    <section class="vue" id="vue-depenses" role="tabpanel">
+      <div class="carte">
+        <div class="carte-titre"><h2>Dépenses</h2>
+          <button class="btn primaire btn-min" id="dep-nouvelle">+ Dépense</button></div>
+        <div id="dep-totaux"></div>
+      </div>
+      <div class="carte">
+        <div class="champ" style="max-width:230px;margin-bottom:11px">
+          <select id="dep-filtre"><option value="tous">Toutes les catégories</option></select>
+        </div>
+        <div id="liste-depenses"></div>
+      </div>
+    </section>
+
+    <section class="vue" id="vue-calendrier" role="tabpanel">
+      <div class="carte">
+        <div class="carte-titre">
+          <h2 id="cal-titre">Calendrier</h2>
+          <div class="btn-rang" style="margin:0">
+            <button class="btn btn-min" id="cal-prec">‹</button>
+            <button class="btn btn-min" id="cal-auj">Aujourd'hui</button>
+            <button class="btn btn-min" id="cal-suiv">›</button>
+          </div>
+        </div>
+        <div id="cal-planif"></div>
+        <div id="cal-trancher"></div>
+        <div id="cal-aplanifier"></div>
+        <div id="cal-grille"></div>
+        <div class="legende" style="margin-top:10px">
+          <span><i style="background:#2E7D46"></i>confirmé</span>
+          <span><i style="background:#B98A00"></i>prévu (devis)</span>
+          <span><i style="background:#1D6FB8"></i>travaillé</span>
+          <span><i style="background:#8E8878"></i>non travaillé</span>
+          <span id="cal-leg-sel" hidden><i style="background:var(--encre)"></i>jour retenu pour ce chantier</span>
+        </div>
+        <div id="cal-charge"></div>
+      </div>
+      <div class="carte">
+        <div class="carte-titre"><h2 id="cal-jour-titre">Journée</h2>
+          <button class="btn primaire btn-min" id="cal-saisir">J'ai travaillé</button></div>
+        <div id="cal-detail"></div>
+      </div>
+    </section>
+
+    <section class="vue" id="vue-estimer" role="tabpanel">
+      <div class="carte">
+        <h2>Estimer un devis</h2>
+        <p class="muted" style="font-size:12.5px;margin:0 0 12px">
+          À partir de vos chantiers passés : rendement attendu, journées, prix conseillé.
+        </p>
+        <div id="estim-form"></div>
+      </div>
+      <div id="estim-resultat"></div>
+    </section>
+
+    <section class="vue" id="vue-rendements" role="tabpanel">
+      <div class="carte">
+        <h2>Rendements</h2>
+        <p class="muted" style="font-size:12.5px;margin:0 0 12px">
+          Par type de travaux, d'après les chantiers où le temps est saisi.
+        </p>
+        <div class="champ" style="max-width:250px;margin-bottom:11px">
+          <select id="rend-tri"></select>
+        </div>
+        <div id="rend-corps"></div>
+      </div>
+    </section>
+
+    <section class="vue" id="vue-chantier" role="tabpanel">
+      <div id="fiche-chantier"></div>
+    </section>
+
+    <!-- ======================================================= véhicule -->
+    <section class="vue" id="vue-carnetv" role="tabpanel"><div id="veh-carnet"></div></section>
+    <section class="vue" id="vue-echeancesv" role="tabpanel"><div id="veh-echeances"></div></section>
+    <section class="vue" id="vue-coutsv" role="tabpanel"><div id="veh-couts"></div></section>
+
+    <!-- ================================================ achats à venir -->
+    <section class="vue" id="vue-fichech" role="tabpanel"><div id="fch-corps"></div></section>
+    <section class="vue" id="vue-achats" role="tabpanel"><div id="ach-liste"></div></section>
+    <section class="vue" id="vue-budget" role="tabpanel"><div id="ach-budget"></div></section>
+
+    <!-- ============================================== bois de chauffage -->
+    <section class="vue" id="vue-stock" role="tabpanel">
+      <div class="carte">
+        <div class="carte-titre"><h2>Stock</h2>
+          <button class="btn primaire btn-min" id="p-nouvelle">Nouvelle pile</button></div>
+        <div id="stock-corps"></div>
+      </div>
+      <div class="carte" id="c-sechage"><h2>Séchage</h2><div id="stock-sechage"></div></div>
+    </section>
+
+    <section class="vue" id="vue-bois" role="tabpanel">
+      <div class="carte">
+        <div class="carte-titre"><h2>Mes piles</h2>
+          <button class="btn primaire btn-min" id="p-nouvelle2">Nouvelle pile</button></div>
+        <div id="liste-piles"></div>
+      </div>
+    </section>
+
+    <!-- ========================================================== lieux -->
+    <section class="vue" id="vue-lieux" role="tabpanel">
+      <div class="carte">
+        <div class="carte-titre"><h2>Où sont mes bois</h2>
+          <button class="btn btn-min" id="l-relever">Ma position</button></div>
+        <p class="muted" style="font-size:12.5px;margin:0 0 10px" id="l-etat">
+          Relevez votre position pour classer les points du plus proche au plus lointain.
+        </p>
+        <div id="liste-lieux"></div>
+        <div id="lieux-carte"></div>
+      </div>
+    </section>
+
+    <!-- ================================================== impression --- -->
+    <section class="vue" id="vue-impression" aria-hidden="true"></section>
+  </main>
+</div>
+
+<!-- ============================================================ modale -->
+<div class="modale" id="modale" hidden>
+  <div class="modale-in" role="dialog" aria-modal="true" aria-labelledby="modale-titre">
+    <div class="modale-tete">
+      <h2 id="modale-titre"></h2>
+      <button class="x" id="modale-x" aria-label="Fermer">×</button>
+    </div>
+    <div id="modale-corps"></div>
+  </div>
+</div>
+<div id="toast" hidden role="status"></div>
+<div id="maj-avis" hidden role="dialog" aria-live="polite" aria-label="Mise à jour disponible">
+  <div class="txt"><b>Une mise à jour est prête</b>
+    <small id="maj-avis-det">Elle s’installe en une seconde, vos données ne sont pas touchées.</small></div>
+  <button class="non" id="maj-non">Plus tard</button>
+  <button class="oui" id="maj-oui">Installer</button>
+</div>
+<datalist id="liste-clients"></datalist>
+<datalist id="liste-proprios"></datalist>
+<datalist id="liste-fournisseurs"></datalist>
+<datalist id="lieux-connus"></datalist>
+

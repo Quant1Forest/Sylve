@@ -12,6 +12,7 @@ const fs = require('fs');
 const path = require('path');
 
 const VOCABULAIRE = require('./vocabulaire.js');
+const construire = require('./construire.js');
 const racine = process.argv[2] || path.join(__dirname, '..');
 const fApp = path.join(racine, 'index.html');
 const fSw = path.join(racine, 'sw.js');
@@ -62,10 +63,19 @@ function nettoyer(code) {
   return out;
 }
 
-/* Numéro de ligne dans le fichier complet, pour pouvoir aller voir. */
+/* Numéro de ligne dans le fichier complet, pour pouvoir aller voir — suivi
+   du morceau de sources/, puisque c'est là qu'on corrige. Seulement si
+   index.html est bien le recollage de sources/ : sinon le renvoi mentirait. */
+const assemblage = (() => {
+  try {
+    const a = construire.assembler(racine);
+    return !a.erreurs.length && a.texte === src ? a : null;
+  } catch (e) { return null; }
+})();
 function ligneDe(bloc, pos) {
   const avant = src.indexOf(bloc);
-  return src.slice(0, avant + pos).split('\n').length;
+  const l = src.slice(0, avant + pos).split('\n').length;
+  return assemblage ? `${l} (${construire.ouEst(assemblage, l)})` : l;
 }
 
 /* --- 1. deux fonctions du même nom dans la même portée ---------------- */
@@ -75,8 +85,11 @@ propres.forEach((b, i) => {
   for (const m of b.matchAll(/^function ([A-Za-z_$][\w$]*)\s*\(/gm)) {
     const n = m[1];
     if (vus.has(n)) {
+      /* Le bloc brut, pas sa copie nettoyée : celle-ci n'existe pas dans le
+         fichier, et la ligne annoncée tombait n'importe où. Les positions
+         sont les mêmes dans les deux. */
       grave(`« ${n} » déclarée deux fois dans le même bloc — lignes ` +
-        `${ligneDe(b, vus.get(n))} et ${ligneDe(b, m.index)}. ` +
+        `${ligneDe(blocs[i], vus.get(n))} et ${ligneDe(blocs[i], m.index)}. ` +
         `La seconde écrase la première en silence.`);
     } else vus.set(n, m.index);
   }

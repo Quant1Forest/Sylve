@@ -1,8 +1,8 @@
 # Sylve
 
 Application de gestion pour un entrepreneur de travaux forestiers. Un seul
-fichier HTML, aucune dépendance, aucune compilation, tout fonctionne hors
-ligne.
+fichier HTML servi, recollé depuis `sources/` sans rien transformer ; aucune
+dépendance, tout fonctionne hors ligne.
 
 Version courante : **4.85.1-20261030-1850**
 
@@ -46,8 +46,10 @@ mains dans la terre.
 ## Règles de travail
 
 - **Ne lire un fichier de `docs/` que si la tâche touche son thème** (voir
-  *Où trouver quoi*, plus bas). **Ne jamais lire `index.html` en entier** :
-  chercher avec grep, puis lire par plages de lignes.
+  *Où trouver quoi*, plus bas). **Travailler dans le fichier de `sources/`
+  de la partie concernée** (tableau dans *Structure*) ; pour chercher à
+  travers les parties, grep sur `sources/`. Jamais dans `index.html` : il est
+  fabriqué.
 - **Les priorités sont décidées hors de cette conversation.** Exécuter le lot
   demandé, ne pas en ouvrir d'autres. Ce qui est repéré en chemin se note dans
   les remontées du rapport.
@@ -68,25 +70,16 @@ mains dans la terre.
 
 ```bash
 npm install        # une seule fois : jsdom
-npm run controle   # vérificateur + service worker + tests + reconstruction + conformité
+npm run controle   # fabrication + vérificateur + service worker + tests + conformité
 ```
 
-Doit afficher **« Bon pour livraison »**, puis **« le service worker tient »**
-(33 vérifications), puis la suite au vert — 1850 à ce jour — puis
-**« Sylve.html est conforme »**.
+Doit afficher **« index.html fabriqué »**, puis **« Bon pour livraison »**,
+puis **« le service worker tient »** (33 vérifications), puis la suite au
+vert — 1874 à ce jour — puis **« Sylve.html est conforme »**.
 
-Compter **moins de deux minutes**. Ça a été dix, et deux choses l'expliquaient :
-
-- Les tests attendaient **2,4 s à chaque ouverture** alors que l'application
-  démarre en une seconde. Elle pose maintenant `data-pret` sur le `body`
-  quand ses données sont relues et ses écrans rendus ; `ouvrir()` sonde
-  jusque-là. Ne jamais revenir à une attente devinée.
-- La suite tournait **deux fois**, la seconde sur `Sylve.html`. Or ce fichier
-  ne diffère de `index.html` que par deux lignes : rejouer quarante scénarios
-  dessus, c'était retester du code déjà testé. `outils/comparer.js` prouve la
-  même chose en une seconde — comparaison ligne à ligne, puis démarrage réel.
-  Sa garde a été éprouvée dans les deux sens : elle sort en 1 dès que les
-  fichiers divergent.
+Compter **moins de deux minutes**. Ne jamais revenir à une attente devinée
+dans les tests : `ouvrir()` sonde `data-pret` — pourquoi, dans
+`docs/tests-et-pieges.md`.
 
 **Une correction sans vérification qui la couvre n'est pas finie.** Chaque
 changement de comportement s'accompagne d'un scénario dans `outils/tests.js`.
@@ -95,20 +88,12 @@ régressions silencieuses.
 
 **Et un contrôle qu'on n'a jamais vu échouer ne prouve rien.** Avant
 d'adopter une vérification, la casser exprès et s'assurer qu'elle crie. Trois
-fois déjà, un contrôle passait au vert sans rien examiner : le vérificateur
-qui annonçait « 1 identifiant, tous uniques » après avoir coupé le fichier au
-premier `<script>` ; la première version de `comparer.js` ; et celle des tests
-du service worker, qui comparait le cache à la liste que le service worker
-annonce lui-même — retirer un fichier des deux côtés laissait le compte juste.
-Une vérification doit se croiser avec une source écrite ailleurs, pour
-d'autres raisons : c'est le manifeste qui dit maintenant quelles icônes
-doivent être en cache.
+fois déjà, un contrôle passait au vert sans rien examiner (récits dans
+`docs/tests-et-pieges.md`). Une vérification doit se croiser avec une source
+écrite ailleurs, pour d'autres raisons.
 
-**Un seul passage, à la fin.** Ne pas relancer la suite après chaque
-modification : écrire le code et ses scénarios, puis contrôler l'ensemble une
-fois, avant de rendre la liste de ce qui a changé. Dix passages dans une
-séance rejouent surtout des scénarios déjà verts, et c'est l'essentiel du
-temps d'attente.
+**Un seul passage, à la fin** : écrire le code et ses scénarios, puis
+contrôler l'ensemble une fois, avant de rendre la liste de ce qui a changé.
 
 **Pour casser un contrôle exprès, filtrer.** `outils/tests.js` prend un
 troisième argument : seuls les scénarios dont le nom le contient sont joués.
@@ -116,9 +101,6 @@ troisième argument : seuls les scénarios dont le nom le contient sont joués.
 ```bash
 node outils/tests.js index.html "double compte"
 ```
-
-Éprouver cinq gardes en rejouant chaque fois les quarante scénarios coûtait
-dix minutes ; avec le filtre, quelques secondes chacune.
 
 Scripts séparés si besoin : `npm run verifier`, `npm test`,
 `npm run construire`.
@@ -129,9 +111,8 @@ Scripts séparés si besoin : `npm run verifier`, `npm test`,
 
 **Une version = une mise à jour qu'il valide**, pas un lot de travail.
 Plusieurs séances de corrections peuvent s'accumuler sous le même numéro :
-il ne monte qu'au moment d'envoyer. Sinon on arrive à la 4.99 avant que
-l'application soit finie, et chaque numéro perd son sens — il doit
-correspondre à ce qu'il a réellement vu changer sur son téléphone.
+il ne monte qu'au moment d'envoyer. Sinon chaque numéro perd son sens : il
+doit correspondre à ce qu'il a réellement vu changer sur son téléphone.
 
 **La 5.0 sera la version jugée aboutie** — partie Entreprise finie, telle
 que l'utilisateur la veut sur le terrain. D'ici là on reste en 4.x : le
@@ -139,13 +120,10 @@ chiffre du milieu monte à chaque lot qui change quelque chose de visible.
 
 Le dépôt est publié par GitHub Pages : ce qui est poussé sur `main` devient
 l'application, et le téléphone propose la mise à jour à la prochaine ouverture
-avec du réseau.
+avec du réseau. Un `git push` est donc une publication, pas une sauvegarde.
 
-**Un correctif part seul. Une modification se demande.** Règle posée le
-18 août 2026, après une trentaine de lots où il répondait « oui » à chaque
-fois : ce qu'il valide, il ne peut de toute façon le juger qu'une fois
-l'application entre ses mains. Lui faire relire un correctif d'alignement ne
-lui apprend rien.
+**Un correctif part seul. Une modification se demande** (règle du 18 août
+2026 : ce qu'il valide, il ne le juge qu'une fois l'application en main).
 
 **Part sans rien demander** — un correctif : réparer un comportement décrit
 comme cassé, sans changer ce que l'application propose. Un libellé faux, un
@@ -162,11 +140,8 @@ données existantes** : migration, création en masse, suppression.
 message ; se tromper en publiant met sur son téléphone quelque chose qu'il
 n'a pas voulu.
 
-Un `git push` reste une publication, pas une sauvegarde : ce qui part sur
-`main` est en ligne à la prochaine ouverture avec du réseau.
-
-Livrer suppose aussi d'avoir monté la `VERSION` dans `index.html` **et** dans
-`sw.js` — sans quoi les téléphones déjà installés continuent de servir
+Livrer suppose aussi d'avoir monté la `VERSION` dans `sources/installation.js`
+**et** dans `sw.js` — sans quoi les téléphones déjà installés continuent de servir
 l'ancien code. Le vérificateur refuse de passer si les deux divergent.
 
 ---
@@ -175,24 +150,46 @@ l'ancien code. Le vérificateur refuse de passer si les deux divergent.
 
 | Fichier | Rôle |
 |---|---|
-| `index.html` | **Toute l'application.** ~20 300 lignes : HTML, CSS et JS dans un seul fichier. |
-| `Sylve.html` | Version autonome, fabriquée par `outils/construire.js`. Ne jamais l'éditer à la main. |
-| `sw.js` | Service worker. Sa constante `VERSION` doit être identique à celle de `index.html`. |
+| `sources/` | **L'application en morceaux** : on travaille ici. `assemblage.txt` dit l'ordre de recollage et porte les balises. |
+| `index.html` | **Fabriqué** depuis `sources/` par `outils/construire.js` (~20 700 lignes). Ne jamais l'éditer. |
+| `Sylve.html` | Version autonome, fabriquée depuis `index.html`. Ne jamais l'éditer à la main. |
+| `sw.js` | Service worker. Sa constante `VERSION` doit être identique à celle de `sources/installation.js`. |
 | `manifest.webmanifest` | Nom, couleurs, icônes de la PWA. |
-| `icone-*.png` | Icônes d'installation. La version *maskable* garde toute son encre dans la zone de rognage d'Android. |
-| `outils/` | Vérificateur, tests, tests du service worker, construction, conformité du fichier autonome, reprise du carnet, vocabulaire des magasins. |
+| `icone-*.png` | Icônes d'installation, dont une *maskable* pour Android. |
+| `outils/` | Fabrication, vérificateur, tests, tests du service worker, conformité du fichier autonome, reprise du carnet, vocabulaire des magasins. |
 | `docs/` | L'historique des décisions, rangé par thème. Voir *Où trouver quoi*. |
 | `rapports/` | Rapports de fin de lot. **Non versionné**, reste sur ce poste. |
 
-Les fichiers d'origine du logo ne sont pas dans le dépôt : ils sont gardés à
-part. Le dépôt étant public, il ne contient que ce qui est servi, plus de quoi
-travailler.
+Le dépôt étant public, il ne contient que ce qui est servi, plus de quoi
+travailler : les originaux du logo sont gardés à part.
+
+**Les parties dans `sources/`** — `interface/` sauf mention ; `logique/` porte
+les calculs sans écran de la même partie.
+
+| Partie | Fichiers |
+|---|---|
+| Cadre : bandeau, navigation, Accueil, démarrage | `communs.js` (`majBandeau`), `navigation.js` (`init`, modules, Accueil, retour arrière, Lieux), `ecouteurs.js` (`aller`, `brancher`), `../ecrans.html`, `../styles.css`, `../demarrage.*` |
+| Écran Entreprise, notes, alertes, achats à venir | `achats-entreprise.js` ; `logique/alertes-import.js` |
+| Chantiers | `chantiers.js`, `chantiers-carnet-fiche.js`, `chantiers-formulaires.js` ; `logique/chantiers.js` |
+| Calendrier, fiche de chantier imprimée | `calendrier.js` ; `logique/calendrier.js` |
+| Ma journée · Listes déroulantes | `journee.js` · `listes.js` |
+| Finances · Charges fixes · Analyses | `finances.js` · `charges-fixes.js` · `analyses.js` ; `logique/finances.js` |
+| Stock · prix de revient | `stock.js`, `stock-saisie.js` · `prix-de-revient.js` ; `logique/stock.js` |
+| Véhicule · Rendements et estimation | `vehicule.js` · `rendements.js` |
+| Carte | `carte.js`, `fond-de-carte.js` ; `logique/localisation.js` |
+| Cubage · Bois de chauffage | `cubage.js` · `bois.js` ; `logique/cubage.js`, `xlsx.js`, `export-cubage.js`, `bois.js` |
+| Réglages, sauvegarde, corbeille | `reglages-sauvegarde.js` ; `logique/sauvegarde.js`, `logique/stockage.js` |
+| Hors ligne, installation, `VERSION` | `../installation.js` |
+
+Débordements à connaître : `prix-de-revient.js` finit par les réglages
+Chantiers, Veille et Démarrage, puis l'appel d'`init` ; `carte.js` par les
+fenêtres « numéro de facture » et « motif de refus ».
 
 ---
 
 ## Conventions
 
-- **ES5 uniquement** dans `index.html` : `var`, `function`, pas de flèche,
+- **ES5 uniquement** dans `sources/` : `var`, `function`, pas de flèche,
   pas de `let`, pas de template literal. Le fichier s'ouvre parfois sur du
   vieux matériel.
 - **Français partout**, y compris dans les noms de fonctions et de variables.
@@ -212,8 +209,8 @@ travailler.
 Une ligne chacun ; le récit complet est dans `docs/tests-et-pieges.md`, sauf
 mention d'un autre fichier.
 
-- **`Sylve.html` se reconstruit** après chaque modification de `index.html` — `npm run controle` s'en charge.
-- **`VERSION` existe deux fois**, `index.html` et `sw.js` ; le vérificateur refuse s'ils divergent.
+- **`index.html` se fabrique depuis `sources/`**, et `Sylve.html` depuis `index.html` — `npm run controle` s'en charge ; une retouche directe d'`index.html` l'arrête.
+- **`VERSION` existe deux fois**, `sources/installation.js` et `sw.js` ; le vérificateur refuse s'ils divergent.
 - **L'icône d'accueil ne se met pas à jour** : retirer, réinstaller — et exporter une sauvegarde avant.
 - **Le logo n'existe qu'une fois**, dans la variable CSS `--logo`.
 - **Vérifier qu'une variable existe dans `:root`** avant de s'en servir (`--doux`, `--vert-marque`).
@@ -242,7 +239,8 @@ mention d'un autre fichier.
 
 | Fichier | Thème |
 |---|---|
-| `docs/tests-et-pieges.md` | Vocabulaire des magasins, pièges en entier, contrôles qui ont menti, durée du contrôle |
+| `docs/correspondance-refonte.md` | **La référence de la refonte** : ancien endroit → nouvel endroit. Les maquettes validées sont dans `maquettes/`, hors dépôt |
+| `docs/tests-et-pieges.md` | Vocabulaire des magasins, pièges en entier, contrôles qui ont menti, durée du contrôle, fabrication depuis `sources/` |
 | `docs/chantiers.md` | Fiche, devis, facture, numéros, statuts, carnet et ses tris, clients, nommage, SIREN, temps passé |
 | `docs/fiche-de-chantier.md` | Le document obligatoire imprimé : risques, réseau, croquis |
 | `docs/calendrier-journees.md` | Ma journée, statuts des jours, rappels, validation, planification, « jours passés » |

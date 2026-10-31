@@ -1,0 +1,117 @@
+# Assemblage de index.html
+#
+# index.html se fabrique en recopiant ce fichier ligne à ligne, dans l'ordre :
+#   « @chemin »  est remplacée par le contenu de sources/chemin ;
+#   « # … »      est un commentaire, elle ne passe pas ;
+#   tout le reste passe tel quel, lignes vides comprises.
+# Les balises, et l'enveloppe des blocs de code découpés en plusieurs
+# morceaux, vivent donc ici : un morceau ne contient que son langage.
+#
+#   node outils/construire.js
+#
+# -------------------------------------------------------------- en-tête
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+@entete.html
+<style>
+@styles.css
+</style>
+</head>
+<body>
+# ---------------------------------------------------- écran de démarrage
+@demarrage.html
+<script>
+@demarrage.js
+</script>
+# --------------------------------------------------------------- écrans
+@ecrans.html
+# ------------------------------- logique pure, sans DOM : un bloc chacun
+<script>
+@logique/cubage.js
+</script>
+<script>
+@logique/xlsx.js
+</script>
+<script>
+@logique/export-cubage.js
+</script>
+<script>
+@logique/localisation.js
+</script>
+<script>
+@logique/bois.js
+</script>
+<script>
+# Ce bloc-ci est découpé : son enveloppe reste ici, pour que chaque
+# morceau se compile seul.
+/* ==========================================================================
+   Sylve — chantiers sylvicoles (logique pure)
+   Une fiche unique par chantier, qui traverse les états : le devis n'est
+   qu'une étape facultative. Les lignes de travaux portent le chiffrage,
+   les temps saisis en fin de chantier alimenteront les rendements.
+   ========================================================================== */
+(function () {
+'use strict';
+
+@logique/chantiers.js
+@logique/calendrier.js
+@logique/alertes-import.js
+
+})();
+
+</script>
+<script>
+@logique/finances.js
+</script>
+<script>
+@logique/stock.js
+</script>
+<script>
+@logique/stockage.js
+</script>
+<script>
+@logique/sauvegarde.js
+</script>
+# ------------------------------------------------------------ interface
+# Un seul bloc, une seule enveloppe : les morceaux en sont le corps.
+<script>
+/* ==========================================================================
+   Sylve — interface
+   ========================================================================== */
+(function () {
+'use strict';
+
+@interface/communs.js
+@interface/cubage.js
+@interface/reglages-sauvegarde.js
+@interface/ecouteurs.js
+@interface/navigation.js
+@interface/bois.js
+@interface/chantiers.js
+@interface/fond-de-carte.js
+@interface/chantiers-carnet-fiche.js
+@interface/chantiers-formulaires.js
+@interface/rendements.js
+@interface/calendrier.js
+@interface/vehicule.js
+@interface/achats-entreprise.js
+@interface/finances.js
+@interface/listes.js
+@interface/journee.js
+@interface/stock.js
+@interface/charges-fixes.js
+@interface/carte.js
+@interface/analyses.js
+@interface/stock-saisie.js
+@interface/prix-de-revient.js
+
+})();
+
+</script>
+# --------------------------------------------------------- installation
+<script>
+@installation.js
+</script>
+</body>
+</html>

@@ -244,3 +244,73 @@ ne joue pas un scénario : « e » est dans tous les noms, donc la suite entièr
 tourne. Éprouver cinq sabotages ainsi, c’est cinq passages complets — dix
 minutes d’attente pour rien. **Toujours filtrer sur un bout de nom
 distinctif.**
+
+Éprouver cinq gardes en rejouant chaque fois les quarante scénarios coûtait
+dix minutes ; avec le filtre, quelques secondes chacune.
+
+## Comment le contrôle est tombé sous deux minutes
+
+Il a été de dix minutes, et deux choses l'expliquaient :
+
+- Les tests attendaient **2,4 s à chaque ouverture** alors que l'application
+  démarre en une seconde. Elle pose maintenant `data-pret` sur le `body`
+  quand ses données sont relues et ses écrans rendus ; `ouvrir()` sonde
+  jusque-là. Ne jamais revenir à une attente devinée.
+- La suite tournait **deux fois**, la seconde sur `Sylve.html`. Or ce fichier
+  ne diffère de `index.html` que par deux lignes : rejouer quarante scénarios
+  dessus, c'était retester du code déjà testé. `outils/comparer.js` prouve la
+  même chose en une seconde — comparaison ligne à ligne, puis démarrage réel.
+  Sa garde a été éprouvée dans les deux sens : elle sort en 1 dès que les
+  fichiers divergent.
+
+**Un seul passage, à la fin.** Dix passages dans une séance rejouent surtout
+des scénarios déjà verts, et c'est l'essentiel du temps d'attente.
+
+## Trois contrôles qui passaient au vert sans rien examiner
+
+Le vérificateur qui annonçait « 1 identifiant, tous uniques » après avoir
+coupé le fichier au premier `<script>` ; la première version de
+`comparer.js` ; et celle des tests du service worker, qui comparait le cache
+à la liste que le service worker annonce lui-même — retirer un fichier des
+deux côtés laissait le compte juste. C'est le manifeste qui dit maintenant
+quelles icônes doivent être en cache : une source écrite ailleurs, pour
+d'autres raisons.
+
+## index.html se fabrique depuis sources/
+
+Le 31 octobre 2026 (lot 4), les vingt mille lignes d'`index.html` ont été
+coupées en une quarantaine de morceaux, un par partie, pour que chaque lot de
+la refonte ne lise et ne touche que la sienne. **Couper, jamais réécrire** :
+`index.html` recollé est resté identique, octet pour octet, à celui d'avant.
+
+`sources/assemblage.txt` est le squelette du fichier : une ligne `@chemin`
+appelle un morceau, une ligne `#` est un commentaire, tout le reste passe tel
+quel. Les balises `<script>`, et l'enveloppe `(function () { … })();` des deux
+blocs découpés en plusieurs morceaux, y vivent : sans cela le premier et le
+dernier morceau d'un bloc ne se compileraient pas seuls.
+
+Trois gardes dans `outils/construire.js`, chacune cassée exprès une fois :
+
+- **Retouche directe d'`index.html`.** Une empreinte (`outils/empreinte-index.txt`)
+  est posée à chaque fabrication. Si `index.html` ne la porte plus, la
+  fabrication s'arrête et dit « travaillez dans sources/ » : l'écraser
+  perdrait la retouche, le laisser publierait du code absent de `sources/`.
+  Éprouvé : retouche gardée, code de sortie 1, première ligne fautive citée
+  avec son morceau.
+- **Coupure au milieu d'une fonction.** Chaque morceau `.js` se compile seul
+  (`vm.Script`, sans l'exécuter). Éprouvé en déplaçant trois lignes d'un
+  morceau au suivant : le recollage restait identique, la garde a crié sur
+  les deux morceaux.
+- **Morceau oublié ou en trop.** Un fichier de `sources/` absent de la liste,
+  une entrée sans fichier ou citée deux fois : refus. Éprouvé dans les trois
+  sens.
+
+Les fins de ligne Windows et la marque d'ordre en tête sont effacées à la
+lecture : `index.html` n'en a jamais contenu, et git (autocrlf) en remet à
+chaque extraction — sans cela `git checkout index.html` passerait pour une
+retouche à la main.
+
+En branchant le vérificateur sur les morceaux, une vieille erreur est
+apparue : pour une fonction déclarée deux fois, il cherchait dans le fichier
+la copie *nettoyée* du bloc, qui n'y est pas, et annonçait une ligne fausse
+(10 478 au lieu de 16 689). Il cite maintenant la bonne ligne, et le morceau.

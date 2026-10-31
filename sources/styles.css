@@ -1,0 +1,845 @@
+/* ===================================================================
+   Palette : papier NCR vert pâle du bordereau carbone, encre vert-noir
+   d'écorce mouillée. L'accent reprend la couleur des plaquettes du lot.
+   =================================================================== */
+:root{
+  /* Palette réchauffée sur le crème du logo (#F8F2EA) : le logo se pose
+     sur la page sans qu'on voie où il commence. Les écarts de clarté entre
+     papier, carte et carte2 sont ceux d'avant, seule la température change. */
+  --encre:#22301C; --papier:#F4EDE2; --carte:#FCF8F2; --carte2:#F0E8DA;
+  --trait:#DED4C4; --trait-fort:#B8AB95; --gris:#6F6A5C; --gris-clair:#8E8878;
+  /* --doux était utilisé seize fois sans jamais être défini : tous les
+     textes secondaires sortaient donc en pleine encre au lieu du gris. */
+  --doux:#6F6A5C;
+  --vert-marque:#32461E; --brun-marque:#6A4A22;
+  /* Le logo est stocke une seule fois ici : l'accueil et le bouton du
+     bandeau s'en servent tous les deux, sans repeter les 4 Ko. */
+  --logo:url("data:image/png;base64,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");
+  --alerte:#A4451F; --alerte-fond:#F7E6D9;
+  /* Un avis qui n'accuse pas : la classe annoncée ne tient pas ses critères,
+     mais c'est le classeur qui a la grume sous les yeux, pas Sylve. Le rouge
+     est réservé à ce qui est faux, pas à ce qui mérite un second regard. */
+  --tiede:#7A5E12; --tiede-fond:#FBF2DC; --tiede-trait:#E2CFA4;
+  /* La couleur vive de l'application. Le bleu avait été validé le 3 août ;
+     il l'a repris le 23 pour un vert, « qui respire plus l'esprit de
+     l'application ». Le nom Sylve, lui, garde le vert de la marque
+     (--vert-marque) : c'est la signature, pas une couleur d'action. */
+  --accent:#2E7D46; --accent-doux:#E3EFE7; --accent-texte:#fff;
+  /* La couleur des plaquettes du bordereau ouvert. Elle repeignait toute
+     l'application par --accent, si bien que l'écran changeait de couleur
+     sans raison visible — selon le bordereau de cubage ouvert. Elle ne peint
+     plus que ce qui la désigne vraiment : la pastille du bordereau et les
+     plaquettes du ruban de saisie. */
+  --plaq:#2E4A3C;
+  --r:10px; --r-s:7px;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --ombre:0 1px 2px rgba(34,48,28,.08),0 4px 14px rgba(34,48,28,.06);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:var(--sans); font-size:15px; line-height:1.45;
+  color:var(--encre); background:var(--papier);
+  -webkit-text-size-adjust:100%; overscroll-behavior-y:none;
+}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:none}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.eyebrow{
+  font-size:10.5px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;
+  color:var(--gris);
+}
+/* Petit « + liste » posé dans l'intitulé d'un champ : ajoute la valeur
+   saisie à la liste déroulante sans quitter le formulaire. */
+.mini-plus{
+  margin-left:7px;padding:1px 6px;border:1px solid var(--trait);border-radius:20px;
+  background:transparent;color:var(--gris);font:inherit;font-size:9.5px;cursor:pointer;
+  letter-spacing:.06em;
+}
+.mini-plus:hover{border-color:var(--encre);color:var(--encre)}
+.mini-plus[disabled]{opacity:.45;cursor:default}
+.jour-pris{font-size:11.5px;color:#8A6A00;margin:3px 0 0 2px;line-height:1.35}
+/* Un poste du coût au kilomètre qui n'a pas de quoi se calculer : il dit ce
+   qui lui manque plutôt que d'afficher un zéro qui passerait pour un chiffre. */
+.manque-v{color:var(--tiede)}
+/* Le numéro composé : le préfixe et les tirets sont écrits, il ne tape que
+   l'année et le rang. Les zéros de tête se posent tout seuls. */
+.numcomp{display:flex;gap:6px;align-items:center}
+.numcomp .pref{font-family:var(--mono);font-size:20px;font-weight:700;padding:0 2px}
+.numcomp input{font-size:19px;font-weight:600;text-align:center;padding:8px 4px}
+.numcomp .an{width:5.2em;flex:none}
+.numcomp .rg{width:4.6em;flex:none}
+.apercu-num{margin:6px 0 0;font-size:13px;color:var(--doux)}
+.apercu-num b{font-family:var(--mono);font-size:16px;color:var(--encre);letter-spacing:.02em}
+/* Ce qui a bougé entre le devis signé et la facture. La marque est sur la
+   ligne : c'est là qu'on cherche, pas dans un récapitulatif. */
+.marque-l{
+  display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.05em;
+  text-transform:uppercase;padding:2px 7px;border-radius:99px;vertical-align:2px;
+}
+.marque-l.ajout{background:var(--accent-doux);color:var(--vert-marque);border:1px solid #C4DCCC}
+.marque-l.chg{background:var(--tiede-fond);color:var(--tiede);border:1px solid var(--tiede-trait)}
+.marque-l.ret{background:var(--alerte-fond);color:var(--alerte);border:1px solid #D9BCAE}
+.ligne-retiree b{text-decoration:line-through;color:var(--gris)}
+/* Un jour du chantier : ce qu'on y a fait à gauche — la colonne qu'on vient
+   lire — et ce qui reste prévu à droite. */
+.jtete{display:grid;grid-template-columns:1fr auto auto;gap:12px;padding-bottom:5px;
+  border-bottom:1px solid var(--trait-fort)}
+.jtete span{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gris)}
+.jtete span:not(:first-child),.jrang .jv{min-width:4.4em;text-align:right}
+.jrang{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:baseline;
+  padding:8px 0;border-bottom:1px solid var(--trait)}
+.jrang .jd{font-size:13.5px}
+.jrang .jd small{display:block;font-size:11.5px;color:var(--gris)}
+.jrang .jv{font-family:var(--mono);font-size:14px;font-weight:600}
+.jrang .jv.vide{color:var(--gris-clair);font-weight:400}
+.jrang.avenir .jd{color:var(--gris)}
+/* Un achat à prévoir : la case à gauche, ce que c'est au milieu, le prix à
+   droite. Coché, il pâlit et se barre — il reste lisible, il ne se mélange
+   plus à ce qui attend. */
+.achat{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:start;
+  padding:9px 0;border-bottom:1px solid var(--trait)}
+.ach-case{flex:none;width:26px;height:26px;border:1.5px solid var(--trait-fort);
+  border-radius:7px;background:var(--carte2);font-size:15px;font-weight:700;
+  line-height:1;color:var(--accent-texte);margin-top:1px}
+.ach-case[aria-pressed=true]{background:var(--accent);border-color:var(--accent)}
+.ach-corps{text-align:left;padding:0;background:none;border:0;min-width:0}
+.ach-corps b{display:block;font-size:14px;line-height:1.3}
+.ach-corps small{display:block;font-size:11.5px;color:var(--gris);margin-top:1px}
+.ach-note{font-style:italic}
+.ach-prix{text-align:right;white-space:nowrap}
+.ach-prix b{display:block;font-size:15px}
+.ach-prix small{display:block;font-size:11px;color:var(--gris)}
+.achat.fait{opacity:.55}
+.achat.fait .ach-corps b{text-decoration:line-through}
+/* La part d'un poste dans ce qui l'attend : une barre vaut mieux qu'un
+   pourcentage à relire. */
+.ach-jauge{height:7px;border-radius:99px;background:var(--carte2);
+  border:1px solid var(--trait);margin-top:4px;overflow:hidden}
+.ach-jauge i{display:block;height:100%;border-radius:99px}
+.dit-avant{font-size:12px;color:var(--tiede);margin-top:3px}
+/* Sous-titre d'un bloc de la fiche : dit à quoi le bloc sert, pour qu'on
+   ne confonde plus le prévu (Journées) et le réel (Temps passé). */
+.sous-titre-bloc{font-size:12px;color:var(--doux);margin:0 0 10px;line-height:1.4}
+.sous-titre-bloc b{font-weight:700;color:var(--encre)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.muted{color:var(--gris)}
+
+/* ------------------------------------------------------ structure ---- */
+#app{display:flex;flex-direction:column;min-height:100vh;min-height:100dvh}
+main{flex:1;padding:14px 14px 96px;max-width:1240px;width:100%;margin:0 auto}
+.vue{display:none}
+.vue.actif{display:block}
+
+/* On masque ce qui n'appartient pas au module ouvert. La forme body:not()
+   l'emporte sur un display posé directement sur l'élément (.bandeau-sous,
+   .carte…), ce qui évite qu'un bloc réapparaisse dans une autre partie. */
+/* Les réglages sont communs à tous les modules : le bandeau du bordereau
+   n'y a rien à faire. */
+body.v-reglages #b-bordereau{display:none}
+body:not(.m-cubage) .mod-cubage,
+body:not(.m-bois) .mod-bois,
+body:not(.m-ent) .mod-ent{display:none}
+.st{display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;white-space:nowrap;color:#fff}
+.retard{color:#B4231F;font-size:11.5px}
+/* Un rappel, pas un reproche : le ton de l'avertissement doux, jamais celui
+   de l'erreur. Une fiche incomplète n'a rien fait de mal. */
+/* L'offre d'ajout à une liste : une ligne sous le champ, qu'on tape ou qu'on
+   ignore. Une fenêtre bloquante à la validation arrivait trop tard — le nom
+   était tapé depuis longtemps — et coupait la saisie. */
+.offre-liste{margin:5px 0 0;font-size:12px;color:var(--doux);display:none}
+.offre-liste.visible{display:block}
+.offre-liste button{
+  font:inherit;font-size:12px;font-weight:600;color:var(--accent);
+  background:none;border:0;padding:0 0 0 4px;text-decoration:underline;
+  text-underline-offset:2px;cursor:pointer;
+}
+.offre-liste.faite{color:var(--vert-marque)}
+/* Une note de mise à jour : cliquable quand elle mène quelque part, muette
+   sinon. Le chevron suffit à faire la différence. */
+.note-maj{
+  display:block;width:100%;text-align:left;font:inherit;font-size:13px;
+  color:var(--encre);background:none;border:0;padding:5px 0;line-height:1.4;
+}
+.note-maj[data-notevue]{color:var(--accent);cursor:pointer}
+.note-maj.sans{color:var(--doux)}
+.paire-fiche{display:flex;justify-content:space-between;font-size:13.5px;padding:4px 0}
+/* Un bloc dont l'étape n'est pas atteinte : présent, mais en retrait. */
+.carte.avenir{background:transparent;box-shadow:none;border-style:dashed;opacity:.62}
+.carte.avenir .modif-bloc{color:var(--gris-clair)}
+.tete-bloc{display:flex;align-items:baseline;justify-content:space-between;gap:9px;margin-bottom:8px}
+.etape-bloc{
+  font-size:10.5px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;
+  color:var(--gris);
+}
+.modif-bloc{
+  font:inherit;font-size:12.5px;color:var(--accent);font-weight:600;white-space:nowrap;
+  background:none;border:0;padding:0;cursor:pointer;
+}
+.acompleter-bloc{
+  margin:9px 0 0;padding:8px 11px;border-radius:var(--r-s);
+  background:#F5EBCB;color:#6B5200;font-size:12.5px;
+}
+/* Le numéro de facture, discret mais lisible : c'est une référence, pas un
+   titre. */
+.num-fact{
+  font-family:var(--mono);font-size:11px;color:var(--doux);
+  background:var(--carte2);border-radius:4px;padding:1px 5px;white-space:nowrap;
+}
+.acompleter{
+  color:#8A6A00;font-size:11px;font-weight:600;background:#F5EBCB;
+  padding:1px 7px;border-radius:20px;white-space:nowrap;
+}
+.ligne-trav{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center;padding:7px 0;border-bottom:1px solid var(--trait)}
+.ligne-trav:last-child{border-bottom:none}
+.fiche-tete{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+/* Des tuiles un peu plus larges et un chiffre un cran plus bas : un montant à
+   six chiffres ne tenait pas en 19 px dans 96 px, et le symbole passait à la ligne. Le
+   nombre ne se coupe jamais — mieux vaut une tuile qui s'étire qu'un « € »
+   tout seul en dessous. */
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(102px,1fr));gap:8px;margin-top:11px}
+.kpi .carte2{padding:9px 8px;min-width:0}
+/* Deux carreaux par ligne : ce qui est rentré en haut, ce qui arrive en bas. */
+.kpi2{grid-template-columns:repeat(2,1fr)}
+.kpi b{font-size:17px;display:block;white-space:nowrap;letter-spacing:-.01em}
+
+.lien-regl{
+  font:inherit;font-size:12px;color:var(--gris);border:none;background:none;padding:0;
+  cursor:pointer;text-decoration:underline;text-underline-offset:2px;
+}
+.lien-regl:hover{color:var(--accent)}
+.tot td{font-weight:700;border-top:2px solid var(--trait-fort);border-bottom:none}
+.pt{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:1px}
+.bandeau-nav{flex:1;min-width:0}
+.bandeau-nav select{
+  width:100%;max-width:280px;border:none;background:none;color:inherit;
+  font:inherit;font-size:15px;font-weight:600;letter-spacing:-.01em;
+  padding:4px 22px 4px 6px;border-radius:8px;cursor:pointer;
+  appearance:none;-webkit-appearance:none;
+  background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%);
+  background-position:calc(100% - 11px) 52%,calc(100% - 6px) 52%;
+  background-size:5px 5px,5px 5px;background-repeat:no-repeat;
+}
+.bandeau-nav select:hover{background-color:rgba(255,255,255,.10)}
+.bandeau-nav select option{color:#22301C;background:#fff}
+.bandeau-ctx{display:flex;gap:6px;align-items:center;flex:none}
+.bandeau-sous{
+  display:flex;align-items:center;gap:9px;padding:7px 15px 9px;
+  border-top:1px solid rgba(255,255,255,.13);
+}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.cal .jn{font-size:10px;text-align:center;color:var(--doux);padding:3px 0;text-transform:uppercase;letter-spacing:.05em}
+.cal button{
+  aspect-ratio:1;border:1px solid var(--trait);background:var(--carte);border-radius:8px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  cursor:pointer;font:inherit;padding:0;position:relative;
+}
+.cal button.vide{border-color:transparent;background:none;cursor:default}
+.cal button.hors{opacity:.32}
+.cal button.auj{border-color:var(--encre);border-width:2px}
+.cal button.sel{background:var(--encre);color:#EAEFE6}
+.cal button.we{background:var(--carte2)}
+/* Un jour non travaillé est hachuré : la case dit d’un coup d’œil qu’on
+   n’y comptait pas. Il garde sa pastille comme les autres — un jour, un
+   statut, une pastille. */
+.cal button.st-absent{background:repeating-linear-gradient(135deg,var(--carte2),var(--carte2) 4px,var(--papier) 4px,var(--papier) 8px);color:var(--gris)}
+.cal button.st-absent.sel{background:var(--encre);color:#EAEFE6}
+/* La fiche du jour s’ouvre sur son statut : c’est la première chose à lire. */
+.fj-etat{display:flex;align-items:center;gap:10px;padding:10px 12px;
+  border:1px solid var(--trait);border-left-width:4px;border-radius:var(--r-s);
+  background:var(--carte2)}
+.fj-etat b{display:block;font-size:14.5px}
+.fj-etat small{display:block;font-size:11.5px;color:var(--gris)}
+/* La fiche de chantier. Le même dessin sert à l'aperçu et à l'impression :
+   deux feuilles de style auraient fini par diverger, et c'est justement
+   l'aperçu qui doit dire la vérité sur ce qui sortira. */
+.feuille{background:#fff;color:#111;padding:9mm 8mm;font-size:9.4pt;line-height:1.32;
+  border:1px solid var(--trait-fort);border-radius:var(--r-s);margin-bottom:12px}
+.feuille h1{font-size:15pt;margin:0;text-transform:uppercase;letter-spacing:.02em}
+.feuille .lg{font-size:7.2pt;color:#555;margin:2px 0 0}
+.ft{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;
+  border-bottom:2px solid #111;padding-bottom:7px;margin-bottom:9px}
+.fm{text-align:right;font-size:8pt;line-height:1.35}
+.fm b{display:block;font-size:10.5pt}
+.fm span{display:block}
+.fs{margin-top:9px;break-inside:avoid}
+.fs > h2{font-size:8.4pt;letter-spacing:.09em;text-transform:uppercase;margin:0 0 5px;
+  background:#111;color:#fff;padding:2.5px 7px}
+.fs > h3{font-size:8.2pt;letter-spacing:.06em;text-transform:uppercase;margin:7px 0 3px;
+  color:#111;border-bottom:1px solid #111;padding-bottom:2px}
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:2px 16px}
+.fl{display:flex;gap:6px;border-bottom:1px dotted #aaa;padding:2.5px 0;align-items:baseline}
+.fl .k{font-size:7.8pt;color:#555;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+.fl .v{flex:1;font-weight:600}
+.feuille .manque{color:#B4231F;font-style:italic;font-weight:600}
+.fr{display:grid;grid-template-columns:repeat(3,1fr);gap:1px 12px;margin-top:3px}
+.fc{font-size:8.2pt;display:flex;gap:5px;align-items:baseline}
+.fc i{display:inline-block;width:8px;height:8px;border:1px solid #111;flex:none;position:relative;top:1px}
+.fc.on{font-weight:700}
+.fc.on i{background:#111;box-shadow:inset 0 0 0 1.5px #fff}
+.fb{border:1px solid #111;padding:5px 7px;margin-top:5px;font-size:8.6pt;min-height:22px}
+.fb .k{font-size:7.4pt;color:#555;text-transform:uppercase;display:block;margin-bottom:2px}
+.fv{border:1px solid #111;height:52mm;margin-top:4px;position:relative}
+.fv span{position:absolute;left:6px;top:5px;font-size:7.6pt;color:#777}
+.fsg{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px}
+.fsg div{border:1px solid #111;height:20mm;padding:4px 6px;font-size:7.8pt;color:#555}
+.fn{font-size:7.6pt;color:#555;margin:6px 0 0}
+.fu{background:#111;color:#fff;text-align:center;padding:4px;font-weight:700;
+  font-size:10pt;letter-spacing:.06em}
+.fp{display:flex;justify-content:space-between;font-size:7.2pt;color:#666;
+  border-top:1px solid #999;margin-top:10px;padding-top:4px}
+/* L'aperçu tient dans la fenêtre : la feuille y est réduite, pas retaillée. */
+.apercu-feuille{background:var(--carte2);padding:8px;border-radius:var(--r-s);
+  max-height:58vh;overflow:auto}
+.cal button.sel.we{background:var(--encre)}
+.cal .n{font-size:13px;font-family:var(--mono)}
+.cal .pts{display:flex;gap:2px;height:9px}
+/* Un cerne clair détache la pastille du fond de la case : sans lui, le vert
+   et le bleu se ressemblent au soleil. */
+.cal .pts i{width:9px;height:9px;border-radius:50%;display:block;
+  box-shadow:0 0 0 1.5px var(--carte)}
+.cal button.sel .pts i{box-shadow:0 0 0 1.5px var(--encre)}
+.alerte{
+  display:flex;align-items:flex-start;gap:9px;padding:10px 12px;border-radius:11px;
+  border:1px solid var(--trait);background:var(--carte);margin-bottom:7px;cursor:pointer;
+  width:100%;text-align:left;font:inherit;color:inherit;
+}
+.alerte .ic{flex:none;width:8px;height:8px;border-radius:50%;margin-top:5px}
+.alerte b{display:block;font-size:13.5px}
+/* Un rappel qu'on ne peut pas chasser finit par ne plus être lu. La croix
+   déborde volontiers de la zone du texte : c'est une cible de doigt. */
+.alerte .fermer{
+  flex:none;margin:-10px -12px -10px auto;padding:10px 13px;font:inherit;font-size:17px;
+  line-height:1;background:none;border:0;color:var(--gris-clair);cursor:pointer;
+}
+.alerte .fermer:hover{color:var(--encre)}
+/* Les pastilles rouges des tuiles ont été retirées : un second nombre posé
+   sous « 4 chantiers » se lisait comme une contradiction, et le lui faire
+   dire en toutes lettres ne l'a pas sauvé. Ce qui est à traiter se lit dans
+   la zone « À traiter », qui le dit déjà et que l'on comprend. */
+.alerte small{color:var(--doux);font-size:12px}
+/* Une note garde ses retours à la ligne : « j'ai ce chantier, ce chantier,
+   ce chantier » s'écrit en liste. */
+.note-texte{display:block;white-space:pre-line;flex:1;min-width:0;font-size:13.5px}
+.note-c{border:1px solid var(--trait);background:var(--carte);border-radius:11px;
+  padding:10px 12px;margin-bottom:7px}
+.note-t{display:flex;align-items:flex-start;gap:9px}
+.note-t .ic{flex:none;width:8px;height:8px;border-radius:50%;margin-top:7px}
+.note-titre{flex:1;text-align:left;background:none;border:0;padding:0;font:inherit;
+  font-weight:700;font-size:13.5px;color:inherit;cursor:pointer}
+.note-c .fermer{flex:none;margin:-6px -8px -6px auto;padding:6px 9px;font:inherit;font-size:17px;
+  line-height:1;background:none;border:0;color:var(--gris-clair);cursor:pointer}
+.note-i{display:flex;align-items:flex-start;gap:9px;padding:7px 0 0}
+.note-i input{flex:none;width:20px;height:20px;margin:0}
+.note-i.fait .note-texte{text-decoration:line-through;color:var(--doux)}
+.note-ajout{width:100%;margin-top:8px;font:inherit;font-size:13px;padding:7px 9px;
+  border:1px dashed var(--trait);border-radius:8px;background:transparent;color:inherit}
+.kpi small{font-size:11px;color:var(--doux)}
+
+/* ---------------------------------------------------------- accueil --- */
+.accueil-ouvert .bandeau,.accueil-ouvert .onglets{display:none}
+/* Dans les réglages, la barre du bas proposait les écrans du module d'où l'on
+   venait : on arrivait des Finances et elle offrait Bilan, Dépenses, Charges,
+   Analyses, alors qu'aucun de ces écrans n'est affiché. Les réglages sont un
+   écran de côté ; on en sort par la flèche du bandeau, qui redescend là où on
+   était. */
+body.v-reglages .onglets{display:none}
+.accueil{max-width:640px;margin:0 auto;padding:26px 15px 40px}
+.marque{display:flex;align-items:center;gap:13px;margin:6px 0 4px}
+.marque svg{flex:none}
+/* Le logo est fourni détouré : il se pose sur le crème de la page sans
+   cadre ni fond, quelle que soit la vue. */
+.marque-logo{
+  flex:none;display:block;width:54px;height:59px;
+  background:var(--logo) center/contain no-repeat;
+}
+.marque h1{font-size:29px;letter-spacing:-.02em;margin:0;font-weight:600;color:var(--vert-marque)}
+/* Le logo de l'entreprise, sur son écran à elle. L'accueil général garde la
+   marque de l'outil : les mélanger brouillerait les deux. */
+.logo-ent{
+  flex:none;width:46px;height:46px;border-radius:12px;background:var(--carte);
+  border:1px solid var(--trait);display:flex;align-items:center;justify-content:center;
+  box-shadow:var(--ombre);overflow:hidden;
+}
+.logo-ent img{width:100%;height:100%;object-fit:contain}
+.marque p{margin:1px 0 0;font-size:12.5px;color:var(--doux)}
+.tuiles{display:grid;gap:11px;margin-top:22px}
+.tuile{
+  display:flex;align-items:center;gap:14px;width:100%;text-align:left;
+  background:var(--carte);border:1px solid var(--trait);border-radius:14px;
+  padding:16px 15px;cursor:pointer;font:inherit;color:inherit;
+}
+.tuile:hover{border-color:var(--encre)}
+.tuile[disabled]{opacity:.5;cursor:default}
+.tuile .ic{
+  flex:none;width:42px;height:42px;border-radius:11px;background:var(--encre);
+  color:#EAEFE6;display:flex;align-items:center;justify-content:center;font-size:20px;
+}
+/* Pictogrammes des tuiles : dessin au trait plutôt que des caractères de
+   remplissage. Ils héritent de la couleur du bloc, donc un seul réglage. */
+.pic{
+  width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;
+  stroke-linecap:round;stroke-linejoin:round;
+}
+/* Second niveau (les tuiles d'une partie) : un trait fin cerclé, comme sur
+   la planche du logo. L'accueil garde ses pastilles pleines, si bien qu'on
+   voit d'un coup d'œil à quel étage on se trouve. */
+.tuile .ic.rond{
+  background:transparent;border:1.5px solid var(--vert-marque);
+  border-radius:50%;color:var(--vert-marque);
+}
+.tuile .ic.rond .pic{width:20px;height:20px;stroke-width:1.6}
+.tuile b{display:block;font-size:16px;letter-spacing:-.01em}
+.tuile small{display:block;font-size:12.5px;color:var(--doux);margin-top:2px}
+.tuile .chiffre{margin-left:auto;text-align:right;font-family:var(--mono);font-size:19px;flex:none}
+.tuile .chiffre span{display:block;font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--doux);font-family:var(--corps)}
+
+/* ------------------------------------------------------------ jauge --- */
+.jauge{display:flex;height:13px;border-radius:7px;overflow:hidden;background:var(--trait);margin:9px 0 7px}
+.jauge i{display:block;height:100%}
+.legende{display:flex;flex-wrap:wrap;gap:11px;font-size:12px;color:var(--doux)}
+.legende span{display:flex;align-items:center;gap:5px}
+.legende i{width:9px;height:9px;border-radius:2px;display:block}
+.badge{
+  display:inline-block;font-size:11px;padding:2px 7px;border-radius:20px;
+  border:1px solid currentColor;white-space:nowrap;
+}
+.badge.sec{color:#2E7D46}.badge.presume{color:#7A8471}
+.badge.sechage{color:#B98A00}.badge.vert{color:#B4231F}.badge.inconnu{color:#7A8471}
+.liste-item.epuise{opacity:.55}
+.etiq{
+  display:inline-block;font-style:normal;font-size:10.5px;font-weight:700;color:#fff;
+  padding:1px 6px;border-radius:20px;vertical-align:2px;margin-left:5px;letter-spacing:.02em;
+}
+.pile-c{flex-direction:column;align-items:stretch;gap:8px}
+.pile-c .li-h{display:flex;align-items:flex-start;gap:10px}
+.pile-c .li-actions{display:flex;flex-wrap:wrap;gap:6px;padding-left:24px}
+.pile-c .li-actions .btn-min{flex:1;min-width:72px;text-align:center}
+.x-mes{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:none;background:none;color:var(--doux);cursor:pointer;font-size:15px;padding:4px}
+input.mini{padding:6px 7px;border:1px solid var(--trait);border-radius:7px;font-family:var(--mono)}
+.pt-dist{font-family:var(--mono);font-size:13px;white-space:nowrap}
+
+/* --------------------------------------------------------- bandeau --- */
+.bandeau{
+  position:sticky;top:0;z-index:40;background:var(--encre);color:#EAEFE6;
+  border-bottom:3px solid var(--brun-marque);
+  padding:9px 14px calc(9px + env(safe-area-inset-bottom,0px)*0);
+}
+.bandeau-in{max-width:1240px;margin:0 auto;display:flex;align-items:center;gap:12px}
+.bandeau-id{min-width:0;flex:1}
+.bandeau-t{
+  font-weight:650;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.bandeau-s{font-size:12px;color:#A9B7A4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bandeau-tot{text-align:right;line-height:1.05;flex:none}
+.bandeau-tot b{font-family:var(--mono);font-size:23px;font-weight:600;letter-spacing:-.02em}
+.bandeau-tot span{display:block;font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:#93A28E}
+.pastille{
+  width:15px;height:15px;border-radius:50%;flex:none;background:var(--accent);
+  box-shadow:0 0 0 2px rgba(255,255,255,.28);
+}
+/* Une charge fixe se lit en grille et non en rangée souple : la pastille, le
+   texte et les montants tombent chacun sur leur colonne, donc les montants
+   s'alignent au chiffre près d'une ligne à l'autre. En rangée, la longueur du
+   libellé les faisait danser. */
+.charge-l{
+  display:grid;grid-template-columns:15px 1fr auto;align-items:start;column-gap:11px;
+  padding:11px;border:1px solid var(--trait);border-radius:var(--r-s);
+  background:var(--carte);margin-bottom:8px;
+}
+.charge-l .pastille{margin-top:3px}
+.charge-n{font-weight:600;font-size:14.5px}
+.charge-q{display:block;font-size:12px;color:var(--doux);margin-top:1px}
+.charge-p{display:block;font-size:11.5px;color:var(--gris-clair);margin-top:1px}
+.charge-m{display:block;font-size:15px;white-space:nowrap}
+.charge-a{display:block;font-size:11px;color:var(--doux);white-space:nowrap}
+.charge-act{grid-column:2/4;display:flex;gap:6px;margin-top:8px}
+
+/* Le carnet suit la même grille que les charges : pastille, texte, montant,
+   chacun dans sa colonne. Les montants tombent donc les uns sous les autres
+   quelle que soit la longueur du nom. */
+.chantier-l{
+  display:grid;grid-template-columns:15px 1fr auto;align-items:start;column-gap:11px;
+  padding:11px;border:1px solid var(--trait);border-radius:var(--r-s);
+  background:var(--carte);margin-bottom:8px;
+}
+.chantier-l .pastille{margin-top:3px}
+/* Le prélèvement se voit sans se confondre avec le statut du jour : une
+   marque dans l'angle, pas une seconde pastille. */
+.cal-prel{position:absolute;top:1px;right:3px;font-size:11px;line-height:1;
+  color:var(--encre);font-weight:700;opacity:.75}
+/* Le compté n'est pas le mesuré : il porte l'ocre des prévisions, pas le
+   vert de ce qui a eu lieu. */
+.compte{color:#B98A00}
+.chantier-n{font-weight:600;font-size:14.5px}
+.chantier-d{display:block;font-size:12px;color:var(--doux);margin-top:2px}
+.chantier-e{display:block;font-size:12px;margin-top:4px}
+/* Trois lignes dans la colonne de droite : le hors taxes et le TTC se lisent
+   d'un balayage, la TVA se lit quand on s'arrête dessus. */
+.chantier-m{display:block;font-size:15px;white-space:nowrap;text-align:right}
+.chantier-m b{display:block;font-weight:600;line-height:1.25}
+.chantier-m small{display:block;font-size:11px;color:var(--doux);margin-top:1px}
+.chantier-act{grid-column:2/4;display:flex;gap:6px;margin-top:9px}
+
+/* Le bilan de l'écran Entreprise. Trois colonnes tiennent sur 375 px sans
+   couper un montant ; un seul chiffre par bulle, sinon on ne sait plus
+   lequel des deux on lit. */
+.bilan{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:9px}
+.bulle{
+  background:var(--carte2);border:1px solid var(--trait);border-radius:var(--r);
+  padding:9px 10px;text-align:left;display:block;font:inherit;color:inherit;
+}
+.bulle .v{font-size:17px;display:block;line-height:1.1;white-space:nowrap;letter-spacing:-.01em}
+.bulle .e{
+  display:block;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--doux);margin-top:3px;
+}
+.bulle .s{display:block;font-size:11.5px;color:var(--doux);margin-top:2px}
+.bulle.chaud{background:var(--alerte-fond);border-color:#E4C9B4}
+.suite{
+  display:flex;align-items:center;gap:7px;margin-top:9px;padding:9px 11px;width:100%;
+  background:var(--carte);border:1px solid var(--trait);border-radius:var(--r);
+  font:inherit;font-size:13.5px;color:inherit;text-align:left;
+}
+.suite .pic{width:17px;height:17px;color:var(--vert-marque);flex:none}
+.bandeau-btn{
+  color:#DDE5D8;border:1px solid rgba(255,255,255,.22);border-radius:var(--r-s);
+  padding:5px 9px;font-size:12.5px;flex:none;
+}
+/* Le logo remplace le losange. Il est presque entièrement en encre sombre :
+   posé tel quel sur le bandeau sombre, il disparaîtrait. On lui donne donc
+   la même pastille crème que l'icône de l'application, carrée et assez
+   grande pour qu'il se lise — c'est le repère de marque, il porte plus que
+   les autres boutons. */
+#b-accueil{
+  width:33px;height:33px;padding:0;background-color:#F7F1E6;
+  background-image:var(--logo);background-repeat:no-repeat;
+  background-position:center;background-size:auto 25px;
+  border-color:rgba(255,255,255,.28);
+}
+.bandeau-btn:hover{background:rgba(255,255,255,.1)}
+
+/* ------------------------------------------------------------ onglets */
+.onglets{
+  position:fixed;left:0;right:0;bottom:0;z-index:45;display:flex;
+  background:var(--carte);border-top:1px solid var(--trait);
+  padding-bottom:env(safe-area-inset-bottom,0px);box-shadow:0 -2px 12px rgba(23,37,31,.06);
+}
+.onglets button{
+  flex:1;padding:9px 2px 8px;font-size:11px;font-weight:600;color:var(--gris);
+  border-top:2.5px solid transparent;letter-spacing:.02em;
+}
+.onglets button .ic{display:block;line-height:0;margin-bottom:3px}
+.onglets button .ic .pic{width:21px;height:21px;stroke-width:1.6}
+.onglets button[aria-selected=true]{color:var(--accent);border-top-color:var(--accent)}
+
+/* -------------------------------------------------------------- cartes */
+.carte{
+  background:var(--carte);border:1px solid var(--trait);border-radius:var(--r);
+  padding:14px;margin-bottom:12px;box-shadow:var(--ombre);
+}
+.carte>h2{
+  margin:0 0 10px;font-size:12px;font-weight:700;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--gris);
+}
+.carte-titre{display:flex;align-items:center;gap:10px;margin:0 0 10px}
+.carte-titre h2{margin:0;flex:1}
+
+/* -------------------------------------------------------------- champs */
+.champ{margin-bottom:11px}
+.champ>label,.champ>.lab{display:block;margin-bottom:4px}
+.grille{display:grid;gap:11px}
+.g2{grid-template-columns:1fr 1fr}
+.g3{grid-template-columns:1fr 1fr 1fr}
+input[type=text],input[type=number],input[type=search],select,textarea{
+  width:100%;padding:9px 10px;background:#fff;border:1px solid var(--trait-fort);
+  border-radius:var(--r-s);
+}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--accent-doux)}
+input.gros{font-family:var(--mono);font-size:24px;font-weight:600;text-align:center;padding:8px 6px;letter-spacing:.01em}
+input.err{border-color:var(--alerte);background:var(--alerte-fond)}
+textarea{resize:vertical;min-height:56px}
+
+.pas{display:flex;gap:7px;align-items:stretch}
+.pas input{flex:1}
+.pas button{
+  width:46px;flex:none;border:1px solid var(--trait-fort);border-radius:var(--r-s);
+  background:var(--carte2);font-size:17px;font-weight:600;color:var(--encre);
+}
+.pas button:active{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+/* --------------------------------------------------------------- chips */
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{
+  padding:7px 11px;border:1px solid var(--trait-fort);border-radius:99px;
+  background:var(--carte2);font-size:13.5px;font-weight:600;white-space:nowrap;
+}
+.chip small{font-weight:400;color:var(--gris);margin-left:5px;font-size:11.5px}
+.chip:hover{border-color:var(--accent)}
+.chip[aria-pressed=true]{background:var(--accent);color:var(--accent-texte);border-color:var(--accent)}
+.chip[aria-pressed=true] small{color:rgba(255,255,255,.8)}
+.chip.nul[aria-pressed=true]{background:var(--alerte);border-color:var(--alerte)}
+.chip.plus{background:none;border-style:dashed;font-weight:500;color:var(--gris)}
+
+/* -------------------------------------------------------------- boutons */
+.btn{
+  padding:10px 15px;border-radius:var(--r-s);border:1px solid var(--trait-fort);
+  background:var(--carte2);font-weight:600;font-size:14px;
+}
+.btn:hover{border-color:var(--gris)}
+.btn.primaire{background:var(--accent);border-color:var(--accent);color:var(--accent-texte)}
+.btn.primaire:hover{filter:brightness(1.08)}
+.btn.danger{color:var(--alerte);border-color:#D9BCAE}
+.btn.danger:hover{background:var(--alerte-fond)}
+.btn.plein{width:100%}
+.btn:disabled{opacity:.42;cursor:not-allowed}
+.btn-rang{display:flex;gap:9px;flex-wrap:wrap}
+.btn-rang>.btn{flex:1;min-width:132px}
+.btn-min{padding:5px 9px;font-size:12.5px;border-radius:6px;border:1px solid var(--trait);background:var(--carte2);font-weight:600}
+
+/* ------------------------------------------- ruban de plaquettes (signature) */
+.ruban{
+  display:flex;gap:5px;overflow-x:auto;padding:2px 0 8px;margin-bottom:2px;
+  scrollbar-width:thin;
+}
+.plaq{
+  flex:none;min-width:56px;padding:5px 8px 6px;border-radius:4px 4px 7px 7px;
+  background:var(--plaq);color:#fff;text-align:center;
+  font-family:var(--mono);font-size:12.5px;font-weight:600;line-height:1.15;
+  position:relative;box-shadow:0 1px 2px rgba(23,37,31,.2);
+}
+.plaq::before{
+  content:"";position:absolute;top:3px;left:50%;transform:translateX(-50%);
+  width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.45);
+}
+.plaq{padding-top:13px}
+.plaq em{display:block;font-style:normal;font-size:9.5px;opacity:.85;font-family:var(--sans)}
+.plaq.suiv{background:none;color:var(--gris);border:1.5px dashed var(--trait-fort);box-shadow:none}
+.plaq.suiv::before{background:var(--trait)}
+
+/* ------------------------------------------------- l'arrivée du cubage */
+/* Reprendre le bordereau en cours, ou choisir le cubage du suivant. Les
+   quatre types existaient déjà, mais au huitième champ de l'en-tête : on ne
+   pouvait pas les choisir sans savoir qu'ils étaient là. */
+.cub-reprise{
+  display:flex;align-items:center;gap:12px;width:100%;text-align:left;
+  background:var(--carte2);border:1px solid var(--trait-fort);border-radius:14px;
+  padding:14px;margin-bottom:10px;font:inherit;color:inherit;
+}
+.cub-reprise:hover{border-color:var(--encre)}
+.cub-reprise .pastille{flex:none;width:11px;height:11px;border-radius:50%}
+.cub-reprise .txt{flex:1;min-width:0}
+.cub-reprise b{display:block;font-size:15px;letter-spacing:-.01em}
+.cub-reprise small{display:block;font-size:12px;color:var(--gris);margin-top:2px}
+.cub-reprise .fleche{flex:none;font-size:19px;line-height:1;color:var(--gris)}
+.cub-tuile{align-items:flex-start;margin-bottom:10px;box-shadow:var(--ombre)}
+.cub-tuile .ic{margin-top:1px}
+.cub-tuile .txt{flex:1;min-width:0}
+.cub-codes{margin-top:7px;display:flex;flex-wrap:wrap;gap:4px}
+.cub-codes i{
+  font-style:normal;font-family:var(--mono);font-size:11px;color:var(--gris);
+  background:var(--carte2);border:1px solid var(--trait);border-radius:4px;padding:1px 5px;
+}
+/* Chablis et Sans classement : gardés à portée, mais en retrait. Ce sont les
+   deux dont il ne se sert pas. */
+.cub-autres{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.cub-mini{
+  background:none;border:1px dashed var(--trait-fort);border-radius:12px;
+  padding:11px 12px;text-align:left;font:inherit;color:inherit;
+}
+.cub-mini:hover{border-style:solid;border-color:var(--encre)}
+.cub-mini b{display:block;font-size:13.5px}
+.cub-mini small{display:block;font-size:11.5px;color:var(--gris);margin-top:2px;line-height:1.35}
+.cub-sep{display:flex;align-items:center;gap:10px;margin:16px 0 10px}
+.cub-sep>span{flex:none}
+.cub-sep::before,.cub-sep::after{content:"";flex:1;height:1px;background:var(--trait)}
+
+/* -------------------------------------------------------------- tableaux */
+.tab-boite{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:var(--r-s)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:5px 8px;border-bottom:1px solid var(--trait);text-align:right;white-space:nowrap}
+th{
+  background:var(--encre);color:#E4EBE0;font-size:10px;font-weight:700;letter-spacing:.055em;
+  text-transform:uppercase;position:sticky;top:0;z-index:2;text-align:right;
+}
+th.g,td.g{text-align:left}
+td.num,th.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+tbody tr:nth-child(even){background:rgba(0,0,0,.018)}
+tbody tr.tot{background:var(--carte2);font-weight:700}
+tbody tr.tot td{border-top:1.5px solid var(--trait-fort)}
+tbody tr.tot-gen{background:var(--accent-doux);font-weight:700}
+tr.nulle td{color:var(--alerte)}
+td.act{width:1%;padding:3px 6px}
+.tab-boite table td:first-child,.tab-boite table th:first-child{padding-left:11px}
+
+/* -------------------------------------------------------------- divers */
+.stat-rang{display:flex;flex-wrap:wrap;gap:9px}
+.stat{
+  flex:1;min-width:104px;background:var(--carte2);border:1px solid var(--trait);
+  border-radius:var(--r-s);padding:8px 10px;
+}
+.stat b{display:block;font-family:var(--mono);font-size:19px;font-weight:600;letter-spacing:-.01em}
+.avis{
+  border-radius:var(--r-s);padding:9px 11px;font-size:13.5px;margin-bottom:11px;
+  background:var(--accent-doux);border:1px solid var(--trait);
+}
+.avis.rouge{background:var(--alerte-fond);border-color:#DFC2B3;color:#7A3315}
+.avis.tiede{background:var(--tiede-fond);border-color:var(--tiede-trait);color:var(--tiede)}
+.avis p{margin:0}
+.avis p+p{margin-top:5px}
+.vide{text-align:center;padding:34px 14px;color:var(--gris)}
+.vide p{margin:0 0 14px}
+.repli{border-top:1px solid var(--trait);margin-top:11px;padding-top:10px}
+.repli>summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--gris);list-style:none}
+.repli>summary::-webkit-details-marker{display:none}
+.repli>summary::before{content:"▸ ";display:inline-block;transition:transform .15s}
+.repli[open]>summary::before{content:"▾ "}
+.repli>div{padding-top:11px}
+.sous-onglets{display:flex;gap:5px;overflow-x:auto;margin-bottom:12px;padding-bottom:2px}
+.sous-onglets button{
+  padding:7px 13px;border-radius:99px;border:1px solid var(--trait-fort);
+  background:var(--carte);font-size:13px;font-weight:600;white-space:nowrap;
+}
+.sous-onglets button[aria-selected=true]{background:var(--encre);color:#EAEFE6;border-color:var(--encre)}
+.liste-item{
+  display:flex;align-items:center;gap:11px;padding:11px;border:1px solid var(--trait);
+  border-radius:var(--r-s);background:var(--carte);margin-bottom:8px;text-align:left;width:100%;
+}
+.liste-item:hover{border-color:var(--accent)}
+.liste-item .li-c{flex:1;min-width:0}
+.liste-item b{display:block;font-size:14.5px;overflow:hidden;text-overflow:ellipsis}
+.liste-item small{color:var(--gris);font-size:12px}
+.liste-item.actif{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-doux)}
+
+/* --------------------------------------------------------------- modale */
+.modale{
+  position:fixed;inset:0;z-index:60;background:rgba(23,37,31,.45);
+  display:flex;align-items:flex-end;justify-content:center;padding:0;
+}
+.modale[hidden]{display:none}
+.modale-in{
+  background:var(--papier);width:100%;max-width:660px;max-height:92vh;overflow:auto;
+  border-radius:14px 14px 0 0;padding:16px 15px calc(20px + env(safe-area-inset-bottom,0px));
+}
+.modale-tete{display:flex;align-items:center;gap:10px;margin-bottom:13px}
+.modale-tete h2{margin:0;font-size:17px;flex:1}
+.x{font-size:23px;line-height:1;padding:2px 9px;color:var(--gris);border-radius:6px}
+.x:hover{background:var(--carte2)}
+@media(min-width:700px){
+  .modale{align-items:center;padding:20px}
+  .modale-in{border-radius:14px}
+}
+
+/* ------------------------------------------------------------- toast */
+#toast{
+  position:fixed;left:50%;transform:translateX(-50%);bottom:78px;z-index:80;
+  background:var(--encre);color:#EAEFE6;padding:9px 15px;border-radius:99px;
+  font-size:13.5px;box-shadow:0 4px 18px rgba(0,0,0,.28);max-width:88vw;text-align:center;
+}
+#toast[hidden]{display:none}
+
+/* --------------------------------------------------------- bureau ---- */
+@media(min-width:900px){
+  main{padding:18px 20px 30px}
+  .onglets{
+    position:sticky;top:59px;bottom:auto;border-top:none;border-bottom:1px solid var(--trait);
+    box-shadow:none;background:var(--papier);max-width:1240px;margin:0 auto;padding:0;
+  }
+  .onglets button{flex:none;padding:11px 18px;font-size:13px;border-top:none;border-bottom:2.5px solid transparent}
+  .onglets button .ic{display:none}
+  .onglets button[aria-selected=true]{border-bottom-color:var(--accent)}
+  #vue-saisie .saisie-grille{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
+}
+
+/* -------------------------------------------------------- impression -- */
+@media print{
+  body{background:#fff;font-size:10.5px}
+  .bandeau,.onglets,#toast,.no-print,.modale{display:none !important}
+  main{padding:0;max-width:none}
+  .vue{display:none !important}
+  .vue.impression{display:block !important}
+  .carte{border:none;box-shadow:none;padding:0;margin:0 0 14px;background:none}
+  table{font-size:9.5px}
+  th{background:#e8e8e8 !important;color:#000 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  th,td{border:1px solid #999;padding:2px 4px}
+  tbody tr:nth-child(even){background:none}
+  tbody tr.tot,tbody tr.tot-gen{background:#efefef !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .tab-boite{overflow:visible}
+  .saut{page-break-before:always}
+  /* Les intitulés de la fiche sont blancs sur noir : sans cette consigne le
+     navigateur retire les aplats et ils deviennent illisibles. */
+  .fiche-ch .feuille{border:0;border-radius:0;margin:0;padding:0}
+  .fiche-ch .fs > h2,.fiche-ch .fu{background:#111 !important;color:#fff !important;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .fiche-ch .fc.on i{background:#111 !important;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .imp-tete{margin-bottom:8px}
+  .imp-tete h1{font-size:15px;margin:0 0 3px}
+  .imp-tete dl{display:grid;grid-template-columns:auto 1fr auto 1fr;gap:1px 8px;margin:0;font-size:10px}
+  .imp-tete dt{font-weight:700}
+  .imp-tete dd{margin:0}
+}
+/* ----------------------------------------------- écran de démarrage */
+/* Posé hors de #app : il couvre tout, bandeau compris, et s'efface sans
+   rien laisser dans la mise en page. Le fond est le crème du manifeste,
+   celui qu'Android affiche déjà avant nous — la jointure entre son écran
+   et le nôtre ne doit pas se voir. */
+#demarrage{position:fixed;top:0;right:0;bottom:0;left:0;z-index:100;
+  background:var(--papier);display:flex;align-items:center;justify-content:center;
+  text-align:center;padding:24px;
+  transition:opacity .34s ease,visibility .34s ease}
+#demarrage.parti{opacity:0;visibility:hidden;pointer-events:none}
+/* Sans fondu : au premier affichage de la page, et quand l'écran est
+   désactivé. Il ne doit pas s'effacer sous les yeux, il ne doit pas
+   exister du tout. */
+#demarrage.sec{transition:none}
+.dem-in{display:flex;flex-direction:column;align-items:center}
+.dem-logo{width:96px;height:105px;background:var(--logo) center/contain no-repeat}
+.dem-nom{font-size:34px;font-weight:600;letter-spacing:-.02em;line-height:1;
+  color:var(--vert-marque);margin:16px 0 0}
+.dem-filet{width:38px;height:2px;border-radius:2px;background:var(--brun-marque);
+  margin:13px 0 0;opacity:.75}
+.dem-sous{font-size:13px;line-height:1.5;color:var(--doux);margin:12px 0 0;
+  max-width:34ch;letter-spacing:.01em}
+/* La marque de l'entreprise signe l'écran de démarrage : discrète, en
+   dernier, après la phrase de l'outil. */
+.dem-ent{display:flex;align-items:center;gap:9px;margin:22px 0 0;
+  padding:7px 13px;border:1px solid var(--trait);border-radius:20px;
+  background:var(--carte);max-width:min(88vw,22rem)}
+.dem-ent img{width:22px;height:22px;object-fit:contain;flex:none;border-radius:4px}
+.dem-ent span{font-size:13px;color:var(--doux);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+#demarrage.joue .dem-ent{animation:dem-monte .42s cubic-bezier(.22,.7,.3,1) .46s both}
+#demarrage.joue .dem-logo {animation:dem-monte .42s cubic-bezier(.22,.7,.3,1) both}
+#demarrage.joue .dem-nom  {animation:dem-monte .42s cubic-bezier(.22,.7,.3,1) .16s both}
+#demarrage.joue .dem-filet{animation:dem-etale .40s cubic-bezier(.22,.7,.3,1) .30s both}
+#demarrage.joue .dem-sous {animation:dem-monte .42s cubic-bezier(.22,.7,.3,1) .36s both}
+@keyframes dem-monte{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:none}}
+@keyframes dem-etale{from{opacity:0;transform:scaleX(.2)}to{opacity:.75;transform:none}}
+
+/* ------------------------------------------- avis de mise à jour */
+/* Un toast disparaît en deux secondes et se rate. Cet avis reste jusqu'à ce
+   qu'on réponde, sans bloquer : on peut travailler et l'installer plus tard.
+   Posé hors de #app, au-dessus des onglets du bas. */
+#maj-avis{
+  position:fixed;left:50%;transform:translateX(-50%);
+  bottom:calc(12px + env(safe-area-inset-bottom,0px));
+  z-index:90;width:min(560px,calc(100vw - 24px));
+  background:var(--encre);color:#EAEFE6;border-radius:13px;
+  border:1px solid rgba(255,255,255,.14);
+  box-shadow:0 6px 24px -6px rgba(0,0,0,.45);
+  padding:12px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+}
+#maj-avis[hidden]{display:none}
+#maj-avis .txt{flex:1;min-width:180px;font-size:13.5px;line-height:1.4}
+#maj-avis .txt b{display:block;font-size:14.5px}
+#maj-avis .txt small{color:#B9C6B2;font-size:12px}
+#maj-avis button{font:inherit;font-size:13px;border-radius:9px;padding:8px 13px;
+  border:0;cursor:pointer;flex:none}
+#maj-avis .oui{background:var(--accent);color:#fff;font-weight:600}
+#maj-avis .non{background:transparent;color:#B9C6B2;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.2)}
+
+@media(prefers-reduced-motion:reduce){*{transition:none !important;animation:none !important}}
