@@ -6,6 +6,14 @@
    comme le ferait un doigt, et vérifie le résultat. Un test rouge veut
    dire qu'un comportement qui marchait ne marche plus.
    Dépendance : npm install jsdom
+
+   node outils/tests.js [fichier] [filtre] [options]
+     --sequentiel     tous les scénarios dans ce processus, l'un après
+                      l'autre (pour déboguer)
+     --processus=N    N processus en parallèle (par défaut : cœurs − 1 ;
+                      aussi réglable par SYLVE_PROCESSUS)
+     --durees         affiche où le temps passe : scénarios les plus longs,
+                      part des pauses, part des ouvertures de JSDOM
    ===================================================================== */
 'use strict';
 /* Fuseau avec changement d'heure, posé avant toute date : la suite ne dépend
@@ -13,17 +21,29 @@
    d'un jour dans la fenêtre des journées à trancher). */
 process.env.TZ = 'Europe/Paris';
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
+const util = require('util');
+const { fork } = require('child_process');
 const { JSDOM } = require('jsdom');
 const VOCABULAIRE = require('./vocabulaire.js');
 
-const APP = process.argv[2] || path.join(__dirname, '..', 'index.html');
+/* Les options se reconnaissent à leur « -- » : le fichier et le filtre restent
+   les deux premiers arguments sans tiret, comme avant. */
+const ARGS = process.argv.slice(2);
+const DRAPEAUX = ARGS.filter(a => a.indexOf('--') === 0);
+const POSITIONNELS = ARGS.filter(a => a.indexOf('--') !== 0);
+const APP = POSITIONNELS[0] || path.join(__dirname, '..', 'index.html');
+const FILTRE = POSITIONNELS[1] || '';
 const html = fs.readFileSync(APP, 'utf8');
 
 let ok = 0, ko = 0;
 const scenarios = [];
 const scenario = (nom, fn) => scenarios.push({ nom, fn });
-function verifier(quoi, attendu, obtenu) {
+
+/* Où passe le temps d'un scénario : remis à zéro avant chacun. Les scénarios
+   d'un même processus se jouent l'un après l'autre, donc un seul compteur. */
+let mesure = { pause: 0, pauses: 0, jsdom: 0, pret: 0, ouvertures: 0 };function verifier(quoi, attendu, obtenu) {
   const juste = JSON.stringify(attendu) === JSON.stringify(obtenu);
   if (juste) { ok++; console.log('    ✓ ' + quoi); }
   else { ko++; console.log(`    ✕ ${quoi}\n        attendu : ${JSON.stringify(attendu)}\n        obtenu  : ${JSON.stringify(obtenu)}`); }
@@ -71,6 +91,7 @@ function ouvrir(graines, options) {
     verifier('la graine n’invente aucun champ', [], inconnus);
   }
   return new Promise(resolve => {
+    const avantJsdom = performance.now();
     const dom = new JSDOM(html, {
       runScripts: 'dangerously', pretendToBeVisual: true, url: 'https://local/',
       beforeParse(w) {
@@ -84,12 +105,15 @@ function ouvrir(graines, options) {
         if (options.avant) options.avant(w);
       }
     });
-    const erreurs = [];
+    const apresJsdom = performance.now();
+    mesure.jsdom += apresJsdom - avantJsdom;
+    mesure.ouvertures++;    const erreurs = [];
     dom.window.addEventListener('error', e => erreurs.push(e.message));
     dom.window.console.error = (...a) => erreurs.push(a.join(' '));
     const plafond = options.attente || 8000;
     const depart = Date.now();
     const rendreLaMain = () => {
+      mesure.pret += performance.now() - apresJsdom;
       const w = dom.window, d = w.document;
       resolve({
         w, d, erreurs,
@@ -100,7 +124,11 @@ function ouvrir(graines, options) {
         saisir: (s, v) => { const e = d.querySelector(s); if (!e) return false; e.value = v; e.dispatchEvent(new w.Event('input', { bubbles: true })); return true; },
         choisir: (s, v) => { const e = d.querySelector(s); if (!e) return false; e.value = v; e.dispatchEvent(new w.Event('change', { bubbles: true })); return true; },
         stock: k => JSON.parse(w.localStorage.getItem('bordcub.' + k) || 'null'),
-        pause: ms => new Promise(r => setTimeout(r, ms || 350)),
+        pause: ms => {
+          const debut = performance.now();
+          mesure.pauses++;
+          return new Promise(r => setTimeout(() => { mesure.pause += performance.now() - debut; r(); }, ms || 350));
+        },
         fichier: (selecteur, nom, contenu) => {
           w.FileReader = function () { this.readAsText = () => { this.result = contenu; this.onload && this.onload(); }; };
           const i = d.querySelector(selecteur); if (!i) return false;
@@ -8403,26 +8431,209 @@ scenario('Finances : les montants ne passent plus à la ligne', async () => {
 /* Un troisième argument ne joue que les scénarios dont le nom le contient.
    Sert à éprouver un contrôle en le cassant exprès : rejouer les quarante
    autres pour vérifier qu'un seul crie coûte deux minutes pour rien.
-   node outils/tests.js index.html "double compte" */
+   node outils/tests.js index.html "double compte"
+
+   Chaque scénario ouvre sa propre application et ne partage rien avec les
+   autres : on les répartit donc entre plusieurs processus Node, un scénario
+   à la fois par processus, dans l'ordre d'origine. Le processus principal ne
+   joue rien : il distribue, regroupe les sorties dans l'ordre d'origine et
+   refuse de conclure au vert si un scénario s'est perdu en route ou si un
+   processus est mort. Avec un seul scénario (un filtre précis) ou avec
+   --sequentiel, tout se joue ici, comme avant. */
+const OPTIONS_CONNUES = ['--sequentiel', '--durees', '--ouvrier'];
+
+/* Joue un scénario et rend ce qu'il a donné. Dans un processus ouvrier la
+   sortie est mise de côté : le processus principal la réimprime dans l'ordre
+   d'origine, sans la mêler à celle des autres. */
+async function jouer(s, mettreDeCote) {
+  const lignes = [];
+  const imprimer = console.log;
+  if (mettreDeCote) console.log = (...a) => lignes.push(util.format(...a));
+  mesure = { pause: 0, pauses: 0, jsdom: 0, pret: 0, ouvertures: 0 };
+  const ok0 = ok, ko0 = ko, debut = performance.now();
+  try { await s.fn(); }
+  catch (e) { ko++; console.log('    ✕ le scénario s\'est interrompu : ' + e.message); }  console.log = imprimer;
+  return Object.assign({ nom: s.nom, lignes, ok: ok - ok0, ko: ko - ko0,
+    duree: performance.now() - debut }, mesure);
+}
+
+function montrer(r) {
+  console.log('\n  ' + r.nom);
+  r.lignes.forEach(l => console.log(l));
+}
+
+/* Processus ouvrier : attend qu'on lui désigne un scénario par son rang dans
+   la liste complète, le joue, rend son résultat. S'il perd son processus
+   principal il s'arrête, pour ne pas rester orphelin. */
+function etreOuvrier() {
+  process.on('disconnect', () => process.exit(1));
+  process.on('message', async m => {
+    if (m.type === 'fin') process.exit(0);
+    if (m.type !== 'jouer') return;
+    const r = await jouer(scenarios[m.rang], true);
+    r.rang = m.rang;
+    process.send({ type: 'resultat', r });
+  });
+  process.send({ type: 'pret', total: scenarios.length });
+}
+
+/* Répartit `rangs` entre `n` processus, un scénario à la fois et le suivant
+   à celui qui se libère (les scénarios ne durent pas tous pareil). Rend les
+   résultats rangés comme `rangs`, avec un trou là où rien n'est revenu, et
+   la liste des anomalies du banc lui-même. */
+function enParallele(rangs, n) {
+  return new Promise(resolve => {
+    const resultats = new Array(rangs.length);
+    const anomalies = [];
+    let suivant = 0, affiche = 0, vivants = n, fini = false;
+    /* Affiche, dans l'ordre d'origine, tout ce qui est déjà revenu. */
+    const vider = () => {
+      while (affiche < rangs.length && resultats[affiche]) montrer(resultats[affiche++]);
+    };
+    const terminer = () => {
+      if (fini) return;
+      fini = true;
+      for (; affiche < rangs.length; affiche++) {
+        if (resultats[affiche]) { montrer(resultats[affiche]); continue; }
+        const nom = scenarios[rangs[affiche]].nom;
+        console.log('\n  ' + nom + '\n    ✕ ce scénario n\'a pas été joué jusqu\'au bout');
+        anomalies.push('scénario perdu en route : « ' + nom + ' »');
+      }
+      resolve({ resultats, anomalies });
+    };
+    const donnerDuTravail = o => {
+      if (suivant < rangs.length) {
+        o.encours = suivant;
+        o.send({ type: 'jouer', rang: rangs[suivant++] });
+      } else {
+        o.encours = null;
+        o.congedie = true;
+        o.send({ type: 'fin' });
+      }
+    };
+    const sortir = o => {
+      if (o.sorti) return;
+      o.sorti = true;
+      if (--vivants === 0) terminer();
+    };
+    for (let i = 0; i < n; i++) {
+      const o = fork(__filename, [APP, '--ouvrier'], { stdio: ['inherit', 'inherit', 'inherit', 'ipc'] });
+      o.encours = null; o.congedie = false; o.sorti = false;
+      o.on('message', m => {
+        if (m.type === 'pret') {
+          if (m.total !== scenarios.length) {
+            anomalies.push('un processus connaît ' + m.total + ' scénarios, le principal en connaît ' + scenarios.length);
+          }
+          donnerDuTravail(o);
+        } else if (m.type === 'resultat') {
+          const k = o.encours;
+          if (k === null || m.r.rang !== rangs[k] || m.r.nom !== scenarios[rangs[k]].nom || resultats[k]) {
+            anomalies.push('un résultat est revenu qui ne correspond à aucun scénario en cours : « ' + m.r.nom + ' »');
+          } else {
+            resultats[k] = m.r;
+          }
+          o.encours = null;
+          vider();
+          donnerDuTravail(o);
+        } else {
+          anomalies.push('message inconnu d\'un processus : ' + JSON.stringify(m));
+        }
+      });
+      o.on('error', e => { anomalies.push('un processus n\'a pas pu démarrer ou répondre : ' + e.message); sortir(o); });
+      /* Une sortie qu'on n'a pas demandée est un plantage, même avec le code
+         0 : sans cette garde, un processus tombé laisserait le contrôle
+         conclure « 0 échec » sur ce qu'il avait déjà rendu. */
+      o.on('exit', (code, signal) => {
+        if (!o.congedie || code !== 0) {
+          anomalies.push('un processus s\'est arrêté (code ' + code + (signal ? ', signal ' + signal : '') + ')' +
+            (o.encours !== null ? ' pendant « ' + scenarios[rangs[o.encours]].nom + ' »' : ''));
+        }
+        sortir(o);
+      });
+    }
+  });
+}
+
+const sec = ms => (ms / 1000).toFixed(1).replace('.', ',') + ' s';
+
+/* Où le temps est passé. Les durées par scénario sont celles du passage
+   séquentiel quand on le demande : en parallèle elles s'allongent un peu, les
+   processus se disputant les cœurs. */
+function afficherDurees(resultats, mur) {
+  const somme = c => resultats.reduce((a, r) => a + r[c], 0);
+  const total = somme('duree');
+  const part = ms => (total ? Math.round(100 * ms / total) : 0) + ' %';
+  const ouvertures = somme('jsdom') + somme('pret');
+  const autre = total - somme('pause') - ouvertures;
+  console.log('\n' + '─'.repeat(52) + '\nDurées');
+  console.log('  Temps cumulé des scénarios : ' + sec(total) + '  (durée réelle du passage : ' + sec(mur) + ')');
+  console.log('  Pauses (t.pause) : ' + sec(somme('pause')) + ' · ' + part(somme('pause')) +
+    ' · ' + somme('pauses') + ' appels');
+  console.log('  Ouvertures de l\'application : ' + sec(ouvertures) + ' · ' + part(ouvertures) +
+    ' · ' + somme('ouvertures') + ' ouvertures');
+  console.log('      construction de JSDOM et exécution des scripts : ' + sec(somme('jsdom')));
+  console.log('      attente de data-pret : ' + sec(somme('pret')));
+  console.log('  Le reste (clics, relectures, calculs) : ' + sec(autre) + ' · ' + part(autre));
+  console.log('\n  Les 15 scénarios les plus longs :');
+  resultats.slice().sort((a, b) => b.duree - a.duree).slice(0, 15).forEach(r => {
+    console.log('    ' + sec(r.duree).padStart(7) + '  ' + r.nom + '   [pauses ' + sec(r.pause) +
+      ' · ' + r.ouvertures + ' ouverture(s) ' + sec(r.jsdom + r.pret) + ']');
+  });
+}
+
 (async () => {
-  const filtre = (process.argv[3] || '').toLowerCase();
-  const joues = filtre
-    ? scenarios.filter(s => s.nom.toLowerCase().includes(filtre))
-    : scenarios;
-  console.log('Sylve — tests de non-régression' +
-    (filtre ? ` — filtre « ${process.argv[3]} » : ${joues.length} scénario(s)` : '') +
-    '\n' + '─'.repeat(52));
-  if (filtre && !joues.length) {
-    console.log('✕ aucun scénario ne correspond à « ' + process.argv[3] + ' ».');
+  const inconnues = DRAPEAUX.filter(a => OPTIONS_CONNUES.indexOf(a) < 0 && !/^--processus=\d+$/.test(a));
+  if (inconnues.length) {
+    console.log('✕ option inconnue : ' + inconnues.join(' ') + ' (connues : --sequentiel, --processus=N, --durees).');
     process.exit(1);
   }
-  for (const s of joues) {
-    console.log('\n  ' + s.nom);
-    try { await s.fn(); }
-    catch (e) { ko++; console.log('    ✕ le scénario s\'est interrompu : ' + e.message); }
+  if (DRAPEAUX.indexOf('--ouvrier') >= 0) return etreOuvrier();
+
+  const debut = performance.now();
+  const filtre = FILTRE.toLowerCase();
+  const rangs = [];
+  scenarios.forEach((s, i) => { if (!filtre || s.nom.toLowerCase().includes(filtre)) rangs.push(i); });
+  console.log('Sylve — tests de non-régression' +
+    (filtre ? ` — filtre « ${FILTRE} » : ${rangs.length} scénario(s)` : '') +
+    '\n' + '─'.repeat(52));
+  if (filtre && !rangs.length) {
+    console.log('✕ aucun scénario ne correspond à « ' + FILTRE + ' ».');
+    process.exit(1);
   }
+
+  let demande = 0;
+  DRAPEAUX.forEach(a => { const m = /^--processus=(\d+)$/.exec(a); if (m) demande = +m[1]; });
+  if (!demande) demande = +process.env.SYLVE_PROCESSUS || 0;
+  if (!demande) demande = (os.availableParallelism ? os.availableParallelism() : os.cpus().length) - 1;
+  const processus = DRAPEAUX.indexOf('--sequentiel') >= 0 ? 1 : Math.max(1, Math.min(demande, rangs.length));
+
+  let resultats, anomalies = [];
+  if (processus === 1) {
+    resultats = [];
+    for (const rang of rangs) {
+      console.log('\n  ' + scenarios[rang].nom);
+      resultats.push(await jouer(scenarios[rang], false));
+    }
+  } else {
+    const rendu = await enParallele(rangs, processus);
+    resultats = rendu.resultats.filter(Boolean);
+    anomalies = rendu.anomalies;
+  }
+  /* Le compte se fait sur ce qui est revenu, pas sur ce qu'on avait prévu :
+     un scénario perdu ne doit pas pouvoir passer pour un scénario réussi. */
+  if (resultats.length !== rangs.length) {
+    anomalies.push(resultats.length + ' scénario(s) joué(s) sur ' + rangs.length + ' prévus');
+  }
+  const okTotal = resultats.reduce((a, r) => a + r.ok, 0);
+  const koTotal = resultats.reduce((a, r) => a + r.ko, 0);
+
+  if (DRAPEAUX.indexOf('--durees') >= 0) afficherDurees(resultats, performance.now() - debut);
   console.log('\n' + '─'.repeat(52));
-  console.log(ko ? `✕ ${ko} vérification(s) en échec sur ${ok + ko}.`
-    : `✓ ${ok} vérifications, tout passe.`);
-  process.exit(ko ? 1 : 0);
+  console.log(resultats.length + ' scénario(s) sur ' + rangs.length + ' · ' +
+    (processus === 1 ? 'séquentiel' : processus + ' processus') + ' · ' + sec(performance.now() - debut));
+  anomalies.forEach(a => console.log('✕ ' + a));
+  if (koTotal) console.log(`✕ ${koTotal} vérification(s) en échec sur ${okTotal + koTotal}.`);
+  else if (anomalies.length) console.log('✕ le banc n\'a pas pu jouer toute la suite (' + okTotal + ' vérifications vertes avant cela).');
+  else console.log(`✓ ${okTotal} vérifications, tout passe.`);
+  process.exit(koTotal || anomalies.length ? 1 : 0);
 })();

@@ -248,6 +248,62 @@ distinctif.**
 Éprouver cinq gardes en rejouant chaque fois les quarante scénarios coûtait
 dix minutes ; avec le filtre, quelques secondes chacune.
 
+### Lot 4b : de dix-sept minutes à trois (31 octobre 2026)
+
+La suite avait grossi — 242 scénarios, 1 874 vérifications — et le contrôle
+de nouveau dépassé les dix minutes. **Mesuré** (passage séquentiel, option
+`--durees`, poste portable à 4 cœurs physiques / 8 logiques) : 1 040 s pour
+les scénarios, 1 052 s pour tout le contrôle. Les chiffres ci-dessus sont
+périmés :
+
+- **288 ouvertures de l'application : 635 s, soit 61 %.** Environ 2,2 s
+  chacune dans la suite (0,8 s pour construire JSDOM et exécuter les scripts,
+  1,4 s d'attente de `data-pret`), contre 1,1 s quand on ouvre seul. Ce qu'attend
+  `data-pret` est le démarrage de l'application elle-même ;
+- **868 appels à `t.pause` : 314 s, soit 30 %** — du sommeil, pas du calcul ;
+- le reste (clics, relectures, calculs) : 90 s, 9 %.
+- Les 15 scénarios les plus longs pèsent ensemble 162 s sur 1 040. Les plus
+  longs ouvrent l'application jusqu'à onze fois (« Onglets : un dessin
+  partout » : 11 ouvertures, 26 s). Aucun ne domine : pas de gisement isolé.
+
+**Ce qui a été fait.** `outils/tests.js` répartit les scénarios entre des
+processus Node (`child_process.fork`, cœurs − 1, le suivant donné à celui qui
+se libère). Chaque scénario ouvrait déjà sa propre application et ne partage
+rien : leur contenu n'a pas bougé. Le processus principal réimprime les
+sorties **dans l'ordre d'origine** ; vérifié identique ligne à ligne au
+passage séquentiel (2 360 lignes, 1 874 coches). Résultat : 163 s pour les
+scénarios (160 à 216 s selon la charge du poste), 187 à 221 s pour tout le
+contrôle. `outils/controle.js` remplace la chaîne de `package.json` et
+chronomètre chaque étape.
+
+**Ce qui a été essayé, sans effet.**
+
+- *Plus de processus que de cœurs*, pour occuper les cœurs pendant les pauses :
+  12 processus font 160 s, 7 en font 163 s. Le travail est lié au
+  processeur ; à 4 processus : 250 s.
+- *Fermer les fenêtres JSDOM à la fin de chaque scénario* : 163 s contre
+  163 s. Les fenêtres ouvertes s'accumulent pourtant dans un processus
+  séquentiel (un scénario de 8 ouvertures fait 8,7 s seul, 17,7 s en fin de
+  passage séquentiel), mais un ouvrier n'en porte qu'une quarantaine et n'en
+  souffre pas. Retiré.
+
+**Les gardes du banc parallèle**, chacune cassée exprès sur une copie jetable.
+Un scénario sabordé sort rouge avec son nom et son message ; un processus qui
+plante (exception hors scénario, sortie muette en code 0, processus tué) fait
+échouer le contrôle ; un scénario perdu en route aussi. **Ces trois dernières
+se couvrent entre elles** — le trou repéré scénario par scénario, le compte
+final, la sortie non demandée d'un processus : chacune a été éprouvée **seule**
+(les deux autres coupées), puis toutes coupées ensemble, où le sabotage passe
+en « tout passe » (code 0). C'est la preuve qu'elles sont bien ce qui
+l'attrape.
+
+**Ce qui reste long, et où.** Les ouvertures (63 à 65 % du temps cumulé) : c'est
+le démarrage de l'application dans JSDOM, hors de portée du banc. Pas
+d'attente conditionnelle à la place des pauses, et rien retiré aux scénarios,
+comme avant. Descendre sous deux minutes demanderait d'alléger le démarrage
+de l'application ou de regrouper des ouvertures, ce qui change ce que des
+scénarios vérifient : à n'ouvrir qu'avec l'accord de Quentin.
+
 ## Comment le contrôle est tombé sous deux minutes
 
 Il a été de dix minutes, et deux choses l'expliquaient :

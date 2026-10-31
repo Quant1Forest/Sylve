@@ -77,9 +77,25 @@ Doit afficher **« index.html fabriqué »**, puis **« Bon pour livraison »**,
 puis **« le service worker tient »** (33 vérifications), puis la suite au
 vert — 1874 à ce jour — puis **« Sylve.html est conforme »**.
 
-Compter **moins de deux minutes**. Ne jamais revenir à une attente devinée
-dans les tests : `ouvrir()` sonde `data-pret` — pourquoi, dans
+Compter **trois minutes** : 187 à 221 s mesurées au lot 4b (selon la charge
+du poste ; 17 minutes avant, en séquentiel). Les scénarios se jouent en
+parallèle, un processus par cœur moins un ; le contrôle affiche à la fin le
+temps de chaque étape. Ne jamais revenir à une attente devinée dans les tests :
+`ouvrir()` sonde `data-pret` — pourquoi, et ce qui reste long, dans
 `docs/tests-et-pieges.md`.
+
+**Pour déboguer un scénario, le passage séquentiel d'avant** (un processus,
+dans l'ordre, sortie en direct) :
+
+```bash
+npm run controle -- --sequentiel
+node outils/tests.js index.html "nom du scénario" --sequentiel
+```
+
+Autres options : `--processus=N` (par défaut cœurs − 1, ou `SYLVE_PROCESSUS`),
+`--durees` (où le temps passe). Un filtre qui ne retient qu'un scénario se joue
+de lui-même en séquentiel. Le contrôle refuse de passer au vert si un
+processus meurt ou si un scénario se perd en route.
 
 **Une correction sans vérification qui la couvre n'est pas finie.** Chaque
 changement de comportement s'accompagne d'un scénario dans `outils/tests.js`.
@@ -156,7 +172,7 @@ l'ancien code. Le vérificateur refuse de passer si les deux divergent.
 | `sw.js` | Service worker. Sa constante `VERSION` doit être identique à celle de `sources/installation.js`. |
 | `manifest.webmanifest` | Nom, couleurs, icônes de la PWA. |
 | `icone-*.png` | Icônes d'installation, dont une *maskable* pour Android. |
-| `outils/` | Fabrication, vérificateur, tests, tests du service worker, conformité du fichier autonome, reprise du carnet, vocabulaire des magasins. |
+| `outils/` | Fabrication, `controle.js` (enchaîne les étapes et les chronomètre), vérificateur, tests (en parallèle), tests du service worker, conformité du fichier autonome, reprise du carnet, vocabulaire des magasins. |
 | `docs/` | L'historique des décisions, rangé par thème. Voir *Où trouver quoi*. |
 | `rapports/` | Rapports de fin de lot. **Non versionné**, reste sur ce poste. |
 
