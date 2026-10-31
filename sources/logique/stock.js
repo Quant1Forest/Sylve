@@ -293,6 +293,19 @@ function valeurTotale(articles) {
 function articlesSousSeuil(articles) {
   return (articles || []).filter(sousSeuil);
 }
+/* Ce qu'il faut recommander, et pourquoi. Le réservé compte (S2, 31/10) : un
+   produit au-dessus de son seuil manque quand même si les chantiers signés en
+   demandent plus qu'il n'en reste. « manque » dit combien il en faudrait. */
+function aRecommander(articles) {
+  var out = [];
+  (articles || []).forEach(function (a) {
+    var dispo = stockFutur(a);
+    if (dispo < 0) out.push({ article: a, raison: 'manque', manque: arr(-dispo, 3) });
+    else if (quantite(a) <= 0) out.push({ article: a, raison: 'rupture' });
+    else if (sousSeuil(a)) out.push({ article: a, raison: 'seuil' });
+  });
+  return out;
+}
 
 /* Ce qu'un chantier a consommé, et ce qu'il en coûte. */
 function consommationChantier(articles, chantierId) {
@@ -410,7 +423,7 @@ var M = {
   valeurStock: valeurStock, fraisLivraisonTotal: fraisLivraisonTotal, quantiteSortie: quantiteSortie,
   coutParPlant: coutParPlant, stockEnPlants: stockEnPlants, pourPlants: pourPlants,
   coutSortie: coutSortie, coutSorties: coutSorties, sousSeuil: sousSeuil,
-  valeurTotale: valeurTotale, articlesSousSeuil: articlesSousSeuil,
+  valeurTotale: valeurTotale, articlesSousSeuil: articlesSousSeuil, aRecommander: aRecommander,
   consommationChantier: consommationChantier, coutFournitures: coutFournitures,
   margeChantier: margeChantier, margeGlobale: margeGlobale,
   tauxCharges: tauxCharges, prixPlancher: prixPlancher, prixAvecBenefice: prixAvecBenefice,

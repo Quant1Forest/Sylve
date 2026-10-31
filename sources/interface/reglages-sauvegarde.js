@@ -200,7 +200,7 @@ function repecherObjet(e) {
   if (!d || !(d.liste || d.reposer)) { toast('Type inconnu.'); return Promise.resolve(); }
   if (d.reposer) {
     return d.reposer(e.o).then(function () { return Store.del(e.cle); }).then(function () {
-      renderNotesEnt(); renderSauvegarde();
+      renderNotes(); renderSauvegarde();
       toast(d.nom + ' récupérée.');
     });
   }
@@ -524,105 +524,8 @@ function renderSauvegarde() {
       (vieux ? ' Vos données ne vivent qu’ici : une copie ailleurs, et vous ne risquez plus rien.' : '') +
       '<br><span style="font-size:12px">Le fichier emportera ' + esc(listerContenu(c)) + '.</span>';
   if (!$('#s-recup').hidden) renderRecup();
-  renderNudgeSauvegarde();
-}
-
-/* Le rappel doit être là où il ouvre l'application, pas dans un écran
-   qu'il ne visite jamais. */
-function renderNudgeSauvegarde() {
-  var z = $('#a-sauvegarde'); if (!z) return;
-  var c = contenuSauvegarde();
-  if (!c.length || !B.sauvegardeAncienne(A.export, Date.now())) { z.innerHTML = ''; return; }
-  var q = B.depuisQuand(A.export, Date.now());
-  z.innerHTML = '<button class="alerte" id="a-sauver" style="margin-top:16px;width:100%">' +
-    '<i class="ic" style="background:#B4231F"></i>' +
-    '<span><b>Sauvegardez vos données</b><small>' +
-    (q ? 'Dernière copie ' + esc(q) : 'Aucune copie n’est sortie de ce téléphone') +
-    ' · ' + esc(listerContenu(c)) + '</small></span></button>';
-}
-
-/* Ce qui va tomber du compte se voit au même endroit que le rappel de
-   sauvegarde, et pour la même raison. Au-delà de deux échéances la liste
-   mangerait l'accueil : on résume, le détail est à un appui. */
-/* Chassé d'un doigt, il ne revient qu'au prochain démarrage à froid : une
-   échéance mensuelle reste annoncée trois jours, et un rappel qu'on ne peut
-   pas fermer finit par ne plus être lu du tout. */
-var echeancesChassees = false;
-function renderNudgeEcheances() {
-  var z = $('#a-echeances'); if (!z) return;
-  var al = echeancesChassees ? [] : FIN.alertesCharges(A.charges, A.depenses, Date.now());
-  if (!al.length) { z.innerHTML = ''; return; }
-  var bouton = function (titre, sous) {
-    return '<div class="alerte" data-echeance="1" style="margin-top:12px">' +
-      '<i class="ic" style="background:#5B3A1E"></i>' +
-      '<span><b>' + esc(titre) + '</b><small>' + esc(sous) + '</small></span>' +
-      '<button class="fermer" id="a-ech-fermer" title="Masquer jusqu’au prochain lancement" ' +
-      'aria-label="Masquer">×</button></div>';
-  };
-  if (al.length <= 2) {
-    z.innerHTML = al.map(function (a) {
-      return bouton(a.charge.libelle || 'Charge', eur(a.ttc) + ' · ' + a.texte);
-    }).join('');
-    return;
-  }
-  var total = al.reduce(function (s, a) { return s + C.nb(a.ttc); }, 0);
-  z.innerHTML = bouton(al.length + ' prélèvements à venir — ' + eur(total),
-    'le premier ' + al[0].texte.split(' ·')[0] + ' : ' + (al[0].charge.libelle || 'charge'));
-}
-
-/* « Il faudrait me forcer la main quand la journée est finie, pour que je
-   remplisse. Sinon je me dis : ok, je le ferai plus tard, et après je ne le
-   fais pas et j'oublie. » Une journée posée puis passée sans temps noté ne
-   se réclame nulle part : elle vide les rendements en silence et finit par
-   faire dire « en retard » au chantier sans qu'on sache pourquoi.
-   Comme les deux autres rappels, il se chasse d'un doigt jusqu'au prochain
-   lancement : un rappel qu'on ne peut pas fermer finit par ne plus être lu. */
-var journeesChassees = false;
-function renderNudgeJournees() {
-  var z = $('#a-journees'); if (!z) return;
-  var l = journeesChassees ? []
-    : C.joursAResoudre(A.chantiers, A.cfg, absences(), Date.now());
-  if (!l.length) { z.innerHTML = ''; return; }
-  var p = l[0];
-  var nom = ((p.chantiers[0] || {}).nom) || 'chantier';
-  var titre = l.length === 1
-    ? 'Journée du ' + dateCourte(p.d) + ' à trancher'
-    : l.length + ' journées passées restées au planning';
-  var sous = l.length === 1
-    ? nom + ' — y avez-vous travaillé ?'
-    : 'la plus ancienne : ' + dateCourte(p.d) + ', ' + nom;
-  z.innerHTML = '<div class="alerte" data-journeenudge="1" style="margin-top:12px">' +
-    '<i class="ic" style="background:#2E7D46"></i>' +
-    '<span><b>' + esc(titre) + '</b><small>' + esc(sous) + '</small></span>' +
-    '<button class="fermer" id="a-journees-fermer" title="Masquer jusqu’au prochain lancement" ' +
-    'aria-label="Masquer">×</button></div>';
-}
-
-/* Un devis en attente ne se rappelle pas tout seul : il dort dans le carnet
-   pendant que sa validité court. Il vit donc au même endroit que les
-   prélèvements — l'accueil, le seul écran qu'on voit à coup sûr. Le module
-   Chantiers l'annonce aussi dans « À traiter », mais il faut y aller.
-   Chassé d'un doigt comme les échéances, il revient au prochain lancement. */
-var devisChasses = false;
-function renderNudgeDevis() {
-  var z = $('#a-devis'); if (!z) return;
-  var al = devisChasses ? [] : C.alertes(A.chantiers, A.cfg, Date.now())
-    .filter(function (a) { return a.type === 'devis'; });
-  if (!al.length) { z.innerHTML = ''; return; }
-  var bouton = function (titre, sous) {
-    return '<div class="alerte" data-devisnudge="1" style="margin-top:12px">' +
-      '<i class="ic" style="background:#B98A00"></i>' +
-      '<span><b>' + esc(titre) + '</b><small>' + esc(sous) + '</small></span>' +
-      '<button class="fermer" id="a-devis-fermer" title="Masquer jusqu’au prochain lancement" ' +
-      'aria-label="Masquer">×</button></div>';
-  };
-  if (al.length === 1) {
-    z.innerHTML = bouton('Devis en attente — ' + (C.nomChantier(al[0].chantier)),
-      al[0].texte + (al[0].chantier.donneur ? ' · ' + al[0].chantier.donneur : ''));
-    return;
-  }
-  z.innerHTML = bouton(al.length + ' devis en attente de réponse',
-    'le plus pressé : ' + (C.nomChantier(al[0].chantier)) + ' — ' + al[0].texte);
+  /* La ligne « Sauvegarde à faire » d'Aujourd'hui tombe dès la copie faite. */
+  renderAujourdhui();
 }
 
 function renderRecup() {
@@ -872,55 +775,62 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.87', quoi: [
+    { t: 'Aujourd’hui devient un vrai écran : en retard, bientôt, vos notes, chantiers en cours, prélèvements, derniers jours' },
+    { t: 'Chaque ligne se masque d’un × jusqu’au lendemain ; elle revient tant que ce n’est pas réglé' },
+    { t: 'Mes notes passent sur Aujourd’hui ; une nouvelle note se crée par le +' },
+    { t: 'À recommander compte aussi ce que les chantiers signés vont prendre', vue: 'stock2' },
+    { t: 'La Fiche de chantier ouverte depuis une fiche y ramène', vue: 'carnet' }
+  ] },
   { v: '4.86', quoi: [
-    { t: 'Une barre en bas, partout : Aujourd hui, Chantiers, +, Agenda (le calendrier), Argent (les finances)', vue: 'calendrier' },
-    { t: 'Le + cree : ma journee, depense, chantier, note ; et commande, achat, intervention, charge fixe' },
-    { t: 'Le ☰ en haut a droite : stock, achats, vehicule, rendements, cubage, bois, reglages, sauvegarde' },
-    { t: 'Les onglets de chaque ecran sont passes en haut, en pastilles', vue: 'finances' },
-    { t: 'Mon entreprise et Mes notes : sur Aujourd hui, tuile Mon entreprise' }
+    { t: 'Une barre en bas, partout : Aujourd’hui, Chantiers, +, Agenda (le calendrier), Argent (les finances)', vue: 'calendrier' },
+    { t: 'Le + crée : ma journée, dépense, chantier, note ; et commande, achat, intervention, charge fixe' },
+    { t: 'Le ☰ en haut à droite : stock, achats, véhicule, rendements, cubage, bois, réglages, sauvegarde' },
+    { t: 'Les onglets de chaque écran sont passés en haut, en pastilles', vue: 'finances' },
+    { t: 'Mon entreprise et Mes notes : sur Aujourd’hui, tuile Mon entreprise' }
   ] },
   { v: '4.85.1', quoi: [
     { t: 'Les messages de suppression donnent le bon chemin vers la corbeille', vue: 'reglages' },
-    { t: 'Le rappel de sauvegarde de l accueil ouvre la carte Sauvegarde des Reglages', vue: 'reglages' },
-    { t: 'Journees a trancher : la veille n est plus oubliee apres un changement d heure' }
+    { t: 'Le rappel de sauvegarde de l’accueil ouvre la carte Sauvegarde des Réglages', vue: 'reglages' },
+    { t: 'Journées à trancher : la veille n’est plus oubliée après un changement d’heure' }
   ] },
   { v: '4.85', quoi: [
-    { t: 'Mes notes se cochent : un element par ligne, barre et descendu une fois fait' },
-    { t: 'Une note supprimee passe par la corbeille, vous pouvez la retrouver', vue: 'reglages' },
-    { t: 'Reglages : « Ce qui a change » est tout en bas de General' , vue: 'reglages' },
-    { t: 'La corbeille explique ce qu elle garde, et combien de temps' , vue: 'reglages' }
+    { t: 'Mes notes se cochent : un élément par ligne, barré et descendu une fois fait' },
+    { t: 'Une note supprimée passe par la corbeille, vous pouvez la retrouver', vue: 'reglages' },
+    { t: 'Réglages : « Ce qui a changé » est tout en bas de Général' , vue: 'reglages' },
+    { t: 'La corbeille explique ce qu’elle garde, et combien de temps' , vue: 'reglages' }
   ] },
   { v: '4.84', quoi: [
     { t: 'Nouveau chantier : avec ou sans devis, et une estimation en jours ou en surface', vue: 'carnet' },
-    { t: 'Le SIREN ne se demande plus qu une fois, sous le champ du client', vue: 'carnet' },
+    { t: 'Le SIREN ne se demande plus qu’une fois, sous le champ du client', vue: 'carnet' },
     { t: 'La fiche du chantier ouvre la carte : voir ou placer le chantier', vue: 'carnet' },
-    { t: 'Calendrier : la liste de ce qui reste a planifier, chantier par chantier', vue: 'calendrier' },
-    { t: 'Finances : les montants ne passent plus a la ligne', vue: 'finances' }
+    { t: 'Calendrier : la liste de ce qui reste à planifier, chantier par chantier', vue: 'calendrier' },
+    { t: 'Finances : les montants ne passent plus à la ligne', vue: 'finances' }
   ] },
   { v: '4.83', quoi: [
-    { t: 'Ma journee : le temps total, les heures productives et le trajet', vue: 'calendrier' },
-    { t: 'Carte : les zones deja regardees restent visibles sans reseau', vue: 'carte' },
+    { t: 'Ma journée : le temps total, les heures productives et le trajet', vue: 'calendrier' },
+    { t: 'Carte : les zones déjà regardées restent visibles sans réseau', vue: 'carte' },
     { t: 'Carnet : un filtre par famille de travaux', vue: 'carnet' },
-    { t: 'Declarations : le versement liberatoire se coche, a partir de son annee', vue: 'analyses' },
-    { t: 'Le reste dans la tranche d impot est a ressaisir : plus de chiffre par defaut', vue: 'analyses' }
+    { t: 'Déclarations : le versement libératoire se coche, à partir de son année', vue: 'analyses' },
+    { t: 'Le reste dans la tranche d’impôt est à ressaisir : plus de chiffre par défaut', vue: 'analyses' }
   ] },
   { v: '4.82', quoi: [
-    { t: 'Carte : chercher une commune, et le doigt ne se bloque plus au bout d un moment', vue: 'carte' },
-    { t: 'Les contours de communes sont partis : photo aerienne ou carte IGN', vue: 'carte' },
-    { t: 'Mes notes vont a la ligne, et passent sous les tuiles de Mon entreprise' },
-    { t: 'Carnet : les filtres dans votre ordre, et « En cours ou a planifier »', vue: 'carnet' },
-    { t: 'Ma journee : plus de case non facturee, et « Hors production » pour l affutage', vue: 'calendrier' }
+    { t: 'Carte : chercher une commune, et le doigt ne se bloque plus au bout d’un moment', vue: 'carte' },
+    { t: 'Les contours de communes sont partis : photo aérienne ou carte IGN', vue: 'carte' },
+    { t: 'Mes notes vont à la ligne, et passent sous les tuiles de Mon entreprise' },
+    { t: 'Carnet : les filtres dans votre ordre, et « En cours ou à planifier »', vue: 'carnet' },
+    { t: 'Ma journée : plus de case non facturée, et « Hors production » pour l’affûtage', vue: 'calendrier' }
   ] },
   { v: '4.81', quoi: [
-    { t: 'Photo aerienne et carte IGN sur la carte, quand vous avez du reseau', vue: 'carte' },
-    { t: 'Sans reseau, les contours de communes restent : ils sont dans l appareil', vue: 'carte' },
-    { t: '« Ma position » vous y emmene, au lieu d y poser un point', vue: 'carte' },
-    { t: 'Et le pincement ne begaye plus quand vous dezoomez large', vue: 'carte' }
+    { t: 'Photo aérienne et carte IGN sur la carte, quand vous avez du réseau', vue: 'carte' },
+    { t: 'Sans réseau, les contours de communes restent : ils sont dans l’appareil', vue: 'carte' },
+    { t: '« Ma position » vous y emmène, au lieu d’y poser un point', vue: 'carte' },
+    { t: 'Et le pincement ne bégaye plus quand vous dézoomez large', vue: 'carte' }
   ] },
   { v: '4.80', quoi: [
-    { t: 'Une vraie carte : les communes de six departements, hors ligne', vue: 'carte' },
-    { t: 'Glissez pour vous deplacer, pincez pour zoomer', vue: 'carte' },
-    { t: 'Et « Poser un chantier » place un point d un doigt', vue: 'carte' }
+    { t: 'Une vraie carte : les communes de six départements, hors ligne', vue: 'carte' },
+    { t: 'Glissez pour vous déplacer, pincez pour zoomer', vue: 'carte' },
+    { t: 'Et « Poser un chantier » place un point d’un doigt', vue: 'carte' }
   ] }
 ];
 /* Seule la version installée est dépliée : les quatre précédentes tiennent

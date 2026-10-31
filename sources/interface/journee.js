@@ -380,7 +380,6 @@ function ouvrirJournee(id, modele) {
   });
 }
 
-/* Le raccourci de l'accueil : la saisie du soir doit être à un pouce. */
 /* « C'est pénible d'aller chercher les kilomètres. Est-ce qu'il n'y aurait
    pas un moyen de mettre deux communes et que ça les estime ? » Pas sans une
    carte, et l'application n'en a aucune : elle tourne hors ligne, sans
@@ -402,20 +401,5 @@ function kmHabituels(idChantier) {
     if (C.nb(t.date) >= quand) { quand = C.nb(t.date); vu = C.nb(t.km); }
   });
   return vu;
-}
-function renderMaJournee() {
-  var z = $('#a-journee'); if (!z) return;
-  var auj = B.jour(Date.now());
-  var faite = (A.journees || []).some(function (j) { return B.jour(j.date) === auj; });
-  var sem = (A.journees || []).filter(function (j) {
-    return (j.date || 0) > Date.now() - 7 * 86400000;
-  });
-  var h = sem.reduce(function (s, j) { return s + C.heuresJournee(j); }, 0);
-  z.innerHTML = '<button class="btn primaire" id="a-jour" style="width:100%;margin-top:10px;' +
-    'display:flex;align-items:center;justify-content:center;gap:9px;padding:13px">' +
-    '<span style="font-size:16px">☀</span><span>Enregistrer ma journée</span>' +
-    '</button><p class="muted" style="font-size:12px;margin:6px 0 0;text-align:center">' +
-    (faite ? 'Déjà saisie aujourd’hui' : 'Rien de saisi aujourd’hui') +
-    (sem.length ? ' · ' + E.fmt(h, 1) + ' h sur 7 jours' : '') + '</p>';
 }
 

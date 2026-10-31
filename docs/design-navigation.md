@@ -53,6 +53,9 @@ Fait en 4.21.0 :
 
 ## L'écran Entreprise : bulles, tuiles, puis ses notes
 
+*Retiré au lot 5b (4.87.0) : bulles, tuiles et notes ont leur nouvel endroit
+(voir « L'écran Aujourd'hui », en bas). Ce qui suit est l'histoire.*
+
 **Depuis la 4.82 : bulles, tuiles, puis « Mes notes ».** *« Quand j'arrive,
 j'ai directement tous mes onglets, je ne suis pas obligé de défiler. Et il y a
 la même partie À traiter dans le carnet. »* « À traiter » a quitté l'écran ;
@@ -334,8 +337,8 @@ tour 2 de l'étape 5b pour le contenu du +.
 
 - **Barre fixe en bas, sur tous les écrans** : Aujourd'hui · Chantiers · + ·
   Agenda · Argent. Chantiers ouvre le carnet, Agenda le calendrier, Argent le
-  bilan des finances. Aujourd'hui ouvre l'ancien accueil (rappels, tuiles, Mon
-  entreprise, Mes notes) jusqu'au lot 5b.
+  bilan des finances. Aujourd'hui ouvrait l'ancien accueil (rappels, tuiles, Mon
+  entreprise, Mes notes) jusqu'au lot 5b (voir plus bas).
 - **Bandeau** : logo (simple image, plus un bouton) · « ← parent » sur un
   écran de second niveau seulement · titre de l'écran · actions propres
   gardées (Aujourd'hui du calendrier, En-tête du cubage et sa seconde ligne) ·
@@ -368,3 +371,39 @@ Aujourd'hui ; depuis Aujourd'hui, il sort. Les crans ne s'empilent plus à
 chaque descente : `synchroniserCrans()` en empile autant que l'écran en
 demande (`profondeur()`), jamais plus. Remonter par la barre ou la flèche ne
 les consomme pas, et redescendre ensuite ne les double pas.
+
+## L'écran Aujourd'hui (lot 5b, 4.87.0)
+
+L'onglet Aujourd'hui devient l'écran de la maquette V2, corrigé par le tour 2
+de l'étape 5b. L'ancien accueil et Mon entreprise sont retirés ; où va chaque
+élément : `docs/inventaire-ecrans.md`, *Où sont allés l'accueil et Mon
+entreprise*, que le scénario de non-perte lit ligne par ligne.
+
+- **Ordre** : date · ligne de saisie · En retard · Bientôt · Mes notes (N1) ·
+  Chantiers en cours · Prélèvements à venir · Derniers jours. Un bloc vide ne
+  s'affiche pas ; sans retard ni rien de proche, une phrase le dit.
+- **Rien de calculé à neuf** : les lignes relisent `C.alertes()` (impayé, à
+  facturer, devis à relancer, jours à placer ou temps à estimer),
+  `C.joursAResoudre()`, `FIN.alertesCharges()`, `echeancesVehicule()` et
+  `ST.aRecommander()` (S2 : le réservé compte ; la tuile Stock du ☰ lit le même
+  calcul). Seuls ajouts : l'horizon de sept jours des prélèvements (un préavis
+  plus long est gardé) et la semaine depuis lundi de la ligne de saisie.
+- **Chaque ligne d'En retard, de Bientôt et des prélèvements porte une clé**
+  (`data-ajcle`, « impaye:c1 »…) : le × la masque jusqu'au lendemain, la clé
+  et le jour vont dans `bordcub.masques` (hors sauvegarde : ce n'est pas une
+  donnée), on ne garde que les masques du jour. Les tests visent une ligne par
+  sa clé (`ligneAuj`, `appuyerLigne`).
+- **Où mène une ligne** : `data-ajouvre="quoi:qui"`, lu par `OUVRIR_AUJ`. Toute
+  ligne d'un chantier ouvre sa fiche, sauf « À programmer : N j à placer »
+  (placement de l'Agenda) ; « Trancher » ouvre la fenêtre « Que s'est-il
+  passé ? » ; la sauvegarde, l'endroit de ☰ ▸ Sauvegarde.
+- **Mes notes** ont déménagé de `achats-entreprise.js` dans
+  `interface/aujourdhui.js`, avec leurs gestes ; elles se refont seules
+  (`renderNotes()`), pour qu'un élément ajouté ne referme pas le clavier.
+  Une note se crée par + ▸ Note.
+- **La vue garde son nom, « accueil »** : la barre, le retour, `?vue=accueil`
+  et les tests la connaissent ainsi. `renderAccueil()` reste le
+  rafraîchissement commun après une saisie ; il appelle `renderAujourdhui()`.
+- **Fiche de chantier ouverte depuis une fiche** : elle y revient (← « Fiche »
+  et retour du téléphone, un cran de plus) ; `A.fchDeFiche` le retient,
+  posé par `noterParcours()`.

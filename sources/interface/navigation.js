@@ -21,7 +21,7 @@ function init() {
       lire('bordcub.commandes', []), lire('bordcub.sorties', []),
       lire('bordcub.journees', []), lire('bordcub.lieux', []),
       lire('bordcub.versements', []), lire('bordcub.vehicule', null),
-      lire('bordcub.achats', [])]);
+      lire('bordcub.achats', []), lire('bordcub.masques', {})]);
   })
     .then(function (res) {
       A.export = res[3] || 0;
@@ -49,6 +49,7 @@ function init() {
       A.vehicule = res[18] || vehiculeDefaut();
       if (!res[18]) sauverVehicule();
       A.achats = res[19] || [];
+      A.masques = res[20] || {};
       A.cfg = res[0] || E.configDefaut();
       var d = E.configDefaut();
       ['essences', 'qualites', 'favoris'].forEach(function (k) { if (!A.cfg[k]) A.cfg[k] = d[k]; });
@@ -278,7 +279,8 @@ PICTOS.corbeille = '<path d="M4 7h16M9.5 7V4h5v3M6 7l1 13h10l1-13"/>';
 PICTOS.menu = '<path d="M4 7h16M4 12h16M4 17h16"/>';
 PICTOS.retour = '<path d="M14.5 6l-6 6 6 6"/>';
 PICTOS.plus = '<path d="M12 5v14M5 12h14"/>';
-/* Le dessin de la tuile Cubage de l'accueil, pour que le ☰ montre le même. */
+PICTOS.chevron = '<path d="M9.5 6l6 6-6 6"/>';
+/* Le dessin de l'ancienne tuile Cubage de l'accueil, gardé par le ☰. */
 PICTOS.cubage = '<circle cx="12" cy="12" r="8.4"/><path d="M4.5 12h15"/>' +
   '<path d="M7.1 9.5 4.6 12l2.5 2.5M16.9 9.5 19.4 12l-2.5 2.5"/>';
 function picto(nom) {
@@ -295,18 +297,17 @@ var BARRE = {
   argent: { nom: 'Argent', picto: 'finances', module: 'finances' }
 };
 var ONGLET_DE_MODULE = { chantiers: 'chantiers', calendrier: 'agenda', finances: 'argent' };
-var TITRES_VUE = { accueil: 'Aujourd’hui', entreprise: 'Mon entreprise', reglages: 'Réglages',
+var TITRES_VUE = { accueil: 'Aujourd’hui', reglages: 'Réglages',
   chantier: 'Chantier', fichech: 'Fiche de chantier' };
 
 /* Trois sortes d'écrans, qui ne remontent pas de la même façon :
    - « barre » : un onglet de la barre ; il remonte à Aujourd'hui ;
-   - « fixe » : son parent ne change jamais (la fiche → Chantiers, Mon
-     entreprise → Aujourd'hui) ;
+   - « fixe » : son parent ne change jamais (la fiche → Chantiers ; la
+     Fiche de chantier → la fiche d'où on l'a ouverte, sinon Chantiers) ;
    - « libre » : ce qu'on ouvre par le ☰ ou par un lien (Stock, Véhicule,
      Cubage, Réglages…) ; il remonte là d'où l'on vient. */
 function typeEcran(e) {
   if (!e || e.vue === 'accueil') return 'racine';
-  if (e.vue === 'entreprise') return 'fixe';
   if (e.vue === 'reglages') return 'libre';
   if (ONGLET_DE_MODULE[e.module]) {
     return e.module === 'chantiers' && (e.vue === 'chantier' || e.vue === 'fichech') ? 'fixe' : 'barre';
@@ -330,6 +331,9 @@ function memeModule(a, b) {
 function noterParcours(v) {
   var de = A.ecran, vers = { vue: v, module: A.module }, parMenu = !!A.parMenu;
   A.parMenu = false;
+  /* La Fiche de chantier ouverte depuis une fiche y revient (31/10) ; par la
+     pastille du carnet, elle revient aux Chantiers. */
+  if (v === 'fichech' && !(de && de.vue === 'fichech')) A.fchDeFiche = !!(de && de.vue === 'chantier');
   if (typeEcran(vers) !== 'libre') { A.pile = []; return; }
   if (A.enRemontee || !de) return;
   if (de.vue === vers.vue && (de.vue === 'reglages' || de.module === vers.module)) return;
@@ -339,7 +343,7 @@ function noterParcours(v) {
 function parentEcran() {
   var e = A.ecran, t = typeEcran(e);
   if (t === 'racine' || t === 'barre') return null;
-  if (t === 'fixe') return { nom: e.vue === 'entreprise' ? 'Aujourd’hui' : 'Chantiers' };
+  if (t === 'fixe') return { nom: e.vue === 'fichech' && A.fchDeFiche ? 'Fiche' : 'Chantiers' };
   var p = A.pile[A.pile.length - 1];
   if (!p) return { nom: 'Aujourd’hui' };
   return p.menu ? { menu: true, nom: 'Le reste de Sylve' } : { nom: titreEcran(p) };
@@ -351,11 +355,11 @@ function majCadre() {
   var e = { vue: A.vue, module: A.module }, t = typeEcran(e);
   A.ecran = e;
   A.parMenu = false;
-  document.body.classList.toggle('accueil-ouvert', e.vue === 'accueil' || e.vue === 'entreprise');
+  document.body.classList.toggle('accueil-ouvert', e.vue === 'accueil');
   var titre = $('#b-ecran');
   if (titre) titre.textContent = titreEcran(e);
   var ctx = $('#b-ctx');
-  if (ctx) ctx.hidden = e.vue === 'accueil' || e.vue === 'entreprise' || e.vue === 'reglages';
+  if (ctx) ctx.hidden = e.vue === 'accueil' || e.vue === 'reglages';
   var ret = $('#b-retour'), p = parentEcran();
   if (ret) {
     ret.hidden = !p;
@@ -367,7 +371,7 @@ function majCadre() {
   }
   /* Un écran libre garde l'onglet d'où l'on est parti : c'est là que le
      retour finira par ramener. */
-  if (t === 'racine' || e.vue === 'entreprise') A.onglet = 'aujourdhui';
+  if (t === 'racine') A.onglet = 'aujourdhui';
   else if (t !== 'libre') A.onglet = ONGLET_DE_MODULE[e.module];
   $$('#barre [data-barre]').forEach(function (b) {
     if (b.dataset.barre === (A.onglet || 'aujourdhui')) b.setAttribute('aria-current', 'page');
@@ -399,13 +403,18 @@ function allerOnglet(cle) {
 function remonter() {
   var e = A.ecran, t = typeEcran(e);
   if (t === 'racine') return;
-  if (t === 'barre' || e.vue === 'entreprise') { allerAccueil(); return; }
-  if (t === 'fixe') { allerModule('chantiers', 'carnet'); return; }
+  if (t === 'barre') { allerAccueil(); return; }
+  if (t === 'fixe') {
+    if (e.vue === 'fichech' && A.fchDeFiche && chantier(A.chOuvert)) {
+      A.fchDeFiche = false;
+      ouvrirChantier(A.chOuvert);
+    } else allerModule('chantiers', 'carnet');
+    return;
+  }
   var p = A.pile.pop();
   A.enRemontee = true;
   try {
     if (!p || p.vue === 'accueil') allerAccueil();
-    else if (p.vue === 'entreprise') { renderAccueil(); aller('entreprise'); }
     else if (p.vue === 'reglages') { A.module = moduleValide(p.module); majOnglets(); aller('reglages'); }
     else allerModule(p.module, p.vue);
   } finally { A.enRemontee = false; }
@@ -416,7 +425,7 @@ function remonter() {
 /* ------------------------------------------------------- le ☰ et le + */
 /* Les réglages s'ouvrent sur la zone de l'écran d'où l'on vient. */
 function secReglagesDe(e) {
-  if (!e || e.vue === 'accueil' || e.vue === 'entreprise') return 'general';
+  if (!e || e.vue === 'accueil') return 'general';
   if (e.vue === 'reglages') return A.secReglages || 'general';
   var m = MODULES[e.module];
   return SEC_DE_MODULE[e.module] || (m && m.groupe === 'entreprise' ? 'ent' : 'general');
@@ -463,7 +472,8 @@ function ouvrirMenu() {
 var PLUS_QUOTIDIEN = [
   ['journee', 'p1', 'horloge', 'Ma journée', 'le plus fréquent'],
   ['depense', 'p2', 'depenses', 'Dépense', 'carburant, achat'],
-  ['chantier', 'p3', 'chantier', 'Chantier', 'on m’en a parlé'],
+  /* Le carnet : le dessin de Chantiers dans la barre (une notion, un dessin). */
+  ['chantier', 'p3', 'carnet', 'Chantier', 'on m’en a parlé'],
   ['note', 'p4', 'note', 'Note', 'pense-bête']
 ];
 var PLUS_RARE = [
@@ -564,7 +574,8 @@ function empilerCran() {
 function profondeurDe(e) {
   var t = typeEcran(e);
   if (t === 'racine') return 0;
-  return t === 'fixe' && e.vue !== 'entreprise' ? 2 : 1;
+  if (t === 'fixe') return e.vue === 'fichech' && A.fchDeFiche ? 3 : 2;
+  return 1;
 }
 function profondeur() {
   if (typeEcran(A.ecran) !== 'libre') return profondeurDe(A.ecran);
@@ -612,15 +623,11 @@ function allerAccueil() {
   renderAccueil();
   aller('accueil');
 }
+/* Le rafraîchissement commun après une saisie : l'écran Aujourd'hui, et les
+   écrans d'à côté qui n'ont pas d'autre occasion de se refaire. */
 function renderAccueil() {
-  var cub = situationModule('cubage'), bois = situationModule('bois');
-  $('#a-cub-n').textContent = cub.n;
-  $('#a-cub-s').textContent = cub.s;
-  $('#a-bois-n').textContent = bois.n;
-  $('#a-bois-s').textContent = bois.s;
-  renderNudgeSauvegarde(); renderNudgeEcheances(); renderNudgeDevis(); renderNudgeJournees(); renderMaJournee();
+  renderAujourdhui();
   renderAchats(); renderBudgetAchats(); renderFicheChantier();
-  renderEntreprise();
 }
 
 /* ------------------------------------------------------------ position */

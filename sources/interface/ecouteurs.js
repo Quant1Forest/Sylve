@@ -94,7 +94,6 @@ function brancher() {
     }
     aller(b.dataset.vue);
   });
-  $('#a-reglages').addEventListener('click', function () { allerReglages('general'); });
   $('#regl-nav').addEventListener('click', function (e) {
     var b = e.target.closest('[data-regl]');
     if (b) { A.secReglages = b.dataset.regl; renderReglagesNav(); }
@@ -111,13 +110,7 @@ function brancher() {
     if (b.id === 'b-entete2') ouvrirEntete();
     else if (b.id === 'b-aujourdhui') { A.calMois = null; A.calJour = Date.now(); renderCalendrier(); aller('calendrier'); }
   });
-  document.addEventListener('click', function (e) {
-    var t = e.target.closest ? e.target.closest('[data-module]') : null;
-    if (!t) return;
-    if (t.dataset.module === 'accueil') allerAccueil();
-    else if (t.dataset.module === 'entreprise') aller('entreprise');
-    else allerModule(t.dataset.module);
-  });
+  brancherAujourdhui();
   document.addEventListener('click', function (ev) {
     var t = ev.target.closest ? ev.target.closest('[data-aller]') : null;
     if (t) aller(t.dataset.aller);
@@ -559,7 +552,7 @@ function brancher() {
       a.dateFait = a.fait ? Date.now() : null;
       a.maj = Date.now();
       sauverAchats().then(function () {
-        renderAchats(); renderBudgetAchats(); renderEntreprise();
+        renderAchats(); renderBudgetAchats();
         toast(a.fait ? 'Acheté — la ligne passe à la suite.' : 'Remis dans la liste.');
       });
       return;
@@ -847,99 +840,6 @@ function brancher() {
     var b = e.target.closest('[data-alerte]');
     if (b) ouvrirChantier(b.dataset.alerte);
   });
-  /* Le rappel d'échéances mène à la page des charges, pas à un chantier —
-     sauf si c'est la croix qu'on vise. */
-  $('#a-echeances').addEventListener('click', function (e) {
-    if (e.target.closest('#a-ech-fermer')) {
-      echeancesChassees = true;
-      renderNudgeEcheances();
-      return;
-    }
-    if (e.target.closest('[data-echeance]')) allerModule('finances', 'charges');
-  });
-  $('#a-journees').addEventListener('click', function (e) {
-    if (e.target.closest('#a-journees-fermer')) {
-      journeesChassees = true;
-      renderNudgeJournees();
-      return;
-    }
-    if (!e.target.closest('[data-journeenudge]')) return;
-    /* On ouvre la plus ancienne, sa date déjà posée. Trois issues, jamais
-       une seule : y avoir travaillé, le déplacer, ou ne pas y avoir été. */
-    var l = C.joursAResoudre(A.chantiers, A.cfg, absences(), Date.now());
-    if (!l.length) return;
-    ouvrirResolutionJour(l[0].d);
-  });
-  $('#a-devis').addEventListener('click', function (e) {
-    if (e.target.closest('#a-devis-fermer')) {
-      devisChasses = true;
-      renderNudgeDevis();
-      return;
-    }
-    if (!e.target.closest('[data-devisnudge]')) return;
-    /* Un seul devis en attente : on ouvre sa fiche, c'est là qu'on relance.
-       Plusieurs : le carnet filtré sur les devis envoyés, pour les voir tous. */
-    var al = C.alertes(A.chantiers, A.cfg, Date.now())
-      .filter(function (a) { return a.type === 'devis'; });
-    if (al.length === 1) { ouvrirChantier(al[0].chantier.id); return; }
-    A.filtreCh = 'envoye'; A.rechCh = '';
-    if ($('#c-rech')) $('#c-rech').value = '';
-    renderFiltreChantiers(); renderListeChantiers();
-    allerModule('chantiers', 'carnet');
-  });
-  $('#ent-notes').addEventListener('click', function (e) {
-    var sup = e.target.closest('[data-notesup]');
-    if (sup) {
-      var n = noteParId(sup.dataset.notesup);
-      if (n && !confirm('Supprimer « ' + (n.titre || 'cette note') + ' » ?\n\nElle restera récupérable ' +
-        B.JOURS_POUBELLE + ' jours dans Réglages ▸ Général ▸ Sauvegarde ▸ Corbeille.')) return;
-      effacerNote(sup.dataset.notesup);
-      return;
-    }
-    var si = e.target.closest('[data-nt-supitem]');
-    if (si) {
-      var carte = si.closest('[data-note-id]');
-      majNote(carte.dataset.noteId, function (nn) {
-        nn.items = nn.items.filter(function (x) { return x.id !== si.dataset.ntSupitem; });
-      });
-      return;
-    }
-    var note = e.target.closest('[data-note]');
-    if (note) { ouvrirNote(note.dataset.note); return; }
-    if (e.target.closest('#ent-note-plus')) ouvrirNote(null);
-  });
-  $('#ent-notes').addEventListener('change', function (e) {
-    var c = e.target.closest('[data-nt-coche]'); if (!c) return;
-    var carte = c.closest('[data-note-id]');
-    majNote(carte.dataset.noteId, function (nn) {
-      nn.items.forEach(function (x) { if (x.id === c.dataset.ntCoche) x.fait = c.checked; });
-    });
-  });
-  /* Entrée crée l'élément et garde le champ ouvert pour le suivant. */
-  $('#ent-notes').addEventListener('keydown', function (e) {
-    var c = e.target.closest ? e.target.closest('[data-nt-ajout]') : null;
-    if (!c || e.key !== 'Enter') return;
-    e.preventDefault();
-    ajouterItemNote(c);
-  });
-  /* Chaque bulle du bilan mène à la liste qui la détaille : le chiffre seul
-     ne sert à rien si l'on doit ensuite chercher de quoi il parle. */
-  $('#ent-bilan').addEventListener('click', function (e) {
-    var b = e.target.closest('[data-bulle]'); if (!b) return;
-    var ou = b.dataset.bulle;
-    if (ou === 'calendrier') { allerModule('calendrier', 'calendrier'); return; }
-    if (ou === 'finances') { allerModule('finances', 'finances'); return; }
-    if (ou === 'depenses') { allerModule('finances', 'depenses'); return; }
-    /* « Les bulles qui mènent droit à la fiche » : une liste d'un seul
-       chantier, c'est un appui de plus pour rien. La bulle compte par statut,
-       le raccourci aussi. */
-    var seuls = A.chantiers.filter(function (c) { return c.statut === ou; });
-    if (seuls.length === 1) { ouvrirChantier(seuls[0].id); return; }
-    A.filtreCh = ou; A.rechCh = '';
-    if ($('#c-rech')) $('#c-rech').value = '';
-    renderFiltreChantiers(); renderListeChantiers();
-    allerModule('chantiers', 'carnet');
-  });
   brancherReglagesAlertes();
   brancherReglagesMarque();
   $('#c-notes-maj').addEventListener('click', function (e) {
@@ -1033,15 +933,6 @@ function brancher() {
   $('#b-xlsx').addEventListener('click', exportStockXlsx);
   $('#s-tout').addEventListener('click', sauvegarderTout);
   $('#s-restaurer').addEventListener('click', importJson);
-  $('#a-journee').addEventListener('click', function (e) {
-    if (e.target.closest('#a-jour')) ouvrirJournee(null);
-  });
-  $('#a-sauvegarde').addEventListener('click', function (e) {
-    if (!e.target.closest('#a-sauver')) return;
-    allerReglages('general');
-    var c = $('#c-sauvegarde');
-    if (c) c.scrollIntoView({ block: 'center' });
-  });
   $('#s-recuperer').addEventListener('click', function () {
     var z = $('#s-recup');
     z.hidden = !z.hidden;

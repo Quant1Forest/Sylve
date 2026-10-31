@@ -20,6 +20,8 @@ Statuts :
 - **à maquetter** — l'endroit est fixé, la forme sera dessinée à l'étape 5b.
 - **fait (lot 5a)** — en place dans l'application depuis la 4.86.0 (le statut de décision suit).
 - **en partie (lot 5a)** — le chemin est en place, la forme vient à un lot suivant (dit après les deux-points).
+- **fait (lot 5b)** — en place depuis la 4.87.0 (écran Aujourd'hui, retrait de l'accueil et de Mon entreprise).
+- **en partie (lot 5b)** — en place depuis la 4.87.0 ; ce qui reste est dit après les deux-points.
 
 ---
 
@@ -38,6 +40,10 @@ Statuts :
 - **Lot 5a (4.86.0)** : barre, +, ☰, bandeau, pastilles et retour sont en place,
   branchés sur les écrans existants. Aujourd'hui ouvre encore l'ancien accueil
   (rappels, tuiles, Mon entreprise et Mes notes) jusqu'au lot 5b.
+- **Lot 5b (4.87.0)** : Aujourd'hui est le vrai écran (V2 et tour 2) ; l'ancien
+  accueil et Mon entreprise sont retirés, chaque élément à l'endroit dit ici
+  (preuve élément par élément : `docs/inventaire-ecrans.md`, *Où sont allés
+  l'accueil et Mon entreprise*).
 
 ---
 
@@ -45,21 +51,21 @@ Statuts :
 
 | Ancien (chemin de l'inventaire) | Nouvel endroit | Statut |
 |---|---|---|
-| Accueil (l'écran) | Écran de démarrage, puis Aujourd'hui | en partie (lot 5a) : le démarrage mène à l'onglet Aujourd'hui, qui montre encore l'accueil (5b) — validé (30/10) |
-| Accueil ▸ marque (logo, « Sylve », sous-titre) | Écran de démarrage | validé (30/10) |
-| Accueil ▸ ⚙ | ☰ ▸ Réglages | fait (lot 5a) ; le ⚙ de l'accueil reste jusqu'au 5b — validé (30/10) |
-| Accueil ▸ tuile Mon entreprise (chantiers ouverts) | Barre du bas ; le chiffre « ouverts » disparaît au profit des groupes de Chantiers (voir 11) | en partie (lot 5a) : la barre est là ; la tuile et son chiffre restent jusqu'au 5b — validé (30/10) |
+| Accueil (l'écran) | Écran de démarrage, puis Aujourd'hui | fait (lot 5b) — validé (30/10) |
+| Accueil ▸ marque (logo, « Sylve », sous-titre) | Écran de démarrage | fait (lot 5b) — validé (30/10) |
+| Accueil ▸ ⚙ | ☰ ▸ Réglages | fait (lot 5b) — validé (30/10) |
+| Accueil ▸ tuile Mon entreprise (chantiers ouverts) | Barre du bas ; le chiffre « ouverts » disparaît au profit des groupes de Chantiers (voir 11) | en partie (lot 5b) : tuile retirée ; son chiffre est le compte de « Chantiers en cours » d'Aujourd'hui, les groupes de Chantiers viennent avec la liste — validé (30/10) |
 | Accueil ▸ tuiles Cubage (m³) et Bois de chauffage (stères) | ☰ ▸ Outils de terrain, chaque tuile avec son chiffre (m³ comme aujourd'hui pour le cubage, stères pour le bois) | fait (lot 5a) — validé (30/10) ; chiffre : proposé |
-| Accueil ▸ bouton « Enregistrer ma journée » | + ▸ Ma journée | fait (lot 5a) ; le bouton de l'accueil reste jusqu'au 5b — validé (30/10) |
-| Accueil ▸ ligne « Déjà saisie / Rien de saisi · X h sur 7 jours » | Haut d'Aujourd'hui (« Rien de saisi aujourd'hui · Cette semaine : X h sur N jours »), information seule | validé (V2) |
-| Accueil ▸ les quatre rappels | Aujourd'hui (détail en section 2) | validé (V2) |
-| Mon entreprise (l'écran) | Disparaît ; contenu redistribué ci-dessous | validé (31/10) |
+| Accueil ▸ bouton « Enregistrer ma journée » | + ▸ Ma journée | fait (lot 5b) : bouton retiré ; la ligne de saisie d'Aujourd'hui ouvre aussi Ma journée — validé (30/10) |
+| Accueil ▸ ligne « Déjà saisie / Rien de saisi · X h sur 7 jours » | Haut d'Aujourd'hui (« Rien de saisi aujourd'hui · Cette semaine : X h sur N jours »), information seule | fait (lot 5b) : la semaine part du lundi ; un appui ouvre Ma journée (pré-choix du chantier, P4 : lot c) — validé (V2) |
+| Accueil ▸ les quatre rappels | Aujourd'hui (détail en section 2) | fait (lot 5b) — validé (V2) |
+| Mon entreprise (l'écran) | Disparaît ; contenu redistribué ci-dessous | fait (lot 5b) — validé (31/10) |
 | Mon entreprise ▸ marque de l'entreprise (logo et nom) | Écran de démarrage, sous le logo Sylve, si renseignés | fait (lot 5a, déjà en place depuis 4.7x) — proposé |
-| Mon entreprise ▸ bouton ↩ | Sans objet (barre du bas) | validé (30/10) |
-| Mon entreprise ▸ six bulles « Où j'en suis » et ligne des 7 jours | Aujourd'hui et Argent (section 2) | validé (31/10) |
+| Mon entreprise ▸ bouton ↩ | Sans objet (barre du bas) | fait (lot 5b) — validé (30/10) |
+| Mon entreprise ▸ six bulles « Où j'en suis » et ligne des 7 jours | Aujourd'hui et Argent (section 2) | fait (lot 5b) — validé (31/10) |
 | Mon entreprise ▸ tuiles Chantiers, Calendrier, Finances | Barre du bas : Chantiers, Agenda, Argent | fait (lot 5a) — validé (30/10) |
 | Mon entreprise ▸ tuiles Stock, Achats, Véhicule, Rendements (avec chiffre et phrase de situation) | ☰ ▸ Entreprise, chaque tuile garde son chiffre de situation | fait (lot 5a) — validé (V2) |
-| Mon entreprise ▸ Mes notes | Aujourd'hui ▸ Mes notes (section 2) | validé (31/10) |
+| Mon entreprise ▸ Mes notes | Aujourd'hui ▸ Mes notes (section 2) | fait (lot 5b) — validé (31/10) |
 | Bandeau ▸ logo (retour à l'accueil) | Logo affiché, sans rôle de bouton (Aujourd'hui est dans la barre) | fait (lot 5a) — proposé |
 | Bandeau ▸ ← (remonter d'un étage) | « ← <écran parent> » sur les écrans de second niveau seulement (fiche → Chantiers, Stock → ☰…) | fait (lot 5a) — proposé |
 | Bandeau ▸ sélecteur de partie | ☰ et barre du bas | fait (lot 5a) — validé (30/10) |
@@ -79,25 +85,25 @@ venir** · **Derniers jours**.
 
 | Ancien | Dans Aujourd'hui | Statut |
 |---|---|---|
-| Rappel de sauvegarde (accueil) | En retard, si la dernière sauvegarde a plus de 30 jours : ligne « Sauvegarde à faire · dernière copie il y a N jours », en dernier dans En retard → ☰ ▸ Sauvegarde ; elle disparaît dès qu'on a sauvegardé | validé (31/10 ; B1, maquette tour 2) |
-| Rappel « journées à trancher » (accueil) et bandeau du Calendrier | En retard : une ligne par jour passé prévu non saisi (« Jeudi 29 non saisi · Trancher ») → fiche du jour à l'état « à trancher » (R8) ; la ligne existe aussi en tête de l'Agenda (P3) | validé (V2 ; 31/10, P3, R8) |
-| Rappel d'échéances (prélèvements des charges fixes, 3 jours) | Bloc « Prélèvements à venir », séparé des tâches ; horizon 7 jours (la maquette), réglable dans Relances et calendrier | validé (30/10) ; horizon : proposé |
-| Rappel de devis en attente de réponse | Bientôt : « Relancer le devis ? » (délai de relance des Réglages) | validé (V2) |
-| Rappels fermables par × (reviennent au lancement suivant) | Chaque ligne d'En retard et de Bientôt garde un × « masquer jusqu'à demain » ; elle revient tant que ce n'est pas réglé | proposé |
-| Bulle « journées à planifier » | Bientôt : « À programmer : N j à placer » par chantier engagé (« temps à estimer » s'il n'a pas d'estimation) → Agenda en mode placement, retour à Aujourd'hui à la fin | validé (31/10, P1, P2) |
-| Bulle « devis signés » | Même ligne « À programmer » (signé = à programmer) ; liste complète dans Chantiers | proposé |
-| Bulle « chantiers en cours » | Bloc « Chantiers en cours » (points d'étape, montant, situation) | validé (V2) |
-| Bulle « factures en attente » (+ « N en retard ») | En retard : « Facture impayée » quand l'échéance est dépassée ; total « Facturé, pas encore payé » dans Argent ▸ Mois | validé (V2) |
-| Alerte du Carnet « à facturer » | En retard : « Facture à faire » (chantier terminé non facturé) | validé (V2) |
-| Bulle « chiffre d'affaires » | Argent ▸ Mois | validé (30/10) |
-| Bulle « TVA déductible » | Argent ▸ TVA | validé (30/10) |
-| Ligne « Aujourd'hui / Demain / Dans N jours » (travail posé à 7 jours) | Bientôt : « N jours prévus · lun. 2 → mer. 4 » | validé (V2) |
-| (nouveau, issu du déroulé) Devis à faire, Repérage à faire | Bientôt : une seule ligne « Devis à faire » par chantier à l'étape Infos, avec « repéré il y a N j » ou « annoncé il y a N j · pas encore repéré » en petit ; plus de ligne « Repérage à faire » séparée (le repérage n'est pas systématique) | validé (V2 ; 31/10, C1) |
-| Mes notes (listes cochables colorées, + note, cocher, modifier le titre, × d'un élément, × de la note → corbeille, ajouter un élément) | Aujourd'hui ▸ Mes notes, juste après Bientôt (N1), toutes ces actions sur place : une carte par note (bande de la couleur à gauche, titre → fenêtre titre / couleur / Supprimer, × → confirmation puis corbeille, « N à faire »), éléments à faire visibles, cochés repliés sous « N faits » (N2 ; un appui les montre, décocher les remet en haut), champ « ajouter… » en bas de chaque note (Entrée ajoute et garde le clavier) ; créer une note : + ▸ Note | validé (31/10, maquette tour 2) |
-| Remontées du lot 1 : ancienne note sur plusieurs lignes = un seul élément ; élément non modifiable | Un appui sur le texte d'un élément le corrige sur place (Entrée ou sortie du champ enregistre, Échap annule, vide = on garde l'ancien texte) ; un élément de plusieurs lignes affiche « N lignes : en faire N éléments », qui le découpe à sa place | validé (31/10, maquette tour 2) |
-| (nouveau) Trois derniers jours saisis | Bas d'Aujourd'hui, lien « Tout l'historique dans l'Agenda » | validé (V2), à juger à l'usage |
-| Tuile Stock ▸ « N à recommander » | Bientôt : une seule ligne « À recommander : N fournitures » (chacune avec sa raison : sous le seuil, rupture, ou « il en manque N » pour les chantiers signés, S2) → Stock ; et sous-titre de la tuile ☰ | validé (31/10, Q4 ; S2) |
-| Tuile Véhicule ▸ « N échéances dépassées » | En retard si dépassée, Bientôt si proche (et sous-titre ☰) | validé (31/10, Q4) |
+| Rappel de sauvegarde (accueil) | En retard, si la dernière sauvegarde a plus de 30 jours : ligne « Sauvegarde à faire · dernière copie il y a N jours », en dernier dans En retard → ☰ ▸ Sauvegarde ; elle disparaît dès qu'on a sauvegardé | fait (lot 5b) : ☰ ▸ Sauvegarde ouvre encore la carte des Réglages (écran propre : lot f) — validé (31/10 ; B1, maquette tour 2) |
+| Rappel « journées à trancher » (accueil) et bandeau du Calendrier | En retard : une ligne par jour passé prévu non saisi (« Jeudi 29 non saisi · Trancher ») → fiche du jour à l'état « à trancher » (R8) ; la ligne existe aussi en tête de l'Agenda (P3) | en partie (lot 5b) : une ligne par jour ; « Trancher » ouvre encore la fenêtre « Que s'est-il passé ? » (fiche du jour R8 : lot c) — validé (V2 ; 31/10, P3, R8) |
+| Rappel d'échéances (prélèvements des charges fixes, 3 jours) | Bloc « Prélèvements à venir », séparé des tâches ; horizon 7 jours (la maquette), réglable dans Relances et calendrier | en partie (lot 5b) : bloc en place, 7 jours (le préavis plus long d'une échéance annuelle ou semestrielle est gardé) ; aucun réglage n'existait, rien d'ajouté — validé (30/10) ; horizon : proposé |
+| Rappel de devis en attente de réponse | Bientôt : « Relancer le devis ? » (délai de relance des Réglages) | fait (lot 5b) — validé (V2) |
+| Rappels fermables par × (reviennent au lancement suivant) | Chaque ligne d'En retard et de Bientôt garde un × « masquer jusqu'à demain » ; elle revient tant que ce n'est pas réglé | fait (lot 5b) ; les prélèvements gardent aussi leur × — proposé |
+| Bulle « journées à planifier » | Bientôt : « À programmer : N j à placer » par chantier engagé (« temps à estimer » s'il n'a pas d'estimation) → Agenda en mode placement, retour à Aujourd'hui à la fin | en partie (lot 5b) : lignes en place, mode placement actuel (« Fini de placer » ramène encore à la fiche, P2 : lot c) ; « temps à estimer » ouvre la fiche, comme « À planifier » de l'Agenda — validé (31/10, P1, P2) |
+| Bulle « devis signés » | Même ligne « À programmer » (signé = à programmer) ; liste complète dans Chantiers | fait (lot 5b) — proposé |
+| Bulle « chantiers en cours » | Bloc « Chantiers en cours » (points d'étape, montant, situation) | fait (lot 5b) : tous les chantiers non soldés, comme la V2 — validé (V2) |
+| Bulle « factures en attente » (+ « N en retard ») | En retard : « Facture impayée » quand l'échéance est dépassée ; total « Facturé, pas encore payé » dans Argent ▸ Mois | en partie (lot 5b) : la ligne est en place ; le total est le « en attente » du Bilan d'Argent (Argent ▸ Mois : lot d) — validé (V2) |
+| Alerte du Carnet « à facturer » | En retard : « Facture à faire » (chantier terminé non facturé) | fait (lot 5b) : même seuil que l'alerte (15 jours) ; l'alerte du carnet reste — validé (V2) |
+| Bulle « chiffre d'affaires » | Argent ▸ Mois | en partie (lot 5b) : bulle retirée, le même chiffre est dans Argent ▸ Bilan (année) ; Argent ▸ Mois : lot d — validé (30/10) |
+| Bulle « TVA déductible » | Argent ▸ TVA | en partie (lot 5b) : bulle retirée, le même chiffre est dans Argent ▸ Bilan (année) ; Argent ▸ TVA : lot d — validé (30/10) |
+| Ligne « Aujourd'hui / Demain / Dans N jours » (travail posé à 7 jours) | Bientôt : « N jours prévus · lun. 2 → mer. 4 » | fait (lot 5b) : une ligne par chantier, avec le donneur d'ordre — validé (V2) |
+| (nouveau, issu du déroulé) Devis à faire, Repérage à faire | Bientôt : une seule ligne « Devis à faire » par chantier à l'étape Infos, avec « repéré il y a N j » ou « annoncé il y a N j · pas encore repéré » en petit ; plus de ligne « Repérage à faire » séparée (le repérage n'est pas systématique) | en partie (lot 5b) : une ligne par chantier « Devis à envoyer » pas encore envoyé, « annoncé il y a N j » ; « repéré » attend la donnée (C2, « Noter le repérage ») — validé (V2 ; 31/10, C1) |
+| Mes notes (listes cochables colorées, + note, cocher, modifier le titre, × d'un élément, × de la note → corbeille, ajouter un élément) | Aujourd'hui ▸ Mes notes, juste après Bientôt (N1), toutes ces actions sur place : une carte par note (bande de la couleur à gauche, titre → fenêtre titre / couleur / Supprimer, × → confirmation puis corbeille, « N à faire »), éléments à faire visibles, cochés repliés sous « N faits » (N2 ; un appui les montre, décocher les remet en haut), champ « ajouter… » en bas de chaque note (Entrée ajoute et garde le clavier) ; créer une note : + ▸ Note | en partie (lot 5b) : déplacées avec toutes leurs actions, en cartes ; « + note » retiré (+ ▸ Note) ; cochés repliés (N2) : lot f — validé (31/10, maquette tour 2) |
+| Remontées du lot 1 : ancienne note sur plusieurs lignes = un seul élément ; élément non modifiable | Un appui sur le texte d'un élément le corrige sur place (Entrée ou sortie du champ enregistre, Échap annule, vide = on garde l'ancien texte) ; un élément de plusieurs lignes affiche « N lignes : en faire N éléments », qui le découpe à sa place | validé (31/10, maquette tour 2) ; lot f |
+| (nouveau) Trois derniers jours saisis | Bas d'Aujourd'hui, lien « Tout l'historique dans l'Agenda » | fait (lot 5b) : un appui rouvre Ma journée sur ce jour — validé (V2), à juger à l'usage |
+| Tuile Stock ▸ « N à recommander » | Bientôt : une seule ligne « À recommander : N fournitures » (chacune avec sa raison : sous le seuil, rupture, ou « il en manque N » pour les chantiers signés, S2) → Stock ; et sous-titre de la tuile ☰ | en partie (lot 5b) : la ligne et la tuile du ☰ comptent pareil, réservé compris ; l'écran Stock garde son ancien compte jusqu'au lot du stock — validé (31/10, Q4 ; S2) |
+| Tuile Véhicule ▸ « N échéances dépassées » | En retard si dépassée, Bientôt si proche (et sous-titre ☰) | fait (lot 5b) : « proche » = la définition des Échéances (60 jours ou 5 000 km) — validé (31/10, Q4) |
 
 ---
 
@@ -430,7 +436,7 @@ La fonction reste toujours accessible ; seule la porte en double part.
 | R6 | Dates posées à la main dans la fenêtre « Les journées » de la fiche | Placement dans l'Agenda (alerte jour déjà pris, jour libre suivant) | accepté (31/10) |
 | R7 | Carte « Journée » sous la grille de l'Agenda (fusion) | Fiche du jour, tous ses boutons | accepté (31/10) |
 | R8 | Fenêtre « Que s'est-il passé ? » (fusion) | Fiche du jour à l'état « à trancher », mêmes réponses | accepté (31/10) |
-| — | Bandeau (logo-bouton, ←, sélecteur), ↩ de Mon entreprise, écrans Accueil et Mon entreprise, bulles et tuiles | Barre du bas, ☰, Aujourd'hui, Argent | en partie (lot 5a) : bandeau fait ; Accueil, Mon entreprise, ↩, bulles et tuiles au 5b — validé (30-31/10) |
+| — | Bandeau (logo-bouton, ←, sélecteur), ↩ de Mon entreprise, écrans Accueil et Mon entreprise, bulles et tuiles | Barre du bas, ☰, Aujourd'hui, Argent | fait (lot 5a : bandeau ; lot 5b : Accueil, Mon entreprise, ↩, bulles et tuiles) — validé (30-31/10) |
 
 ---
 

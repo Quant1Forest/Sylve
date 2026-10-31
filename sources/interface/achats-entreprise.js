@@ -148,7 +148,7 @@ function ouvrirAchat(id) {
   });
   var fini = function (message) {
     sauverAchats().then(function () {
-      fermerModale(); renderAchats(); renderBudgetAchats(); renderEntreprise();
+      fermerModale(); renderAchats(); renderBudgetAchats();
       toast(message);
     });
   };
@@ -172,8 +172,8 @@ function ouvrirAchat(id) {
 }
 
 /* La situation d'un module : un chiffre, son unité, une phrase. Les tuiles
-   de Mon entreprise, de l'accueil et du ☰ la lisent ici, d'un seul calcul :
-   elles ne peuvent pas se contredire. */
+   du ☰ la lisent ici (elles l'ont reprise de Mon entreprise et de l'accueil,
+   retirés au lot 5b), d'un seul calcul. */
 function situationModule(m) {
   if (m === 'achats') {
     var ta = FIN.totauxAchats(A.achats);
@@ -198,7 +198,8 @@ function situationModule(m) {
         : 'Carnet d’entretien, échéances' };
   }
   if (m === 'stock') {
-    var vs = ST.valeurTotale(A.articles), bas = ST.articlesSousSeuil(A.articles);
+    /* Le même compte que la ligne « À recommander » d'Aujourd'hui (S2). */
+    var vs = ST.valeurTotale(A.articles), bas = ST.aRecommander(A.articles);
     return { n: vs ? eur(vs) : '—', u: 'en stock',
       s: A.articles.length
         ? A.articles.length + ' article' + (A.articles.length > 1 ? 's' : '') +
@@ -219,276 +220,12 @@ function situationModule(m) {
   }
   return { n: '—', u: '', s: '' };
 }
-function poserSituation(cle, m) {
-  var s = situationModule(m);
-  if ($('#e-' + cle + '-n')) $('#e-' + cle + '-n').textContent = s.n;
-  if ($('#e-' + cle + '-s')) $('#e-' + cle + '-s').textContent = s.s;
-}
-
-function renderEntreprise() {
-  poserSituation('ac', 'achats');
-  var ouv = C.filtre(A.chantiers, 'ouverts').length;
-  var t = C.totaux(A.chantiers, A.cfg);
-  if ($('#a-ent-n')) $('#a-ent-n').textContent = ouv || '—';
-
-  if ($('#e-ch-n')) $('#e-ch-n').textContent = ouv || '—';
-  if ($('#e-ch-s')) {
-    $('#e-ch-s').textContent = A.chantiers.length
-      ? (t.signe ? eur(t.signe) + ' signés' + (t.aFacturer ? ' · ' + eur(t.aFacturer) + ' à facturer' : '')
-        : 'Aucun chantier signé')
-      : 'En cours, terminés, à venir';
-  }
-
-  var d = new Date(), cm = C.chargeMois(A.chantiers, d.getFullYear(), d.getMonth(), A.cfg);
-  if ($('#e-cal-n')) $('#e-cal-n').textContent = (cm.fermes + cm.provisoires) || '—';
-  if ($('#e-cal-s')) {
-    $('#e-cal-s').textContent = (cm.fermes || cm.provisoires)
-      ? cm.fermes + ' confirmés · ' + cm.provisoires + ' provisoires ce mois'
-      : 'Programmation, journées placées';
-  }
-
-  poserSituation('rd', 'rendements');
-
-  var b = periodeCourante();
-  var ca = FIN.chiffreAffaires(A.chantiers, b);
-  var bal = FIN.balanceTva(A.chantiers, A.depenses, b, C.tauxLigne);
-  if ($('#e-fi-n')) $('#e-fi-n').textContent = ca.total ? eur(ca.total) : '—';
-  poserSituation('vh', 'vehicule');
-  if ($('#e-fi-s')) {
-    $('#e-fi-s').textContent = ca.total || bal.montant
-      ? libellePeriode() + ' · TVA ' + eur(bal.montant) + ' ' +
-        (bal.sens === 'a_payer' ? 'à reverser' : (bal.sens === 'a_recuperer' ? 'à récupérer' : ''))
-      : 'Bilan, recettes, dépenses, analyses';
-  }
-
-  poserSituation('st', 'stock');
-
-  renderMarqueEntreprise();
-  renderEntBilan();
-  renderNotesEnt();
-}
-
-/* Six chiffres qui disent ce qu'il reste à faire, pas ce qui est déjà fait —
-   les tuiles s'en chargent. Chacun mène droit à la liste qui le détaille.
-   Le bilan répond à « où j'en suis » avant qu'on ait à chercher. */
-/* Le nom et le logo de l'entreprise, sur son écran. Rien de saisi : l'écran
-   garde son intitulé d'origine. */
-function renderMarqueEntreprise() {
-  var z = $('#ent-logo'), h = $('#ent-nom');
-  if (!z || !h) return;
-  var nom = ((A.cfg && A.cfg.nomEntreprise) || '').trim();
-  var logo = (A.cfg && A.cfg.logoEntreprise) || '';
-  h.textContent = nom || 'Mon entreprise';
-  z.hidden = !logo;
-  z.innerHTML = logo ? '<img alt="">' : '';
-  if (logo) z.querySelector('img').src = logo;
-}
-
-function renderEntBilan() {
-  var z = $('#ent-bilan'); if (!z) return;
-  if (!A.chantiers.length && !A.charges.length) { z.innerHTML = ''; return; }
-  var an = new Date().getFullYear();
-  var b = FIN.bornes('annee', an, 0);
-  var aPlanifier = 0, signes = 0, signesM = 0, encours = 0, impayes = 0, impayesM = 0;
-  A.chantiers.forEach(function (c) {
-    /* Un chantier terminé n'a plus de journées à placer : ce qui reste à
-       planifier ne concerne que ce qui n'est pas encore fait. */
-    if (['devis', 'envoye', 'accepte', 'encours'].indexOf(c.statut) >= 0) {
-      var reste = C.resteAPlacer(c);
-      if (reste != null && reste > 0) aPlanifier += reste;
-    }
-    if (c.statut === 'accepte') { signes++; signesM += C.montant(c); }
-    if (c.statut === 'encours') encours++;
-    if (c.statut === 'facture') { impayes++; impayesM += C.montant(c); }
-  });
-  /* La bulle ne chauffe que s'il y a un vrai retard d'échéance : c'est
-     l'alerte de « À traiter » qui fait foi, pas le simple fait d'attendre. */
-  var enRetard = C.alertes(A.chantiers, A.cfg, Date.now())
-    .filter(function (a) { return a.type === 'impaye'; }).length;
-  var ca = FIN.chiffreAffaires(A.chantiers, b);
-  var bal = FIN.balanceTva(A.chantiers, A.depenses, b, C.tauxLigne);
-  var bulle = function (val, etiquette, sous, cible, chaud) {
-    return '<button class="bulle' + (chaud ? ' chaud' : '') + '" data-bulle="' + cible + '">' +
-      '<span class="v num">' + val + '</span>' +
-      '<span class="e">' + etiquette + '</span>' +
-      '<span class="s num">' + (sous || '&nbsp;') + '</span></button>';
-  };
-  z.innerHTML = '<p class="eyebrow" style="margin:20px 0 0">Où j’en suis</p>' +
-    '<div class="bilan">' +
-    bulle(aPlanifier ? E.fmt(aPlanifier, aPlanifier % 1 ? 1 : 0) : '—', 'journées à planifier',
-      aPlanifier ? 'devis et chantiers' : 'rien en attente', 'calendrier') +
-    bulle(signes || '—', 'devis signés', signes ? eur(signesM) : 'à planifier', 'accepte') +
-    bulle(encours || '—', 'chantiers en cours', '&nbsp;', 'encours') +
-    bulle(impayes || '—', 'factures en attente',
-      impayes ? eur(impayesM) + (enRetard ? ' · ' + enRetard + ' en retard' : '') : 'tout est réglé',
-      'facture', enRetard > 0) +
-    bulle(ca.total ? eurCourt(ca.total) : '—', 'chiffre d’affaires', String(an), 'finances') +
-    bulle(bal.deductible.total ? eurCourt(bal.deductible.total) : '—', 'TVA déductible',
-      'cette année', 'depenses') +
-    '</div>' + prochaineJourneeHtml();
-}
-/* Ce qui est posé à l'agenda pour tout de suite. Un chantier prévu demain ne
-   doit pas s'apprendre en ouvrant le calendrier. */
-function prochaineJourneeHtml() {
-  var now = C.minuit(Date.now()), trouve = null;
-  A.chantiers.forEach(function (c) {
-    if (['accepte', 'encours', 'termine'].indexOf(c.statut) < 0) return;
-    C.journeesPlacees(c).forEach(function (j) {
-      var d = Math.round((C.minuit(j.d) - now) / C.JOUR);
-      if (d < 0 || d > 7) return;
-      if (!trouve || j.d < trouve.d) trouve = { d: j.d, p: j.p, ch: c, dans: d };
-    });
-  });
-  if (!trouve) return '';
-  var quand = trouve.dans === 0 ? 'Aujourd’hui' : trouve.dans === 1 ? 'Demain'
-    : 'Dans ' + trouve.dans + ' jours';
-  return '<button class="suite" data-bulle="calendrier">' +
-    '<svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><rect x="4" y="5.6" width="16" ' +
-    'height="14" rx="2"/><path d="M4 10.2h16M8.6 3.6v3.8M15.4 3.6v3.8"/></svg>' +
-    '<span><b>' + quand + '</b> — ' + esc(C.nomChantier(trouve.ch)) + ', ' +
-    esc(C.fmtJours(trouve.p)) +
-    /* Pour qui je travaille : c'est ce qu'on veut savoir la veille. */
-    (trouve.ch.donneur ? '<small>pour ' + esc(trouve.ch.donneur) + '</small>' : '') +
-    '</span></button>';
-}
-
-/* Les notes qu'il s'écrit à lui-même, sous les tuiles de l'écran
-   Entreprise. Elles restent tant qu'il ne les efface pas. « À traiter » a
-   quitté cet écran en 4.82 : le carnet le porte. */
-var COUL_NOTE = [
-  { c: '#B4231F', n: 'rouge' }, { c: '#C4611B', n: 'orange' },
-  { c: '#B98A00', n: 'or' }, { c: '#2E7D46', n: 'vert' },
-  { c: '#1F5FA9', n: 'bleu' }, { c: '#6F6A5C', n: 'gris' }
-];
-/* Une note est une liste : des éléments à cocher, comme une liste de courses.
-   Avant la 4.85 elle portait un seul texte ; il devient son premier élément,
-   non coché, la première fois qu'on la lit. */
-function notes() {
-  A.cfg = A.cfg || {};
-  A.cfg.notes = A.cfg.notes || [];
-  A.cfg.notes.forEach(function (n) {
-    if (Array.isArray(n.items)) return;
-    n.items = n.texte ? [{ id: uid(), texte: n.texte, fait: false }] : [];
-    delete n.texte;
-  });
-  return A.cfg.notes;
-}
-function noteParId(id) {
-  return notes().filter(function (x) { return x.id === id; })[0] || null;
-}
-/* Les éléments cochés descendent en bas ; l'ordre de saisie est gardé dans la
-   base, de sorte qu'en décochant un élément il reprend sa place. */
-function itemsAffiches(n) {
-  var a = n.items || [];
-  return a.filter(function (x) { return !x.fait; }).concat(a.filter(function (x) { return x.fait; }));
-}
-function renderNotesEnt() {
-  var z = $('#ent-notes'); if (!z) return;
-  var mes = notes();
-  z.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;' +
-    'gap:9px;margin:22px 0 8px">' +
-    '<p class="eyebrow" style="margin:0">Mes notes</p>' +
-    '<button class="btn-min" id="ent-note-plus">+ note</button></div>' +
-    mes.map(function (n) {
-      return '<div class="note-c" data-note-id="' + esc(n.id) + '">' +
-        '<div class="note-t"><span class="ic" style="background:' + esc(n.couleur || '#6F6A5C') + '"></span>' +
-        '<button class="note-titre" data-note="' + esc(n.id) + '" title="Modifier la note">' +
-        esc(n.titre || 'Note') + '</button>' +
-        '<button class="fermer" data-notesup="' + esc(n.id) + '" title="Supprimer cette note" ' +
-        'aria-label="Supprimer la note">×</button></div>' +
-        itemsAffiches(n).map(function (it) {
-          return '<div class="note-i' + (it.fait ? ' fait' : '') + '">' +
-            '<input type="checkbox" data-nt-coche="' + esc(it.id) + '"' + (it.fait ? ' checked' : '') +
-            ' aria-label="Fait">' +
-            '<span class="note-texte">' + esc(it.texte) + '</span>' +
-            '<button class="fermer" data-nt-supitem="' + esc(it.id) + '" title="Supprimer cet élément" ' +
-            'aria-label="Supprimer l’élément">×</button></div>';
-        }).join('') +
-        '<input type="text" class="note-ajout" data-nt-ajout="' + esc(n.id) + '" autocomplete="off" ' +
-        'enterkeyhint="next" placeholder="ajouter un élément…"></div>';
-    }).join('') +
-    (mes.length ? '' : '<p class="muted" style="font-size:12.5px;margin:0">' +
-      '« + note » pour vous écrire ce qu’il ne faut pas oublier : un chantier qui se ' +
-      'prépare, un appel à passer.</p>');
-}
-function ouvrirNote(id) {
-  var l = notes();
-  var n = id ? noteParId(id) : null;
-  var coul = (n && n.couleur) || COUL_NOTE[4].c;
-  modale(id ? 'Modifier la note' : 'Une note à moi-même',
-    '<div class="champ"><label class="eyebrow" for="nt-titre">Quoi ?</label>' +
-    '<input type="text" id="nt-titre" class="gros" autocomplete="off" ' +
-    'placeholder="rappeler le gestionnaire" value="' + esc(n ? n.titre || '' : '') + '"></div>' +
-    '<p class="eyebrow" style="margin:12px 0 6px">Couleur</p>' +
-    '<div class="chips" id="nt-couls">' + COUL_NOTE.map(function (x) {
-      return '<button type="button" class="chip" data-ntcoul="' + x.c + '" title="' + x.n +
-        '" aria-pressed="' + (coul === x.c ? 'true' : 'false') + '">' +
-        '<span class="pastille" style="width:12px;height:12px;background:' + x.c +
-        ';display:inline-block;vertical-align:-1px"></span></button>';
-    }).join('') + '</div>' +
-    (id ? '' : '<p class="muted" style="font-size:12px;margin:10px 0 0">Les éléments à cocher ' +
-      's’ajoutent ensuite, dans la note.</p>') +
-    '<div class="btn-rang" style="margin-top:12px">' +
-    (id ? '<button class="btn danger btn-min" id="nt-sup">Supprimer</button>' : '') +
-    '<button class="btn primaire" id="nt-ok">Enregistrer</button></div>');
-  $('#nt-couls').addEventListener('click', function (e) {
-    var b = e.target.closest('[data-ntcoul]'); if (!b) return;
-    coul = b.dataset.ntcoul;
-    $$('#nt-couls [data-ntcoul]').forEach(function (x) {
-      x.setAttribute('aria-pressed', String(x.dataset.ntcoul === coul));
-    });
-  });
-  if ($('#nt-sup')) $('#nt-sup').addEventListener('click', function () { effacerNote(id); });
-  $('#nt-ok').addEventListener('click', function () {
-    var titre = $('#nt-titre').value.trim();
-    if (!titre) { toast('Écrivez au moins de quoi il s’agit.'); return; }
-    if (!n) { n = { id: uid(), cree: Date.now(), items: [] }; l.push(n); }
-    n.titre = titre;
-    n.couleur = coul;
-    Promise.resolve(sauverCfg()).then(function () {
-      fermerModale(); renderNotesEnt();
-      toast(id ? 'Note modifiée.' : 'Note ajoutée.');
-    });
-  });
-}
-/* Par la corbeille, comme le reste : une liste de courses perdue d'un doigt
-   maladroit se récupère. */
-function effacerNote(id) {
-  var n = noteParId(id); if (!n) return Promise.resolve();
-  var faits = (n.items || []).filter(function (x) { return x.fait; }).length;
-  var detail = (n.items || []).length
-    ? faits + '/' + n.items.length + ' fait' + (faits > 1 ? 's' : '') : '';
-  return jeterObjet('note', n, n.titre || 'Note', detail).then(function () {
-    A.cfg.notes = notes().filter(function (x) { return x.id !== id; });
-    return sauverCfg();
-  }).then(function () {
-    fermerModale(); renderNotesEnt(); toast('Note mise à la corbeille.');
-  });
-}
-function majNote(id, f, refocus) {
-  var n = noteParId(id); if (!n) return;
-  f(n);
-  Promise.resolve(sauverCfg()).then(function () {
-    renderNotesEnt();
-    if (refocus) {
-      var c = $('#ent-notes [data-nt-ajout="' + id + '"]');
-      if (c) c.focus();
-    }
-  });
-}
-function ajouterItemNote(champ) {
-  var t = champ.value.trim(); if (!t) return;
-  champ.value = '';
-  majNote(champ.dataset.ntAjout, function (n) {
-    n.items.push({ id: uid(), texte: t, fait: false });
-  }, true);
-}
 
 function renderAlertes() {
   var z = $('#bandeau-alertes'); if (!z) return;
   /* Le seul « À traiter » depuis la 4.82 : l'écran Entreprise le répétait,
      et il l'y trouvait de trop. Les journées à placer et le travail qui
-     approche vivent dans les bulles et sur le calendrier ; ici on ne garde
+     approche vivent dans Aujourd'hui et sur le calendrier ; ici on ne garde
      que ce qui porte un nom de chantier et attend une action. */
   var al = C.alertes(A.chantiers, A.cfg, Date.now()).filter(function (a2) {
     return ['retard', 'afacturer', 'impaye'].indexOf(a2.type) >= 0;

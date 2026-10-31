@@ -38,7 +38,7 @@ function renderCarnet() {
   renderFiltreChantiers();
   renderListeChantiers();
   renderAlertes();
-  renderEntreprise();
+  renderAujourdhui();
 }
 function premierDonneur(chantiers, cfg, total) {
   var l = C.parDonneur(chantiers, cfg)

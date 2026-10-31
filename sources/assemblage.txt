@@ -96,6 +96,7 @@
 @interface/calendrier.js
 @interface/vehicule.js
 @interface/achats-entreprise.js
+@interface/aujourdhui.js
 @interface/finances.js
 @interface/listes.js
 @interface/journee.js

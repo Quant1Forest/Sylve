@@ -385,8 +385,11 @@ function preavisDe(p) { return PREAVIS[p] != null ? PREAVIS[p] : 7; }
 
 /* Ce qui va tomber du compte. Uniquement ce qui vient : une échéance passée
    n'est pas un oubli, elle a été prélevée toute seule. Réclamer un pointage
-   qui ne viendra jamais installerait une alerte permanente. */
-function alertesCharges(charges, depenses, maintenant) {
+   qui ne viendra jamais installerait une alerte permanente.
+   « horizon » avance le préavis sans jamais le raccourcir : Aujourd'hui
+   regarde sept jours devant (lot 5b), mais une échéance annuelle continue de
+   s'annoncer quatorze jours avant, comme elle l'a toujours fait. */
+function alertesCharges(charges, depenses, maintenant, horizon) {
   var now = maintenant || Date.now();
   var JOURMS = 86400000;
   var minuit = function (ts) { var d = new Date(ts); d.setHours(0, 0, 0, 0); return d.getTime(); };
@@ -395,7 +398,7 @@ function alertesCharges(charges, depenses, maintenant) {
   chargesDues(charges, depenses, b).forEach(function (d) {
     if (d.paye) return;
     var jours = Math.round((minuit(d.date) - minuit(now)) / JOURMS);
-    if (jours < 0 || jours > preavisDe(d.charge.periodicite)) return;
+    if (jours < 0 || jours > Math.max(preavisDe(d.charge.periodicite), nb(horizon))) return;
     out.push({ charge: d.charge, date: d.date, jours: jours, ttc: d.ttc,
       texte: (jours === 0 ? 'prélevé aujourd’hui'
         : jours === 1 ? 'prélevé demain'

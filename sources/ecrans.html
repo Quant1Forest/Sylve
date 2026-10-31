@@ -488,85 +488,17 @@
       </div><!-- /regl-corps -->
     </section>
 
-    <!-- ======================================================= accueil -->
+    <!-- =================================================== aujourd'hui -->
+    <!-- L'écran d'arrivée (lot 5b). Il prend la vue « accueil » : c'est
+         elle que la barre, le retour et les raccourcis connaissent. Le haut
+         et le bas se refont ensemble ; les notes à part, pour qu'un élément
+         ajouté ne referme pas le clavier. -->
     <section class="vue" id="vue-accueil" role="tabpanel">
-      <div class="accueil">
-        <div class="marque">
-          <span class="marque-logo" role="img" aria-label="Sylve"></span>
-          <div style="flex:1"><h1>Sylve</h1>
-            <p id="a-sous">Gestion d'entreprise et outils de terrain</p></div>
-          <button class="tuile" id="a-reglages" title="Réglages"
-            style="width:auto;flex:none;padding:11px 13px">⚙</button>
-        </div>
-        <div id="a-sauvegarde"></div>
-        <div id="a-journees"></div>
-        <div id="a-echeances"></div>
-        <div id="a-devis"></div>
-        <p class="eyebrow" style="margin:22px 0 8px">Entreprise</p>
-        <div class="tuiles">
-          <button class="tuile" data-module="entreprise">
-            <span class="ic"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><path d="M8.6 4H6.6A1.6 1.6 0 0 0 5 5.6v13.8A1.6 1.6 0 0 0 6.6 21h10.8a1.6 1.6 0 0 0 1.6-1.6V5.6A1.6 1.6 0 0 0 17.4 4h-2"/><rect x="8.6" y="2.4" width="6.8" height="3.4" rx="1.1"/><path d="M8.7 10.6h6.6M8.7 14h6.6M8.7 17.4h3.8"/></svg></span>
-            <span><b>Mon entreprise</b><small>Chantiers, devis, rendements, finances</small></span>
-            <span class="chiffre"><b id="a-ent-n">—</b><span>chantiers ouverts</span></span>
-          </button>
-        </div>
-        <div id="a-journee"></div>
-
-        <p class="eyebrow" style="margin:24px 0 8px">Outils de terrain</p>
-        <div class="tuiles">
-          <button class="tuile" data-module="cubage">
-            <span class="ic"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><circle cx="12" cy="12" r="8.4"/><path d="M4.5 12h15"/><path d="M7.1 9.5 4.6 12l2.5 2.5M16.9 9.5 19.4 12l-2.5 2.5"/></svg></span>
-            <span><b>Cubage</b><small id="a-cub-s">Bordereaux de cubage</small></span>
-            <span class="chiffre"><b id="a-cub-n">—</b><span>m³</span></span>
-          </button>
-          <button class="tuile" data-module="bois">
-            <span class="ic"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><circle cx="7.6" cy="15.6" r="4.3"/><circle cx="16.4" cy="15.6" r="4.3"/><circle cx="12" cy="7.6" r="4.3"/></svg></span>
-            <span><b>Bois de chauffage</b><small id="a-bois-s">Piles, séchage, stock</small></span>
-            <span class="chiffre"><b id="a-bois-n">—</b><span>stères</span></span>
-          </button>
-                </div>
-      </div>
-    </section>
-
-    <!-- ===================================================== entreprise -->
-    <section class="vue" id="vue-entreprise" role="tabpanel">
-      <div class="accueil">
-        <div class="marque">
-          <button class="tuile" data-module="accueil" style="width:auto;padding:9px 13px">↩</button>
-          <span class="logo-ent" id="ent-logo" hidden></span>
-          <div><h1 style="font-size:24px" id="ent-nom">Mon entreprise</h1><p>Chantiers sylvicoles</p></div>
-        </div>
-        <!-- Le bilan passe au-dessus des tuiles : c'est ce qu'on vient
-             chercher en arrivant, et en dessous il tombait sous la ligne
-             d'horizon d'un écran de téléphone. -->
-        <div id="ent-bilan"></div>
-        <div class="tuiles">
-          <button class="tuile" data-module="chantiers"><span class="ic rond"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><path d="M12 20.6s6.1-5.9 6.1-10A6.1 6.1 0 0 0 5.9 10.6c0 4.1 6.1 10 6.1 10Z"/><circle cx="12" cy="10.4" r="2.3"/></svg></span>
-            <span><b>Chantiers</b><small id="e-ch-s">En cours, terminés, à venir</small></span>
-            <span class="chiffre"><b id="e-ch-n">—</b><span>ouverts</span></span></button>
-          <button class="tuile" data-module="calendrier"><span class="ic rond"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><rect x="4" y="5.6" width="16" height="14" rx="2"/><path d="M4 10.2h16M8.6 3.6v3.8M15.4 3.6v3.8"/></svg></span>
-            <span><b>Calendrier</b><small id="e-cal-s">Programmation, journées placées</small></span>
-            <span class="chiffre"><b id="e-cal-n">—</b><span>j. ce mois</span></span></button>
-          <button class="tuile" data-module="rendements"><span class="ic rond"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><path d="M4.6 19.6h14.8"/><path d="M7.7 19.6v-5.2M12 19.6v-8.8M16.3 19.6v-12.4"/></svg></span>
-            <span><b>Rendements</b><small id="e-rd-s">Temps passé par type de travaux</small></span>
-            <span class="chiffre"><b id="e-rd-n">—</b><span>références</span></span></button>
-          <button class="tuile" data-module="stock"><span class="ic rond"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><path d="M4.7 8.5 12 4.8l7.3 3.7v7L12 19.2l-7.3-3.7Z"/><path d="M4.7 8.5 12 12.2l7.3-3.7M12 12.2v7"/></svg></span>
-            <span><b>Stock et fournitures</b><small id="e-st-s">Protections, tuteurs, marges</small></span>
-            <span class="chiffre"><b id="e-st-n">—</b><span>en stock</span></span></button>
-          <button class="tuile" data-module="finances"><span class="ic rond"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><path d="M16.4 7.6a5.7 5.7 0 0 0-8.5 4.5 5.7 5.7 0 0 0 8.5 4.5"/><path d="M6.3 10.6h6.8M6.3 13.6h6.8"/></svg></span>
-            <span><b>Finances</b><small id="e-fi-s">Bilan, recettes, dépenses, analyses</small></span>
-            <span class="chiffre"><b id="e-fi-n">—</b><span>facturé</span></span></button>
-          <button class="tuile" data-module="achats"><span class="ic rond"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><path d="M4.4 8.4h15.2l-1.5 9.1a1.6 1.6 0 0 1-1.6 1.3H7.5a1.6 1.6 0 0 1-1.6-1.3z"/><path d="M8.9 8.4V6.6a3.1 3.1 0 0 1 6.2 0v1.8"/></svg></span>
-            <span><b>Achats à venir</b><small id="e-ac-s">Ce que vous comptez acheter</small></span>
-            <span class="chiffre"><b id="e-ac-n">—</b><span>à prévoir</span></span></button>
-          <button class="tuile" data-module="vehicule"><span class="ic rond"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true"><path d="M3.5 15.6V9.4h9.6l3.3 3h4.1v3.2"/><path d="M9.6 16.2h4.6"/><circle cx="7.3" cy="16.2" r="1.8"/><circle cx="16.6" cy="16.2" r="1.8"/></svg></span>
-            <span><b>Véhicule</b><small id="e-vh-s">Carnet d'entretien, échéances</small></span>
-            <span class="chiffre"><b id="e-vh-n">—</b><span>km</span></span></button>
-        </div>
-        <!-- Les notes sous les tuiles : on arrive sur les modules sans
-             défiler, et les notes se lisent en descendant. « À traiter »
-             n'est plus ici — le carnet des chantiers le porte déjà. -->
-        <div id="ent-notes"></div>
+      <div class="aj">
+        <p class="aj-date" id="aj-date"></p>
+        <div id="aj-haut"></div>
+        <section class="aj-bloc" id="aj-notes"></section>
+        <div id="aj-bas"></div>
       </div>
     </section>
 

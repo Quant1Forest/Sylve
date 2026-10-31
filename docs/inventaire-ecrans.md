@@ -98,6 +98,10 @@ Pour chacun : **chemin**, **blocs dans l'ordre d'affichage**, **actions**.
 
 ### 2.1 Accueil
 
+> **Retiré au lot 5b (4.87.0)**, comme Mon entreprise (2.2) : le constat de
+> 4.85 reste ci-dessous, et le tableau *Où sont allés l'accueil et Mon
+> entreprise* dit où se trouve désormais chaque élément.
+
 Chemin : ouverture de l'application, ou logo du bandeau.
 
 Blocs, de haut en bas :
@@ -150,6 +154,49 @@ Actions :
 - **+ note** → fenêtre Note ; titre d'une note → la modifier ; case → cocher ;
   × d'un élément ou de la note → supprimer (note → corbeille) ; champ « ajouter
   un élément… » + Entrée.
+
+### Où sont allés l'accueil et Mon entreprise (lot 5b)
+
+Chaque élément des deux écrans retirés, et son nouvel endroit. La dernière
+colonne est la clé de la preuve : le scénario « Cadre : chaque élément de
+l'accueil et de Mon entreprise a son nouvel endroit » lit ce tableau et joue,
+depuis Aujourd'hui, la preuve de chaque ligne. Une ligne sans preuve, ou une
+preuve sans ligne, le fait crier.
+
+| Élément (4.85) | Nouvel endroit | Preuve |
+|---|---|---|
+| Accueil ▸ marque (logo, « Sylve », sous-titre) | Écran de démarrage | `demarrage-marque` |
+| Accueil ▸ ⚙ | ☰ ▸ Réglages | `menu-reglages` |
+| Accueil ▸ rappel de sauvegarde | Aujourd'hui ▸ En retard, dernière ligne « Sauvegarde à faire » → ☰ ▸ Sauvegarde (carte Sauvegarde des Réglages) | `retard-sauvegarde` |
+| Accueil ▸ rappel « journées à trancher » | Aujourd'hui ▸ En retard, une ligne par jour « … non saisi » → fenêtre « Que s'est-il passé ? » | `retard-trancher` |
+| Accueil ▸ rappel d'échéances des charges fixes | Aujourd'hui ▸ Prélèvements à venir (7 jours, ou le préavis s'il est plus long ; total) → Argent ▸ Charges fixes | `prelevements` |
+| Accueil ▸ rappel de devis en attente | Aujourd'hui ▸ Bientôt « Relancer le devis ? », un par devis → sa fiche (la liste filtrée reste dans Chantiers) | `bientot-relancer` |
+| Accueil ▸ tuile Mon entreprise (chantiers ouverts) | Barre ▸ Chantiers ; le chiffre : compte de « Chantiers en cours » | `encours-compte` |
+| Accueil ▸ bouton « Enregistrer ma journée » | Ligne de saisie d'Aujourd'hui → fenêtre Ma journée | `saisie-journee` |
+| Accueil ▸ bouton « Enregistrer ma journée » (bis) | + ▸ Ma journée | `plus-journee` |
+| Accueil ▸ ligne « Déjà saisie / Rien de saisi · X h sur 7 jours » | Ligne de saisie : « … aujourd'hui · Cette semaine : X h sur N jours » (depuis lundi) | `saisie-ligne` |
+| Accueil ▸ tuiles Cubage et Bois de chauffage, avec m³ et stères | ☰ ▸ Outils de terrain | `menu-outils` |
+| Mon entreprise ▸ marque (logo et nom de l'entreprise) | Écran de démarrage, sous Sylve ; aperçu dans Réglages ▸ Général | `demarrage-entreprise` |
+| Mon entreprise ▸ ↩ | Barre ▸ Aujourd'hui | `barre-aujourdhui` |
+| Mon entreprise ▸ bulle « journées à planifier » | Aujourd'hui ▸ Bientôt « À programmer : N j à placer » → placement de l'Agenda | `bientot-programmer` |
+| Mon entreprise ▸ bulle « devis signés » | La même ligne « À programmer » (signé = à programmer) ; le total dans Chantiers | `bientot-programmer` |
+| Mon entreprise ▸ bulle « chantiers en cours » | Aujourd'hui ▸ Chantiers en cours → fiche | `encours-bloc` |
+| Mon entreprise ▸ bulle « factures en attente » (et « N en retard ») | Aujourd'hui ▸ En retard « Facture impayée » quand l'échéance est passée → fiche | `retard-impaye` |
+| Mon entreprise ▸ bulle « factures en attente », son montant | Argent ▸ Bilan, « en attente » | `argent-attente` |
+| Mon entreprise ▸ bulle « chiffre d'affaires » | Argent ▸ Bilan, « facturé (HT) » de l'année | `argent-ca` |
+| Mon entreprise ▸ bulle « TVA déductible » | Argent ▸ Bilan, « déductible » de l'année | `argent-tva` |
+| Mon entreprise ▸ ligne « Aujourd'hui / Demain / Dans N jours — chantier, pour qui » | Aujourd'hui ▸ Bientôt « N jours prévus », sur 7 jours | `bientot-prevus` |
+| Mon entreprise ▸ tuiles Chantiers, Calendrier, Finances | Barre : Chantiers, Agenda, Argent | `barre-modules` |
+| Mon entreprise ▸ tuiles Stock, Achats, Véhicule, Rendements, avec leur chiffre | ☰ ▸ Entreprise | `menu-entreprise` |
+| Mon entreprise ▸ tuile Stock, « N à recommander » | Aujourd'hui ▸ Bientôt « À recommander », réservé compris, même chiffre que la tuile du ☰ | `bientot-recommander` |
+| Mon entreprise ▸ tuile Véhicule, « N échéances dépassées » | Aujourd'hui ▸ En retard (dépassée) ou Bientôt (proche) → Véhicule ▸ Échéances | `vehicule-echeance` |
+| Mon entreprise ▸ Mes notes (cocher, titre, couleur, ajouter, × d'un élément, × de la note → corbeille) | Aujourd'hui ▸ Mes notes, juste après Bientôt | `notes-actions` |
+| Mon entreprise ▸ Mes notes, « + note » | + ▸ Note | `plus-note` |
+| Accueil ▸ × des rappels (jusqu'au lancement suivant) | × de chaque ligne d'Aujourd'hui, jusqu'au lendemain | `masquer` |
+
+Le chiffre de la tuile Calendrier (« j. ce mois ») est dans Agenda (jours
+confirmés et provisoires du mois affiché) ; celui de la tuile Finances
+(facturé de la période, TVA) dans Argent ▸ Bilan, sur la même période.
 
 ### 2.3 Chantiers
 

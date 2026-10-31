@@ -398,7 +398,7 @@ function ouvrirReleveV() {
     A.vehicule.releves = A.vehicule.releves || [];
     A.vehicule.releves.push({ id: uid(), km: k, date: versDate($('#vr-date').value) || Date.now() });
     sauverVehicule().then(function () {
-      fermerModale(); renderCarnetV(); renderEcheancesV(); renderEntreprise(); toast('Compteur noté.');
+      fermerModale(); renderCarnetV(); renderEcheancesV(); renderAujourdhui(); toast('Compteur noté.');
     });
   });
 }
@@ -458,7 +458,7 @@ function ouvrirInterventionV(id) {
     var creeDep = $('#vi-dep') && $('#vi-dep').checked && !x.depense;
     var apres = function () {
       sauverVehicule().then(function () {
-        fermerModale(); renderCarnetV(); renderEcheancesV(); renderEntreprise();
+        fermerModale(); renderCarnetV(); renderEcheancesV(); renderAujourdhui();
         toast(creeDep ? 'Intervention notée, dépense créée — vérifiez sa TVA dans les Dépenses.'
           : 'Intervention notée.');
       });

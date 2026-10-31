@@ -484,7 +484,7 @@ function ouvrirDepense(id) {
     }
     var fini = function () {
       fermerModale(); renderDepenses(); renderFinances(); renderAnalyses(); renderAccueil();
-      renderCarnetV(); renderEcheancesV(); renderCoutsV(); renderEntreprise();
+      renderCarnetV(); renderEcheancesV(); renderCoutsV();
       /* Une réparation qui ne vient pas du carnet du véhicule mérite d'y
          être notée aussi : c'est le kilométrage qui nourrit les échéances. */
       var entretien = !id && !cible.vehicule &&

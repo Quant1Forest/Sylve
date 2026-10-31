@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML servi, recollé depuis `sources/` sans rien transformer ; aucune
 dépendance, tout fonctionne hors ligne.
 
-Version courante : **4.86.0-20261031-1654**
+Version courante : **4.87.0-20261031-2104**
 
 ---
 
@@ -75,9 +75,9 @@ npm run controle   # fabrication + vérificateur + service worker + tests + conf
 
 Doit afficher **« index.html fabriqué »**, puis **« Bon pour livraison »**,
 puis **« le service worker tient »** (33 vérifications), puis la suite au
-vert — 2132 à ce jour — puis **« Sylve.html est conforme »**.
+vert — 2325 à ce jour — puis **« Sylve.html est conforme »**.
 
-Compter **trois minutes** : 187 à 221 s mesurées au lot 4b (selon la charge
+Compter **trois minutes** : 187 à 221 s mesurées au lot 4b, 260 s au lot 5b (selon la charge
 du poste ; 17 minutes avant, en séquentiel). Les scénarios se jouent en
 parallèle, un processus par cœur moins un ; le contrôle affiche à la fin le
 temps de chaque étape. Ne jamais revenir à une attente devinée dans les tests :
@@ -184,8 +184,9 @@ les calculs sans écran de la même partie.
 
 | Partie | Fichiers |
 |---|---|
-| Cadre : bandeau, barre, +, ☰, pastilles, Accueil, démarrage | `communs.js` (`majBandeau` du bordereau), `navigation.js` (`init`, modules, cadre : `majCadre`, `remonter`, `ouvrirMenu`, `ouvrirPlus`, retour arrière, Accueil, Lieux), `ecouteurs.js` (`aller`, `brancher`), `../ecrans.html`, `../styles.css`, `../demarrage.*` |
-| Écran Entreprise, notes, alertes, achats à venir | `achats-entreprise.js` ; `logique/alertes-import.js` |
+| Cadre : bandeau, barre, +, ☰, pastilles, démarrage | `communs.js` (`majBandeau` du bordereau), `navigation.js` (`init`, modules, cadre : `majCadre`, `remonter`, `ouvrirMenu`, `ouvrirPlus`, retour arrière, `renderAccueil`, Lieux), `ecouteurs.js` (`aller`, `brancher`), `../ecrans.html`, `../styles.css`, `../demarrage.*` |
+| Aujourd'hui, Mes notes | `aujourdhui.js` |
+| Alertes du carnet, achats à venir, chiffres des tuiles du ☰ | `achats-entreprise.js` ; `logique/alertes-import.js` |
 | Chantiers | `chantiers.js`, `chantiers-carnet-fiche.js`, `chantiers-formulaires.js` ; `logique/chantiers.js` |
 | Calendrier, fiche de chantier imprimée | `calendrier.js` ; `logique/calendrier.js` |
 | Ma journée · Listes déroulantes | `journee.js` · `listes.js` |
@@ -201,11 +202,13 @@ Débordements à connaître : `prix-de-revient.js` finit par les réglages
 Chantiers, Veille et Démarrage, puis l'appel d'`init` ; `carte.js` par les
 fenêtres « numéro de facture » et « motif de refus ».
 
-**La navigation (lot 5a, 4.86.0)** — détail dans `docs/design-navigation.md`,
-*Le cadre du lot 5a* :
+**La navigation (lots 5a et 5b, 4.86.0 et 4.87.0)** — détail dans
+`docs/design-navigation.md`, *Le cadre du lot 5a* et *L'écran Aujourd'hui* :
 
-- Démarrage → **Aujourd'hui**, qui montre encore l'ancien accueil (rappels,
-  tuile Mon entreprise, Mes notes) jusqu'au lot 5b.
+- Démarrage → **Aujourd'hui** (vue `accueil`) : saisie · En retard · Bientôt ·
+  Mes notes · Chantiers en cours · Prélèvements · Derniers jours. L'ancien
+  accueil et Mon entreprise sont partis. Une ligne se vise par sa clé
+  (`data-ajcle`) ; dans les tests, `ligneAuj(t, 'impaye:c1')`.
 - **Barre fixe en bas**, partout : Aujourd'hui · Chantiers (carnet) · **+** ·
   Agenda (calendrier) · Argent (finances).
 - **Bandeau** : logo · « ← parent » au second niveau · titre · **☰** (Stock,
@@ -318,7 +321,6 @@ mention d'un autre fichier.
 - Le versement libératoire : son droit à l'option n'est pas vérifié, il devait
   appeler la MSA.
 - La CFE n'est pas calculée.
-- Les six bulles de l'écran Entreprise : il n'en a rien dit.
 - Une ligne groupée qui mêlerait deux familles de travaux : à rouvrir si le cas
   arrive.
 
