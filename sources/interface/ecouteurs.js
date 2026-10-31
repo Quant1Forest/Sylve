@@ -27,6 +27,9 @@ function imprimer() {
 
 /* ============================================================== MODALE */
 function modale(titre, html) {
+  /* Le + et le ☰ posent leur allure de feuille après coup : toute autre
+     fenêtre la retire. */
+  $('#modale').classList.remove('feuille-nav');
   $('#modale-titre').textContent = titre;
   /* On remplace le conteneur au lieu de vider son contenu : les écouteurs
      posés par la fenêtre précédente disparaissent avec lui. Sans cela ils
@@ -38,16 +41,16 @@ function modale(titre, html) {
   vieux.parentNode.replaceChild(neuf, vieux);
   $('#modale').hidden = false;
 }
-function fermerModale() { $('#modale').hidden = true; $('#modale-corps').innerHTML = ''; }
+function fermerModale() {
+  $('#modale').hidden = true; $('#modale-corps').innerHTML = '';
+  $('#modale').classList.remove('feuille-nav');
+}
 
 /* ============================================================ NAVIGATION */
 function aller(v) {
-  /* Les réglages sont une vue, pas un étage de la navigation : on retient
-     l'écran quitté pour pouvoir y redescendre. Sans cette mémoire, le retour
-     du bandeau lisait le module courant et remontait au menu du groupe —
-     on ressortait des réglages dans « Mon entreprise », jamais là où on
-     était. */
-  if (v === 'reglages' && A.vue && A.vue !== 'reglages') A.vueAvantReglages = A.vue;
+  /* Le chemin d'un écran libre se note avant de changer d'écran : il faut
+     savoir d'où l'on vient pour savoir où revenir. */
+  noterParcours(v);
   A.vue = v;
   $$('.onglets button').forEach(function (b) { b.setAttribute('aria-selected', String(b.dataset.vue === v)); });
   $$('main > .vue').forEach(function (s) { s.classList.toggle('actif', s.id === 'vue-' + v); });
@@ -76,6 +79,7 @@ function aller(v) {
   if (v === 'carnetv') renderCarnetV();
   if (v === 'echeancesv') renderEcheancesV();
   if (v === 'coutsv') renderCoutsV();
+  majCadre();
   try { if (window.scrollY || window.pageYOffset) window.scrollTo(0, 0); } catch (e) { }
 }
 
@@ -95,16 +99,13 @@ function brancher() {
     var b = e.target.closest('[data-regl]');
     if (b) { A.secReglages = b.dataset.regl; renderReglagesNav(); }
   });
-  $('#b-accueil').addEventListener('click', allerAccueil);
-  $('#b-retour').addEventListener('click', allerMenuParent);
+  $('#b-retour').addEventListener('click', remonter);
   brancherRetourTelephone();
-  /* Les réglages du module courant, depuis n'importe où : la section
-     s'ouvre sur celle qui correspond à la partie où l'on se trouve. */
-  $('#b-reglages').addEventListener('click', function () {
-    var m = MODULES[A.module];
-    allerReglages(SEC_DE_MODULE[A.module] || (m && m.groupe === 'entreprise' ? 'ent' : 'general'));
+  $('#b-menu').addEventListener('click', ouvrirMenu);
+  $('#barre').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-barre]');
+    if (b) allerOnglet(b.dataset.barre);
   });
-  $('#b-module').addEventListener('change', function () { allerModule(this.value); });
   $('#b-ctx').addEventListener('click', function (e) {
     var b = e.target.closest('button'); if (!b) return;
     if (b.id === 'b-entete2') ouvrirEntete();
@@ -114,11 +115,8 @@ function brancher() {
     var t = e.target.closest ? e.target.closest('[data-module]') : null;
     if (!t) return;
     if (t.dataset.module === 'accueil') allerAccueil();
-    else if (t.dataset.module === 'entreprise') {
-      if (A.vue === 'accueil') empilerCran();
-      document.body.classList.add('accueil-ouvert');
-      aller('entreprise');
-    } else allerModule(t.dataset.module);
+    else if (t.dataset.module === 'entreprise') aller('entreprise');
+    else allerModule(t.dataset.module);
   });
   document.addEventListener('click', function (ev) {
     var t = ev.target.closest ? ev.target.closest('[data-aller]') : null;

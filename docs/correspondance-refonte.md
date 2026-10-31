@@ -18,6 +18,8 @@ Statuts :
 - **proposé** — choix par défaut, rien ne disparaît ; à corriger s'il le demande.
 - **retrait accepté** — porte en double retirée avec son accord (section 12).
 - **à maquetter** — l'endroit est fixé, la forme sera dessinée à l'étape 5b.
+- **fait (lot 5a)** — en place dans l'application depuis la 4.86.0 (le statut de décision suit).
+- **en partie (lot 5a)** — le chemin est en place, la forme vient à un lot suivant (dit après les deux-points).
 
 ---
 
@@ -33,6 +35,9 @@ Statuts :
 - **Bandeau du haut** : logo · titre de l'écran · ☰.
 - Règles : une action = un endroit ; une seule saisie du temps ; un mot = une chose.
 - Usage : téléphone uniquement.
+- **Lot 5a (4.86.0)** : barre, +, ☰, bandeau, pastilles et retour sont en place,
+  branchés sur les écrans existants. Aujourd'hui ouvre encore l'ancien accueil
+  (rappels, tuiles, Mon entreprise et Mes notes) jusqu'au lot 5b.
 
 ---
 
@@ -40,29 +45,29 @@ Statuts :
 
 | Ancien (chemin de l'inventaire) | Nouvel endroit | Statut |
 |---|---|---|
-| Accueil (l'écran) | Écran de démarrage, puis Aujourd'hui | validé (30/10) |
+| Accueil (l'écran) | Écran de démarrage, puis Aujourd'hui | en partie (lot 5a) : le démarrage mène à l'onglet Aujourd'hui, qui montre encore l'accueil (5b) — validé (30/10) |
 | Accueil ▸ marque (logo, « Sylve », sous-titre) | Écran de démarrage | validé (30/10) |
-| Accueil ▸ ⚙ | ☰ ▸ Réglages | validé (30/10) |
-| Accueil ▸ tuile Mon entreprise (chantiers ouverts) | Barre du bas ; le chiffre « ouverts » disparaît au profit des groupes de Chantiers (voir 11) | validé (30/10) |
-| Accueil ▸ tuiles Cubage (m³) et Bois de chauffage (stères) | ☰ ▸ Outils de terrain, chaque tuile avec son chiffre (m³ comme aujourd'hui pour le cubage, stères pour le bois) | validé (30/10) ; chiffre : proposé |
-| Accueil ▸ bouton « Enregistrer ma journée » | + ▸ Ma journée | validé (30/10) |
+| Accueil ▸ ⚙ | ☰ ▸ Réglages | fait (lot 5a) ; le ⚙ de l'accueil reste jusqu'au 5b — validé (30/10) |
+| Accueil ▸ tuile Mon entreprise (chantiers ouverts) | Barre du bas ; le chiffre « ouverts » disparaît au profit des groupes de Chantiers (voir 11) | en partie (lot 5a) : la barre est là ; la tuile et son chiffre restent jusqu'au 5b — validé (30/10) |
+| Accueil ▸ tuiles Cubage (m³) et Bois de chauffage (stères) | ☰ ▸ Outils de terrain, chaque tuile avec son chiffre (m³ comme aujourd'hui pour le cubage, stères pour le bois) | fait (lot 5a) — validé (30/10) ; chiffre : proposé |
+| Accueil ▸ bouton « Enregistrer ma journée » | + ▸ Ma journée | fait (lot 5a) ; le bouton de l'accueil reste jusqu'au 5b — validé (30/10) |
 | Accueil ▸ ligne « Déjà saisie / Rien de saisi · X h sur 7 jours » | Haut d'Aujourd'hui (« Rien de saisi aujourd'hui · Cette semaine : X h sur N jours »), information seule | validé (V2) |
 | Accueil ▸ les quatre rappels | Aujourd'hui (détail en section 2) | validé (V2) |
 | Mon entreprise (l'écran) | Disparaît ; contenu redistribué ci-dessous | validé (31/10) |
-| Mon entreprise ▸ marque de l'entreprise (logo et nom) | Écran de démarrage, sous le logo Sylve, si renseignés | proposé |
+| Mon entreprise ▸ marque de l'entreprise (logo et nom) | Écran de démarrage, sous le logo Sylve, si renseignés | fait (lot 5a, déjà en place depuis 4.7x) — proposé |
 | Mon entreprise ▸ bouton ↩ | Sans objet (barre du bas) | validé (30/10) |
 | Mon entreprise ▸ six bulles « Où j'en suis » et ligne des 7 jours | Aujourd'hui et Argent (section 2) | validé (31/10) |
-| Mon entreprise ▸ tuiles Chantiers, Calendrier, Finances | Barre du bas : Chantiers, Agenda, Argent | validé (30/10) |
-| Mon entreprise ▸ tuiles Stock, Achats, Véhicule, Rendements (avec chiffre et phrase de situation) | ☰ ▸ Entreprise, chaque tuile garde son chiffre de situation | validé (V2) |
+| Mon entreprise ▸ tuiles Chantiers, Calendrier, Finances | Barre du bas : Chantiers, Agenda, Argent | fait (lot 5a) — validé (30/10) |
+| Mon entreprise ▸ tuiles Stock, Achats, Véhicule, Rendements (avec chiffre et phrase de situation) | ☰ ▸ Entreprise, chaque tuile garde son chiffre de situation | fait (lot 5a) — validé (V2) |
 | Mon entreprise ▸ Mes notes | Aujourd'hui ▸ Mes notes (section 2) | validé (31/10) |
-| Bandeau ▸ logo (retour à l'accueil) | Logo affiché, sans rôle de bouton (Aujourd'hui est dans la barre) | proposé |
-| Bandeau ▸ ← (remonter d'un étage) | « ← <écran parent> » sur les écrans de second niveau seulement (fiche → Chantiers, Stock → ☰…) | proposé |
-| Bandeau ▸ sélecteur de partie | ☰ et barre du bas | validé (30/10) |
+| Bandeau ▸ logo (retour à l'accueil) | Logo affiché, sans rôle de bouton (Aujourd'hui est dans la barre) | fait (lot 5a) — proposé |
+| Bandeau ▸ ← (remonter d'un étage) | « ← <écran parent> » sur les écrans de second niveau seulement (fiche → Chantiers, Stock → ☰…) | fait (lot 5a) — proposé |
+| Bandeau ▸ sélecteur de partie | ☰ et barre du bas | fait (lot 5a) — validé (30/10) |
 | Bandeau ▸ action Calendrier « Aujourd'hui » | Agenda, à côté de ‹ › | proposé (inchangé) |
-| Bandeau ▸ action Cubage « En-tête » et seconde ligne du bordereau en cours | Inchangés dans Cubage | proposé (inchangé) |
-| Bandeau ▸ pictogramme Réglages (arrivée selon le module, tableau 5.4) | ☰ ▸ Réglages, qui arrive sur la zone liée à l'écran d'où l'on vient (même tableau ; Agenda = Relances et calendrier ; Argent = Financier) | proposé |
-| Retour du téléphone (fenêtre → module → menu → accueil) | Fenêtre → écran parent → onglet de la barre → Aujourd'hui ; depuis Aujourd'hui, même comportement qu'aujourd'hui depuis l'accueil | proposé |
-| « Ce qui a changé » : lignes cliquables vers un module | Inchangé (Réglages ▸ Général, en bas) ; les liens pointent vers les nouveaux endroits | proposé |
+| Bandeau ▸ action Cubage « En-tête » et seconde ligne du bordereau en cours | Inchangés dans Cubage | fait (lot 5a) — proposé (inchangé) |
+| Bandeau ▸ pictogramme Réglages (arrivée selon le module, tableau 5.4) | ☰ ▸ Réglages, qui arrive sur la zone liée à l'écran d'où l'on vient (même tableau ; Agenda = Relances et calendrier ; Argent = Financier) | fait (lot 5a) — proposé |
+| Retour du téléphone (fenêtre → module → menu → accueil) | Fenêtre → écran parent → onglet de la barre → Aujourd'hui ; depuis Aujourd'hui, même comportement qu'aujourd'hui depuis l'accueil | fait (lot 5a) — proposé |
+| « Ce qui a changé » : lignes cliquables vers un module | Inchangé (Réglages ▸ Général, en bas) ; les liens pointent vers les nouveaux endroits | fait (lot 5a) — proposé |
 
 ---
 
@@ -102,7 +107,7 @@ venir** · **Derniers jours**.
 
 | Ancien | Nouvel endroit | Statut |
 |---|---|---|
-| Accès : Mon entreprise ▸ Chantiers, ou onglet Carnet du Calendrier | Onglet Chantiers de la barre | validé (30/10) |
+| Accès : Mon entreprise ▸ Chantiers, ou onglet Carnet du Calendrier | Onglet Chantiers de la barre | fait (lot 5a) ; l'onglet Carnet du Calendrier reste jusqu'à R1 — validé (30/10) |
 | « À traiter (N) » (journées passées, à facturer, facture impayée) | Aujourd'hui ▸ En retard, et groupe « À faire maintenant » de Chantiers | validé (V2) |
 | Bouton « Nouveau chantier » | + ▸ Chantier | validé (30/10) |
 | Carte Carnet : facturé, encaissé, devis signés, premier donneur d'ordre (tout l'historique) | Argent ▸ Année (facturé, encaissé, par donneur d'ordre, devis signés et taux), avec un cumul « depuis le début » en bas | proposé |
@@ -187,7 +192,7 @@ tuiles Rendement, Fiche sécurité, Fournitures, Note.
 
 | Ancien | Nouvel endroit | Statut |
 |---|---|---|
-| Calendrier ▸ Agenda | Onglet Agenda de la barre | validé (30/10) |
+| Calendrier ▸ Agenda | Onglet Agenda de la barre | fait (lot 5a) — validé (30/10) |
 | Titre du mois, ‹ · Aujourd'hui · › | Inchangés ; « Aujourd'hui » va au mois courant et ouvre la fiche du jour (qui remplace la carte Journée, R7) | validé (31/10, P5) |
 | Bandeau de placement + Terminer | Inchangé sur le fond ; « Terminer » devient « Fini de placer » et ramène au point de départ (fiche, Agenda, Aujourd'hui) ; le placement s'ouvre sur le mois du dernier jour placé, sinon du prochain jour ouvré ; il reçoit l'alerte « jour déjà pris » (Garder les deux / Prendre le jour libre suivant), venue de la fenêtre Les journées (R6) | validé (31/10, P2, R6) |
 | Rappel « N journées passées restent à trancher » | Aujourd'hui ▸ En retard **et** ligne en tête de l'Agenda (sa demande d'origine : « à l'ouverture de l'app ou à l'accès au calendrier ») ; dans la grille, le jour porte un « ? » | validé (31/10, P3) |
@@ -221,16 +226,16 @@ mémorisés et partagés comme aujourd'hui.
 | Bilan ▸ Devis (taux d'acceptation, en attente) | Année ▸ Devis : taux, en attente, perdus et motifs | proposé |
 | (V2) Ce qui rapporte par type de travaux, Marge sur fournitures, Charges fixes prélevées | Mois ▸ Pour aller plus loin (repliés) | validé (V2) |
 | Finances ▸ Dépenses : indicateurs (TTC, HT, TVA déductible, nombre), filtre par catégorie, liste (Modifier, Supprimer) | Argent ▸ Dépenses : indicateurs, filtre et liste intacts ; un appui sur la ligne ouvre la dépense (modifier) ; Supprimer passe dans la feuille de la dépense, comme Ma journée ; une dépense née d'une charge fixe renvoie toujours à sa charge | validé (31/10 ; D5) |
-| Finances ▸ Dépenses ▸ + Dépense | + ▸ Dépense | validé (30/10) |
+| Finances ▸ Dépenses ▸ + Dépense | + ▸ Dépense | fait (lot 5a) ; « + Dépense » reste aussi dans la page — validé (30/10) |
 | Finances ▸ Charges fixes : résumé, liste (Modifier, Supprimer), Échéances (quand, où part l'argent) | Argent ▸ Dépenses, bloc Charges fixes ; « Échéances » devient « Prélèvements à venir » | validé (31/10) |
-| Finances ▸ Charges fixes ▸ + Charge | + ▸ Charge fixe (Plus rare) | validé (31/10, Q1) |
+| Finances ▸ Charges fixes ▸ + Charge | + ▸ Charge fixe (Plus rare) | fait (lot 5a) ; « + Charge » reste aussi dans la page — validé (31/10, Q1) |
 | Dépenses créées seules à chaque échéance ; bouton « La charge » d'une dépense | Inchangés | proposé (inchangé) |
 | Finances ▸ Analyses ▸ Vue d'ensemble · Recettes · Dépenses · Déclarations (tout leur contenu) | Argent ▸ Année, mêmes quatre pastilles, contenu intact | validé (31/10) |
 | Analyses ▸ sélecteurs de période propres (type et année) | Gardés dans l'onglet Année, qui arrive sur l'année en cours | proposé |
 | Analyses ▸ Déclarations ▸ cotisations et impôt, simulateur | Année ▸ Déclarations | validé (31/10) |
 | Analyses ▸ Déclarations ▸ versements et récupérations, + Mouvement | Année ▸ Déclarations (s'ajoute à une déclaration, reste sur place) | proposé |
 | Taux en double (Réglages ▸ Financier et cases du simulateur) | Réglages = taux de référence ; les cases du simulateur partent de ces taux et servent à essayer sans modifier les Réglages (vérifier le comportement actuel avant de toucher) | proposé |
-| Tuile Finances (facturé, TVA à reverser / à récupérer) | Onglet Argent | validé (30/10) |
+| Tuile Finances (facturé, TVA à reverser / à récupérer) | Onglet Argent | fait (lot 5a) — validé (30/10) |
 | Bilan ▸ coût du carburant estimé | Mois ▸ Pour aller plus loin ▸ Déplacements | proposé |
 | (plus tard) Vrai résultat comparé à l'abattement, par an et par chantier | Année, et fiche annuelle PDF | idée (après la refonte) |
 
@@ -249,22 +254,22 @@ propres créations.
 
 | Ancienne porte de création | Nouvel endroit | Statut |
 |---|---|---|
-| Enregistrer ma journée (accueil) | + ▸ Ma journée ; aussi la ligne de saisie en tête d'Aujourd'hui ; un chantier posé ce jour-là est pré-choisi | validé (30/10 ; 31/10, P4) |
+| Enregistrer ma journée (accueil) | + ▸ Ma journée ; aussi la ligne de saisie en tête d'Aujourd'hui ; un chantier posé ce jour-là est pré-choisi | en partie (lot 5a) : + ▸ Ma journée ouvre la fenêtre actuelle ; ligne d'Aujourd'hui et pré-choix (P4) à venir — validé (30/10 ; 31/10, P4) |
 | J'ai travaillé / J'y ai travaillé / Modifier ma journée / Autre chose (Agenda, fiche d'un jour, Que s'est-il passé ?) | Gardées dans la fiche du jour : elles ouvrent Ma journée datée du jour concerné | validé (31/10, R7, R8) |
 | Temps (Carnet), + Du temps fait (fiche) | + ▸ Ma journée | retrait accepté (31/10, R2, R4) |
-| Nouveau chantier (avec ou sans devis) | + ▸ Chantier (« on m'en a parlé ») : formulaire court = étape Infos. Pour qui (donneur d'ordre + offre d'ajout ; propriétaire facultatif, « souvent connu plus tard », + offre d'ajout puis question SIREN) · Où, quoi (commune, forêt, type de travaux par familles, quantité ou surface selon l'unité) · Ce que je sais (accès, code du portail) · nom composé affiché · « Annoncé aujourd'hui · changer » · Créer le chantier → la fiche, étapes Infos et Devis ouvertes. Le choix avec / sans devis se fait ensuite dans l'étape Devis | validé (30/10 ; maquette tour 2, 31/10) |
+| Nouveau chantier (avec ou sans devis) | (en partie, lot 5a : + ▸ Chantier ouvre le formulaire actuel ; le formulaire court vient ensuite) + ▸ Chantier (« on m'en a parlé ») : formulaire court = étape Infos. Pour qui (donneur d'ordre + offre d'ajout ; propriétaire facultatif, « souvent connu plus tard », + offre d'ajout puis question SIREN) · Où, quoi (commune, forêt, type de travaux par familles, quantité ou surface selon l'unité) · Ce que je sais (accès, code du portail) · nom composé affiché · « Annoncé aujourd'hui · changer » · Créer le chantier → la fiche, étapes Infos et Devis ouvertes. Le choix avec / sans devis se fait ensuite dans l'étape Devis | validé (30/10 ; maquette tour 2, 31/10) |
 | … champ « Journées à prévoir » du formulaire de création | Étape Devis ▸ Temps estimé (facultatif) | validé (31/10, maquette tour 2) |
 | Rendements ▸ Estimer ▸ Créer le devis | Gardé : crée le chantier avec son devis prérempli (suite d'une estimation) | proposé |
 | Réglages ▸ Entreprise ▸ Import de données (chantiers, dépenses en masse) | Inchangé | proposé (inchangé) |
-| + Dépense | + ▸ Dépense, feuille haute : « Comme la dernière » (fournisseur et catégories, ni date ni montants, D3) · Quand, où (date, fournisseur proposé d'après les dépenses passées, D4) · Le ticket, une ligne par nature d'achat : catégorie en puces (les six plus fréquentes + « Autre… » avec les 19, D1), montant TTC, TVA en boutons 20 / 10 / 5,5 / sans (« sans » d'office et bloqué pour assurance, frais bancaires, prêt, cotisations, D2), litres et prix du litre (carburant), désignation facultative, mention immobilisation · Pour s'y retrouver (n° de pièce, chantier, « concerne le véhicule », carnet + kilométrage si Frais véhicule) · pied fixe (TTC, HT, TVA déductible, immobilisé ; Supprimer en modification, Enregistrer) | validé (30/10 ; 31/10, D1-D5) |
+| + Dépense | + ▸ Dépense, feuille haute : « Comme la dernière » (fournisseur et catégories, ni date ni montants, D3) · Quand, où (date, fournisseur proposé d'après les dépenses passées, D4) · Le ticket, une ligne par nature d'achat : catégorie en puces (les six plus fréquentes + « Autre… » avec les 19, D1), montant TTC, TVA en boutons 20 / 10 / 5,5 / sans (« sans » d'office et bloqué pour assurance, frais bancaires, prêt, cotisations, D2), litres et prix du litre (carburant), désignation facultative, mention immobilisation · Pour s'y retrouver (n° de pièce, chantier, « concerne le véhicule », carnet + kilométrage si Frais véhicule) · pied fixe (TTC, HT, TVA déductible, immobilisé ; Supprimer en modification, Enregistrer) | en partie (lot 5a) : + ▸ Dépense ouvre la fenêtre actuelle ; la feuille D1-D5 vient ensuite — validé (30/10 ; 31/10, D1-D5) |
 | Case « créer la dépense » (intervention du véhicule), « porter en dépense » (commande) | Inchangées | proposé (inchangé) |
-| + note (Mon entreprise) | + ▸ Note : Quoi ?, couleur, premiers éléments facultatifs (Entrée ajoute) ; la note arrive en tête de Mes notes | validé (V2 ; maquette tour 2) |
-| Stock ▸ Entrées / sorties ▸ Enregistrer (pastille Entrées) | + ▸ Commande de fournitures | validé (V2) |
-| Achats ▸ + Achat | + ▸ Achat à prévoir | validé (V2) |
-| Véhicule ▸ + Intervention | + ▸ Noter une intervention | validé (V2) |
+| + note (Mon entreprise) | + ▸ Note : Quoi ?, couleur, premiers éléments facultatifs (Entrée ajoute) ; la note arrive en tête de Mes notes | en partie (lot 5a) : + ▸ Note ouvre la fenêtre actuelle (« + note » reste dans Mon entreprise) — validé (V2 ; maquette tour 2) |
+| Stock ▸ Entrées / sorties ▸ Enregistrer (pastille Entrées) | + ▸ Commande de fournitures | fait (lot 5a) ; « Enregistrer » reste aussi dans la page — validé (V2) |
+| Achats ▸ + Achat | + ▸ Achat à prévoir | fait (lot 5a) ; « + Achat » reste aussi dans la page — validé (V2) |
+| Véhicule ▸ + Intervention | + ▸ Noter une intervention | fait (lot 5a) ; « + Intervention » reste aussi dans la page — validé (V2) |
 | Bois ▸ Nouvelle pile (onglets Stock et Piles) | Dans l'outil seulement, un seul bouton (onglet Stock) ; le second (onglet Piles) est retiré ; pas d'entrée dans le + | validé (31/10, Q2) |
-| Cubage ▸ Bordereaux ▸ tuiles de choix du cubage (créent un bordereau) | Dans l'outil seulement, inchangé ; pas d'entrée dans le + | validé (31/10, Q2) |
-| Finances ▸ Charges fixes ▸ + Charge | + ▸ Charge fixe | validé (31/10, Q1) |
+| Cubage ▸ Bordereaux ▸ tuiles de choix du cubage (créent un bordereau) | Dans l'outil seulement, inchangé ; pas d'entrée dans le + | fait (lot 5a) — validé (31/10, Q2) |
+| Finances ▸ Charges fixes ▸ + Charge | + ▸ Charge fixe | fait (lot 5a) — validé (31/10, Q1) |
 | Rendements ▸ + Noter une cadence (dont chantiers observés) | Fiche du chantier ▸ tuile Rendement : la cadence se note sur le chantier où elle est constatée (chantier prérempli, prestation choisie parmi ses lignes) ; un chantier seulement observé se crée par + ▸ Chantier | validé (31/10, Q1) |
 
 Restent dans leur objet (s'ajoutent à quelque chose qui existe) : + Ligne
@@ -285,14 +290,14 @@ fournisseur, entrées de listes (Réglages) · Coller depuis Excel · Importer
 | Stock ▸ Inventaire ▸ Importer | Reste dans Stock (il l'y voulait dès le départ) | proposé |
 | Stock ▸ Entrées / sorties ▸ Enregistrer (libellé ambigu selon la pastille) | Entrées : + ▸ Commande ; Sorties : « Sortie à la main » ; Pertes : « Noter une perte » ; Reçue et Modifier inchangés | proposé |
 | Sorties automatiques depuis la facture | Inchangées : quantités prises sur les lignes du chantier ; réservées dès la signature (c'est déjà le cas : sorties « engagées », `engagees()` / `stockFutur()`) ; sorties à « Travaux terminés » et non à la facture (S1, confirmé le 31/10). Le lot Stock renomme et affiche la réservation, il ne la crée pas | validé (31/10, S1) |
-| Stock ▸ Rentabilité (Hypothèses, Simulateur, Coûts, Performance, Par année) | ☰ ▸ Stock ▸ Rentabilité, intacte | validé (31/10) |
-| Tuile Stock (valeur, à recommander) | Sous-titre de la tuile ☰ ; à recommander aussi dans Aujourd'hui ▸ Bientôt | validé (V2 ; 31/10, Q4) |
-| Achats ▸ Ma liste (groupée par priorité, case acheté / remettre, ligne → fenêtre) ; Ce que ça pèse | ☰ ▸ Achats à venir, intacts | validé (V2) |
-| Véhicule ▸ Carnet (fiche, Noter le compteur, historique, Modifier) ; Échéances (+ Poste, Modifier) ; Coûts (+ Compléter la fiche) | ☰ ▸ Véhicule, intacts ; « Carnet » devient le seul carnet de Sylve | proposé |
-| Tuile Véhicule (km, échéances dépassées) | Sous-titre de la tuile ☰ ; échéances aussi dans Aujourd'hui (En retard / Bientôt) | validé (V2 ; 31/10, Q4) |
-| Rendements ▸ Rendements (tri, Détail, Estimer) ; Estimer (formulaire, Créer le devis, références) | ☰ ▸ Rendements, intacts | validé (V2) |
+| Stock ▸ Rentabilité (Hypothèses, Simulateur, Coûts, Performance, Par année) | ☰ ▸ Stock ▸ Rentabilité, intacte | fait (lot 5a) — validé (31/10) |
+| Tuile Stock (valeur, à recommander) | Sous-titre de la tuile ☰ ; à recommander aussi dans Aujourd'hui ▸ Bientôt | en partie (lot 5a) : la tuile ☰ est faite ; Bientôt au 5b — validé (V2 ; 31/10, Q4) |
+| Achats ▸ Ma liste (groupée par priorité, case acheté / remettre, ligne → fenêtre) ; Ce que ça pèse | ☰ ▸ Achats à venir, intacts | fait (lot 5a) — validé (V2) |
+| Véhicule ▸ Carnet (fiche, Noter le compteur, historique, Modifier) ; Échéances (+ Poste, Modifier) ; Coûts (+ Compléter la fiche) | ☰ ▸ Véhicule, intacts ; « Carnet » devient le seul carnet de Sylve | fait (lot 5a) pour ☰ ▸ Véhicule ; le carnet des chantiers garde son nom jusqu'à R1 — proposé |
+| Tuile Véhicule (km, échéances dépassées) | Sous-titre de la tuile ☰ ; échéances aussi dans Aujourd'hui (En retard / Bientôt) | en partie (lot 5a) : la tuile ☰ est faite ; Aujourd'hui au 5b — validé (V2 ; 31/10, Q4) |
+| Rendements ▸ Rendements (tri, Détail, Estimer) ; Estimer (formulaire, Créer le devis, références) | ☰ ▸ Rendements, intacts | fait (lot 5a) — validé (V2) |
 | Rendements ▸ + Noter une cadence | Création depuis la fiche du chantier (tuile Rendement). La porte de ☰ ▸ Rendements est gardée pour les cadences générales « sans chantier » (repère tant qu'aucun chantier fini n'a de vrai suivi) | validé (31/10, Q1) |
-| Tuile Rendements (nombre de références) | Sous-titre de la tuile ☰ | validé (V2) |
+| Tuile Rendements (nombre de références) | Sous-titre de la tuile ☰ | fait (lot 5a) — validé (V2) |
 
 ---
 
@@ -300,8 +305,8 @@ fournisseur, entrées de listes (Réglages) · Coller depuis Excel · Importer
 
 | Ancien | Nouvel endroit | Statut |
 |---|---|---|
-| Cubage : Saisie, Bordereau, Synthèses (Synthèse, Financière, Bûcheron, Martelage), Bordereaux, exports (Excel, CSV, .json, Coller depuis Excel) | ☰ ▸ Cubage, intérieur inchangé | proposé (inchangé) |
-| Bois de chauffage : Stock, Piles, Où ?, Export et analyse | ☰ ▸ Bois de chauffage, intérieur inchangé | proposé (inchangé) |
+| Cubage : Saisie, Bordereau, Synthèses (Synthèse, Financière, Bûcheron, Martelage), Bordereaux, exports (Excel, CSV, .json, Coller depuis Excel) | ☰ ▸ Cubage, intérieur inchangé | fait (lot 5a) — proposé (inchangé) |
+| Bois de chauffage : Stock, Piles, Où ?, Export et analyse | ☰ ▸ Bois de chauffage, intérieur inchangé | fait (lot 5a) — proposé (inchangé) |
 | Boutons de création internes (Nouvelle pile ×2, tuiles de cubage) | Gardés dans les outils ; Nouvelle pile une seule fois (onglet Stock) | validé (31/10, Q2) |
 | Libellés en double propres aux outils (« Bordereau » / « Bordereaux », « Stock » du bois) | Notés, non traités : les outils restent tels quels | proposé |
 
@@ -311,11 +316,11 @@ fournisseur, entrées de listes (Réglages) · Coller depuis Excel · Importer
 
 | Ancien | Nouvel endroit | Statut |
 |---|---|---|
-| Réglages (Général, Entreprise, Cubage, Bois de chauffage ; zones déroulées) | ☰ ▸ Réglages, mêmes pastilles et zones | validé (V2) |
+| Réglages (Général, Entreprise, Cubage, Bois de chauffage ; zones déroulées) | ☰ ▸ Réglages, mêmes pastilles et zones | fait (lot 5a) — validé (V2) |
 | Général ▸ Mon entreprise (nom, logo) | Réglages ▸ Entreprise, en tête (une seule « Entreprise ») | proposé |
 | Général ▸ L'application (installer, protéger les données, mises à jour, durée de l'écran de démarrage, écran allumé) | Inchangé | proposé (inchangé) |
-| Général ▸ Sauvegarde (Tout sauvegarder, Restaurer — fusionner ou remplacer) | ☰ ▸ Sauvegarde, écran propre (sort des Réglages : une seule porte) : état (en rouge au-delà de 30 jours) et contenu du fichier, « Tout sauvegarder » en gros, Restaurer un fichier (fusionner / remplacer, demandé à chaque fois), Corbeille ; « ← » revient à l'écran d'où l'on vient | validé (31/10, maquette tour 2) |
-| Général ▸ Sauvegarde ▸ Corbeille… | ☰ ▸ Corbeille, écran propre | proposé |
+| Général ▸ Sauvegarde (Tout sauvegarder, Restaurer — fusionner ou remplacer) | ☰ ▸ Sauvegarde, écran propre (sort des Réglages : une seule porte) : état (en rouge au-delà de 30 jours) et contenu du fichier, « Tout sauvegarder » en gros, Restaurer un fichier (fusionner / remplacer, demandé à chaque fois), Corbeille ; « ← » revient à l'écran d'où l'on vient | en partie (lot 5a) : ☰ ▸ Sauvegarde ouvre pour l'instant Réglages ▸ Général ▸ Sauvegarde ; l'écran propre au lot (f) — validé (31/10, maquette tour 2) |
+| Général ▸ Sauvegarde ▸ Corbeille… | ☰ ▸ Corbeille, écran propre | en partie (lot 5a) : ☰ ▸ Corbeille ouvre la corbeille des Réglages, dépliée ; l'écran propre au lot (f) — proposé |
 | Général ▸ Remise à zéro (listes de cubage) | Réglages ▸ Cubage | proposé |
 | Général ▸ Ce qui a changé | Inchangé, en bas de Général | proposé (inchangé) |
 | Entreprise : Ma journée de travail, Véhicule, Relances et calendrier, Listes déroulantes, Stock et fournitures, Financier, Import de données | Inchangés | proposé (inchangé) |
@@ -425,7 +430,7 @@ La fonction reste toujours accessible ; seule la porte en double part.
 | R6 | Dates posées à la main dans la fenêtre « Les journées » de la fiche | Placement dans l'Agenda (alerte jour déjà pris, jour libre suivant) | accepté (31/10) |
 | R7 | Carte « Journée » sous la grille de l'Agenda (fusion) | Fiche du jour, tous ses boutons | accepté (31/10) |
 | R8 | Fenêtre « Que s'est-il passé ? » (fusion) | Fiche du jour à l'état « à trancher », mêmes réponses | accepté (31/10) |
-| — | Bandeau (logo-bouton, ←, sélecteur), ↩ de Mon entreprise, écrans Accueil et Mon entreprise, bulles et tuiles | Barre du bas, ☰, Aujourd'hui, Argent | validé (30-31/10) |
+| — | Bandeau (logo-bouton, ←, sélecteur), ↩ de Mon entreprise, écrans Accueil et Mon entreprise, bulles et tuiles | Barre du bas, ☰, Aujourd'hui, Argent | en partie (lot 5a) : bandeau fait ; Accueil, Mon entreprise, ↩, bulles et tuiles au 5b — validé (30-31/10) |
 
 ---
 

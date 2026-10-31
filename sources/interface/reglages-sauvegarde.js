@@ -752,7 +752,7 @@ var SEC_DE_MODULE = {
   finances: 'fin', stock: 'stock', vehicule: 'vehicule', achats: 'fin'
 };
 var RACCOURCIS_REGLAGES = {
-  maj: ['general', 'maj'],
+  maj: ['general', 'maj'], sauvegarde: ['general', 'sauvegarde'],
   stock: ['ent', 'stock'], listes: ['ent', 'listes'], fin: ['ent', 'fin'],
   journee: ['ent', 'journee'], vehicule: ['ent', 'vehicule'],
   alertes: ['ent', 'alertes']
@@ -872,6 +872,13 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.86', quoi: [
+    { t: 'Une barre en bas, partout : Aujourd hui, Chantiers, +, Agenda (le calendrier), Argent (les finances)', vue: 'calendrier' },
+    { t: 'Le + cree : ma journee, depense, chantier, note ; et commande, achat, intervention, charge fixe' },
+    { t: 'Le ☰ en haut a droite : stock, achats, vehicule, rendements, cubage, bois, reglages, sauvegarde' },
+    { t: 'Les onglets de chaque ecran sont passes en haut, en pastilles', vue: 'finances' },
+    { t: 'Mon entreprise et Mes notes : sur Aujourd hui, tuile Mon entreprise' }
+  ] },
   { v: '4.85.1', quoi: [
     { t: 'Les messages de suppression donnent le bon chemin vers la corbeille', vue: 'reglages' },
     { t: 'Le rappel de sauvegarde de l accueil ouvre la carte Sauvegarde des Reglages', vue: 'reglages' },

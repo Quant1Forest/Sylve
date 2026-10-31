@@ -23,6 +23,9 @@ var A = {
   achats: [], fch: null, fchFiltre: 'ouverts',
   versements: [], vehicule: null,
   vue: 'saisie', sousVue: 'synthese', edition: null,
+  /* Le cadre : l'écran affiché, l'onglet de la barre, le chemin des écrans
+     libres et les crans d'historique déjà empilés. */
+  ecran: null, onglet: 'aujourdhui', pile: [], crans: 0, parMenu: false, enRemontee: false,
   memeGrume: false, classementRegl: 'Class. Comt', filtre: ''
 };
 var COULEURS = {

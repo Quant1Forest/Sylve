@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML servi, recollé depuis `sources/` sans rien transformer ; aucune
 dépendance, tout fonctionne hors ligne.
 
-Version courante : **4.85.1-20261030-1850**
+Version courante : **4.86.0-20261031-1654**
 
 ---
 
@@ -75,7 +75,7 @@ npm run controle   # fabrication + vérificateur + service worker + tests + conf
 
 Doit afficher **« index.html fabriqué »**, puis **« Bon pour livraison »**,
 puis **« le service worker tient »** (33 vérifications), puis la suite au
-vert — 1874 à ce jour — puis **« Sylve.html est conforme »**.
+vert — 2132 à ce jour — puis **« Sylve.html est conforme »**.
 
 Compter **trois minutes** : 187 à 221 s mesurées au lot 4b (selon la charge
 du poste ; 17 minutes avant, en séquentiel). Les scénarios se jouent en
@@ -184,7 +184,7 @@ les calculs sans écran de la même partie.
 
 | Partie | Fichiers |
 |---|---|
-| Cadre : bandeau, navigation, Accueil, démarrage | `communs.js` (`majBandeau`), `navigation.js` (`init`, modules, Accueil, retour arrière, Lieux), `ecouteurs.js` (`aller`, `brancher`), `../ecrans.html`, `../styles.css`, `../demarrage.*` |
+| Cadre : bandeau, barre, +, ☰, pastilles, Accueil, démarrage | `communs.js` (`majBandeau` du bordereau), `navigation.js` (`init`, modules, cadre : `majCadre`, `remonter`, `ouvrirMenu`, `ouvrirPlus`, retour arrière, Accueil, Lieux), `ecouteurs.js` (`aller`, `brancher`), `../ecrans.html`, `../styles.css`, `../demarrage.*` |
 | Écran Entreprise, notes, alertes, achats à venir | `achats-entreprise.js` ; `logique/alertes-import.js` |
 | Chantiers | `chantiers.js`, `chantiers-carnet-fiche.js`, `chantiers-formulaires.js` ; `logique/chantiers.js` |
 | Calendrier, fiche de chantier imprimée | `calendrier.js` ; `logique/calendrier.js` |
@@ -200,6 +200,21 @@ les calculs sans écran de la même partie.
 Débordements à connaître : `prix-de-revient.js` finit par les réglages
 Chantiers, Veille et Démarrage, puis l'appel d'`init` ; `carte.js` par les
 fenêtres « numéro de facture » et « motif de refus ».
+
+**La navigation (lot 5a, 4.86.0)** — détail dans `docs/design-navigation.md`,
+*Le cadre du lot 5a* :
+
+- Démarrage → **Aujourd'hui**, qui montre encore l'ancien accueil (rappels,
+  tuile Mon entreprise, Mes notes) jusqu'au lot 5b.
+- **Barre fixe en bas**, partout : Aujourd'hui · Chantiers (carnet) · **+** ·
+  Agenda (calendrier) · Argent (finances).
+- **Bandeau** : logo · « ← parent » au second niveau · titre · **☰** (Stock,
+  Achats, Véhicule, Rendements, Cubage, Bois, Réglages, Sauvegarde, Corbeille).
+- Les onglets d'un module sont des **pastilles en haut** (`#onglets`, mêmes
+  `data-vue`).
+- Tout passe par `aller()`, qui finit par `majCadre()` : bandeau, barre,
+  flèche, `accueil-ouvert` et crans d'historique suivent seuls.
+- Dans les tests : `parBarre(t, 'agenda')`, `parMenu(t, 'reglages')`.
 
 ---
 
@@ -230,9 +245,9 @@ mention d'un autre fichier.
 - **L'icône d'accueil ne se met pas à jour** : retirer, réinstaller — et exporter une sauvegarde avant.
 - **Le logo n'existe qu'une fois**, dans la variable CSS `--logo`.
 - **Vérifier qu'une variable existe dans `:root`** avant de s'en servir (`--doux`, `--vert-marque`).
-- **Deux tests lisent le texte du CSS** (`--logo:url(`, taille de `#b-accueil`) : un reformatage les casse.
+- **Deux tests lisent le texte du CSS** (`--logo:url(`, taille de `#b-logo`) : un reformatage les casse.
 - **`dateChantier()` ≠ `dernierEvenement()`** : deux notions voisines, deux noms.
-- **Toute vue de contenu doit lever `accueil-ouvert`**, sinon la fiche s'affiche sans retour.
+- **`accueil-ouvert` n'est plus posé à la main** : `majCadre()` le pose à chaque `aller()` (lot 5a). Ne jamais changer d'écran sans passer par `aller()`.
 - **Ne pas additionner des quantités d'unités différentes.**
 - **Scripts de retouche dans un fichier, jamais `node -e`** ; et `split().join()` plutôt que `String.replace` dès qu'il peut y avoir un `$`.
 - **Un motif ouvert à gauche mange le nom devant** (`esc(` → `escC.nomChantier`) : inclure ce qui précède.

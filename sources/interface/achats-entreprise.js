@@ -171,14 +171,62 @@ function ouvrirAchat(id) {
   }
 }
 
-function renderEntreprise() {
-  var ta = FIN.totauxAchats(A.achats);
-  if ($('#e-ac-n')) $('#e-ac-n').textContent = ta.n ? eurCourt(ta.ttc) : '—';
-  if ($('#e-ac-s')) {
-    $('#e-ac-s').textContent = ta.n
-      ? ta.n + ' achat' + (ta.n > 1 ? 's' : '') + ' en attente'
-      : 'Ce que vous comptez acheter';
+/* La situation d'un module : un chiffre, son unité, une phrase. Les tuiles
+   de Mon entreprise, de l'accueil et du ☰ la lisent ici, d'un seul calcul :
+   elles ne peuvent pas se contredire. */
+function situationModule(m) {
+  if (m === 'achats') {
+    var ta = FIN.totauxAchats(A.achats);
+    return { n: ta.n ? eurCourt(ta.ttc) : '—', u: 'à prévoir',
+      s: ta.n ? ta.n + ' achat' + (ta.n > 1 ? 's' : '') + ' en attente' : 'Ce que vous comptez acheter' };
   }
+  if (m === 'rendements') {
+    var nRef = 0, nTypes = 0;
+    C.TRAVAUX.forEach(function (tv) {
+      var r = C.references(A.chantiers, tv.c, A.cfg);
+      if (r.length) { nTypes++; nRef += r.length; }
+    });
+    return { n: nRef ? String(nRef) : '—', u: 'références',
+      s: nRef ? nTypes + ' type' + (nTypes > 1 ? 's' : '') + ' de travaux mesuré' + (nTypes > 1 ? 's' : '')
+        : 'Saisissez temps et quantités pour en obtenir' };
+  }
+  if (m === 'vehicule') {
+    var kmV = kmVehicule();
+    var nRet = echeancesVehicule().filter(function (x) { return x.etat === 'retard'; }).length;
+    return { n: kmV ? E.fmt(kmV, 0) : '—', u: 'km',
+      s: nRet ? nRet + ' échéance' + (nRet > 1 ? 's' : '') + ' dépassée' + (nRet > 1 ? 's' : '')
+        : 'Carnet d’entretien, échéances' };
+  }
+  if (m === 'stock') {
+    var vs = ST.valeurTotale(A.articles), bas = ST.articlesSousSeuil(A.articles);
+    return { n: vs ? eur(vs) : '—', u: 'en stock',
+      s: A.articles.length
+        ? A.articles.length + ' article' + (A.articles.length > 1 ? 's' : '') +
+          (bas.length ? ' · ' + bas.length + ' à recommander' : '')
+        : 'Protections, tuteurs, marges' };
+  }
+  if (m === 'cubage') {
+    var vol = A.index.reduce(function (s, x) { return s + (Number(x.vol) || 0); }, 0);
+    return { n: A.index.length ? E.fmt(vol, 2) : '—', u: 'm³',
+      s: A.index.length ? A.index.length + (A.index.length > 1 ? ' bordereaux' : ' bordereau')
+        : 'Aucun bordereau' };
+  }
+  if (m === 'bois') {
+    var r = H.repartition(A.piles);
+    return { n: A.piles.length ? E.fmt(r.total, 2) : '—', u: 'stères',
+      s: A.piles.length ? A.piles.length + (A.piles.length > 1 ? ' piles' : ' pile')
+        : 'Aucune pile enregistrée' };
+  }
+  return { n: '—', u: '', s: '' };
+}
+function poserSituation(cle, m) {
+  var s = situationModule(m);
+  if ($('#e-' + cle + '-n')) $('#e-' + cle + '-n').textContent = s.n;
+  if ($('#e-' + cle + '-s')) $('#e-' + cle + '-s').textContent = s.s;
+}
+
+function renderEntreprise() {
+  poserSituation('ac', 'achats');
   var ouv = C.filtre(A.chantiers, 'ouverts').length;
   var t = C.totaux(A.chantiers, A.cfg);
   if ($('#a-ent-n')) $('#a-ent-n').textContent = ouv || '—';
@@ -199,30 +247,13 @@ function renderEntreprise() {
       : 'Programmation, journées placées';
   }
 
-  var nRef = 0, nTypes = 0;
-  C.TRAVAUX.forEach(function (tv) {
-    var r = C.references(A.chantiers, tv.c, A.cfg);
-    if (r.length) { nTypes++; nRef += r.length; }
-  });
-  if ($('#e-rd-n')) $('#e-rd-n').textContent = nRef || '—';
-  if ($('#e-rd-s')) {
-    $('#e-rd-s').textContent = nRef
-      ? nTypes + ' type' + (nTypes > 1 ? 's' : '') + ' de travaux mesuré' + (nTypes > 1 ? 's' : '')
-      : 'Saisissez temps et quantités pour en obtenir';
-  }
+  poserSituation('rd', 'rendements');
 
   var b = periodeCourante();
   var ca = FIN.chiffreAffaires(A.chantiers, b);
   var bal = FIN.balanceTva(A.chantiers, A.depenses, b, C.tauxLigne);
   if ($('#e-fi-n')) $('#e-fi-n').textContent = ca.total ? eur(ca.total) : '—';
-  var kmV = kmVehicule();
-  if ($('#e-vh-n')) $('#e-vh-n').textContent = kmV ? E.fmt(kmV, 0) : '—';
-  if ($('#e-vh-s')) {
-    var nRet = echeancesVehicule().filter(function (x) { return x.etat === 'retard'; }).length;
-    $('#e-vh-s').textContent = nRet
-      ? nRet + ' échéance' + (nRet > 1 ? 's' : '') + ' dépassée' + (nRet > 1 ? 's' : '')
-      : 'Carnet d’entretien, échéances';
-  }
+  poserSituation('vh', 'vehicule');
   if ($('#e-fi-s')) {
     $('#e-fi-s').textContent = ca.total || bal.montant
       ? libellePeriode() + ' · TVA ' + eur(bal.montant) + ' ' +
@@ -230,14 +261,7 @@ function renderEntreprise() {
       : 'Bilan, recettes, dépenses, analyses';
   }
 
-  var vs = ST.valeurTotale(A.articles), bas = ST.articlesSousSeuil(A.articles);
-  if ($('#e-st-n')) $('#e-st-n').textContent = vs ? eur(vs) : '—';
-  if ($('#e-st-s')) {
-    $('#e-st-s').textContent = A.articles.length
-      ? A.articles.length + ' article' + (A.articles.length > 1 ? 's' : '') +
-        (bas.length ? ' · ' + bas.length + ' à recommander' : '')
-      : 'Protections, tuteurs, marges';
-  }
+  poserSituation('st', 'stock');
 
   renderMarqueEntreprise();
   renderEntBilan();

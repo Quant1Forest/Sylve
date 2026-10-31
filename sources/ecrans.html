@@ -2,20 +2,15 @@
 
   <!-- ========================================================= bandeau -->
   <header class="bandeau no-print">
+    <!-- Logo · titre de l'écran · ☰. Le logo signe, il ne mène plus nulle
+         part : Aujourd'hui est dans la barre du bas. La flèche n'apparaît que
+         sur un écran de second niveau, et nomme celui où elle ramène. -->
     <div class="bandeau-in">
-      <button class="bandeau-btn" id="b-accueil" title="Accueil Sylve" aria-label="Accueil"></button>
-      <button class="bandeau-btn" id="b-retour" title="Revenir au menu" aria-label="Retour" hidden>←</button>
-      <div class="bandeau-nav">
-        <select id="b-module" aria-label="Changer de partie"></select>
-      </div>
+      <span class="bandeau-logo" id="b-logo" role="img" aria-label="Sylve"></span>
+      <button class="bandeau-btn bandeau-retour" id="b-retour" hidden></button>
+      <h1 class="bandeau-titre" id="b-ecran">Aujourd’hui</h1>
       <div class="bandeau-ctx" id="b-ctx"></div>
-      <!-- Les réglages étaient un onglet parmi les autres, en bas et
-           différent d'un module à l'autre : on s'y perdait. Ici ils sont
-           au même endroit partout, et ne mangent plus une place dans la
-           barre du bas. -->
-      <button class="bandeau-btn" id="b-reglages" title="Réglages" aria-label="Réglages">
-        <svg viewBox="0 0 24 24" class="pic" aria-hidden="true" style="width:17px;height:17px;vertical-align:-3px"><path d="M6 4v6.2M6 14.2v5.8M12 4v3.2M12 11.2v8.8M18 4v9.2M18 17.2v2.8"/><circle cx="6" cy="12.2" r="2"/><circle cx="12" cy="9.2" r="2"/><circle cx="18" cy="15.2" r="2"/></svg>
-      </button>
+      <button class="bandeau-menu" id="b-menu" title="Le reste de Sylve" aria-label="Le reste de Sylve"></button>
     </div>
     <div class="bandeau-sous mod-cubage" id="b-bordereau">
       <span class="pastille" id="b-pastille"></span>
@@ -28,14 +23,9 @@
     </div>
   </header>
 
-  <!-- ========================================================== onglets -->
-  <nav class="onglets no-print" id="onglets" role="tablist" aria-label="Sections">
-    <button role="tab" data-vue="saisie"    aria-selected="true"><span class="ic">✎</span>Saisie</button>
-    <button role="tab" data-vue="bordereau" aria-selected="false"><span class="ic">▤</span>Bordereau</button>
-    <button role="tab" data-vue="syntheses" aria-selected="false"><span class="ic">∑</span>Synthèses</button>
-    <button role="tab" data-vue="fichiers"  aria-selected="false"><span class="ic">▣</span>Bordereaux</button>
-    <button role="tab" data-vue="reglages"  aria-selected="false"><span class="ic">⚙</span>Réglages</button>
-  </nav>
+  <!-- ======================================================== pastilles -->
+  <!-- Les onglets d'un module, en haut de l'écran. Remplis par majOnglets(). -->
+  <nav class="onglets no-print" id="onglets" role="tablist" aria-label="Sections"></nav>
 
   <main>
     <!-- ======================================================== saisie -->
@@ -845,6 +835,10 @@
     <!-- ================================================== impression --- -->
     <section class="vue" id="vue-impression" aria-hidden="true"></section>
   </main>
+
+  <!-- ===================================================== barre du bas -->
+  <!-- Fixe, sur tous les écrans. Remplie par dessinerCadre(). -->
+  <nav class="barre no-print" id="barre" aria-label="Navigation"></nav>
 </div>
 
 <!-- ============================================================ modale -->

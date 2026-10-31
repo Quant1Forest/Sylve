@@ -131,9 +131,10 @@ rouvrait dans le cubage, à l'autre bout.
 
 **Les réglages ne sont pas un étage de la navigation.** C'est une vue, et le
 retour du bandeau lisait le module courant : on ressortait des réglages dans
-« Mon entreprise », jamais sur l'écran quitté. `aller()` retient donc
-`A.vueAvantReglages`, et `allerMenuParent()` y redescend d'abord — à
-condition que cette vue appartienne encore au module ouvert.
+« Mon entreprise », jamais sur l'écran quitté. Jusqu'en 4.85, `aller()`
+retenait `A.vueAvantReglages` et `allerMenuParent()` y redescendait. Depuis
+le lot 5a, les réglages sont un écran « libre » et suivent la pile du cadre
+(voir *Le cadre du lot 5a*, en bas).
 
 ## Le rangement des réglages
 
@@ -301,7 +302,7 @@ que JSDOM n'a pas — un écran, un capteur — **avant** que l'application dém
 Sans lui, rien de ce qui se branche au lancement n'était testable : poser le
 faux après coup, c'est le poser trop tard.
 
-## Le retour arrière remonte d'un cran
+## Le retour arrière remonte d'un cran (jusqu'en 4.85)
 
 Le bouton du téléphone quittait Sylve d'un coup, même au fond d'un module.
 `brancherRetourTelephone()` écoute `popstate` : une fenêtre ouverte se ferme
@@ -324,3 +325,46 @@ sort.
   ouvert, or l'accueil et le menu d'une partie ne sont les vues d'aucun module.
   On ressortait donc dans « Mon entreprise » après y être entré depuis
   l'accueil.
+
+## Le cadre du lot 5a (4.86.0)
+
+La forme de la refonte, branchée sur les écrans existants. Référence :
+`docs/correspondance-refonte.md` (§ 0, 1, 6 à 9), maquette V2 pour le cadre,
+tour 2 de l'étape 5b pour le contenu du +.
+
+- **Barre fixe en bas, sur tous les écrans** : Aujourd'hui · Chantiers · + ·
+  Agenda · Argent. Chantiers ouvre le carnet, Agenda le calendrier, Argent le
+  bilan des finances. Aujourd'hui ouvre l'ancien accueil (rappels, tuiles, Mon
+  entreprise, Mes notes) jusqu'au lot 5b.
+- **Bandeau** : logo (simple image, plus un bouton) · « ← parent » sur un
+  écran de second niveau seulement · titre de l'écran · actions propres
+  gardées (Aujourd'hui du calendrier, En-tête du cubage et sa seconde ligne) ·
+  ☰. Le sélecteur de partie et le bouton Réglages sont partis.
+- **Le +** et **le ☰** sont deux fenêtres (`modale()`) qui prennent l'allure
+  d'une feuille (classe `feuille-nav`, retirée par toute autre fenêtre). Le +
+  ouvre les formulaires existants ; le ☰ ouvre Stock, Achats, Véhicule,
+  Rendements (chiffre de situation de `situationModule()`, le même calcul que
+  les tuiles de Mon entreprise), Cubage, Bois, Réglages, Sauvegarde et
+  Corbeille (ces deux-là ouvrent la carte Sauvegarde des Réglages jusqu'au
+  lot f).
+- **Les onglets du bas sont devenus des pastilles en haut** : même élément
+  `#onglets`, mêmes `data-vue`, noms, ordre, arrivée et dessins.
+- **`majCadre()`, appelé à la fin de `aller()`**, tient bandeau, barre, flèche,
+  `accueil-ouvert` et crans d'historique. Aucun chemin vers un écran ne peut
+  l'oublier : c'est ce qui rend obsolète le piège « toute vue de contenu doit
+  lever `accueil-ouvert` ».
+
+**Trois sortes d'écrans** (`typeEcran()`), qui ne remontent pas pareil :
+« barre » (un onglet : il remonte à Aujourd'hui), « fixe » (la fiche →
+Chantiers, Mon entreprise → Aujourd'hui), « libre » (ce qu'on ouvre par le ☰
+ou un lien : il remonte là d'où l'on vient). Les écrans libres tiennent une
+**pile** (`A.pile`) : passer d'une pastille à l'autre, ou d'une entrée du ☰ à
+une autre, est un pas de côté qui garde le parent ; revenir sur un onglet de la
+barre vide la pile. Entré par le ☰, on y revient : la flèche montre ☰ et
+`remonter()` rouvre la feuille sur l'écran de départ.
+
+**Retour du téléphone** : fenêtre → écran parent → onglet de la barre →
+Aujourd'hui ; depuis Aujourd'hui, il sort. Les crans ne s'empilent plus à
+chaque descente : `synchroniserCrans()` en empile autant que l'écran en
+demande (`profondeur()`), jamais plus. Remonter par la barre ou la flèche ne
+les consomme pas, et redescendre ensuite ne les double pas.

@@ -153,6 +153,23 @@ function ouvrir(graines, options) {
 
 const VIDE = { index: [], piles: [], chantiers: [], articles: [], commandes: [], sorties: [], journees: [] };
 
+/* Le cadre du lot 5a : la barre du bas et le ☰ du bandeau sont les seuls
+   chemins entre les écrans. Les scénarios qui passaient par le sélecteur de
+   partie, le logo-bouton ou le bouton Réglages passent par eux. */
+async function parBarre(t, cle) {
+  const ok = t.clic('#barre [data-barre="' + cle + '"]');
+  await t.pause(300);
+  return ok;
+}
+async function parMenu(t, cle) {
+  t.clic('#b-menu'); await t.pause(150);
+  const ok = t.clic('#modale [data-menu="' + cle + '"]');
+  await t.pause(350);
+  return ok;
+}
+const vueActive = t => (t.$('main > .vue.actif') || {}).id || null;
+const ongletMarque = t => t.$$('#barre [aria-current="page"]').map(b => b.dataset.barre);
+
 /* --------------------------------------------------------------------- */
 scenario('L\'application démarre sans erreur', async () => {
   const t = await ouvrir(VIDE);
@@ -313,23 +330,43 @@ scenario('Sauvegarde : le rappel compte toutes les données', async () => {
 });
 
 /* --------------------------------------------------------------------- */
-scenario('Bandeau : le retour remonte au menu de la partie', async () => {
-  const t = await ouvrir(Object.assign({}, VIDE, { module: 'chantiers' }));
-  const ret = t.$('#b-retour');
-  verifierVrai('le bouton retour existe', ret);
-  verifier('il est visible dans un module de l\'entreprise', false, ret.hidden);
-  verifierVrai('il nomme la partie', /Mon entreprise/.test(ret.title));
-  t.clic('#b-retour'); await t.pause(200);
-  verifierVrai('on est revenu sur le menu de l\'entreprise',
-    t.$('#vue-entreprise') && !t.$('#vue-entreprise').hidden);
-  /* Elle était masquée hors d'une partie — le bouton d'accueil y faisait déjà
-     le même trajet. Il l'a demandée partout le 23 août : « comme ça j'ai les
-     deux possibilités ». Hors partie, elle vise l'accueil. */
-  t.clic('[data-module="cubage"]'); await t.pause(250);
-  verifier('elle est là dans le cubage aussi', false, t.$('#b-retour').hidden);
-  verifierVrai('et elle y vise l’accueil', /accueil/.test(t.$('#b-retour').title));
+scenario('Bandeau : la flèche ne paraît qu’au second niveau, et nomme où elle ramène', async () => {
+  /* Jusqu'en 4.85, la flèche remontait au menu de la partie (« Mon
+     entreprise ») ou à l'accueil. Depuis le lot 5a, la barre du bas porte les
+     écrans du premier niveau : la flèche ne paraît que sur un écran de second
+     niveau, et dit où elle ramène — la fiche aux Chantiers, un outil à l'écran
+     d'où on l'a ouvert, le ☰ quand on y est entré par lui. */
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'chantiers',
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'encours', lignes: [], temps: [], maj: Date.now() }] }));
+  const ret = () => t.$('#b-retour');
+  verifierVrai('le bouton retour existe', ret());
+  verifierVrai('pas de flèche sur Aujourd’hui', ret().hidden);
+  await parBarre(t, 'chantiers');
+  verifierVrai('ni sur un onglet de la barre', ret().hidden);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(300);
+  verifier('sur la fiche, elle paraît', false, ret().hidden);
+  verifierVrai('et nomme les Chantiers', /Chantiers/.test(ret().textContent));
   t.clic('#b-retour'); await t.pause(250);
-  verifierVrai('où elle ramène bien', t.$('#vue-accueil').classList.contains('actif'));
+  verifier('elle ramène au carnet', 'vue-carnet', vueActive(t));
+  /* Elle était masquée hors d'une partie ; il l'a demandée partout le 23
+     août : « comme ça j'ai les deux possibilités ». Un outil ouvert depuis sa
+     tuile d'Aujourd'hui y remonte. */
+  await parBarre(t, 'aujourdhui');
+  t.clic('#vue-accueil [data-module="cubage"]'); await t.pause(250);
+  verifier('elle est là dans le cubage', false, ret().hidden);
+  verifierVrai('et elle y vise Aujourd’hui', /Aujourd’hui/.test(ret().textContent));
+  t.clic('#b-retour'); await t.pause(250);
+  verifier('où elle ramène bien', 'vue-accueil', vueActive(t));
+  /* Ouvert par le ☰, un outil y ramène : la flèche montre le ☰. */
+  await parBarre(t, 'agenda');
+  await parMenu(t, 'bois');
+  verifier('dans le bois ouvert par le ☰, elle paraît', false, ret().hidden);
+  verifierVrai('elle montre le ☰ et le dit',
+    ret().querySelectorAll('svg').length === 2 && /Le reste de Sylve/.test(ret().getAttribute('aria-label')));
+  t.clic('#b-retour'); await t.pause(300);
+  verifier('elle ramène sur l’écran d’où l’on était parti', 'vue-calendrier', vueActive(t));
+  verifier('le ☰ rouvert par-dessus', 'Le reste de Sylve',
+    !t.$('#modale').hidden && t.texte('#modale-titre'));
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -586,7 +623,10 @@ scenario('Accueil : des pictogrammes dessinés, plus des caractères de rempliss
     verifierVrai(m + ' n’a plus de caractère de remplissage',
       tuile && !/[▤▥▦▧▨▩]/.test(tuile.querySelector('.ic').textContent));
   });
-  verifier('le bouton accueil n’affiche plus de losange', '', t.texte('#b-accueil'));
+  /* Le logo du bandeau n'est plus un bouton depuis le lot 5a : Aujourd'hui
+     est dans la barre. Il ne porte toujours aucun caractère. */
+  verifier('le logo du bandeau n’affiche aucun losange', '', t.texte('#b-logo'));
+  verifier('et ce n’est plus un bouton', 'SPAN', t.$('#b-logo') && t.$('#b-logo').tagName);
   /* Second niveau : les six tuiles de l'entreprise, cerclées — Véhicule est
      arrivé en 4.59. */
   const sous = ['chantiers', 'calendrier', 'rendements', 'stock', 'finances', 'vehicule'];
@@ -602,7 +642,7 @@ scenario('Accueil : des pictogrammes dessinés, plus des caractères de rempliss
   const brut = t.d.documentElement.outerHTML;
   verifier('le logo n’est stocké qu’une fois', 1,
     (brut.match(/--logo:url\("data:image\/png/g) || []).length);
-  verifierVrai('le bandeau s’en sert', /#b-accueil\{[^}]*var\(--logo\)/s.test(brut));
+  verifierVrai('le bandeau s’en sert', /#b-logo\{[^}]*var\(--logo\)/s.test(brut));
   verifierVrai('l’accueil aussi', /\.marque-logo\{[^}]*var\(--logo\)/s.test(brut));
   verifier('aucune erreur', [], t.erreurs);
 });
@@ -633,12 +673,15 @@ scenario('Bandeau : rien qui fasse doublon avec la page', async () => {
   const css = t2.d.documentElement.outerHTML;
   verifierVrai('le filet du bandeau est brun',
     /\.bandeau\{[^}]*border-bottom:3px solid var\(--brun-marque\)/s.test(css));
+  /* La taille de la maquette V2 (lot 5a) : 34 px, au lieu de 33. */
   verifierVrai('le logo du bandeau a de la place',
-    /#b-accueil\{[^}]*width:33px;height:33px/s.test(css));
+    /#b-logo\{[^}]*width:34px;height:34px/s.test(css));
 });
 
 /* --------------------------------------------------------------------- */
-scenario('Onglets : un dessin partout, le même d’un module à l’autre', async () => {
+scenario('Pastilles : un dessin partout, le même d’un module à l’autre', async () => {
+  /* Les onglets du bas sont devenus des pastilles en haut de l'écran (lot
+     5a) : même élément, mêmes dessins. */
   /* Un onglet de moins par module : les réglages sont passés dans le
      bandeau. Ils étaient répétés en bas de chaque partie, à une place
      différente selon le module — on s'y perdait, et ils mangeaient un
@@ -665,14 +708,14 @@ scenario('Onglets : un dessin partout, le même d’un module à l’autre', asy
   const carte = a.$('#onglets [data-vue="carte"] svg').innerHTML;
   const lieux = b.$('#onglets [data-vue="lieux"] svg').innerHTML;
   verifier('la carte et le « Où ? » montrent le même repère', carte, lieux);
-  /* Les réglages ne sont plus un onglet : ils vivent dans le bandeau, au
-     même endroit partout, et mènent à la section de la partie ouverte. */
-  verifier('plus d’onglet réglages en bas', null, a.$('#onglets [data-vue="reglages"]'));
-  verifierVrai('le bandeau en porte l’accès', a.$('#b-reglages'));
-  verifierVrai('avec un dessin', a.$('#b-reglages svg.pic'));
-  a.clic('#b-reglages'); await a.pause(300);
-  verifierVrai('et il ouvre bien les réglages',
-    a.$('#vue-reglages') && !a.$('#vue-reglages').hidden);
+  /* Les réglages ne sont plus un onglet : ils vivent dans le ☰ du bandeau,
+     au même endroit partout, et mènent à la section de l'écran quitté. */
+  verifier('plus de pastille réglages', null, a.$('#onglets [data-vue="reglages"]'));
+  verifierVrai('le ☰ du bandeau en porte l’accès', a.$('#b-menu'));
+  verifierVrai('avec un dessin', a.$('#b-menu svg.pic'));
+  await parBarre(a, 'agenda');
+  await parMenu(a, 'reglages');
+  verifier('et il ouvre bien les réglages', 'vue-reglages', vueActive(a));
   /* Depuis le calendrier — une partie de l'entreprise — c'est la section
      Entreprise qui doit s'ouvrir, pas les réglages généraux. */
   const actif = a.$$('#regl-nav .chip').filter(x => x.getAttribute('aria-pressed') === 'true')[0];
@@ -2190,10 +2233,11 @@ scenario('Réglages : le retour redescend là où on était, pas au menu', async
      module courant et remontait au menu du groupe. On sortait des réglages
      dans « Mon entreprise », jamais sur l'écran quitté. */
   const t = await ouvrir(Object.assign({}, VIDE, { module: 'finances' }));
+  await parBarre(t, 'argent');
   t.clic('[data-vue="charges"]'); await t.pause(250);
   verifierVrai('on part des charges fixes', t.$('#vue-charges').classList.contains('actif'));
 
-  t.clic('#b-reglages'); await t.pause(300);
+  await parMenu(t, 'reglages');
   verifierVrai('les réglages sont ouverts', t.$('#vue-reglages').classList.contains('actif'));
 
   t.clic('#b-retour'); await t.pause(300);
@@ -2202,11 +2246,16 @@ scenario('Réglages : le retour redescend là où on était, pas au menu', async
     !t.$('#vue-entreprise').classList.contains('actif'));
   verifierVrai('le masque des menus n’est pas posé',
     !t.d.body.classList.contains('accueil-ouvert'));
+  /* Entré par le ☰ (lot 5a), on y revient : il se rouvre par-dessus. */
+  verifier('le ☰ est rouvert', 'Le reste de Sylve', !t.$('#modale').hidden && t.texte('#modale-titre'));
+  t.clic('#modale-x'); await t.pause(200);
 
-  /* Deuxième appui : là, on remonte bien au menu du groupe. */
-  t.clic('#b-retour'); await t.pause(300);
-  verifierVrai('un second retour mène au menu de la partie',
-    t.$('#vue-entreprise').classList.contains('actif'));
+  /* Deuxième étage : jusqu'en 4.85, le menu de la partie. Les charges sont
+     maintenant dans un onglet de la barre, sans flèche : le retour du
+     téléphone remonte à Aujourd'hui. */
+  verifierVrai('pas de flèche sur un onglet de la barre', t.$('#b-retour').hidden);
+  t.w.dispatchEvent(new t.w.PopStateEvent('popstate')); await t.pause(300);
+  verifier('un second retour mène à Aujourd’hui', 'vue-accueil', vueActive(t));
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -2220,14 +2269,19 @@ scenario('Modules : Devis disparaît, Analyses devient un onglet de Finances', a
     .map(b => b.dataset.module);
   /* Une tuile par module de la partie, ni plus ni moins. Le compte était
      écrit en dur : il cassait à chaque module ajouté sans rien apprendre.
-     On le croise maintenant avec le sélecteur de module du bandeau, qui
-     porte la même liste, écrit pour une autre raison — naviguer. Une tuile
+     On le croisait avec le sélecteur de partie du bandeau, parti au lot 5a ;
+     on le croise maintenant avec ce qui l'a remplacé, écrit pour naviguer :
+     les modules de la barre du bas et ceux du ☰ ▸ Entreprise. Une tuile
      oubliée comme une tuile fantôme font crier ce contrôle. */
-  t.clic('[data-module="chantiers"]'); await t.pause(300);
-  const parBandeau = [...t.$('#b-module [label="Entreprise"]').children]
-    .map(o => o.value).sort();
-  t.clic('#b-retour'); await t.pause(300);
-  verifier('une tuile par module de la partie', parBandeau, tuiles.slice().sort());
+  const parCadre = [];
+  for (const o of ['chantiers', 'agenda', 'argent']) {
+    await parBarre(t, o); parCadre.push(t.stock('module'));
+  }
+  t.clic('#b-menu'); await t.pause(200);
+  [...t.$('#modale .fn-tuiles').querySelectorAll('[data-menu]')].forEach(b => parCadre.push(b.dataset.menu));
+  t.clic('#modale-x'); await t.pause(150);
+  await parBarre(t, 'aujourdhui');
+  verifier('une tuile par module de la partie', parCadre.sort(), tuiles.slice().sort());
   verifierVrai('plus de tuile Devis', tuiles.indexOf('devis') < 0);
   verifierVrai('plus de tuile Analyses', tuiles.indexOf('analyses') < 0);
   verifierVrai('Chantiers, Calendrier, Rendements, Stock et Finances sont là',
@@ -2274,7 +2328,7 @@ scenario('Réglages : chaque zone porte son sujet, plus de fourre-tout', async (
      journée de travail, le véhicule, les relances, les week-ends. Rien ne
      disait que la consommation du fourgon se réglait là. */
   const t = await ouvrir(Object.assign({}, VIDE, { module: 'chantiers' }));
-  t.clic('#b-reglages'); await t.pause(350);
+  await parMenu(t, 'reglages');
   t.clic('[data-regl="ent"]'); await t.pause(250);
 
   const zones = t.$$('#regl-corps .reg-titre[data-sec="ent"]')
@@ -2308,11 +2362,18 @@ scenario('Réglages : chaque zone porte son sujet, plus de fourre-tout', async (
 scenario('Réglages : le bouton descend sur la zone de l’écran quitté', async () => {
   /* Il ne choisissait que l'onglet et déposait au sommet d'un défilement de
      six sujets : depuis Finances, on atterrissait sur les heures de travail. */
+  /* Depuis le lot 5a, le chemin est ☰ ▸ Réglages, et la zone est celle de
+     l'écran sous le ☰ : on y va d'abord, par la barre ou par le ☰. Achats et
+     Véhicule s'ajoutent (tableau 5.4 de l'inventaire), et Aujourd'hui mène
+     aux réglages généraux. */
+  const ONGLET = { chantiers: 'chantiers', calendrier: 'agenda', finances: 'argent' };
   const vise = async (module, sectionAttendue, zoneAttendue) => {
-    const t = await ouvrir(Object.assign({}, VIDE, { module: module }));
+    const t = await ouvrir(Object.assign({}, VIDE, { module: module === 'accueil' ? 'chantiers' : module }));
     const vus = [];
     t.w.Element.prototype.scrollIntoView = function () { vus.push(this); };
-    t.clic('#b-reglages'); await t.pause(400);
+    if (ONGLET[module]) await parBarre(t, ONGLET[module]);
+    else if (module !== 'accueil') await parMenu(t, module);
+    await parMenu(t, 'reglages'); await t.pause(100);
     verifierVrai(module + ' : les réglages sont ouverts',
       t.$('#vue-reglages').classList.contains('actif'));
     const onglet = t.$$('#regl-nav .chip')
@@ -2331,19 +2392,25 @@ scenario('Réglages : le bouton descend sur la zone de l’écran quitté', asyn
   await vise('rendements', 'ent', 'journee');
   await vise('finances', 'ent', 'fin');
   await vise('stock', 'ent', 'stock');
+  await vise('achats', 'ent', 'fin');
+  await vise('vehicule', 'ent', 'vehicule');
   await vise('cubage', 'cubage', null);
   await vise('bois', 'bois', null);
+  await vise('accueil', 'general', null);
 });
 
 /* --------------------------------------------------------------------- */
-scenario('Réglages : la barre du bas ne propose plus les écrans du module quitté', async () => {
+scenario('Réglages : les pastilles du module quitté s’effacent, la barre du bas reste', async () => {
   /* On arrivait des Finances et la barre offrait Bilan, Dépenses, Charges,
      Analyses — alors qu'aucun de ces écrans n'était affiché. Les réglages sont
-     un écran de côté : on en sort par la flèche du bandeau. */
+     un écran de côté : on en sort par la flèche du bandeau. Depuis le lot 5a,
+     ces onglets sont des pastilles en haut ; la barre du bas, elle, est la
+     même partout et reste. */
   const t = await ouvrir(Object.assign({}, VIDE, { module: 'finances' }));
-  verifierVrai('la barre est visible sur Finances',
-    !t.d.body.classList.contains('v-reglages'));
-  t.clic('#b-reglages'); await t.pause(350);
+  await parBarre(t, 'argent');
+  verifierVrai('les pastilles sont là sur Argent',
+    !t.d.body.classList.contains('v-reglages') && t.$$('#onglets button').length >= 2);
+  await parMenu(t, 'reglages');
   verifierVrai('les réglages sont ouverts', t.$('#vue-reglages').classList.contains('actif'));
   verifierVrai('le corps porte la marque des réglages',
     t.d.body.classList.contains('v-reglages'));
@@ -2357,10 +2424,13 @@ scenario('Réglages : la barre du bas ne propose plus les écrans du module quit
     }
   }
   const masque = regles.filter(r => /v-reglages/.test(r[0]) && /onglets/.test(r[0]));
-  verifier('une règle vise la barre dans les réglages', 1, masque.length);
-  verifier('et elle la masque', 'none', masque[0] && masque[0][1]);
+  verifier('une règle vise les pastilles dans les réglages', 1, masque.length);
+  verifier('et elle les masque', 'none', masque[0] && masque[0][1]);
+  verifier('aucune règle ne masque la barre du bas', [],
+    regles.filter(r => /barre/.test(r[0]) && r[1] === 'none').map(r => r[0]));
+  verifierVrai('la barre est là, ses cinq boutons aussi', t.$$('#barre [data-barre]').length === 5);
   t.clic('#b-retour'); await t.pause(300);
-  verifierVrai('en sortant, elle revient',
+  verifierVrai('en sortant, les pastilles reviennent',
     !t.d.body.classList.contains('v-reglages'));
   verifier('aucune erreur', [], t.erreurs);
 });
@@ -2936,7 +3006,7 @@ scenario('Produit : le dosage par plant ne s’offre qu’aux unités dosables',
   verifierVrai('l’unité, non', !ST.UNITE_DOSABLE('unite'));
   verifierVrai('le rouleau non plus', !ST.UNITE_DOSABLE('rouleau'));
 
-  t.clic('#b-reglages'); await t.pause(350);
+  await parMenu(t, 'reglages');
   t.clic('#rp-add'); await t.pause(350);
   /* Le formulaire s'ouvre sur l'unité par défaut : à la pièce, pas de dosage. */
   t.choisir('#ar-unite', 'unite'); await t.pause(200);
@@ -3195,7 +3265,7 @@ scenario('L’application ne porte plus le nom de celle dont elle est partie', a
      l'écran. Les clés de stockage, elles, gardent leur nom — les renommer
      ferait chercher les données dans un tiroir vide. */
   const t = await ouvrir(Object.assign({}, VIDE, { module: 'cubage' }));
-  t.clic('#b-reglages'); await t.pause(350);
+  await parMenu(t, 'reglages');
   t.clic('[data-regl="cubage"]'); await t.pause(250);
   const texte = t.$('#regl-corps').textContent;
   verifierVrai('le mode ne cite plus l’application d’origine', !/Bord.?Cub/i.test(texte));
@@ -3238,7 +3308,7 @@ scenario('Marque : le logo et le nom de l’entreprise, là où ils servent', as
   verifierVrai('et rien ne signe le démarrage', vide.$('#dem-ent').hidden);
 
   /* Le nom se règle, et l'écran suit. */
-  vide.clic('#b-reglages'); await vide.pause(350);
+  await parMenu(vide, 'reglages');
   verifierVrai('le champ est dans les réglages', vide.$('#r-ent-nom'));
   vide.choisir('#r-ent-nom', 'Forêts du Levant'); await vide.pause(350);
   verifier('le nom est enregistré', 'Forêts du Levant', (vide.stock('cfg') || {}).nomEntreprise);
@@ -3251,7 +3321,7 @@ scenario('Notes de mise à jour : la version installée d’abord, les autres de
   /* Cinq notes dépliées faisaient un long défilement pour une information
      qu'on ne relit presque jamais. */
   const t = await ouvrir(Object.assign({}, VIDE, { module: 'chantiers' }));
-  t.clic('#b-reglages'); await t.pause(350);
+  await parMenu(t, 'reglages');
   t.clic('[data-regl="general"]'); await t.pause(250);
   const z = t.$('#c-notes-maj');
   verifierVrai('la liste est là', z && z.textContent.trim());
@@ -4142,32 +4212,53 @@ scenario('Temps passé : la date est facultative et suit le chantier', async () 
 });
 
 /* --------------------------------------------------------------------- */
-scenario('Retour arrière du téléphone : il remonte d’un cran au lieu de quitter', async () => {
+scenario('Retour arrière du téléphone : fenêtre, écran parent, onglet, Aujourd’hui', async () => {
   /* Le bouton du téléphone quittait Sylve d'un coup, même au fond d'un
-     module. Un cran d'historique est empilé à chaque descente et consommé par
-     la remontée : un appui par étage. */
-  const t = await ouvrir(VIDE);
+     module. Il remonte d'un cran à la fois. Jusqu'en 4.85 : fenêtre → module
+     → menu de la partie → accueil. Depuis le lot 5a : fenêtre → écran parent
+     → onglet de la barre → Aujourd'hui. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'encours', lignes: [], temps: [], maj: Date.now() }] }));
   const retour = () => t.w.dispatchEvent(new t.w.PopStateEvent('popstate'));
-  t.clic('[data-module="entreprise"]'); await t.pause(250);
-  t.clic('[data-module="chantiers"]'); await t.pause(350);
-  verifierVrai('on est descendu dans le carnet',
-    t.$('#vue-carnet').classList.contains('actif'));
+  await parBarre(t, 'chantiers');
+  t.clic('[data-chouvrir="c1"]'); await t.pause(300);
+  verifier('on est descendu sur la fiche', 'vue-chantier', vueActive(t));
 
   /* Une fenêtre ouverte se ferme d'abord, sans quitter l'écran. */
-  t.clic('#c-nouveau'); await t.pause(350);
+  t.clic('#f-note'); await t.pause(300);
   verifierVrai('une fenêtre est ouverte', !t.$('#modale').hidden);
   retour(); await t.pause(300);
   verifierVrai('le retour la ferme', t.$('#modale').hidden);
-  verifierVrai('sans changer d’écran', t.$('#vue-carnet').classList.contains('actif'));
+  verifier('sans changer d’écran', 'vue-chantier', vueActive(t));
 
   retour(); await t.pause(300);
-  verifierVrai('puis il remonte au menu de la partie',
-    t.$('#vue-entreprise').classList.contains('actif'));
+  verifier('puis il remonte à l’écran parent', 'vue-carnet', vueActive(t));
   retour(); await t.pause(300);
-  verifierVrai('puis à l’accueil', t.$('#vue-accueil').classList.contains('actif'));
+  verifier('puis de l’onglet à Aujourd’hui', 'vue-accueil', vueActive(t));
   retour(); await t.pause(300);
-  verifierVrai('depuis l’accueil, il ne va pas plus haut',
-    t.$('#vue-accueil').classList.contains('actif'));
+  verifier('depuis Aujourd’hui, il ne va pas plus haut', 'vue-accueil', vueActive(t));
+
+  /* Un outil ouvert par le ☰ : son parent est le ☰, ouvert sur l'écran d'où
+     l'on était parti — une fenêtre, que le retour suivant ferme. */
+  await parBarre(t, 'argent');
+  await parMenu(t, 'vehicule');
+  verifier('le véhicule est ouvert', 'vue-carnetv', vueActive(t));
+  retour(); await t.pause(300);
+  verifier('le retour ramène à Argent', 'vue-finances', vueActive(t));
+  verifierVrai('le ☰ ouvert par-dessus', !t.$('#modale').hidden);
+  retour(); await t.pause(300);
+  verifierVrai('le retour suivant le ferme', t.$('#modale').hidden);
+  verifier('sans quitter Argent', 'vue-finances', vueActive(t));
+  retour(); await t.pause(300);
+  verifier('puis Aujourd’hui', 'vue-accueil', vueActive(t));
+
+  /* Passer d'un onglet de la barre à l'autre est un pas de côté : un seul
+     cran pour les trois, sinon il faudrait trois appuis pour sortir. */
+  const avant = t.w.history.length;
+  await parBarre(t, 'chantiers'); await parBarre(t, 'agenda'); await parBarre(t, 'argent');
+  verifier('trois onglets de suite n’empilent qu’un cran', avant + 1, t.w.history.length);
+  retour(); await t.pause(300);
+  verifier('et un seul appui ramène à Aujourd’hui', 'vue-accueil', vueActive(t));
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -4176,23 +4267,27 @@ scenario('Réglages : on ressort par où l’on est entré', async () => {
   /* Entré depuis l'accueil, on ressortait dans « Mon entreprise ». La vue
      d'origine était bien retenue, mais rejetée parce que l'accueil n'est la
      vue d'aucun module. */
+  /* Lot 5a : le logo n'est plus un bouton, on revient par la barre ; et
+     depuis un module, on entre dans les réglages par le ☰. */
   const t = await ouvrir(VIDE);
   t.clic('[data-module="entreprise"]'); await t.pause(250);
   t.clic('[data-module="chantiers"]'); await t.pause(350);
-  t.clic('#b-accueil'); await t.pause(300);
+  await parBarre(t, 'aujourdhui');
   verifierVrai('on est bien sur l’accueil', t.$('#vue-accueil').classList.contains('actif'));
 
   t.clic('#a-reglages'); await t.pause(350);
   verifierVrai('les réglages s’ouvrent', t.$('#vue-reglages').classList.contains('actif'));
+  verifierVrai('la flèche nomme Aujourd’hui', /Aujourd’hui/.test(t.texte('#b-retour')));
   t.clic('#b-retour'); await t.pause(350);
   verifierVrai('et le retour ramène à l’accueil',
     t.$('#vue-accueil').classList.contains('actif'));
   verifierVrai('pas dans « Mon entreprise »',
     !t.$('#vue-entreprise').classList.contains('actif'));
+  verifierVrai('sans ouvrir le ☰ : on n’y était pas entré par lui', t.$('#modale').hidden);
 
   /* Entré depuis un module, on y redescend — le comportement d'origine. */
-  t.clic('[data-module="chantiers"]'); await t.pause(350);
-  t.clic('#b-reglages'); await t.pause(350);
+  await parBarre(t, 'chantiers');
+  await parMenu(t, 'reglages');
   t.clic('#b-retour'); await t.pause(350);
   verifierVrai('depuis un module, on revient dans ce module',
     t.$('#vue-carnet').classList.contains('actif'));
@@ -4265,7 +4360,7 @@ scenario('Familles : les travaux se choisissent par famille, et l’analyse suit
   t.clic('#modale-x'); await t.pause(250);
 
   /* L'analyse par famille : c'est ce qu'il attend depuis le début. */
-  t.clic('#b-accueil'); await t.pause(250);
+  await parBarre(t, 'aujourdhui');
   t.clic('[data-module="entreprise"]'); await t.pause(250);
   t.clic('[data-module="finances"]'); await t.pause(300);
   t.clic('[data-vue="analyses"]'); await t.pause(300);
@@ -4285,7 +4380,7 @@ scenario('Familles : le rangement livré n’est qu’un défaut, il se change',
   /* Quarante-cinq travaux rangés par nous : il faut qu'il puisse corriger
      sans repasser par une livraison. */
   const t = await ouvrir(Object.assign({}, VIDE, { module: 'chantiers' }));
-  t.clic('#b-reglages'); await t.pause(350);
+  await parMenu(t, 'reglages');
   t.clic('[data-regl="ent"]'); await t.pause(300);
   t.clic('[data-liste="travaux"]'); await t.pause(300);
   /* La liste ne déplie que les huit premières : le détourage est derrière. */
@@ -4368,7 +4463,7 @@ scenario('Réglages : l’unité d’une prestation n’est qu’une proposition
   /* « Unité de facturation » se lisait comme une règle : il facture la même
      prestation tantôt à la journée, tantôt à l'hectare. */
   const t = await ouvrir(Object.assign({}, VIDE, { module: 'chantiers' }));
-  t.clic('#b-reglages'); await t.pause(350);
+  await parMenu(t, 'reglages');
   t.clic('[data-regl="ent"]'); await t.pause(300);
   t.clic('[data-liste="travaux"]'); await t.pause(300);
   if (t.$('#rl-plus')) { t.clic('#rl-plus'); await t.pause(300); }
@@ -8424,6 +8519,317 @@ scenario('Finances : les montants ne passent plus à la ligne', async () => {
   verifier('ses montants ne se coupent pas', 'nowrap', t.w.getComputedStyle(l).whiteSpace);
   verifierVrai('le chiffre qui compte, puis d’où il vient',
     /61 728 €\s*sur 123 456 €/.test(l.textContent.replace(/ /g, ' ')));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* ====================================================== LE CADRE (lot 5a) */
+/* La refonte change les chemins, pas les écrans. Ces scénarios vérifient le
+   nouveau cadre (barre du bas, +, ☰, bandeau, pastilles) en le croisant avec
+   ce qui existait avant : l'inventaire des écrans écrit en 4.85, et les
+   portes de création d'origine, restées en place. */
+const INVENTAIRE = fs.readFileSync(path.join(__dirname, '..', 'docs', 'inventaire-ecrans.md'), 'utf8')
+  .split(/\r?\n/);
+/* Le tableau « Les modules et leurs onglets » : nom, onglets dans l'ordre,
+   arrivée par défaut. */
+function modulesInventaire() {
+  const debut = INVENTAIRE.findIndex(l => /^### Les modules et leurs onglets/.test(l));
+  const lignes = [];
+  for (let i = debut + 1; i < INVENTAIRE.length && !/^###/.test(INVENTAIRE[i]); i++) {
+    const m = /^\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|$/.exec(INVENTAIRE[i]);
+    if (!m || m[1] === 'Module' || /^-+$/.test(m[1])) continue;
+    lignes.push({ nom: m[1], onglets: m[2].split(' · '), arrivee: m[3] });
+  }
+  return lignes;
+}
+/* Les sous-niveaux : « - **Synthèses** (Cubage) : Synthèse · Financière… ». */
+function sousNiveauxInventaire() {
+  const debut = INVENTAIRE.findIndex(l => /^### Les sous-niveaux/.test(l));
+  const lignes = [];
+  for (let i = debut + 1; i < INVENTAIRE.length && !/^###/.test(INVENTAIRE[i]); i++) {
+    const m = /^- \*\*(.+?)\*\*(?: \((.+?)\))? : (.+?)$/.exec(INVENTAIRE[i]);
+    if (!m) continue;
+    const items = m[3].replace(/\s*\(voir [^)]*\)/, '').replace(/\.$/, '').split(' · ');
+    lignes.push({ onglet: m[1], module: m[2] || null, items });
+  }
+  return lignes;
+}
+/* Les trois modules de la barre portent un autre nom qu'avant : la table de
+   correspondance (§ 1) dit Calendrier → Agenda, Finances → Argent. Les autres
+   se trouvent dans le ☰, sous leur nom. */
+const BARRE_DE_MODULE = { Chantiers: 'chantiers', Calendrier: 'agenda', Finances: 'argent' };
+async function allerAuModule(t, nom) {
+  if (BARRE_DE_MODULE[nom]) return parBarre(t, BARRE_DE_MODULE[nom]);
+  t.clic('#b-menu'); await t.pause(150);
+  const tuile = t.$$('#modale [data-menu]').filter(b => b.querySelector('b') &&
+    b.querySelector('b').textContent.trim() === nom)[0];
+  if (!tuile) { t.clic('#modale-x'); return false; }
+  tuile.click(); await t.pause(350);
+  return true;
+}
+const pastilles = t => t.$$('#onglets button').map(b => b.textContent.replace(/\s+/g, ' ').trim());
+const pastilleOuverte = t => t.$$('#onglets button')
+  .filter(b => b.getAttribute('aria-selected') === 'true').map(b => b.textContent.trim());
+/* Ce qu'une fenêtre montre : son titre et les champs qu'elle porte. Deux
+   portes vers le même formulaire donnent la même signature. */
+const signatureFenetre = t => (t.$('#modale').hidden ? null :
+  t.texte('#modale-titre') + ' | ' + t.$$('#modale-corps [id]').map(e => e.id).sort().join(','));
+
+/* --------------------------------------------------------------------- */
+scenario('Cadre : le démarrage mène à Aujourd’hui, l’entreprise signe dessous', async () => {
+  /* Le module ouvert la dernière fois reste en mémoire (Finances ici) : il
+     ne décide pas de l'arrivée, qui se fait toujours sur Aujourd'hui. */
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'finances',
+    cfg: { nomEntreprise: 'Forêts du Levant' } }));
+  verifierVrai('l’écran de démarrage est là', t.$('#demarrage'));
+  verifierVrai('il porte le nom de l’entreprise sous celui de Sylve',
+    !t.$('#dem-ent').hidden && /Forêts du Levant/.test(t.texte('#dem-ent')) &&
+    (t.$('.dem-nom').compareDocumentPosition(t.$('#dem-ent')) & 4));
+  verifier('on arrive sur Aujourd’hui', 'vue-accueil', vueActive(t));
+  verifier('le bandeau le dit', 'Aujourd’hui', t.texte('#b-ecran'));
+  verifier('l’onglet Aujourd’hui est marqué', ['aujourdhui'], ongletMarque(t));
+  verifierVrai('pas de flèche de retour', t.$('#b-retour').hidden);
+  verifierVrai('pas de pastilles de module', t.d.body.classList.contains('accueil-ouvert'));
+  verifier('le module en mémoire n’a pas bougé', 'finances', t.stock('module'));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Cadre : la barre du bas sur tous les écrans, l’onglet courant marqué', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'encours', lignes: [], temps: [], maj: Date.now() }] }));
+  const vus = [];
+  const constater = (ou, attendu) => {
+    const b = t.$('#barre');
+    const ok = !!b && !b.hidden && !b.closest('[hidden]') && !b.closest('main') &&
+      t.$$('#barre [data-barre]').length === 5;
+    vus.push(ou);
+    verifier(ou + ' : la barre est là, « ' + attendu + ' » marqué', [true, [attendu]], [ok, ongletMarque(t)]);
+  };
+  constater('Aujourd’hui', 'aujourdhui');
+  t.clic('#vue-accueil [data-module="entreprise"]'); await t.pause(250);
+  constater('Mon entreprise', 'aujourdhui');
+  const tour = async (onglet, nom) => {
+    await parBarre(t, onglet);
+    for (const v of t.$$('#onglets button').map(b => b.dataset.vue)) {
+      t.clic('#onglets [data-vue="' + v + '"]'); await t.pause(200);
+      constater(nom + ' ▸ ' + v, onglet);
+    }
+  };
+  await tour('chantiers', 'Chantiers');
+  t.clic('[data-chouvrir="c1"]'); await t.pause(250);
+  constater('la fiche ouverte du carnet', 'chantiers');
+  await tour('agenda', 'Agenda');
+  await tour('argent', 'Argent');
+  /* Un écran du ☰ garde marqué l'onglet d'où l'on est parti : c'est là que
+     le retour ramènera. */
+  for (const m of ['stock', 'achats', 'vehicule', 'rendements', 'cubage', 'bois', 'reglages']) {
+    await parMenu(t, m);
+    constater('☰ ▸ ' + m + ', ouvert depuis Argent', 'argent');
+    if (m === 'reglages') continue;
+    for (const v of t.$$('#onglets button').map(b => b.dataset.vue)) {
+      t.clic('#onglets [data-vue="' + v + '"]'); await t.pause(150);
+      constater('☰ ▸ ' + m + ' ▸ ' + v, 'argent');
+    }
+  }
+  verifierVrai('tous les écrans ont été parcourus (' + vus.length + ')', vus.length > 30);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Cadre : chaque entrée du + ouvre le formulaire qui existait déjà', async () => {
+  /* Le + n'invente aucun formulaire : chaque entrée doit ouvrir exactement
+     celui de l'ancienne porte, restée en place — même titre, mêmes champs. */
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'stock',
+    articles: [{ id: 'a1', nom: 'Tuteur', type: 'tuteur', unite: 'unite', mouvements: [], maj: Date.now() }] }));
+  t.clic('#barre [data-barre="plus"]'); await t.pause(200);
+  verifier('la feuille s’appelle « Ajouter »', 'Ajouter', t.texte('#modale-titre'));
+  const libelles = sel => t.$$(sel).map(b => b.textContent.replace(/\s+/g, ' ').trim());
+  verifier('Quotidien : Ma journée, Dépense, Chantier, Note',
+    ['Ma journéele plus fréquent', 'Dépensecarburant, achat', 'Chantieron m’en a parlé', 'Notepense-bête'],
+    libelles('#modale .fn-ajout [data-plus]'));
+  verifier('Plus rare : commande, achat, intervention, charge fixe',
+    ['Commande de fournitures', 'Achat à prévoir', 'Noter une intervention', 'Charge fixe'],
+    libelles('#modale .fn-puces [data-plus]'));
+  verifierVrai('ni pile ni bordereau', !/Pile|Bordereau/i.test(t.texte('#modale')));
+  t.clic('#modale-x'); await t.pause(150);
+
+  const ancienne = {
+    journee: '#a-jour', depense: '#dep-nouvelle', chantier: '#c-nouveau', note: '#ent-note-plus',
+    commande: '#cmd-nouvelle', achat: '#ach-plus', intervention: '#vh-plus', charge: '#chg-nouvelle'
+  };
+  for (const cle of Object.keys(ancienne)) {
+    /* La porte du véhicule n'est dessinée qu'à l'ouverture de son carnet. */
+    if (cle === 'intervention') await parMenu(t, 'vehicule');
+    verifierVrai(cle + ' : l’ancienne porte est toujours là', t.clic(ancienne[cle]));
+    await t.pause(300);
+    const avant = signatureFenetre(t);
+    t.clic('#modale-x'); await t.pause(150);
+    t.clic('#barre [data-barre="plus"]'); await t.pause(200);
+    t.clic('#modale [data-plus="' + cle + '"]'); await t.pause(300);
+    const apres = signatureFenetre(t);
+    verifierVrai(cle + ' : une fenêtre s’ouvre', apres);
+    verifier(cle + ' : la même que par l’ancienne porte', avant, apres);
+    t.clic('#modale-x'); await t.pause(150);
+  }
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Cadre : chaque entrée du ☰ ouvre le bon écran, avec son chiffre', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    index: [{ id: 'b1', vol: 12.5, nb: 3, meta: { foret: 'Haut' } },
+      { id: 'b2', vol: 3.25, nb: 1, meta: { foret: 'Bas' } }] }));
+  const vus = [];
+  t.w.Element.prototype.scrollIntoView = function () { vus.push(this); };
+  t.clic('#b-menu'); await t.pause(200);
+  verifier('la feuille s’appelle « Le reste de Sylve »', 'Le reste de Sylve', t.texte('#modale-titre'));
+  verifier('ses deux groupes', ['Entreprise', 'Outils de terrain'], t.$$('#modale .fn-sous').map(p => p.textContent));
+  verifier('dans l’ordre de la maquette',
+    ['stock', 'achats', 'vehicule', 'rendements', 'cubage', 'bois', 'reglages', 'sauvegarde', 'corbeille'],
+    t.$$('#modale [data-menu]').map(b => b.dataset.menu));
+  /* Le chiffre de situation : deux bordereaux de 12,5 et 3,25 m³. */
+  const cub = t.$('#modale [data-menu="cubage"]');
+  verifierVrai('la tuile Cubage porte son chiffre', /15,75 m³/.test(cub.textContent));
+  verifierVrai('et sa phrase', /2 bordereaux/.test(cub.textContent));
+  verifierVrai('chaque tuile dit quelque chose', t.$$('#modale .fn-tuiles button')
+    .every(b => b.querySelector('small') && b.querySelector('small').textContent.trim()));
+  t.clic('#modale-x'); await t.pause(150);
+
+  const attendus = { stock: 'vue-stock2', achats: 'vue-achats', vehicule: 'vue-carnetv',
+    rendements: 'vue-rendements', cubage: 'vue-fichiers', bois: 'vue-stock', reglages: 'vue-reglages' };
+  for (const m of Object.keys(attendus)) {
+    await parMenu(t, m);
+    verifier('☰ ▸ ' + m + ' ouvre son écran', attendus[m], vueActive(t));
+    verifierVrai('☰ ▸ ' + m + ' : la feuille s’est refermée', t.$('#modale').hidden);
+    if (m !== 'reglages') verifier('☰ ▸ ' + m + ' : le module est retenu', m, t.stock('module'));
+  }
+  /* Sauvegarde et Corbeille ouvrent pour l'instant l'endroit d'avant, en
+     attendant leurs écrans (lot f). */
+  vus.length = 0;
+  await parMenu(t, 'sauvegarde');
+  verifier('Sauvegarde ouvre les réglages', 'vue-reglages', vueActive(t));
+  verifierVrai('sur Général, carte Sauvegarde visible', !t.$('#c-sauvegarde').hidden &&
+    t.$('[data-regl="general"]').getAttribute('aria-pressed') === 'true');
+  verifierVrai('et y descend', vus.some(e => e.dataset && e.dataset.sous === 'sauvegarde'));
+  verifierVrai('la corbeille reste fermée', t.$('#s-recup').hidden);
+  await parMenu(t, 'corbeille');
+  verifier('Corbeille ouvre les réglages', 'vue-reglages', vueActive(t));
+  verifierVrai('corbeille dépliée', !t.$('#s-recup').hidden && /Ce que vous supprimez arrive ici/.test(t.texte('#s-recup')));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Cadre : les pastilles reprennent les onglets de l’inventaire', async () => {
+  /* Noms, ordre et arrivée lus dans le tableau de l'inventaire des écrans,
+     écrit en 4.85 avant toute refonte : une pastille perdue, renommée ou
+     déplacée fait crier ce contrôle. */
+  const mods = modulesInventaire();
+  verifier('l’inventaire porte ses neuf modules', 9, mods.length);
+  const t = await ouvrir(VIDE);
+  for (const m of mods) {
+    verifierVrai(m.nom + ' : joignable par la barre ou le ☰', await allerAuModule(t, m.nom));
+    verifier(m.nom + ' : mêmes pastilles, même ordre', m.onglets, pastilles(t));
+    verifier(m.nom + ' : même arrivée', [m.arrivee], pastilleOuverte(t));
+    /* Aucune mémoire de la dernière pastille, comme avant : on repart de
+       l'arrivée. */
+    const autre = t.$$('#onglets button').filter(b => b.getAttribute('aria-selected') !== 'true')[0];
+    if (autre) { autre.click(); await t.pause(200); }
+    await parBarre(t, 'aujourdhui');
+    await allerAuModule(t, m.nom);
+    verifier(m.nom + ' : au retour, de nouveau l’arrivée', [m.arrivee], pastilleOuverte(t));
+    await parBarre(t, 'aujourdhui');
+  }
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Cadre : rien de l’inventaire des écrans ne s’est perdu', async () => {
+  /* L'inventaire de non-perte. Chaque écran, onglet et sous-niveau listé en
+     4.85 doit s'ouvrir depuis le nouveau cadre, en partant d'Aujourd'hui. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'encours', lignes: [], temps: [], maj: Date.now() }] }));
+  const faits = [];
+  /* Accueil → Aujourd'hui ; Mon entreprise et Mes notes, joignables par lui. */
+  await parBarre(t, 'chantiers'); await parBarre(t, 'aujourdhui');
+  verifier('Accueil : l’onglet Aujourd’hui l’ouvre', 'vue-accueil', vueActive(t));
+  t.clic('#vue-accueil [data-module="entreprise"]'); await t.pause(250);
+  verifier('Mon entreprise : sa tuile sur Aujourd’hui', 'vue-entreprise', vueActive(t));
+  verifierVrai('Mes notes y sont, avec « + note »', t.$('#vue-entreprise #ent-notes #ent-note-plus'));
+  verifier('ses sept tuiles de modules aussi', 7, t.$$('#vue-entreprise .tuiles [data-module]').length);
+  await parMenu(t, 'reglages');
+  verifier('Réglages : par le ☰', 'vue-reglages', vueActive(t));
+
+  const mods = modulesInventaire();
+  for (const m of mods) {
+    await parBarre(t, 'aujourdhui');
+    verifierVrai(m.nom + ' : joignable', await allerAuModule(t, m.nom));
+    for (const o of m.onglets) {
+      const b = t.$$('#onglets button').filter(x => x.textContent.trim() === o)[0];
+      if (!b) { verifierVrai(m.nom + ' ▸ ' + o + ' : pastille présente', false); continue; }
+      b.click(); await t.pause(200);
+      verifier(m.nom + ' ▸ ' + o + ' s’ouvre', 'vue-' + b.dataset.vue, vueActive(t));
+      faits.push(m.nom + ' ▸ ' + o);
+    }
+  }
+  /* Les sous-niveaux à l'intérieur d'un onglet. */
+  for (const s of sousNiveauxInventaire()) {
+    await parBarre(t, 'aujourdhui');
+    let ici;
+    if (!s.module) { await parMenu(t, 'reglages'); ici = '#vue-reglages'; }
+    else {
+      const m = mods.filter(x => x.nom.indexOf(s.module) === 0)[0];
+      await allerAuModule(t, m.nom);
+      const p = t.$$('#onglets button').filter(x => x.textContent.trim() === s.onglet)[0];
+      if (p) { p.click(); await t.pause(250); }
+      ici = 'main > .vue.actif';
+    }
+    for (const it of s.items) {
+      const cherche = () => t.$$(ici + ' button').filter(x => x.textContent.trim() === it)[0];
+      const b = cherche();
+      if (!b) { verifierVrai(s.onglet + ' ▸ ' + it + ' : présent', false); continue; }
+      b.click(); await t.pause(200);
+      const apres = cherche();
+      verifierVrai(s.onglet + ' ▸ ' + it + ' s’ouvre', apres &&
+        (apres.getAttribute('aria-selected') === 'true' || apres.getAttribute('aria-pressed') === 'true'));
+      faits.push(s.onglet + ' ▸ ' + it);
+    }
+  }
+  verifierVrai('tout l’inventaire a été parcouru (' + faits.length + ')', faits.length >= 40);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Cadre : le bandeau titre l’écran et garde ses actions propres', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'encours', lignes: [], temps: [], maj: Date.now() }] }));
+  verifierVrai('plus de sélecteur de partie', !t.$('#b-module') && !t.$('.bandeau select'));
+  verifierVrai('le ☰ est en haut à droite',
+    t.$('.bandeau-in').lastElementChild === t.$('#b-menu'));
+  verifierVrai('pas d’action propre sur Aujourd’hui', t.$('#b-ctx').hidden);
+  await parBarre(t, 'chantiers');
+  verifier('Chantiers', 'Chantiers', t.texte('#b-ecran'));
+  t.clic('[data-chouvrir="c1"]'); await t.pause(250);
+  verifier('la fiche', 'Chantier', t.texte('#b-ecran'));
+  await parBarre(t, 'agenda');
+  verifier('Agenda', 'Agenda', t.texte('#b-ecran'));
+  verifierVrai('le bouton Aujourd’hui du calendrier est gardé',
+    !t.$('#b-ctx').hidden && /Aujourd’hui/.test(t.texte('#b-aujourdhui') || ''));
+  await parBarre(t, 'argent');
+  verifier('Argent', 'Argent', t.texte('#b-ecran'));
+  await parMenu(t, 'cubage');
+  verifier('Cubage', 'Cubage', t.texte('#b-ecran'));
+  verifierVrai('l’En-tête du cubage est gardé', /En-tête/.test(t.texte('#b-entete2') || ''));
+  verifierVrai('et sa seconde ligne aussi', t.d.body.classList.contains('m-cubage') &&
+    !t.d.body.classList.contains('accueil-ouvert') && t.$('#b-bordereau.mod-cubage'));
+  await parMenu(t, 'reglages');
+  verifier('Réglages', 'Réglages', t.texte('#b-ecran'));
+  await parBarre(t, 'aujourdhui');
+  /* Sur Aujourd'hui, la seconde ligne du bordereau est masquée par une règle
+     (jsdom ne résout pas getComputedStyle sur ce sélecteur). */
+  const regles = [];
+  for (const f of t.d.styleSheets) for (const r of f.cssRules || []) if (r.selectorText) regles.push([r.selectorText, r.style.display]);
+  verifierVrai('la ligne du bordereau ne déborde pas sur Aujourd’hui',
+    regles.some(r => /\.accueil-ouvert #b-bordereau/.test(r[0]) && r[1] === 'none'));
   verifier('aucune erreur', [], t.erreurs);
 });
 

@@ -11,7 +11,7 @@ function vueDemandee(def) {
 }
 
 function init() {
-  champs(); brancher();
+  champs(); dessinerCadre(); brancher();
   window.BCS.pret.then(function () {
     return Promise.all([lire('bordcub.cfg', null), lire('bordcub.index', []),
       Store.get('bordcub.actif'), lire('bordcub.export', 0),
@@ -265,12 +265,244 @@ var MODULES = {
   }
 };
 
-/* Le bandeau porte le nom de la partie ouverte, et permet d'en changer
-   sans repasser par l'accueil. L'action à droite dépend du module. */
-var NOMS_GROUPE = { entreprise: 'Mon entreprise' };
+/* Les dessins du cadre (lot 5a), repris de la maquette V2 validée. Ceux qui
+   existaient déjà gardent le leur : la barre montre le carnet, l'agenda et
+   l'euro des onglets qu'elle ouvre. */
+PICTOS.jour = '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4' +
+  'M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/>';
+PICTOS.horloge = '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>';
+PICTOS.note = '<path d="M5 4h10l4 4v12H5z"/><path d="M14 4v5h5M8.5 13h7M8.5 16.5h4.5"/>';
+PICTOS.sauvegarde = '<path d="M7 18.5a4 4 0 0 1-.6-8A6 6 0 0 1 18 9.5a4.5 4.5 0 0 1 0 9z"/>' +
+  '<path d="M12 16v-5M9.6 13.4 12 11l2.4 2.4"/>';
+PICTOS.corbeille = '<path d="M4 7h16M9.5 7V4h5v3M6 7l1 13h10l1-13"/>';
+PICTOS.menu = '<path d="M4 7h16M4 12h16M4 17h16"/>';
+PICTOS.retour = '<path d="M14.5 6l-6 6 6 6"/>';
+PICTOS.plus = '<path d="M12 5v14M5 12h14"/>';
+/* Le dessin de la tuile Cubage de l'accueil, pour que le ☰ montre le même. */
+PICTOS.cubage = '<circle cx="12" cy="12" r="8.4"/><path d="M4.5 12h15"/>' +
+  '<path d="M7.1 9.5 4.6 12l2.5 2.5M16.9 9.5 19.4 12l-2.5 2.5"/>';
+function picto(nom) {
+  return '<svg viewBox="0 0 24 24" class="pic" aria-hidden="true">' + (PICTOS[nom] || '') + '</svg>';
+}
 
-/* Remonter d'un cran : le menu de la partie si le module en a une,
-   l'accueil sinon. */
+/* ============================================================ LE CADRE */
+/* Quatre onglets en bas, le + au milieu. Chacun ouvre l'écran d'arrivée de
+   son module : Chantiers le carnet, Agenda le calendrier, Argent le bilan. */
+var BARRE = {
+  aujourdhui: { nom: 'Aujourd’hui', picto: 'jour' },
+  chantiers: { nom: 'Chantiers', picto: 'carnet', module: 'chantiers' },
+  agenda: { nom: 'Agenda', picto: 'calendrier', module: 'calendrier' },
+  argent: { nom: 'Argent', picto: 'finances', module: 'finances' }
+};
+var ONGLET_DE_MODULE = { chantiers: 'chantiers', calendrier: 'agenda', finances: 'argent' };
+var TITRES_VUE = { accueil: 'Aujourd’hui', entreprise: 'Mon entreprise', reglages: 'Réglages',
+  chantier: 'Chantier', fichech: 'Fiche de chantier' };
+
+/* Trois sortes d'écrans, qui ne remontent pas de la même façon :
+   - « barre » : un onglet de la barre ; il remonte à Aujourd'hui ;
+   - « fixe » : son parent ne change jamais (la fiche → Chantiers, Mon
+     entreprise → Aujourd'hui) ;
+   - « libre » : ce qu'on ouvre par le ☰ ou par un lien (Stock, Véhicule,
+     Cubage, Réglages…) ; il remonte là d'où l'on vient. */
+function typeEcran(e) {
+  if (!e || e.vue === 'accueil') return 'racine';
+  if (e.vue === 'entreprise') return 'fixe';
+  if (e.vue === 'reglages') return 'libre';
+  if (ONGLET_DE_MODULE[e.module]) {
+    return e.module === 'chantiers' && (e.vue === 'chantier' || e.vue === 'fichech') ? 'fixe' : 'barre';
+  }
+  return 'libre';
+}
+function titreEcran(e) {
+  if (TITRES_VUE[e.vue]) return TITRES_VUE[e.vue];
+  var o = ONGLET_DE_MODULE[e.module];
+  if (o) return BARRE[o].nom;
+  return (MODULES[e.module] || {}).nom || 'Sylve';
+}
+function memeModule(a, b) {
+  return a.vue !== 'reglages' && b.vue !== 'reglages' && a.module === b.module;
+}
+
+/* Le chemin d'un écran libre : la pile des écrans d'où l'on est venu. Passer
+   d'une pastille à l'autre, ou d'une entrée du ☰ à une autre, est un pas de
+   côté : le parent reste celui d'avant. Revenir sur un onglet de la barre
+   vide la pile. */
+function noterParcours(v) {
+  var de = A.ecran, vers = { vue: v, module: A.module }, parMenu = !!A.parMenu;
+  A.parMenu = false;
+  if (typeEcran(vers) !== 'libre') { A.pile = []; return; }
+  if (A.enRemontee || !de) return;
+  if (de.vue === vers.vue && (de.vue === 'reglages' || de.module === vers.module)) return;
+  if (typeEcran(de) === 'libre' && (parMenu || memeModule(de, vers))) return;
+  A.pile.push({ vue: de.vue, module: de.module, menu: parMenu });
+}
+function parentEcran() {
+  var e = A.ecran, t = typeEcran(e);
+  if (t === 'racine' || t === 'barre') return null;
+  if (t === 'fixe') return { nom: e.vue === 'entreprise' ? 'Aujourd’hui' : 'Chantiers' };
+  var p = A.pile[A.pile.length - 1];
+  if (!p) return { nom: 'Aujourd’hui' };
+  return p.menu ? { menu: true, nom: 'Le reste de Sylve' } : { nom: titreEcran(p) };
+}
+
+/* Le bandeau, la barre et les pastilles suivent l'écran affiché. Appelé par
+   aller() : aucun chemin vers un écran ne peut l'oublier. */
+function majCadre() {
+  var e = { vue: A.vue, module: A.module }, t = typeEcran(e);
+  A.ecran = e;
+  A.parMenu = false;
+  document.body.classList.toggle('accueil-ouvert', e.vue === 'accueil' || e.vue === 'entreprise');
+  var titre = $('#b-ecran');
+  if (titre) titre.textContent = titreEcran(e);
+  var ctx = $('#b-ctx');
+  if (ctx) ctx.hidden = e.vue === 'accueil' || e.vue === 'entreprise' || e.vue === 'reglages';
+  var ret = $('#b-retour'), p = parentEcran();
+  if (ret) {
+    ret.hidden = !p;
+    if (p) {
+      ret.innerHTML = picto('retour') + (p.menu ? picto('menu') : '<span>' + esc(p.nom) + '</span>');
+      ret.setAttribute('aria-label', 'Revenir à « ' + p.nom + ' »');
+      ret.title = 'Revenir à « ' + p.nom + ' »';
+    }
+  }
+  /* Un écran libre garde l'onglet d'où l'on est parti : c'est là que le
+     retour finira par ramener. */
+  if (t === 'racine' || e.vue === 'entreprise') A.onglet = 'aujourdhui';
+  else if (t !== 'libre') A.onglet = ONGLET_DE_MODULE[e.module];
+  $$('#barre [data-barre]').forEach(function (b) {
+    if (b.dataset.barre === (A.onglet || 'aujourdhui')) b.setAttribute('aria-current', 'page');
+    else b.removeAttribute('aria-current');
+  });
+  synchroniserCrans();
+}
+function dessinerCadre() {
+  var m = $('#b-menu');
+  if (m) m.innerHTML = picto('menu');
+  var b = $('#barre'); if (!b) return;
+  var bouton = function (cle) {
+    return '<button type="button" data-barre="' + cle + '">' + picto(BARRE[cle].picto) +
+      '<span>' + BARRE[cle].nom + '</span></button>';
+  };
+  b.innerHTML = bouton('aujourdhui') + bouton('chantiers') +
+    '<button type="button" class="barre-plus" data-barre="plus" aria-label="Ajouter" title="Ajouter">' +
+    '<span class="rond">' + picto('plus') + '</span></button>' +
+    bouton('agenda') + bouton('argent');
+}
+function allerOnglet(cle) {
+  if (cle === 'plus') { ouvrirPlus(); return; }
+  if (cle === 'aujourdhui') { allerAccueil(); return; }
+  if (BARRE[cle]) allerModule(BARRE[cle].module);
+}
+
+/* Remonter d'un cran : la flèche du bandeau et le retour du téléphone font
+   le même trajet. Fenêtre → écran parent → onglet de la barre → Aujourd'hui. */
+function remonter() {
+  var e = A.ecran, t = typeEcran(e);
+  if (t === 'racine') return;
+  if (t === 'barre' || e.vue === 'entreprise') { allerAccueil(); return; }
+  if (t === 'fixe') { allerModule('chantiers', 'carnet'); return; }
+  var p = A.pile.pop();
+  A.enRemontee = true;
+  try {
+    if (!p || p.vue === 'accueil') allerAccueil();
+    else if (p.vue === 'entreprise') { renderAccueil(); aller('entreprise'); }
+    else if (p.vue === 'reglages') { A.module = moduleValide(p.module); majOnglets(); aller('reglages'); }
+    else allerModule(p.module, p.vue);
+  } finally { A.enRemontee = false; }
+  /* Entré par le ☰, on y revient : c'est là qu'on choisit l'écran suivant. */
+  if (p && p.menu) ouvrirMenu();
+}
+
+/* ------------------------------------------------------- le ☰ et le + */
+/* Les réglages s'ouvrent sur la zone de l'écran d'où l'on vient. */
+function secReglagesDe(e) {
+  if (!e || e.vue === 'accueil' || e.vue === 'entreprise') return 'general';
+  if (e.vue === 'reglages') return A.secReglages || 'general';
+  var m = MODULES[e.module];
+  return SEC_DE_MODULE[e.module] || (m && m.groupe === 'entreprise' ? 'ent' : 'general');
+}
+var MENU_ENTREPRISE = [['stock', 'stock2'], ['achats', 'achats'], ['vehicule', 'carnetv'],
+  ['rendements', 'rendements']];
+var MENU_OUTILS = [['cubage', 'cubage'], ['bois', 'stock']];
+function ouvrirMenu() {
+  var tuile = function (x) {
+    var s = situationModule(x[0]);
+    return '<button type="button" data-menu="' + x[0] + '"><span class="rond-ic">' + picto(x[1]) +
+      '</span><b>' + esc(MODULES[x[0]].nom) + '</b>' +
+      (s.n !== '—' ? '<span class="n">' + esc(s.n + ' ' + s.u) + '</span>' : '') +
+      '<small>' + esc(s.s) + '</small></button>';
+  };
+  var ligne = function (cle, pic, nom) {
+    return '<button type="button" data-menu="' + cle + '">' + picto(pic) + '<span>' + nom + '</span></button>';
+  };
+  modale('Le reste de Sylve',
+    '<p class="fn-sous" style="margin-top:0">Entreprise</p>' +
+    '<div class="fn-tuiles">' + MENU_ENTREPRISE.map(tuile).join('') + '</div>' +
+    '<p class="fn-sous">Outils de terrain</p>' +
+    '<div class="fn-tuiles">' + MENU_OUTILS.map(tuile).join('') + '</div>' +
+    '<div class="fn-zone">' + ligne('reglages', 'reglages', 'Réglages') +
+    ligne('sauvegarde', 'sauvegarde', 'Sauvegarde') + ligne('corbeille', 'corbeille', 'Corbeille') + '</div>');
+  $('#modale').classList.add('feuille-nav');
+  $('#modale-corps').addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-menu]'); if (!b) return;
+    var ou = b.dataset.menu, depuis = A.ecran;
+    fermerModale();
+    A.parMenu = true;
+    if (ou === 'reglages') { allerReglages(secReglagesDe(depuis)); return; }
+    /* Sauvegarde et Corbeille ont leur écran au lot (f) : en attendant, la
+       carte Sauvegarde des réglages, corbeille ouverte pour la seconde. */
+    if (ou === 'sauvegarde' || ou === 'corbeille') {
+      allerReglages('sauvegarde');
+      if (ou === 'corbeille' && $('#s-recup').hidden) $('#s-recuperer').click();
+      return;
+    }
+    allerModule(ou);
+  });
+}
+/* Chaque entrée ouvre le formulaire qui existait déjà, sans rien y changer. */
+var PLUS_QUOTIDIEN = [
+  ['journee', 'p1', 'horloge', 'Ma journée', 'le plus fréquent'],
+  ['depense', 'p2', 'depenses', 'Dépense', 'carburant, achat'],
+  ['chantier', 'p3', 'chantier', 'Chantier', 'on m’en a parlé'],
+  ['note', 'p4', 'note', 'Note', 'pense-bête']
+];
+var PLUS_RARE = [
+  ['commande', 'stock2', 'Commande de fournitures'],
+  ['achat', 'achats', 'Achat à prévoir'],
+  ['intervention', 'carnetv', 'Noter une intervention'],
+  ['charge', 'charges', 'Charge fixe']
+];
+var OUVRIR_PLUS = {
+  journee: function () { ouvrirJournee(null); },
+  depense: function () { ouvrirDepense(null); },
+  chantier: function () { ouvrirEnteteCh(null); },
+  note: function () { ouvrirNote(null); },
+  commande: function () { ouvrirCommande(null); },
+  achat: function () { ouvrirAchat(null); },
+  intervention: function () { ouvrirInterventionV(null); },
+  charge: function () { ouvrirCharge(null); }
+};
+function ouvrirPlus() {
+  modale('Ajouter',
+    '<p class="fn-sous" style="margin-top:0">Quotidien</p><div class="fn-ajout">' +
+    PLUS_QUOTIDIEN.map(function (x) {
+      return '<button type="button" class="' + x[1] + '" data-plus="' + x[0] + '">' + picto(x[2]) +
+        '<span>' + x[3] + '<small>' + x[4] + '</small></span></button>';
+    }).join('') + '</div>' +
+    '<p class="fn-sous">Plus rare</p><div class="fn-puces">' +
+    PLUS_RARE.map(function (x) {
+      return '<button type="button" data-plus="' + x[0] + '">' + picto(x[1]) + x[2] + '</button>';
+    }).join('') + '</div>');
+  $('#modale').classList.add('feuille-nav');
+  $('#modale-corps').addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-plus]'); if (!b) return;
+    /* Fermée d'abord : un formulaire qui renonce (une commande sans produit
+       renvoie aux réglages) ne laisse pas la feuille ouverte par-dessus. */
+    fermerModale();
+    OUVRIR_PLUS[b.dataset.plus]();
+  });
+}
+
 /* Les modules retirés en 4.38 restent en mémoire sur les téléphones déjà
    installés : « devis » menait à l'estimation, désormais dans Rendements,
    et « analyses » est devenue un onglet de Finances. Sans cette
@@ -281,34 +513,6 @@ function moduleValide(m) {
   if (MODULES_RETIRES[m]) return MODULES_RETIRES[m];
   return 'cubage';
 }
-function allerMenuParent() {
-  /* Depuis les réglages, on redescend d'abord là où on était. On ne le fait
-     que si cette vue appartient encore au module ouvert : sinon on afficherait
-     un écran dont l'onglet n'est plus dans la barre. */
-  if (A.vue === 'reglages' && A.vueAvantReglages) {
-    var precedente = A.vueAvantReglages;
-    A.vueAvantReglages = null;
-    /* L'accueil et le menu d'une partie ne sont les vues d'aucun module : la
-       vérification ci-dessous les rejetait, et on ressortait des réglages
-       dans « Mon entreprise » alors qu'on y était entré depuis l'accueil. */
-    if (precedente === 'accueil') { allerAccueil(); return; }
-    if (NOMS_GROUPE[precedente]) {
-      document.body.classList.add('accueil-ouvert');
-      aller(precedente);
-      return;
-    }
-    var m = MODULES[A.module];
-    if (m && m.vues.some(function (v) { return v[0] === precedente; })) {
-      aller(precedente);
-      return;
-    }
-  }
-  var g = (MODULES[A.module] || {}).groupe;
-  if (!g) { allerAccueil(); return; }
-  document.body.classList.add('accueil-ouvert');
-  aller(g);
-}
-
 /* Le bandeau ne garde que la navigation. Les actions qui existaient déjà
    dans la page (+ Pile, + Chantier, + Dépense, + Commande) en sont sorties :
    il passe par la page, jamais par le haut. Restent celles qui n'ont pas
@@ -318,27 +522,7 @@ var ACTIONS_MODULE = {
   calendrier: [['b-aujourdhui', 'Aujourd’hui']]
 };
 function majBandeauModule() {
-  var sel = $('#b-module'); if (!sel) return;
-  var ent = [], out = [];
-  Object.keys(MODULES).forEach(function (k) {
-    (MODULES[k].groupe === 'entreprise' ? ent : out).push(
-      '<option value="' + k + '"' + (A.module === k ? ' selected' : '') + '>' + esc(MODULES[k].nom) + '</option>');
-  });
-  sel.innerHTML =
-    (ent.length ? '<optgroup label="Entreprise">' + ent.join('') + '</optgroup>' : '') +
-    (out.length ? '<optgroup label="Outils de terrain">' + out.join('') + '</optgroup>' : '');
-  /* Le retour ne remonte que d'un cran : depuis un module d'une partie
-     (Entreprise), il ramène au menu de cette partie. Ailleurs, l'accueil
-     suffit déjà : le bouton reste caché plutôt que de doubler ◈. */
-  var ret = $('#b-retour');
-  if (ret) {
-    /* Elle n'existait que dans les modules d'une partie : ailleurs, le bouton
-       d'accueil faisait déjà le même trajet. Il la veut partout — deux façons
-       de remonter valent mieux qu'une hésitation devant le bandeau. */
-    var g = (MODULES[A.module] || {}).groupe;
-    ret.hidden = false;
-    ret.title = g ? 'Revenir à « ' + (NOMS_GROUPE[g] || g) + ' »' : 'Revenir à l’accueil';
-  }
+  if (!$('#b-ctx')) return;
   var act = ACTIONS_MODULE[A.module] || [];
   $('#b-ctx').innerHTML = act.map(function (x) {
     return '<button class="bandeau-btn" id="' + x[0] + '">' + esc(x[1]) + '</button>';
@@ -352,10 +536,11 @@ function majOnglets() {
   document.body.classList.add('m-' + A.module);
   if (m.groupe === 'entreprise') document.body.classList.add('m-ent');
   majBandeauModule();
+  /* Les anciens onglets du bas, devenus des pastilles en haut de l'écran :
+     mêmes noms, même ordre, même dessin. */
   $('#onglets').innerHTML = m.vues.map(function (v) {
-    return '<button role="tab" data-vue="' + v[0] + '" aria-selected="false">' +
-      '<span class="ic"><svg viewBox="0 0 24 24" class="pic" aria-hidden="true">' +
-      (PICTOS[v[0]] || '') + '</svg></span>' + v[1] + '</button>';
+    return '<button role="tab" data-vue="' + v[0] + '" aria-selected="' + String(A.vue === v[0]) + '">' +
+      '<span class="ic">' + picto(v[0]) + '</span>' + v[1] + '</button>';
   }).join('');
 }
 /* Quel module porte cette vue. Une liste tenue à la main vivait ici : elle ne
@@ -369,39 +554,52 @@ function moduleDeVue(v) {
     return MODULES[m].vues.some(function (x) { return x[0] === v; });
   })[0] || 'chantiers';
 }
-/* Un cran d'historique pour le bouton retour du téléphone. Voir
-   brancherRetourTelephone() : on n'en empile qu'en descendant. */
+/* Un cran d'historique pour le bouton retour du téléphone. */
 function empilerCran() {
   try { history.pushState({ sylve: 1 }, ''); } catch (e) { }
 }
+/* Combien d'appuis sur « retour » séparent cet écran d'Aujourd'hui : un
+   onglet de la barre est à un cran, la fiche à deux, un écran libre à un de
+   plus que celui d'où l'on est venu. */
+function profondeurDe(e) {
+  var t = typeEcran(e);
+  if (t === 'racine') return 0;
+  return t === 'fixe' && e.vue !== 'entreprise' ? 2 : 1;
+}
+function profondeur() {
+  if (typeEcran(A.ecran) !== 'libre') return profondeurDe(A.ecran);
+  var d = 1;
+  for (var i = A.pile.length - 1; i >= 0; i--) {
+    if (typeEcran(A.pile[i]) !== 'libre') return d + profondeurDe(A.pile[i]);
+    d++;
+  }
+  return d;
+}
+/* On empile autant de crans que l'écran en demande, jamais plus : remonter
+   par la barre ou la flèche ne les consomme pas, et les redescendre ensuite
+   ne doit pas les doubler — sinon il faudrait plusieurs appuis pour sortir. */
+function synchroniserCrans() {
+  var p = profondeur();
+  while ((A.crans || 0) < p) { empilerCran(); A.crans = (A.crans || 0) + 1; }
+}
 
 /* Le retour arrière du téléphone quittait Sylve d'un coup, même au fond d'un
-   module. Il remonte maintenant d'un cran, comme n'importe quelle application :
-   une fenêtre ouverte se ferme d'abord, sinon vue → module → partie → accueil.
-   Depuis l'accueil seulement, il sort.
+   module. Il remonte d'un cran, comme n'importe quelle application : une
+   fenêtre ouverte se ferme d'abord, sinon écran parent → onglet de la barre
+   → Aujourd'hui. Depuis Aujourd'hui seulement, il sort.
 
-   Un cran est empilé à chaque descente et consommé par la remontée : c'est ce
-   qui donne un appui par étage, et non deux. Fermer une fenêtre en réempile un,
-   sinon on perdrait un étage au passage. Et on n'en réempile jamais après une
-   remontée, sans quoi le dernier appui ne sortirait pas de l'application. */
+   Chaque appui consomme un cran. Fermer une fenêtre laisse sur le même
+   écran : la synchronisation le réempile, sinon on perdrait un étage. */
 function brancherRetourTelephone() {
   window.addEventListener('popstate', function () {
-    if (!$('#modale').hidden) { fermerModale(); empilerCran(); return; }
-    if (A.vue === 'accueil') return;
-    /* Depuis le menu d'une partie, le cran au-dessus est l'accueil.
-       allerMenuParent() ne sait pas le faire : il lit le module courant, qui
-       appartient encore à cette partie, et y reviendrait en boucle. */
-    if (NOMS_GROUPE[A.vue]) { allerAccueil(); return; }
-    allerMenuParent();
+    A.crans = Math.max(0, (A.crans || 0) - 1);
+    if (!$('#modale').hidden) { fermerModale(); synchroniserCrans(); return; }
+    if (typeEcran(A.ecran) === 'racine') return;
+    remonter();
   });
 }
 function allerModule(m, vue) {
   if (!MODULES[m]) m = 'cubage';
-  /* Descendre depuis l'accueil ou depuis le menu d'une partie empile un cran ;
-     changer de module par le bandeau est un déplacement latéral, pas une
-     descente, et n'en empile pas — sinon les crans s'accumuleraient et il
-     faudrait plusieurs appuis pour sortir. */
-  if (A.vue === 'accueil' || NOMS_GROUPE[A.vue]) empilerCran();
   A.module = m;
   document.body.classList.remove('accueil-ouvert');
   majOnglets();
@@ -415,16 +613,11 @@ function allerAccueil() {
   aller('accueil');
 }
 function renderAccueil() {
-  var vol = A.index.reduce(function (s, x) { return s + (Number(x.vol) || 0); }, 0);
-  $('#a-cub-n').textContent = A.index.length ? E.fmt(vol, 2) : '—';
-  $('#a-cub-s').textContent = A.index.length
-    ? A.index.length + (A.index.length > 1 ? ' bordereaux' : ' bordereau')
-    : 'Aucun bordereau';
-  var r = H.repartition(A.piles);
-  $('#a-bois-n').textContent = A.piles.length ? E.fmt(r.total, 2) : '—';
-  $('#a-bois-s').textContent = A.piles.length
-    ? A.piles.length + (A.piles.length > 1 ? ' piles' : ' pile')
-    : 'Aucune pile enregistrée';
+  var cub = situationModule('cubage'), bois = situationModule('bois');
+  $('#a-cub-n').textContent = cub.n;
+  $('#a-cub-s').textContent = cub.s;
+  $('#a-bois-n').textContent = bois.n;
+  $('#a-bois-s').textContent = bois.s;
   renderNudgeSauvegarde(); renderNudgeEcheances(); renderNudgeDevis(); renderNudgeJournees(); renderMaJournee();
   renderAchats(); renderBudgetAchats(); renderFicheChantier();
   renderEntreprise();
