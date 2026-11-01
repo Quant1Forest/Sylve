@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML servi, recollé depuis `sources/` sans rien transformer ; aucune
 dépendance, tout fonctionne hors ligne.
 
-Version courante : **4.89.0-20261101-1702**
+Version courante : **4.90.0-20261101-1912**
 
 ---
 
@@ -76,7 +76,7 @@ npm run controle -- --dates   # en plus : les scénarios du temps au 1er et au d
 
 Doit afficher **« index.html fabriqué »**, puis **« Bon pour livraison »**,
 puis **« le service worker tient »** (33 vérifications), puis la suite au
-vert — 2554 à ce jour — puis **« largeur : … aucune page plus large que l’écran »** (mesure dans un vrai Chrome à 320 et 360 px, `outils/largeur.js` ; sans Chrome elle le dit et passe), puis **« Sylve.html est conforme »**.
+vert — 2644 à ce jour — puis **« largeur : … aucune page plus large que l’écran »** (mesure dans un vrai Chrome à 320 et 360 px, `outils/largeur.js` ; sans Chrome elle le dit et passe), puis **« Sylve.html est conforme »**.
 
 Compter **trois minutes** : 187 à 260 s aux lots 4b, 5b et c1 (selon la charge du poste ;
 17 minutes avant, en séquentiel). **Avec `--dates`, sept minutes** : les scénarios du
@@ -207,7 +207,7 @@ Débordements à connaître : `prix-de-revient.js` finit par les réglages
 Chantiers, Veille et Démarrage, puis l'appel d'`init` ; `carte.js` par les
 fenêtres « numéro de facture » et « motif de refus ».
 
-**La navigation (lots 5a, 5b, 5b2, 5b3, c1 et c2, 4.86.0 à 4.89.0)** — détail dans
+**La navigation (lots 5a, 5b, 5b2, 5b3, c1, c2 et b1, 4.86.0 à 4.90.0)** — détail dans
 `docs/design-navigation.md`, *Le cadre du lot 5a* et *L'écran Aujourd'hui* :
 
 - Démarrage → **Aujourd'hui** (vue `accueil`) : saisie · En retard · Bientôt ·
@@ -226,6 +226,7 @@ fenêtres « numéro de facture » et « motif de refus ».
 - **5b2** : « Facture à faire » dès le lendemain de « Terminé » (alerte du carnet comprise) ; chemin de la corbeille dans une constante, `B.CHEMIN_CORBEILLE`.
 - **c1 (Agenda)** : une seule fiche du jour, en feuille (`ouvrirFicheJour` ; l'état « à trancher » remplace « Que s'est-il passé ? ») ; un seul placement, `demarrerPlacement(id, 'fiche' | 'agenda' | 'aujourdhui')`, et « Fini de placer » ramène au départ ; plus d'onglet Carnet dans l'Agenda ni d'« Aujourd'hui » dans le bandeau ; « À programmer » partout. Détail : `docs/calendrier-journees.md`, *L'Agenda du lot c1*. Dans les tests, un jour de la grille se vise par `caseDuJour(t, ts)` / `cliquerJour(t, ts)`, qui amènent d'abord son mois.
 - **c2 (Ma journée)** : feuille en trois blocs, pied fixe ; les champs des prestations ne se refont que sur ajout ou retrait d'une ligne, jamais pendant la frappe ; P4, un chantier posé ce jour-là pré-choisi (`posesLe`). Détail : `docs/calendrier-journees.md`, *Ma journée du lot c2*.
+- **b1 (Fiche en étapes)** : `renderFiche` (`chantiers-carnet-fiche.js`) = tête · trois chiffres (`C.troisChiffres`) · cinq `details.fi-etape` (`C.etapeChantier`, `data-etape` 0 à 4) · tuiles. `ouvrirChantier(id, 'devis' | 'travaux' …)` ouvre l'étape utile ; ce qui est déplié se garde tant que l'étape ne change pas (`A.ficheVue`). Fenêtre « Les journées » retirée. Repérage : trois cases nouvelles, `dateReperage`, `vuReperage`, `surface` (accord du 01/11). Les lignes vivent dans l'étape Devis, puis Facture dès qu'il y a facture ou devis figé (`lignesDeFacture`). Où va chaque ancien bloc : `docs/correspondance-refonte.md` 3.2, que lisent les scénarios « Fiche en étapes ». Dans les tests : `ficheB1(t, id)`, `etapeB1(t, i)`.
 
 ---
 
@@ -261,6 +262,8 @@ mention d'un autre fichier.
 - **`accueil-ouvert` n'est plus posé à la main** : `majCadre()` le pose à chaque `aller()` (lot 5a). Ne jamais changer d'écran sans passer par `aller()`.
 - **Ne pas additionner des quantités d'unités différentes.**
 - **Scripts de retouche dans un fichier, jamais `node -e`** ; et `split().join()` plutôt que `String.replace` dès qu'il peut y avoir un `$`.
+- **Écrire ces scripts avec l'outil d'écriture, pas par un « heredoc » du terminal** : sur ce poste l'antislash y disparaît (`\n`, ` `, `\+`), et le script fait autre chose que ce qu'on lit (lot b1).
+- **Une espace insécable recopiée devient ordinaire** : en recopiant du code, écrire `' %'` en toutes lettres ; le scénario « Typographie » le rattrape.
 - **Un motif ouvert à gauche mange le nom devant** (`esc(` → `escC.nomChantier`) : inclure ce qui précède.
 - **Un script de retouche qui refuse se corrige et se relance entier**, jamais rapiécé à la main.
 - **`git stash` rend du `CRLF`** : comparer avec `git show HEAD:fichier` plutôt que remiser.

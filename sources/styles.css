@@ -1065,3 +1065,110 @@ td.act{width:1%;padding:3px 6px}
   box-shadow:inset 0 0 0 1px rgba(255,255,255,.2)}
 
 @media(prefers-reduced-motion:reduce){*{transition:none !important;animation:none !important}}
+
+/* ------------------------------------------- la fiche en étapes (lot b1) */
+.fi-haut{display:flex;gap:8px;align-items:center;margin-bottom:2px}
+.fi-haut select{flex:1;min-width:0}
+.fi-tete{background:var(--carte);border:1px solid var(--trait);border-radius:var(--r);
+  padding:13px 14px;margin-top:11px;display:grid;gap:9px;box-shadow:var(--ombre)}
+.fi-tete h2{margin:0;font-size:19px;line-height:1.25;overflow-wrap:anywhere}
+.fi-lieu{margin:0;font-size:13px;color:var(--doux);overflow-wrap:anywhere}
+.fi-qui{display:grid;gap:2px;text-align:left;width:100%;position:relative;
+  background:var(--accent-doux);border:1px solid var(--accent);border-radius:var(--r-s);
+  padding:8px 30px 8px 11px;font-size:13px;color:var(--vert-marque)}
+.fi-qui b{overflow-wrap:anywhere}
+.fi-qui small{font-size:10.5px;font-weight:700;letter-spacing:.06em}
+.fi-qui-mod{position:absolute;right:10px;top:8px;color:var(--accent)}
+.fi-bulles{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:3px}
+.fi-bulles span{display:flex;flex-direction:column;align-items:center;gap:3px;
+  font-size:10.5px;color:var(--gris);min-width:0;text-align:center}
+.fi-bulles i{width:20px;height:20px;border-radius:50%;background:var(--carte2);
+  border:1.5px solid var(--trait-fort);font-style:normal;font-size:11px;line-height:17px;
+  color:var(--accent-texte)}
+.fi-bulles .f i{background:var(--vert-marque);border-color:var(--vert-marque)}
+.fi-bulles .e{color:var(--encre);font-weight:700}
+.fi-bulles .e i{background:var(--carte);border:2.5px solid var(--accent)}
+.fi-bulles .r i{background:var(--alerte);border-color:var(--alerte)}
+.fi-etat{margin:0;font-size:12.5px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.fi-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:11px}
+.fi-kpi{background:var(--carte2);border-radius:var(--r-s);padding:9px 7px;min-width:0;
+  display:flex;flex-direction:column;gap:2px}
+.fi-kpi b{font-size:15.5px;letter-spacing:-.02em;overflow-wrap:anywhere;line-height:1.2}
+.fi-kpi small{font-size:11px;color:var(--doux);line-height:1.25}
+.fi-kpi.sous b{color:var(--alerte)}
+.fi-obj{font:inherit;font-size:11px;color:var(--accent);font-weight:600;text-align:left;
+  padding:0;margin-top:2px}
+.fi-aide{font-size:12px;color:var(--doux);margin:8px 0 0;line-height:1.4}
+.fi-etapes{display:grid;gap:8px;margin-top:12px}
+details.fi-etape{background:var(--carte);border:1px solid var(--trait);border-radius:var(--r)}
+details.fi-etape.e{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent-doux)}
+details.fi-etape.a{background:transparent;border-style:dashed}
+details.fi-etape summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:9px;
+  padding:11px 12px;flex-wrap:wrap}
+details.fi-etape summary::-webkit-details-marker{display:none}
+details.fi-etape summary b{font-size:14.5px}
+details.fi-etape summary small{flex:1 1 140px;min-width:0;color:var(--doux);font-size:12px;
+  text-align:right;overflow-wrap:anywhere}
+details.fi-etape summary .pic{width:16px;height:16px;flex:none;color:var(--gris);transition:transform .15s}
+details.fi-etape[open] summary .pic{transform:rotate(90deg)}
+details.fi-etape .no{width:22px;height:22px;border-radius:50%;flex:none;display:flex;
+  align-items:center;justify-content:center;font-size:11.5px;font-weight:700;
+  background:var(--carte2);color:var(--gris)}
+details.fi-etape.f .no{background:var(--vert-marque);color:var(--accent-texte)}
+details.fi-etape.e .no{background:var(--accent);color:var(--accent-texte)}
+details.fi-etape.r .no{background:var(--alerte);color:var(--accent-texte)}
+.fi-corps{padding:0 12px 13px;display:grid;gap:8px;min-width:0}
+.fi-corps > *{min-width:0}
+.fi-corps .lien,.fi-bas .lien{font:inherit;font-size:13px;color:var(--accent);font-weight:600;
+  text-align:left;justify-self:start;padding:3px 0}
+.fi-corps .champ{margin-bottom:0}
+.fi-note{display:block;width:100%;text-align:left;background:var(--carte2);
+  border-radius:var(--r-s);padding:8px 10px;font-size:13.5px;overflow-wrap:anywhere;white-space:pre-line}
+.fi-note small{display:block;font-size:10.5px;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--gris);margin-bottom:2px;white-space:normal}
+.fi-note.fi-refus{background:var(--alerte-fond);color:var(--alerte)}
+.fi-pos{display:flex;flex-wrap:wrap;gap:7px;align-items:center;font-size:13px}
+.fi-sur{color:var(--accent);font-weight:600}
+.fi-meta{display:flex;flex-wrap:wrap;gap:4px 14px;margin:0;font-size:12.5px;color:var(--doux)}
+.fi-meta b{color:var(--encre);font-weight:600}
+.fi-tete-etape{display:flex;justify-content:space-between;align-items:flex-start;gap:9px}
+.fi-sous{display:flex;justify-content:space-between;align-items:center;gap:9px;margin-top:4px}
+.fi-sous b{font-size:13px}
+.fi-kv{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 12px;margin:4px 0 0;font-size:13.5px}
+.fi-kv dt{min-width:0}
+.fi-kv dt small{color:var(--gris);font-size:11.5px}
+.fi-kv dd{margin:0;text-align:right}
+.fi-kv .fi-ht{font-weight:700;padding-top:7px;border-top:2px solid var(--encre)}
+.fi-kv .fi-tot{font-weight:700;padding-top:5px;border-top:1px solid var(--trait)}
+.fi-parts{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--doux)}
+.fi-parts i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.fi-parts .pr{background:var(--vert-marque)}
+.fi-parts .ve{background:var(--brun-marque)}
+.fi-gestes{display:grid;gap:8px;padding-top:9px;border-top:1px solid var(--trait)}
+.fi-gestes .btn{flex:1}
+.fi-date{display:flex;align-items:center;gap:8px;font-size:13px;flex-wrap:wrap}
+.fi-date input{flex:1;min-width:0}
+.fi-estim{display:flex;justify-content:space-between;align-items:baseline;gap:10px;
+  padding-top:9px;border-top:1px solid var(--trait)}
+.fi-av{display:grid;gap:6px}
+.fi-av-tete{display:flex;justify-content:space-between;align-items:baseline}
+.fi-av-tete small{color:var(--doux);font-size:12px}
+.fi-av-l > div:first-child{display:flex;justify-content:space-between;gap:9px;font-size:12.5px}
+.fi-av-l > div:first-child span:first-child{min-width:0;overflow-wrap:anywhere}
+.fi-barre{height:6px;border-radius:3px;background:var(--carte2);overflow:hidden;margin-top:3px}
+.fi-barre i{display:block;height:100%;background:var(--accent)}
+.fi-bilan{display:grid;gap:3px;font-size:13px}
+.fi-bilan > div{display:flex;justify-content:space-between;gap:9px;flex-wrap:wrap}
+.fi-bilan.perte{border:1px solid var(--alerte)}
+.fi-bilan.gain{border:1px solid var(--accent)}
+.fi-actions{margin-top:4px}
+.fi-tuiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}
+.fi-tuile{display:grid;gap:3px;text-align:left;background:var(--carte);border:1px solid var(--trait);
+  border-radius:var(--r);padding:10px 11px;min-width:0}
+.fi-tuile .pic{width:20px;height:20px;color:var(--accent)}
+.fi-tuile b{font-size:13.5px}
+.fi-tuile small{font-size:11.5px;color:var(--doux);overflow-wrap:anywhere}
+.fi-bas{display:flex;flex-wrap:wrap;justify-content:space-between;gap:9px;margin:16px 0 6px}
+.fi-bas .lien{color:var(--gris);font-weight:500;font-size:12.5px}
+.fi-bas .lien.danger{color:var(--alerte)}
+.fi-pied{position:sticky;bottom:0;background:var(--carte);padding:9px 0 2px}

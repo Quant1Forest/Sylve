@@ -226,7 +226,15 @@ function synchroniserStock(c) {
 }
 
 /* -------------------------------------------------------------- la fiche */
-function ouvrirChantier(id) {
+/* « vers » : l'étape que la porte rend utile (« devis » pour estimer le
+   temps, « travaux » depuis l'Agenda). Sans elle, la fiche s'ouvre sur
+   l'étape en cours ; revenir sur le même chantier garde ce qu'on avait
+   déplié. */
+function ouvrirChantier(id, vers) {
+  var c = chantier(id);
+  if (c && (vers != null || !A.ficheVue || A.ficheVue.id !== id)) {
+    A.ficheVue = { id: id, etape: C.etapeChantier(c), ouvertes: etapesOuvertes(c, vers) };
+  }
   A.chOuvert = id;
   renderFiche();
   /* Ouvrir une fiche, c'est quitter les menus. Sans ce retrait, une fiche
@@ -442,55 +450,25 @@ function lignesRetirees(c) {
   return (c.devisFige.lignes || []).filter(function (x) { return x.uid && !vus[x.uid]; });
 }
 
-function blocValeur(c, m, pj, vise) {
-  var solde = ['termine', 'facture', 'paye'].indexOf(c.statut) >= 0;
-  /* Le temps saisi, pas les journées posées à l'agenda : celles-ci disent
-     qu'on y était, pas combien de temps on y a passé. Le bloc affichait les
-     secondes pendant que les rendements lisaient le premier. */
-  var saisi = C.tempsMoi(c, A.cfg);
-  var fait = C.tempsPasse(c, A.cfg), est = C.joursPrevus(c);
-  var jours = solde ? fait : est;
-  var parJour = jours > 0 ? m / jours : 0;
-  /* Dire d'où sort le chiffre : « faites » quand il vient du temps noté,
-     « facturées » quand seule la facture en parle — c'est le cas de tous les
-     chantiers repris du carnet. */
-  var motJours = solde ? (saisi > 0 ? 'journées faites' : 'journées facturées')
-    : 'journées estimées';
-  return '<div class="carte"><h2>' + (solde ? 'Ce que ça a rapporté' : 'Ce que ça vaut') +
-    '</h2><p class="sous-titre-bloc">Rien à saisir ici : tout vient du bloc des travaux, ' +
-    'plus bas. Ce bloc ne fait que le lire.</p>' +
-    '<div class="kpi">' +
-    '<div class="carte2"><b class="num">' + (m ? eur(m) : '—') + '</b><small>' +
-    (solde ? (c.statut === 'paye' ? 'encaissé' : 'facturé') : 'proposé') + '</small></div>' +
-    '<div class="carte2"><b class="num">' + (jours ? E.fmt(jours, jours % 1 ? 1 : 0) : '—') +
-    '</b><small>' + motJours + '</small></div>' +
-    '<div class="carte2"><b class="num"' +
-    (parJour && vise && parJour < vise ? ' style="color:#B4231F"' : '') + '>' +
-    (parJour ? eur(C.arr(parJour, 0)) : '—') + '</b><small>par journée</small></div>' +
-    '</div>' +
-    (vise && parJour
-      ? '<p class="muted" style="font-size:12px;margin:9px 0 0">Votre objectif est de ' +
-        eur(vise) + (parJour >= vise ? ' : ce chantier passe au-dessus.'
-          : ' : ce chantier reste en dessous.') + '</p>'
-      : '') +
-    (solde && !fait
-      ? '<p class="muted" style="font-size:12px;margin:6px 0 0">Aucun temps noté : ' +
-        'le bloc « Le temps passé », plus bas, dit ce que le chantier vous a pris.</p>'
-      : (!solde && !est
-        ? '<p class="muted" style="font-size:12px;margin:6px 0 0">Aucune journée estimée : ' +
-          'sans elle, rien ne dit ce que la journée doit rapporter.</p>'
-        : '')) + '</div>';
+/* ------------------------------------------------- la fiche en étapes
+   Lot b1 : la fiche suit le chantier en cinq étapes repliables, celle en
+   cours ouverte. Rien de l'ancienne fiche ne disparaît : chaque bloc a son
+   étape (docs/correspondance-refonte.md, 3.2). */
+
+/* Les lignes vivent dans l'étape Devis tant que rien n'est facturé. Une
+   fois la facture là — ou dès qu'on dit que le montant change — elles sont
+   celles de la facture, et le devis figé sert de comparaison. Il n'y a
+   jamais deux listes : « les travaux sont liés au devis ou à la facture ». */
+function lignesDeFacture(c) {
+  if (c.statut === 'sansuite') return false;
+  return !!c.devisFige || c.statut === 'facture' || c.statut === 'paye' ||
+    !!c.numeroFacture || !!c.dateFacture;
 }
-/* Un seul bloc pour les travaux, et il change de nom avec l'étape — comme
-   « Ce que ça vaut » change de mot. Il n'y a jamais deux listes de lignes à
-   tenir : « les travaux sont liés au devis ou à la facture, c'est net ».
-   Le devis n'est pas perdu quand la facture arrive : il se replie en bas,
-   avec son numéro et ce qu'il disait. */
-function etapeTravaux(c) {
-  if (C.rangStatut(c.statut) >= C.rangStatut('facture') || c.numeroFacture || c.dateFacture) {
-    return 'facture';
-  }
-  return C.aDevis(c) ? 'devis' : 'todo';
+function devisSaisi(c) {
+  return !!(c.numeroDevis || c.dateDevis || c.dateEnvoi || c.dateSignature);
+}
+function factureFaite(c) {
+  return c.statut === 'facture' || c.statut === 'paye' || !!(c.numeroFacture && c.dateFacture);
 }
 function ligneTravaux(c, l, i) {
   /* Quand la ligne porte une précision, c'est elle le titre : c'est le texte
@@ -530,113 +508,50 @@ function delaiRealisation(c) {
   var fin = C.dateChantier(c);
   if (!fin || fin < c.dateSignature) return '';
   var n = Math.round((C.minuit(fin) - C.minuit(c.dateSignature)) / C.JOUR);
-  return '<div class="l"><span>Réalisé en</span><b class="num">' +
-    (n <= 0 ? 'moins d’un jour' : n + ' jour' + (n > 1 ? 's' : '')) +
-    '</b></div>';
+  return 'réalisé en ' + (n <= 0 ? 'moins d’un jour' : n + ' jour' + (n > 1 ? 's' : '')) +
+    ' après la signature';
 }
-function blocTravaux(c) {
-  var e = etapeTravaux(c);
-  var titre = e === 'facture' ? 'La facture' : e === 'devis' ? 'Le devis' : 'Ce qu’il y a à faire';
-  var fin = C.finValiditeDevis(c);
-  var mFacture = C.montant(c), deb = C.montantDebours(c);
-  var prevus = C.joursPrevus(c), deduit = C.joursDevis(c);
-  var muets = C.travauxHorsJournees(c);
-  var vise = C.prixJourVise(c, A.cfg);
+function jf(n) { return E.fmt(n, n % 1 ? 1 : 0); }
+/* Une surface garde ses décimales utiles : 2,5 ha, 1,25 ha, jamais 2,50. */
+function ha(n) { return E.fmt(n, n % 1 ? (C.arr(n, 1) === n ? 1 : 2) : 0) + ' ha'; }
+function tauxFr(t) { return String(t).replace('.', ','); }
+/* « Il manque… » se dit dans l'étape où le champ se remplit, pas en tête de
+   fiche : c'est là qu'on a le crayon sous la main. */
+var ETAPE_CHAMP = { donneur: 0, commune: 0, lignes: 1, joursEstimes: 1, numeroDevis: 1,
+  numeroFacture: 3, dateFacture: 3, echeancePaiement: 3, datePaiement: 4 };
+function ilManque(c, etape) {
+  var noms = C.champsManquants(c);
+  var l = C.CHAMPS_FICHE.filter(function (x) {
+    return ETAPE_CHAMP[x.c] === etape && noms.indexOf(x.n) >= 0;
+  }).map(function (x) { return x.n; });
+  return l.length ? '<p class="acompleter-bloc">Il manque : ' + esc(l.join(', ')) + '.</p>' : '';
+}
+function kv(nom, valeur, cls) {
+  return '<dt' + (cls ? ' class="' + cls + '"' : '') + '>' + nom + '</dt><dd class="num' +
+    (cls ? ' ' + cls : '') + '">' + valeur + '</dd>';
+}
+
+/* Le total de la facture garde le débours — c'est ce que le client paie — et
+   la part qu'il représente est dite juste en dessous. La TVA se lit taux par
+   taux, comme sur le papier. */
+function totauxLignes(c) {
+  var m = C.montant(c); if (!m) return '';
+  var deb = C.montantDebours(c), p = C.partsChantier(c);
+  return '<dl class="fi-kv">' + kv('Total HT', eur(m), 'fi-ht') +
+    (deb ? kv('dont débours, hors chiffre d’affaires', eur(deb), 'muted') : '') +
+    C.tvaParTaux(c).map(function (t) {
+      return kv('TVA ' + tauxFr(t.taux) + ' % <small>sur ' + eur(t.base) + '</small>', eur(t.tva));
+    }).join('') +
+    kv('Total TTC', eur(C.ttcChantier(c)), 'fi-tot') + '</dl>' +
+    '<div class="fi-parts"><span><i class="pr"></i>Prestation ' + eur(p.prestation) + '</span>' +
+    (p.vente ? '<span><i class="ve"></i>Vente ' + eur(p.vente) + '</span>' : '') + '</div>';
+}
+function blocLignes(c, titre) {
   var retirees = lignesRetirees(c);
-
-  var entete = '';
-  if (e === 'devis') {
-    entete = paireFiche('Numéro', c.numeroDevis || '—') +
-      paireFiche('Édité le', c.dateDevis ? dateCourte(c.dateDevis) : '—') +
-      (c.validiteDevis ? paireFiche('Valable', c.validiteDevis + ' mois' +
-        (fin ? ' — jusqu’au ' + dateCourte(fin) : '')) : '') +
-      (c.dateEnvoi ? paireFiche('Envoyé le', dateCourte(c.dateEnvoi)) : '') +
-      (c.dateSignature ? paireFiche('Signé le', dateCourte(c.dateSignature)) : '');
-  } else if (e === 'facture') {
-    var retard = C.retardPaiement(c, Date.now()), delai = C.delaiPaiement(c);
-    entete = paireFiche('Numéro', c.numeroFacture || '—') +
-      paireFiche('Facturé le', c.dateFacture ? dateCourte(c.dateFacture) : '—') +
-      (c.echeancePaiement ? paireFiche('À payer avant le', dateCourte(c.echeancePaiement)) : '') +
-      (c.datePaiement ? paireFiche('Payé le', dateCourte(c.datePaiement)) : '') +
-      (delai != null
-        ? '<p class="muted" style="font-size:12px;margin:6px 0 0">Réglé en ' + delai +
-          ' jour' + (delai > 1 ? 's' : '') + '.</p>'
-        : retard
-          ? '<p class="retard" style="margin:6px 0 0">Échéance dépassée de ' + retard +
-            ' jour' + (retard > 1 ? 's' : '') + '.</p>'
-          : '');
-  }
-
-  /* Le pied dit ce que le devis annonçait. Il ne réapparaît qu'une fois la
-     facture là : avant, le bloc EST le devis. */
-  var pied = '';
-  if (e === 'facture' && c.devisFige) {
-    var ecart = C.arr(mFacture - C.nb(c.devisFige.total), 2);
-    var nAj = 0, nCh = 0;
-    (c.lignes || []).forEach(function (l) {
-      var g = changementLigne(c, l);
-      if (!g) return;
-      if (g.quoi === 'ajout') nAj++; else nCh++;
-    });
-    pied = '<div class="pied-devis">' +
-      '<div class="l"><span>Le devis' + (c.numeroDevis ? ' ' + esc(c.numeroDevis) : '') +
-      ' disait</span><b class="num">' + eur(C.nb(c.devisFige.total)) + '</b></div>' +
-      '<div class="l"><span>Facturé</span><b class="num">' + eur(mFacture) + '</b></div>' +
-      (ecart || nAj || nCh || retirees.length
-        ? '<p style="font-size:12.5px;margin:7px 0 0;color:var(--tiede)">' +
-          [nAj ? nAj + ' ligne' + (nAj > 1 ? 's' : '') + ' ajoutée' + (nAj > 1 ? 's' : '') : '',
-            nCh ? nCh + ' modifiée' + (nCh > 1 ? 's' : '') : '',
-            retirees.length ? retirees.length + ' retirée' + (retirees.length > 1 ? 's' : '') : ''
-          ].filter(Boolean).join(', ') +
-          (ecart ? ' — <b>' + eur(Math.abs(ecart)) + (ecart > 0 ? ' de plus' : ' de moins') +
-            '</b> que le devis signé.' : '.') + '</p>'
-        : '<p style="font-size:12.5px;margin:7px 0 0;color:var(--vert-marque)">' +
-          '<b>Facturé à l’identique.</b> Rien n’a bougé depuis le devis signé.</p>') +
-      '</div>';
-  } else if (e === 'facture' && C.aDevis(c)) {
-    pied = '<div class="pied-devis"><div class="l"><span>Devis</span>' +
-      '<b class="num">' + esc(c.numeroDevis || '—') + '</b></div>' +
-      (c.dateSignature ? '<div class="l"><span>Signé le</span><b class="num">' +
-        dateCourte(c.dateSignature) + '</b></div>' : '') +
-      delaiRealisation(c) + '</div>';
-  } else if (e === 'facture') {
-    /* Un chantier facturé sans devis attaché : le crayon du bloc ouvre la
-       facture, et plus rien ne menait au devis. « J'ai plein de travaux
-       enregistrés avec des factures, j'ai des devis, et j'aimerais bien les
-       attacher. » Régression de la fusion des deux blocs. */
-    pied = '<div class="pied-devis"><p class="muted" style="font-size:12.5px;margin:0">' +
-      'Aucun devis attaché à ce chantier.</p></div>';
-  } else if (e === 'todo') {
-    pied = '<div class="pied-devis"><p class="muted" style="font-size:12.5px;margin:0">' +
-      'Pas de devis sur ce chantier. Ces lignes deviendront la facture telles ' +
-      'quelles — le crayon en attache un si besoin.</p></div>';
-  }
-  /* Le crayon du bloc ouvre le devis tant qu'on n'a pas facturé : sans cette
-     porte-là, la facture ne serait plus joignable que par le statut, et un
-     numéro saisi d'avance n'aurait aucun chemin. */
-  if (e !== 'facture') {
-    pied += '<div class="btn-rang" style="margin-top:11px">' +
-      '<button class="btn btn-min" id="f-facture">Saisir la facture</button></div>';
-  } else {
-    /* Et dans l'autre sens : une fois facturé, c'est le devis qui devient
-       inatteignable si on ne lui laisse pas sa porte. Un devis s'attache
-       toujours après coup — ne serait-ce que pour attester qu'il a existé. */
-    pied += '<div class="btn-rang" style="margin-top:11px">' +
-      '<button class="btn btn-min" id="f-devis">' +
-      (C.aDevis(c) ? 'Modifier le devis' : 'Attacher un devis') + '</button></div>';
-  }
-
-  return '<div class="carte">' +
-    teteBloc(titre, e === 'facture' ? 'f-facture' : 'f-devis',
-      e === 'todo' ? 'attacher un devis' : 'modifier') +
-    entete +
-    '<div class="carte-titre" style="margin:' + (entete ? '14px' : '0') + ' 0 4px">' +
-    '<h2 style="margin:0">' +
-    (e === 'facture' ? 'Ce qui est facturé' : e === 'devis' ? 'Ce que le devis contient'
-      : 'Les travaux prévus') + '</h2>' +
+  return '<div class="fi-sous"><b>' + titre + '</b>' +
     '<button class="btn primaire btn-min" id="f-ligne">+ Ligne</button></div>' +
     ((c.lignes || []).map(function (l, i) { return ligneTravaux(c, l, i); }).join('') ||
-      '<div class="vide"><p>Aucune ligne. Ajoutez les travaux et leur chiffrage.</p></div>') +
+      '<p class="fi-aide">Aucune ligne. Ajoutez les travaux et leur chiffrage.</p>') +
     /* Une ligne du devis qui n'a pas été facturée : elle ne se voit nulle
        part si on se contente de la retirer, et l'écart devient inexplicable. */
     retirees.map(function (x) {
@@ -644,289 +559,510 @@ function blocTravaux(c) {
         '<span class="marque-l ret">retirée</span>' +
         '<div class="muted" style="font-size:12px">Au devis, pas sur la facture.</div></div>' +
         '<div style="text-align:right"><b class="num muted">' + eur(x.montant) + '</b></div></div>';
-    }).join('') +
-    /* Le total de la facture garde le débours — c'est ce que le client paie —
-       et la part qu'il représente est dite juste en dessous. */
-    (mFacture ? '<div style="display:flex;justify-content:space-between;margin-top:11px;padding-top:9px;border-top:2px solid var(--encre)">' +
-      '<b>Total HT</b><b class="num" style="font-size:19px">' + eur(mFacture) + '</b></div>' +
-      (deb ? '<div style="display:flex;justify-content:space-between;font-size:13px" class="muted">' +
-        '<span>dont débours, hors chiffre d’affaires</span><span class="num">' +
-        eur(deb) + '</span></div>' : '') +
-      '<div style="display:flex;justify-content:space-between;font-size:13px" class="muted">' +
-      '<span>TVA ' + C.tauxPresents(c).map(function (t) { return String(t).replace('.', ','); }).join(' et ') + ' %</span><span class="num">' +
-      eur(C.tvaChantier(c)) +
-      '</span></div>' : '') +
-
-    /* Le temps que ça demande vit ici, avec ce qui le chiffre. Il était deux
-       blocs plus haut, dans un formulaire à part : deux endroits pour une
-       même idée. */
-    '<div style="margin-top:13px;padding-top:11px;border-top:1px solid var(--trait)">' +
-    '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">' +
-    '<button class="modif-bloc" id="f-estim" style="font-size:10.5px;font-weight:700;' +
-    'letter-spacing:.10em;text-transform:uppercase;color:var(--gris)">Le temps que ça demande ✎</button>' +
-    '<b class="num" style="font-size:17px">' +
-    (prevus ? E.fmt(prevus, prevus % 1 ? 1 : 0) + ' j' : '—') + '</b></div>' +
-    '<p class="muted" style="font-size:12px;margin:5px 0 0">' +
-    (deduit > 0
-      ? 'Déduit des lignes en journées : rien à ressaisir.' +
-        (muets.length ? ' <b>Attention</b> : ne tient pas compte de ' +
-          esc(muets.join(', ').toLowerCase()) + '.' : '')
-      : (prevus ? 'Votre estimation. Aucune ligne n’est libellée en journées.'
-        : 'Aucune journée estimée : sans elle, rien ne dit ce que la journée doit rapporter.')) +
-    (vise ? ' Objectif ' + eur(vise) + ' la journée.' : '') + '</p></div>' +
-    pied + '</div>';
+    }).join('') + totauxLignes(c);
+}
+/* Le pied dit ce que le devis annonçait, une fois la facture là. */
+function comparaisonDevis(c) {
+  if (!c.devisFige) return '';
+  var mF = C.montant(c), ecart = C.arr(mF - C.nb(c.devisFige.total), 2);
+  var nAj = 0, nCh = 0, ret = lignesRetirees(c).length;
+  (c.lignes || []).forEach(function (l) {
+    var g = changementLigne(c, l);
+    if (!g) return;
+    if (g.quoi === 'ajout') nAj++; else nCh++;
+  });
+  return '<div class="pied-devis">' +
+    '<div class="l"><span>Le devis' + (c.numeroDevis ? ' ' + esc(c.numeroDevis) : '') +
+    ' disait</span><b class="num">' + eur(C.nb(c.devisFige.total)) + '</b></div>' +
+    '<div class="l"><span>Facturé</span><b class="num">' + eur(mF) + '</b></div>' +
+    (ecart || nAj || nCh || ret
+      ? '<p style="font-size:12.5px;margin:7px 0 0;color:var(--tiede)">' +
+        [nAj ? nAj + ' ligne' + (nAj > 1 ? 's' : '') + ' ajoutée' + (nAj > 1 ? 's' : '') : '',
+          nCh ? nCh + ' modifiée' + (nCh > 1 ? 's' : '') : '',
+          ret ? ret + ' retirée' + (ret > 1 ? 's' : '') : ''
+        ].filter(Boolean).join(', ') +
+        (ecart ? ' — <b>' + eur(Math.abs(ecart)) + (ecart > 0 ? ' de plus' : ' de moins') +
+          '</b> que le devis signé.' : '.') + '</p>'
+      : '<p style="font-size:12.5px;margin:7px 0 0;color:var(--vert-marque)">' +
+        '<b>Facturé à l’identique.</b> Rien n’a bougé depuis le devis signé.</p>') +
+    '</div>';
 }
 
-/* Un seul bloc pour le temps. « Est-ce qu'il n'y a pas moyen de regrouper ces
-   deux blocs ? Parce que si déjà je sais quelle journée… » Oui : depuis que
-   tout se compte en heures, le prévu et le fait ont la même forme.
+/* ------------------------------------------------ les trois chiffres
+   Ce que le chantier vaut, le temps qu'il prend, ce que la journée rapporte.
+   Rien ne s'y saisit, sauf l'objectif (✎ sous le troisième). */
+function troisChiffresFiche(c, k) {
+  var solde = C.chantierSolde(c);
+  var lib1 = !k.montant ? (C.aDevis(c) ? 'pas encore de devis' : 'pas encore chiffré')
+    : c.statut === 'paye' ? 'encaissé HT' : c.statut === 'facture' ? 'facturé HT'
+      : c.statut === 'termine' ? 'à facturer HT' : C.aDevis(c) ? 'devis HT' : 'travaux HT';
+  var f = k.faites, e = k.estimees, v2, lib2;
+  /* Dire d'où sort le chiffre : « faites » quand il vient du temps noté,
+     « facturées » quand seule la facture en parle — c'est le cas de tous les
+     chantiers repris du carnet. */
+  if (solde && f > 0 && !k.saisi) { v2 = jf(f); lib2 = 'journées facturées'; }
+  else if (f > 0 && e > 0) { v2 = jf(f) + ' / ' + jf(e) + ' j'; lib2 = 'faites / estimées'; }
+  else if (f > 0) { v2 = jf(f); lib2 = 'journées faites'; }
+  else if (e > 0) { v2 = jf(e); lib2 = 'journées estimées'; }
+  else { v2 = '—'; lib2 = 'journées'; }
+  var lib3 = { reel: 'par jour, réel', rythme: 'par jour, au rythme actuel',
+    devis: 'par jour, au devis' }[k.mode] || 'par jour';
+  var sous = k.vise && k.parJour && k.parJour < k.vise;
+  return '<div class="fi-kpis">' +
+    '<div class="fi-kpi"><b class="num">' + (k.montant ? eur(k.montant) : '—') + '</b><small>' +
+    lib1 + '</small></div>' +
+    '<div class="fi-kpi"><b class="num">' + v2 + '</b><small>' + lib2 + '</small></div>' +
+    '<div class="fi-kpi' + (sous ? ' sous' : '') + '"><b class="num">' +
+    (k.parJour ? eur(C.arr(k.parJour, 0)) : '—') + '</b><small>' + lib3 + '</small>' +
+    '<button class="fi-obj" id="f-objectif">' + (k.vise ? 'objectif ' + eur(k.vise) : 'objectif') +
+    ' ✎</button></div></div>' +
+    (solde && !f
+      ? '<p class="fi-aide">Aucun temps noté : « Ajouter du temps sans date », dans l’étape ' +
+        'Travaux, dit ce que le chantier vous a pris.</p>'
+      : (!solde && !e && c.statut !== 'sansuite'
+        ? '<p class="fi-aide">Aucune journée estimée : sans elle, rien ne dit ce que la ' +
+          'journée doit rapporter.</p>' : ''));
+}
+
+/* ------------------------------------------------- étape 1 : Infos */
+function corpsInfos(c) {
+  var cr = c.criteres || {};
+  var surf = C.nb(c.surface) || C.quantite(c, 'ha');
+  var pe = [cr.essence ? C.nomEssenceCh(cr.essence) : 'essence à préciser',
+    cr.densite ? E.fmt(cr.densite, 0) + ' plants/ha' : 'densité à préciser',
+    surf ? ha(surf) : 'surface à préciser'];
+  var place = c.gps && c.gps.lat != null;
+  return '<div class="fi-note"><small>Ce que je sais</small>' +
+    (c.notes ? esc(c.notes) : '<span class="muted">rien de noté — accès, code du portail…</span>') +
+    '</div>' +
+    (c.vuReperage ? '<div class="fi-note"><small>Ce que j’ai vu' +
+      (c.dateReperage ? ' le ' + dateCourte(c.dateReperage) : '') + '</small>' +
+      esc(c.vuReperage) + '</div>' : '') +
+    '<button class="fi-note fi-btn" id="f-peuplement"><small>Peuplement ✎</small>' +
+    esc(pe.join(' · ')) + '</button>' +
+    /* « Associer la carte au chantier : accéder à la carte depuis ma fiche,
+       ou avoir un emplacement pour le positionner. » */
+    '<div class="fi-pos">' + (place
+      ? '<span class="fi-sur">Sur la carte</span>' +
+        '<button class="btn-min" data-fcarte="voir">Voir</button>' +
+        '<button class="btn-min" data-fcarte="placer">Déplacer</button>'
+      : '<span class="muted">Pas encore sur la carte</span>' +
+        '<button class="btn-min" data-fcarte="moi">Je suis dessus</button>' +
+        '<button class="btn-min" data-fcarte="placer">Placer sur la carte</button>') + '</div>' +
+    '<p class="fi-meta"><span>Annoncé le <b>' + (C.dateEntree(c) ? dateCourte(C.dateEntree(c)) : '—') +
+    '</b></span><span>Repérage : <b>' + (c.dateReperage ? dateCourte(c.dateReperage) : 'pas encore') +
+    '</b></span></p>' +
+    '<button class="btn" id="f-reperage">' + (c.dateReperage ? 'Modifier le repérage' : 'Noter le repérage') +
+    '</button>' +
+    (c.dateReperage ? '' : '<p class="fi-aide">Facultatif : un chantier peut passer au devis sans repérage.</p>') +
+    /* La fiche sécurité est obligatoire au-delà de quatre hectares. C'est
+       ici qu'il chiffre et repère, donc ici qu'il faut le dire. */
+    (C.ficheRequise(c) ? '<p class="acompleter-bloc">Plus de ' + C.SEUIL_FICHE_HA + ' ha : une ' +
+      'fiche sécurité est obligatoire.</p>' : '') +
+    ilManque(c, 0);
+}
+
+/* ------------------------------------------------- étape 2 : Devis */
+function corpsDevis(c) {
+  var avec = C.aDevis(c), h = '';
+  if (c.statut === 'sansuite') {
+    h += '<div class="fi-note fi-refus"><small>' + esc(C.nomStatut('sansuite', c)) + '</small>' +
+      (c.motifRefus ? esc(C.nomMotifRefus(c.motifRefus)) + (c.noteRefus ? ' — ' + esc(c.noteRefus) : '')
+        : 'motif non précisé') + '</div>';
+  }
+  if (!avec) {
+    h += '<p class="fi-aide">Chantier sans devis : il est passé directement à « ' +
+      esc(C.nomStatut('accepte', c)) + ' ». Ses lignes deviendront la facture telles quelles.</p>' +
+      '<button class="lien" id="f-devis-oui">Finalement, saisir un devis</button>';
+  } else if (!devisSaisi(c) && c.statut === 'devis') {
+    h += '<p class="fi-aide">Avec ou sans devis : ça se décide ici, quand vous le savez. Les lignes ' +
+      'du devis serviront ensuite à la facture, à l’avancement et aux sorties de stock.</p>' +
+      '<div class="btn-rang"><button class="btn primaire" id="f-devis">Saisir le devis</button>' +
+      '<button class="btn" id="f-sansdevis">Pas de devis : à programmer</button></div>';
+  } else {
+    var fin = C.finValiditeDevis(c);
+    h += '<div class="fi-tete-etape"><p class="fi-meta">' +
+      '<span>N° <b>' + esc(c.numeroDevis || '—') + '</b></span>' +
+      (c.dateDevis ? '<span>Édité le <b>' + dateCourte(c.dateDevis) + '</b></span>' : '') +
+      (c.validiteDevis ? '<span>Valable <b>' + c.validiteDevis + ' mois' +
+        (fin ? ' — jusqu’au ' + dateCourte(fin) : '') + '</b></span>' : '') +
+      (c.dateEnvoi ? '<span>Envoyé le <b>' + dateCourte(c.dateEnvoi) + '</b></span>' : '') +
+      (c.dateSignature ? '<span>Signé le <b>' + dateCourte(c.dateSignature) + '</b></span>'
+        : c.statut === 'envoye' ? '<span><b>En attente de réponse</b></span>' : '') +
+      '</p><button class="modif-bloc" id="f-devis">modifier ✎</button></div>';
+  }
+  if (!lignesDeFacture(c)) {
+    h += blocLignes(c, avec ? 'Ce que le devis contient' : 'Les travaux prévus');
+  } else if (c.devisFige) {
+    h += '<div class="fi-sous"><b>Ce que le devis contenait</b></div>' +
+      (c.devisFige.lignes || []).map(function (x) {
+        return '<div class="ligne-trav"><div><b>' + esc(x.titre || 'Ligne') + '</b>' +
+          '<div class="muted" style="font-size:12px">' + (x.unite === 'forfait' ? 'forfait'
+            : E.fmt(C.nb(x.quantite), C.nb(x.quantite) % 1 ? 2 : 0) + ' ' + esc(C.courtUnite(x.unite)) +
+              ' × ' + E.fmt(C.nb(x.prix), 2) + ' €') + '</div></div>' +
+          '<div style="text-align:right"><b class="num">' + eur(x.montant) + '</b></div></div>';
+      }).join('') +
+      '<dl class="fi-kv">' + kv('Total HT', eur(C.nb(c.devisFige.total)), 'fi-ht') + '</dl>' +
+      '<p class="fi-aide">Les lignes facturées sont dans l’étape Facture.</p>';
+  } else {
+    h += '<p class="fi-aide">Les lignes sont celles de la facture : étape Facture.</p>';
+  }
+  if (avec && (c.statut === 'devis' || c.statut === 'envoye')) {
+    h += '<div class="fi-gestes">' +
+      (c.statut === 'devis' ? '<button class="btn" id="f-envoye">Devis envoyé</button>' : '') +
+      '<label class="fi-date">Signé le <input type="date" id="f-signe-date" value="' +
+      versChamp(Date.now()) + '"></label>' +
+      '<div class="btn-rang"><button class="btn primaire" id="f-signe">Signé</button>' +
+      '<button class="btn" id="f-refuse">Refusé</button></div></div>';
+  }
+  /* Le temps que ça demande vit ici, avec ce qui le chiffre : un seul
+     endroit pour les journées estimées. */
+  if (c.statut !== 'sansuite') {
+    var prevus = C.joursPrevus(c), deduit = C.joursDevis(c), muets = C.travauxHorsJournees(c);
+    var solde = C.chantierSolde(c);
+    h += '<div class="fi-estim"><button class="lien" id="f-estim">' +
+      (solde ? 'Temps estimé, pour mémoire ✎' : 'Temps estimé (facultatif) ✎') + '</button>' +
+      '<b class="num">' + (prevus ? jf(prevus) + ' j' : '—') + '</b></div>' +
+      '<p class="fi-aide">' + (deduit > 0
+        ? 'Déduit des lignes en journées : rien à ressaisir.' +
+          (muets.length ? ' <b>Attention</b> : ne tient pas compte de ' +
+            esc(muets.join(', ').toLowerCase()) + '.' : '')
+        : (prevus ? 'Votre estimation. Aucune ligne n’est libellée en journées.'
+          : 'Ce que vous pensez y passer : il dira ce que la journée rapporte.')) + '</p>';
+  }
+  return h + ilManque(c, 1);
+}
+
+/* ------------------------------------------------ étape 3 : Travaux */
+/* Le prévu et le fait se rejoignent à l'écran, ligne à ligne, par la date.
    Les deux listes restent distinctes en base — « jours » sont des dates
-   posées sur l'agenda, « temps » est ce qu'on y a passé — et le projet
-   avertit de ne jamais brancher l'une sur l'autre. Ce n'est qu'à l'écran
-   qu'elles se rejoignent, ligne à ligne, par la date.
-   Le fait est à gauche : c'est ce qu'il a demandé, et c'est la colonne qu'on
-   vient lire. */
+   posées sur l'agenda, « temps » est ce qu'on y a passé — et ne se branchent
+   jamais l'une sur l'autre. */
 function lignesTemps(c) {
-  var par = {}, sansDate = { fait: 0, prevu: 0, actes: [], temps: [] };
-  var cle = function (ts) { return C.jourCle(ts); };
+  var par = {}, sansDate = { fait: 0, prevu: 0, actes: [], qtes: {}, km: 0 };
+  var rang = function (ts) {
+    var k = C.jourCle(ts);
+    par[k] = par[k] || { d: C.minuit(ts), fait: 0, prevu: 0, actes: [], qtes: {}, km: 0 };
+    return par[k];
+  };
   C.journeesPlacees(c).forEach(function (x) {
-    var k = cle(x.d);
-    par[k] = par[k] || { d: C.minuit(x.d), fait: 0, prevu: 0, actes: [], temps: [] };
-    par[k].prevu += C.nb(x.p) * C.HEURES_JOUR(A.cfg);
+    rang(x.d).prevu += C.nb(x.p) * C.HEURES_JOUR(A.cfg);
   });
   (c.temps || []).forEach(function (t) {
-    var h = C.heuresSaisie(t, A.cfg);
     /* Une saisie sans date est un rattrapage : elle compte, mais elle ne
        tombe sur aucune case du calendrier. */
-    var cible = t.date ? null : sansDate;
-    if (!cible) {
-      var k = cle(t.date);
-      par[k] = par[k] || { d: C.minuit(t.date), fait: 0, prevu: 0, actes: [], temps: [] };
-      cible = par[k];
-    }
-    cible.fait += h;
-    cible.temps.push(t);
+    var cible = t.date ? rang(t.date) : sansDate;
+    cible.fait += C.heuresSaisie(t, A.cfg);
+    cible.km += C.nb(t.km);
     if (t.activite && cible.actes.indexOf(t.activite) < 0) cible.actes.push(t.activite);
+    if (t.activite && C.nb(t.quantite) > 0) {
+      cible.qtes[t.activite] = (cible.qtes[t.activite] || 0) + C.nb(t.quantite);
+    }
   });
   var out = Object.keys(par).map(function (k) { return par[k]; })
     .sort(function (a, b) { return a.d - b.d; });
   if (sansDate.fait) { sansDate.sans = true; out.push(sansDate); }
   return out;
 }
-function blocJournees(c, bil, pj, vise, rends, mixteNonMarque) {
+function corpsTravaux(c, k) {
   var hj = C.HEURES_JOUR(A.cfg) || 8;
-  var rangs = lignesTemps(c);
-  var auj = C.minuit(Date.now());
-  var faitH = 0, resteH = 0;
+  var rangs = lignesTemps(c), auj = C.minuit(Date.now());
+  var faitH = 0, resteH = 0, km = C.kmChantier(c);
   rangs.forEach(function (r) {
     faitH += r.fait;
     /* Une journée passée sort du « reste à faire » : elle n'est plus à faire,
-       elle est faite. Compter les deux, c'est compter deux fois la même
-       journée — c'est ce qu'il a relevé sur la maquette. */
+       elle est faite. */
     if (!r.sans && r.d > auj && r.prevu) resteH += r.prevu;
   });
-  var prevus = C.joursPrevus(c);
-  var jf = function (h) { return C.ditDuree(h, A.cfg); };
+  var prevus = C.joursPrevus(c), dur = function (h) { return C.ditDuree(h, A.cfg); };
+  var av = k.avancement, h = '';
+  if (C.etapeChantier(c) < 2) {
+    h += '<p class="fi-aide">Après la signature du devis, ou tout de suite pour un chantier sans devis.</p>';
+  }
+  if (av && faitH) {
+    h += '<div class="fi-av"><div class="fi-av-tete"><small>Avancement, ligne par ligne du devis</small>' +
+      '<b class="num">' + Math.round(av.taux * 100) + ' %</b></div>' +
+      av.lignes.map(function (l) {
+        return '<div class="fi-av-l"><div><span>' + esc(l.titre) + '</span><span class="num">' +
+          jf(l.fait) + ' / ' + jf(l.quantite) + ' ' + esc(C.courtUnite(l.unite)) + '</span></div>' +
+          '<div class="fi-barre"><i style="width:' + Math.round(Math.min(1, l.part) * 100) + '%"></i></div></div>';
+      }).join('') + '</div>';
+  }
+  h += rangs.length
+    ? '<p class="fi-aide">Le <b>prévu</b> retient la date sur l’agenda. Le <b>fait</b> est ce que ' +
+      'vous y avez réellement passé — c’est lui qui donne vos rendements. Une journée fait ' +
+      hj + ' h, réglable.</p>' +
+      '<div class="jtete"><span>Date</span><span>Fait</span><span>Prévu</span></div>' +
+      rangs.map(function (r) {
+        var avenir = !r.sans && r.d > auj;
+        var detail = r.actes.map(function (a) {
+          var q = r.qtes[a], u = C.uniteTravail(c, a);
+          return C.nomTravail(a) + (q ? ' ' + E.fmt(q, q % 1 ? 2 : 0) + (u ? ' ' + C.courtUnite(u) : '') : '');
+        });
+        if (r.km) detail.push(E.fmt(r.km, 0) + ' km');
+        return '<div class="jrang' + (avenir ? ' avenir' : '') + '">' +
+          '<span class="jd">' + esc(r.sans ? 'sans date' : dateCourte(r.d)) +
+          (r.sans ? ' <span class="muted" style="font-size:11.5px">(rattrapage)</span>'
+            : avenir ? ' <span class="muted" style="font-size:11.5px">à venir</span>' : '') +
+          (detail.length ? '<small>' + esc(detail.join(' · ')) + '</small>' : '') + '</span>' +
+          '<span class="jv num' + (r.fait ? '' : ' vide') + '">' + (r.fait ? dur(r.fait) : '—') + '</span>' +
+          '<span class="jv num' + (r.prevu ? '' : ' vide') + '">' + (r.prevu ? dur(r.prevu) : '—') + '</span>' +
+          '</div>';
+      }).join('')
+    : '<p class="fi-aide">Aucune date posée, aucun temps noté.</p>';
+  h += '<div class="kpi">' +
+    '<div class="carte2"><b class="num">' + dur(faitH) + '</b><small>fait</small></div>' +
+    '<div class="carte2"><b class="num">' + (resteH ? dur(resteH) : '—') + '</b><small>reste à faire</small></div>' +
+    (prevus ? '<div class="carte2"><b class="num">' + dur(prevus * hj) + '</b><small>estimé au devis</small></div>' : '') +
+    '</div>';
+  var real = delaiRealisation(c);
+  h += '<p class="fi-meta"><span><b>' + E.fmt(C.arr(faitH, 2), faitH % 1 ? 1 : 0) + ' h</b></span>' +
+    '<span><b>' + dur(faitH) + '</b></span>' +
+    '<span><b>' + E.fmt(km, 0) + ' km</b>' + (km ? ' · carburant estimé ' + eur(C.coutCarburant(km, A.cfg)) : '') + '</span>' +
+    (c.dateFin && C.rangStatut(c.statut) >= C.rangStatut('termine') && c.statut !== 'sansuite'
+      ? '<span>terminé le <b>' + dateCourte(c.dateFin) + '</b></span>' : '') +
+    (real ? '<span>' + real + '</span>' : '') + '</p>';
+  /* Ce que le devis paie en journées, face à ce qu'on y a passé. */
+  var bil = C.bilanJournees(c, A.cfg), vise = C.prixJourVise(c, A.cfg);
+  if (bil.prevues != null && bil.faites > 0) {
+    h += '<div class="carte2 fi-bilan' + (bil.ecart > 0.25 ? ' perte' : bil.ecart < -0.25 ? ' gain' : '') + '">' +
+      '<div><span>Le devis paie</span><b class="num">' + dur(bil.prevues * hj) + ' à ' + eur(vise) + ' la journée</b></div>' +
+      '<div><span>J’y ai passé</span><b class="num">' + dur(bil.faites * hj) + '</b></div>' +
+      '<div><span class="muted">soit</span><b class="num">' + eur(bil.obtenu) + ' la journée</b></div>' +
+      '<p class="fi-aide">' + (Math.abs(bil.ecart) <= 0.25 ? 'Estimation juste.'
+        : bil.ecart > 0 ? dur(bil.ecart * hj) + ' de plus que prévu : ' + eur(vise - bil.obtenu) + ' perdus par jour.'
+          : dur(-bil.ecart * hj) + ' de moins que prévu : ' + eur(bil.obtenu - vise) + ' gagnés par jour.') +
+      '</p></div>';
+  }
+  /* Le taire laisserait croire à un oubli : tant que le chantier tourne, la
+     facture est entière et les journées ne le sont pas. */
+  if (faitH && !C.chantierSolde(c) && k.mode !== 'rythme') {
+    h += '<p class="fi-aide">Le prix de journée réel se lira quand le chantier sera terminé : ' +
+      'tant qu’il tourne, la facture est entière et les journées ne le sont pas.</p>';
+  }
+  var travaux = [];
+  (c.lignes || []).forEach(function (l) { if (travaux.indexOf(l.travail) < 0) travaux.push(l.travail); });
+  if (travaux.length > 1 && (c.temps || []).length && !(c.temps || []).some(function (t) { return t.activite; })) {
+    h += '<p class="fi-aide">Plusieurs travaux sur ce chantier : précisez la prestation dans ' +
+      'chaque journée pour obtenir les rendements.</p>';
+  }
+  h += '<div class="btn-rang fi-actions"><button class="btn primaire" id="f-planifier">Placer des jours dans l’Agenda</button></div>' +
+    '<button class="lien" id="f-temps">Ajouter du temps sans date (rattrapage)</button>' +
+    (c.statut === 'accepte' || c.statut === 'encours'
+      ? '<div class="btn-rang fi-actions"><button class="btn" id="f-termine">Travaux terminés</button></div>' : '');
+  return h;
+}
 
-  var lignes = rangs.map(function (r) {
-    var quand = r.sans ? 'sans date' : dateCourte(r.d);
-    var avenir = !r.sans && r.d > auj;
-    return '<div class="jrang' + (avenir ? ' avenir' : '') + '">' +
-      '<span class="jd">' + esc(quand) +
-      (r.sans ? ' <span class="muted" style="font-size:11.5px">(rattrapage)</span>'
-        : avenir ? ' <span class="muted" style="font-size:11.5px">à venir</span>' : '') +
-      (r.actes.length ? '<small>' + esc(r.actes.map(C.nomTravail).join(', ')) + '</small>' : '') +
-      '</span>' +
-      '<span class="jv num' + (r.fait ? '' : ' vide') + '">' + (r.fait ? jf(r.fait) : '—') + '</span>' +
-      '<span class="jv num' + (r.prevu ? '' : ' vide') + '">' + (r.prevu ? jf(r.prevu) : '—') + '</span>' +
-      '</div>';
-  }).join('');
+/* ------------------------------------------------ étape 4 : Facture */
+function corpsFacture(c) {
+  var h = '', e = C.etapeChantier(c);
+  if (c.statut === 'sansuite') return '<p class="fi-aide">—</p>';
+  if (factureFaite(c)) {
+    h += '<div class="fi-tete-etape"><p class="fi-meta">' +
+      '<span>N° <b>' + esc(c.numeroFacture || '—') + '</b></span>' +
+      '<span>Facturé le <b>' + (c.dateFacture ? dateCourte(c.dateFacture) : '—') + '</b></span>' +
+      (c.echeancePaiement ? '<span>À payer avant le <b>' + dateCourte(c.echeancePaiement) + '</b></span>' : '') +
+      '</p><button class="modif-bloc" id="f-facture">modifier ✎</button></div>';
+  } else if (e === 3) {
+    var modifiees = c.devisFige && C.arr(C.montant(c), 2) !== C.arr(C.nb(c.devisFige.total), 2);
+    h += '<dl class="fi-kv">' + kv('Montant HT', eur(C.montant(c))) +
+      kv('À facturer', eur(C.ttcChantier(c)) + ' TTC', 'fi-tot') + '</dl>' +
+      champNumero('F', 'ff-num', c.numeroFacture, 'N° de facture (votre logiciel)') +
+      '<div class="grille g2">' +
+      '<div class="champ"><label class="eyebrow" for="ff-date">Facturé le</label>' +
+      '<input type="date" id="ff-date" value="' + versChamp(c.dateFacture || Date.now()) + '"></div>' +
+      '<div class="champ"><label class="eyebrow" for="ff-ech">À payer avant le</label>' +
+      '<input type="date" id="ff-ech" value="' + versChamp(c.echeancePaiement) + '"></div></div>' +
+      '<div class="btn-rang" style="margin:-4px 0 11px">' +
+      '<button class="btn-min" data-ffech="30">+ 30 jours</button>' +
+      '<button class="btn-min" data-ffech="45">+ 45 jours</button>' +
+      '<button class="btn-min" data-ffech="60">+ 60 jours</button></div>' +
+      '<button class="btn primaire plein" id="f-facturer">' +
+      (modifiees ? 'Facturer au montant des lignes' : 'Facturer au montant du devis') + '</button>' +
+      (C.aDevis(c) && !c.devisFige
+        ? '<button class="lien" id="f-modlignes">Le montant change ? Modifier les lignes</button>' : '') +
+      '<button class="lien" id="f-facture">Toute la facture (échéance, paiement) ✎</button>';
+  } else {
+    var ttc = C.ttcChantier(c);
+    h += '<p class="fi-aide">' + (ttc ? 'Quand les travaux seront terminés : ' + eur(ttc) +
+      ' TTC prévus, à facturer en un geste au montant du devis.' : 'Après le devis et les travaux.') + '</p>' +
+      '<button class="lien" id="f-facture">Saisir la facture</button>';
+  }
+  if (lignesDeFacture(c)) h += blocLignes(c, 'Ce qui est facturé') + comparaisonDevis(c);
+  return h + ilManque(c, 3);
+}
 
-  return '<div class="carte">' + teteBloc('Les journées', 'f-jours', 'modifier') +
-    '<p class="sous-titre-bloc">Le <b>prévu</b> retient la date sur l’agenda. Le <b>fait</b> ' +
-    'est ce que vous y avez réellement passé — c’est lui qui donne vos rendements. ' +
-    'Une journée fait ' + hj + ' h, réglable.</p>' +
-    (lignes
-      ? '<div class="jtete"><span>Date</span><span>Fait</span><span>Prévu</span></div>' + lignes
-      : '<div class="vide"><p>Aucune date posée, aucun temps noté.</p></div>') +
-    '<div class="kpi">' +
-    '<div class="carte2"><b class="num">' + jf(faitH) + '</b><small>fait</small></div>' +
-    '<div class="carte2"><b class="num">' + (resteH ? jf(resteH) : '—') +
-    '</b><small>reste à faire</small></div>' +
-    (prevus ? '<div class="carte2"><b class="num">' + jf(prevus * hj) +
-      '</b><small>estimé au devis</small></div>' : '') +
-    '</div>' +
-    '<div class="btn-rang" style="margin-top:11px">' +
-    '<button class="btn btn-min" id="f-planifier">Placer dans l’Agenda</button>' +
-    '<button class="btn primaire btn-min" id="f-temps">+ Du temps fait</button></div>' +
+/* -------------------------------------------------- étape 5 : Payé */
+function corpsPaye(c) {
+  var h = '';
+  if (c.statut === 'paye' || c.datePaiement) {
+    var delai = C.delaiPaiement(c);
+    h += '<dl class="fi-kv">' + kv('Payé le', c.datePaiement ? dateCourte(c.datePaiement) : '—') +
+      (c.moyenPaiement ? kv('Réglé par', esc(C.nomMoyenPaiement(c.moyenPaiement))) : '') +
+      kv('Montant', eur(C.ttcChantier(c)) + ' TTC') + '</dl>' +
+      (delai != null ? '<p class="fi-aide">Réglé en ' + delai + ' jour' + (delai > 1 ? 's' : '') + '.</p>' : '') +
+      '<button class="lien" data-fiact="facture">Corriger la facture ou le paiement ✎</button>';
+  } else if (c.statut === 'facture') {
+    var r = C.retardPaiement(c, Date.now());
+    h += (r ? '<p class="retard">Échéance dépassée de ' + r + ' jour' + (r > 1 ? 's' : '') + '.</p>' : '') +
+      '<div class="grille g2">' +
+      '<div class="champ"><label class="eyebrow" for="fp-date">Payé le</label>' +
+      '<input type="date" id="fp-date" value="' + versChamp(Date.now()) + '"></div>' +
+      /* Pour savoir ce qui rentre en chèques : liste fermée, sinon on ne
+         pourrait plus les compter. */
+      '<div class="champ"><label class="eyebrow" for="fp-moyen">Réglé par</label>' +
+      '<select id="fp-moyen"><option value="">— non précisé —</option>' +
+      C.MOYENS_PAIEMENT.map(function (x) {
+        return '<option value="' + x.c + '">' + esc(x.n) + '</option>';
+      }).join('') + '</select></div></div>' +
+      '<button class="btn primaire plein" id="f-payer">Noter le paiement</button>';
+  } else {
+    h += '<p class="fi-aide">Après la facture.</p>';
+  }
+  return h + ilManque(c, 4);
+}
 
-    /* Ce que ce temps rapporte, et ce qu'il dit des rendements. */
-    (faitH ? '<div class="kpi">' +
-      (pj ? '<div class="carte2"><b class="num">' + eur(pj) + '</b><small>par jour-homme' +
-        (vise ? (pj >= vise ? ' ✓' : ' ✕') : '') + '</small></div>' : '') +
-      rends + '</div>' : '') +
-    /* Le taire sans rien dire laisserait croire à un oubli. */
-    (faitH && !C.chantierSolde(c)
-      ? '<p class="muted" style="font-size:12px;margin:9px 0 0">Le prix de journée ' +
-        'se lira quand le chantier sera terminé : tant qu’il tourne, la facture est ' +
-        'entière et les journées ne le sont pas.</p>'
-      : '') +
-    (bil.prevues != null && bil.faites > 0
-      ? '<div class="carte2" style="margin-top:11px;border-color:' +
-        (bil.ecart > 0.25 ? '#B4231F' : bil.ecart < -0.25 ? '#2E7D46' : 'var(--trait)') + '">' +
-        '<div style="display:flex;justify-content:space-between;font-size:13.5px">' +
-        '<span>Le devis paie</span><b class="num">' + jf(bil.prevues * hj) + ' à ' + eur(vise) + ' la journée</b></div>' +
-        '<div style="display:flex;justify-content:space-between;font-size:13.5px;margin-top:3px">' +
-        '<span>J’y ai passé</span><b class="num">' + jf(bil.faites * hj) + '</b></div>' +
-        '<div style="display:flex;justify-content:space-between;font-size:13.5px;margin-top:3px">' +
-        '<span class="muted">soit</span><b class="num">' + eur(bil.obtenu) + ' la journée</b></div>' +
-        '<p class="muted" style="font-size:12px;margin:7px 0 0">' +
-        (Math.abs(bil.ecart) <= 0.25
-          ? 'Estimation juste.'
-          : bil.ecart > 0
-            ? jf(bil.ecart * hj) + ' de plus que prévu : ' + eur(vise - bil.obtenu) + ' perdus par jour.'
-            : jf(-bil.ecart * hj) + ' de moins que prévu : ' + eur(bil.obtenu - vise) + ' gagnés par jour.') +
-        '</p></div>'
-      : (vise && pj ? '<p class="muted" style="font-size:12px;margin:9px 0 0">Objectif ' + eur(vise) +
-        ' — ' + (pj >= vise ? 'atteint' : 'manque ' + eur(vise - pj)) + ' par jour.</p>' : '')) +
-    (mixteNonMarque ? '<p class="muted" style="font-size:12px;margin:9px 0 0">Plusieurs travaux sur ' +
-      'ce chantier : précisez l’activité dans chaque saisie de temps pour obtenir les rendements.</p>' : '') +
+/* Ce qu'on lit de chaque étape sans la déplier. Le numéro de facture en
+   fait partie : c'est sur lui qu'il se repère en enchaînant les fiches. */
+function resumeEtape(c, i, k) {
+  var e = C.etapeChantier(c);
+  if (i === 0) {
+    return c.dateReperage ? 'repéré le ' + dateCourte(c.dateReperage)
+      : 'annoncé le ' + dateCourte(C.dateEntree(c)) + (e === 0 ? ' · repérage facultatif' : '');
+  }
+  if (i === 1) {
+    if (c.statut === 'sansuite') return 'refusé' + (c.motifRefus ? ' · ' + C.nomMotifRefus(c.motifRefus) : '');
+    if (!C.aDevis(c)) return 'sans devis';
+    if (!devisSaisi(c) && c.statut === 'devis') return 'avec ou sans devis : à choisir';
+    var m = C.montant(c);
+    return [c.numeroDevis, m ? eur(m) + ' HT' : '',
+      c.dateSignature ? 'signé le ' + dateCourte(c.dateSignature)
+        : c.dateEnvoi ? 'envoyé le ' + dateCourte(c.dateEnvoi) : 'à envoyer'].filter(Boolean).join(' · ');
+  }
+  if (i === 2) {
+    if (c.statut === 'sansuite') return '—';
+    if (e < 2) return 'après le devis';
+    if (c.statut === 'accepte') {
+      var pl = C.totalPlace(c);
+      return 'à programmer' + (pl ? ' · ' + jf(pl) + ' j placé' + (pl > 1 ? 's' : '') : '');
+    }
+    if (c.statut === 'encours') {
+      return [k.avancement && k.faites ? Math.round(k.avancement.taux * 100) + ' %' : '',
+        k.faites ? jf(k.faites) + ' j faits' : 'en cours'].filter(Boolean).join(' · ');
+    }
+    return (c.dateFin ? 'terminé le ' + dateCourte(c.dateFin) : 'terminé') +
+      (k.faites ? ' · ' + jf(k.faites) + ' j' : '');
+  }
+  if (i === 3) {
+    if (factureFaite(c)) {
+      return (c.numeroFacture || 'facturé') + (c.dateFacture ? ' du ' + dateCourte(c.dateFacture) : '');
+    }
+    return e === 3 ? 'à faire · ' + eur(C.ttcChantier(c)) + ' TTC' : '—';
+  }
+  if (c.datePaiement || c.statut === 'paye') {
+    return 'le ' + (c.datePaiement ? dateCourte(c.datePaiement) : '—') +
+      (c.moyenPaiement ? ' · ' + C.nomMoyenPaiement(c.moyenPaiement) : '');
+  }
+  if (c.statut === 'facture') {
+    var r = C.retardPaiement(c, Date.now());
+    return r ? 'échue depuis ' + r + ' j'
+      : 'en attente' + (c.echeancePaiement ? ' · avant le ' + dateCourte(c.echeancePaiement) : '');
+  }
+  return '—';
+}
+
+/* Quelles étapes sont ouvertes. Celle en cours, et le Devis aussi tant que
+   le chantier est à l'étape Infos (maquette tour 2) : c'est là que se
+   décide « avec ou sans devis ». Une porte peut demander une autre étape
+   (« à facturer » → Facture, « temps à estimer » → Devis). Ce qu'il ouvre
+   ou ferme à la main se garde tant qu'il reste sur le chantier. */
+var NOMS_ETAPE = { infos: 0, devis: 1, travaux: 2, facture: 3, paye: 4 };
+function etapesOuvertes(c, vers) {
+  var e = C.etapeChantier(c), o = {};
+  if (e < 5) o[e] = true;
+  if (c.statut === 'devis') o[1] = true;
+  var v = typeof vers === 'string' ? NOMS_ETAPE[vers] : vers;
+  if (v != null && v >= 0 && v < 5) o[v] = true;
+  return o;
+}
+
+function tuilesFiche(c) {
+  var rends = [];
+  (c.lignes || []).forEach(function (l) {
+    var r = C.rendementTravail(c, l.travail, A.cfg);
+    if (r && !rends.some(function (x) { return x.t === l.travail; })) rends.push({ t: l.travail, r: r });
+  });
+  var conso = ST.consommationChantier(A.articles, c.id);
+  var tuile = function (id, pic, titre, sous) {
+    return '<button class="fi-tuile" id="' + id + '">' + picto(pic) + '<b>' + titre + '</b>' +
+      '<small>' + esc(sous) + '</small></button>';
+  };
+  return '<div class="fi-tuiles">' +
+    tuile('f-rendement', 'rendements', 'Rendement', rends.length
+      ? E.fmt(rends[0].r.rendement, rends[0].r.rendement < 10 ? 2 : 0) + ' ' +
+        C.courtUnite(rends[0].r.unite) + ' / jour-homme'
+      : 'facultatif · pas compté') +
+    tuile('f-fichech', 'fichech', 'Fiche sécurité', C.ficheRequise(c) ? 'obligatoire, plus de ' +
+      C.SEUIL_FICHE_HA + ' ha' : (c.fiche ? 'commencée' : 'à préparer avant les travaux')) +
+    tuile('f-fournitures', 'stock', 'Fournitures', conso.length
+      ? conso.length + ' fourniture' + (conso.length > 1 ? 's' : '') + ' du stock' : 'aucune') +
+    tuile('f-note', 'note', 'Note', c.notes ? (c.notes.length > 38 ? c.notes.slice(0, 36) + '…' : c.notes) : 'vide') +
     '</div>';
 }
+
 function renderFiche() {
   var z = $('#fiche-chantier'); if (!z) return;
   var c = chantier(A.chOuvert);
   if (!c) { z.innerHTML = '<div class="carte"><div class="vide"><p>Chantier introuvable.</p></div></div>'; return; }
-  /* « m » est ce que le chantier rapporte : le débours en est retiré. Le
-     total de la facture, plus bas, le garde. */
-  var m = C.montantHorsDebours(c), mFacture = C.montant(c), deb = C.montantDebours(c);
-  var j = C.tempsTotal(c, A.cfg), pj = C.prixJour(c, A.cfg);
-  var vise = C.prixJourVise(c, A.cfg);
-  var bil = C.bilanJournees(c, A.cfg);
-
-  var temps = (c.temps || []).slice().sort(function (a, b) { return (b.date || 0) - (a.date || 0); })
-    .map(function (t, i) {
-      return '<div class="liste-item"><div class="li-c"><b>' + E.fmt(C.joursSaisie(t, A.cfg), 2) + ' j-h</b>' +
-        '<small>' + dateCourte(t.date) + ' · ' + E.fmt(C.nb(t.duree), 1) + (t.unite === 'h' ? ' h' : ' j') +
-        (C.nb(t.personnes) > 1 ? ' × ' + C.nb(t.personnes) + ' pers.' : '') +
-        (t.activite ? ' · ' + esc(C.nomTravail(t.activite)) : '') + '</small></div>' +
-        '<button class="btn-min" data-tsup="' + (c.temps || []).indexOf(t) + '">✕</button></div>';
-    }).join('');
-
-  var travauxUniq = [];
-  (c.lignes || []).forEach(function (l) { if (travauxUniq.indexOf(l.travail) < 0) travauxUniq.push(l.travail); });
-  var rends = travauxUniq.map(function (tv) {
-    var r = C.rendementTravail(c, tv, A.cfg);
-    return r ? '<div class="carte2"><b class="num">' + E.fmt(r.rendement, r.rendement < 10 ? 2 : 0) + '</b>' +
-      '<small>' + esc(C.nomTravail(tv)) + ' — ' + C.courtUnite(r.unite) + ' / jour-homme</small></div>' : '';
-  }).join('');
-  var mixteNonMarque = travauxUniq.length > 1 && (c.temps || []).length &&
-    !(c.temps || []).some(function (t) { return t.activite; });
+  var k = C.troisChiffres(c, A.cfg), e = C.etapeChantier(c);
+  /* Ce qu'il a déplié se garde sur le même chantier, tant que l'étape ne
+     change pas : un geste qui fait avancer le chantier ouvre la suivante. */
+  if (!A.ficheVue || A.ficheVue.id !== c.id || A.ficheVue.etape !== e) {
+    A.ficheVue = { id: c.id, etape: e, ouvertes: etapesOuvertes(c) };
+  }
+  var cr = c.criteres || {}, surf = C.nb(c.surface) || C.quantite(c, 'ha');
+  var lieu = [c.foret, c.parcelles ? 'parc. ' + c.parcelles : '', c.commune,
+    surf ? ha(surf) : '',
+    cr.essence ? C.nomEssenceCh(cr.essence).toLowerCase() : ''].filter(Boolean);
+  var corps = [corpsInfos, corpsDevis, corpsTravaux, corpsFacture, corpsPaye];
+  var courts = ['Infos', 'Devis', 'Travaux', 'Facture', 'Payé'];
+  var refus = c.statut === 'sansuite';
 
   z.innerHTML =
-    '<div class="carte" style="padding-bottom:11px">' +
-    '<label class="eyebrow" for="f-choix">Chantier affiché</label>' +
-    '<select id="f-choix" style="margin-top:5px">' + optionsChantiers(c.id) + '</select>' +
-    /* Passer d'une fiche à la suivante d'un doigt, dans l'ordre du carnet,
-       plutôt que de rouvrir la liste et d'y chercher le voisin. */
+    '<div class="fi-haut"><button class="btn-min" data-chretour="1">← Chantiers</button>' +
+    '<select id="f-choix" aria-label="Changer de chantier">' + optionsChantiers(c.id) + '</select></div>' +
+    /* Passer d'une fiche à la suivante d'un doigt, dans l'ordre des factures
+       (R3 : gardées). */
     boutonsVoisins(c.id) +
+    '<div class="fi-tete" id="f-bloc-chantier">' +
+    '<h2>' + esc(C.nomChantier(c)) + '</h2>' +
+    (lieu.length ? '<p class="fi-lieu">' + esc(lieu.join(' · ')) + '</p>' : '') +
+    '<button class="fi-qui" id="f-identite">' +
+    '<span>Facturé à : <b>' + esc(c.proprietaire || 'à préciser') + '</b>' +
+    (c.siren ? ' <small>SIREN</small>' : '') + '</span>' +
+    '<span>Donneur d’ordre : <b>' + esc(c.donneur || c.client || 'à préciser') + '</b></span>' +
+    '<span class="fi-qui-mod">✎</span></button>' +
+    '<div class="fi-bulles" aria-label="Étape ' + Math.min(e + 1, 5) + ' sur 5">' +
+    courts.map(function (n, i) {
+      var cl = refus && i === 1 ? 'r' : i < e ? 'f' : i === e ? 'e' : '';
+      return '<span class="' + cl + '"><i>' + (cl === 'f' ? '✓' : cl === 'r' ? '✕' : '') + '</i>' + n + '</span>';
+    }).join('') + '</div>' +
+    '<p class="fi-etat">' + badgeStatut(c) +
+    (dateStatut(c) ? ' <span class="muted">' + esc(dateStatut(c)) + '</span>' : '') +
+    (C.enRetard(c, Date.now()) ? ' <span class="retard">jours passés</span>' : '') + '</p>' +
     '</div>' +
-    /* Le chantier : qui, où, et où il en est. */
-    '<div class="carte">' +
-    teteBloc('Le chantier', 'f-identite', 'modifier') +
-    '<div id="f-bloc-chantier">' +
-    '<h2 style="margin:0">' + esc(C.nomChantier(c)) + '</h2>' +
-    '<p class="muted" style="font-size:12.5px;margin:3px 0 0">' +
-    esc([c.donneur || c.client ? 'via ' + (c.donneur || c.client) : '',
-      c.proprietaire ? c.proprietaire + (c.siren ? ' (SIREN)' : '') : '',
-      c.foret, c.parcelles ? 'parc. ' + c.parcelles : '', c.commune].filter(Boolean).join(' · ') || 'sans donneur d’ordre') + '</p>' +
-    /* « Associer la carte au chantier : accéder à la carte depuis ma fiche,
-       ou avoir un emplacement pour le positionner. » */
-    '<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:9px">' +
-    (c.gps && c.gps.lat != null
-      ? '<span class="muted" style="font-size:12.5px">Placé sur la carte</span>' +
-        '<button class="btn btn-min" data-fcarte="voir">Voir sur la carte</button>' +
-        '<button class="btn btn-min" data-fcarte="placer">Déplacer</button>'
-      : '<span class="muted" style="font-size:12.5px">Pas encore sur la carte</span>' +
-        '<button class="btn btn-min" data-fcarte="placer">Placer sur la carte</button>') +
-    '</div>' +
-    '<div style="margin-top:9px">' + badgeStatut(c) +
-    (dateStatut(c) ? ' <span class="muted" style="font-size:12px">' + esc(dateStatut(c)) + '</span>' : '') +
-    (C.enRetard(c, Date.now()) ? ' <span class="retard">jours passés</span>' : '') + '</div>' +
-    /* La facture se lit dès l'en-tête : c'est sur son numéro qu'il se repère,
-       et en enchaînant les fiches par « précédente / suivante » il doit le voir
-       sans dérouler. Rien ne s'affiche tant qu'il n'y a rien à dire. */
-    (function () {
-      var l = [];
-      if (c.numeroFacture) l.push(['Facture', c.numeroFacture]);
-      if (c.dateFacture) l.push(['Facturé le', new Date(c.dateFacture).toLocaleDateString('fr-FR')]);
-      if (c.datePaiement) {
-        l.push(['Payé le', new Date(c.datePaiement).toLocaleDateString('fr-FR') +
-          (c.moyenPaiement ? ' · ' + C.nomMoyenPaiement(c.moyenPaiement) : '')]);
-      }
-      return l.length ? '<div style="margin-top:11px">' +
-        l.map(function (p) { return paireFiche(p[0], p[1]); }).join('') + '</div>' : '';
-    })() +
-    (function () {
-      var manque = C.champsManquants(c);
-      if (!manque.length) return '';
-      return '<p class="acompleter-bloc">Il manque : ' + esc(manque.join(', ')) + '.</p>';
-    })() +
-    '</div>' +
-    /* La fiche de chantier est obligatoire au-delà de quatre hectares. C'est
-       ici qu'il chiffre, donc ici qu'il faut le dire — pas dans un écran
-       qu'il ouvrirait après coup. */
-    (C.ficheRequise(c)
-      ? '<p class="acompleter-bloc">Plus de ' + C.SEUIL_FICHE_HA + ' ha : une fiche de ' +
-        'chantier est obligatoire.</p>'
-      : '') +
-    '<div class="btn-rang" style="margin-top:11px">' +
-    '<button class="btn btn-min" data-chretour="1">← Carnet</button>' +
-    '<button class="btn btn-min" id="f-statut">Changer le statut</button>' +
-    '<button class="btn btn-min" id="f-fichech">Fiche de chantier</button></div>' +
-    '</div>' +
-
-    blocValeur(c, m, pj, vise) +
-    blocTravaux(c) +
-
-    blocJournees(c, bil, pj, vise, rends, mixteNonMarque) +
-
-    (function () {
-      var conso = ST.consommationChantier(A.articles, c.id);
-      if (!conso.length) return '';
-      var mg = ST.margeChantier(A.articles, c, C.montantLigne);
-      return '<div class="carte"><h2>Fournitures</h2>' +
-        conso.map(function (x) {
-          return '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13.5px">' +
-            '<span>' + esc(x.article.nom || '') + ' <span class="muted">' +
-            E.fmt(x.qte, 0) + ' ' + ST.courtUniteArt(x.article.unite) + '</span></span>' +
-            '<span class="num muted">' + eur(x.cout) + '</span></div>';
-        }).join('') +
-        (mg.vendu ? '<div class="kpi" style="margin-top:11px">' +
-          '<div class="carte2"><b class="num">' + eur(mg.vendu) + '</b><small>refacturé</small></div>' +
-          '<div class="carte2"><b class="num">' + eur(mg.cout) + '</b><small>coût du stock</small></div>' +
-          '<div class="carte2" style="border-color:' + (mg.marge >= 0 ? '#2E7D46' : '#B4231F') + '">' +
-          '<b class="num">' + eur(mg.marge) + '</b><small>marge' + (mg.taux != null ? ' · ' + mg.taux + ' %' : '') + '</small></div></div>' : '') +
-        '</div>';
-    })() +
-    (function () {
-      var cr = c.criteres || {};
-      var dit = critLibelle(cr);
-      return '<div class="carte' + (dit ? '' : ' avenir') + '">' +
-        teteBloc('Le peuplement', 'f-peuplement', dit ? 'modifier' : 'renseigner') +
-        '<p style="font-size:13.5px;margin:0"' + (dit ? '' : ' class="muted"') + '>' +
-        esc(dit || 'Essence et densité, pour vos statistiques.') + '</p></div>';
-    })() +
-    (C.kmChantier(c) ? '<div class="carte"><h2>Déplacements</h2>' +
-      '<div class="kpi"><div class="carte2"><b class="num">' + E.fmt(C.kmChantier(c), 0) + '</b><small>km</small></div>' +
-      '<div class="carte2"><b class="num">' + eur(C.coutCarburant(C.kmChantier(c), A.cfg)) + '</b><small>carburant estimé</small></div></div></div>' : '') +
-    (c.motifRefus ? '<div class="carte"><h2>Sans suite</h2><p style="font-size:14px;margin:0">' +
-      esc(C.nomMotifRefus(c.motifRefus)) + (c.noteRefus ? ' — ' + esc(c.noteRefus) : '') + '</p></div>' : '') +
-    '<div class="carte' + (c.notes ? '' : ' avenir') + '">' +
-    teteBloc('Note', 'f-note', c.notes ? 'modifier' : 'écrire') +
-    '<p style="font-size:14px;margin:0"' + (c.notes ? '' : ' class="muted"') + '>' +
-    esc(c.notes || 'Ce que vous voudrez relire dans deux ans.') + '</p></div>' +
-    '<div class="carte"><div class="btn-rang">' +
-    '<button class="btn danger btn-min" id="f-sup">Supprimer ce chantier</button></div></div>';
+    troisChiffresFiche(c, k) +
+    '<div class="fi-etapes" id="f-etapes">' +
+    C.ETAPES_FICHE.map(function (t, i) {
+      var st = refus && i === 1 ? 'r' : i < e ? 'f' : i === e ? 'e' : 'a';
+      return '<details class="fi-etape ' + st + '" data-etape="' + i + '"' +
+        (A.ficheVue.ouvertes[i] ? ' open' : '') + '><summary>' +
+        '<span class="no">' + (st === 'f' ? '✓' : st === 'r' ? '✕' : i + 1) + '</span>' +
+        '<b>' + t + '</b><small>' + esc(resumeEtape(c, i, k)) + '</small>' + picto('chevron') +
+        '</summary><div class="fi-corps">' + corps[i](c, k) + '</div></details>';
+    }).join('') + '</div>' +
+    tuilesFiche(c) +
+    '<div class="fi-bas"><button class="lien" id="f-statut">Corriger l’étape à la main</button>' +
+    '<button class="lien danger" id="f-sup">Supprimer ce chantier</button></div>';
+  if ($('#ff-date')) brancherNumero('F', 'ff-num', c.id);
 }
-

@@ -85,7 +85,7 @@ function finirPlacement() {
     toast(E.fmt(n, n % 1 ? 1 : 0) + ' journée' + (n > 1 ? 's' : '') + ' placée' +
       (n > 1 ? 's' : '') + ' — ' + C.nomChantier(c) + '.');
   }
-  if (depuis === 'fiche' && c) ouvrirChantier(c.id);
+  if (depuis === 'fiche' && c) ouvrirChantier(c.id, 'travaux');
   else if (depuis === 'aujourdhui') allerAccueil();
   else renderCalendrier();
 }
@@ -315,7 +315,7 @@ function ouvrirFicheJour(ts) {
     var mj = e.target.closest('[data-fjmj]');
     if (mj) { fermerModale(); ouvrirJournee(mj.dataset.fjmj); return; }
     var ouv = e.target.closest('[data-fjouvrir]');
-    if (ouv) { fermerModale(); ouvrirChantier(ouv.dataset.fjouvrir); return; }
+    if (ouv) { fermerModale(); ouvrirChantier(ouv.dataset.fjouvrir, 'travaux'); return; }
     var ret = e.target.closest('[data-fjretirer]');
     if (ret) {
       var c = chantier(ret.dataset.fjretirer); if (!c) return;

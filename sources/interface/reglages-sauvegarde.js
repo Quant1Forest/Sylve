@@ -775,6 +775,11 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.90', quoi: [
+    { t: 'La fiche d’un chantier en cinq étapes : Infos et repérage, Devis, Travaux, Facture, Payé ; celle en cours est ouverte', vue: 'carnet' },
+    { t: 'En tête, trois chiffres : le montant, les journées faites et estimées, ce que rapporte la journée' },
+    { t: 'Les gestes sont dans l’étape : noter le repérage, signé, travaux terminés, facturer au montant du devis, noter le paiement' }
+  ] },
   { v: '4.89', quoi: [
     { t: 'Ma journée en trois blocs : quand et où, mon temps, le trajet ; le total reste en bas, avec Enregistrer' },
     { t: 'Le chantier posé ce jour-là est choisi d’office, et le clavier ne se referme plus pendant la saisie' },

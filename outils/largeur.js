@@ -119,7 +119,7 @@ function parcours() {
        celles de l'Agenda. Au lot c1, « + Commande » et « + Intervention »
        dépassaient de 2 à 10 px à 320 px ; corrigé au lot c2. */
     const m = $('#modale'), mi = $('.modale-in');
-    if (/^agenda|^\+ |^fenêtre \+/.test(nom) && m && !m.hidden && mi && mi.scrollWidth > mi.clientWidth + 1) {
+    if (/^agenda|^\+ |^fenêtre \+|^fiche ›/.test(nom) && m && !m.hidden && mi && mi.scrollWidth > mi.clientWidth + 1) {
       fautifs.push('fenêtre de ' + mi.scrollWidth + ' px dans un cadre de ' + mi.clientWidth);
       relevés.push({ ecran: nom, page: mi.scrollWidth, ecranLargeur: mi.clientWidth, trop: true, barre: barreEntiere, fautifs: fautifs.slice(0, 3) });
       return;
@@ -169,6 +169,23 @@ function parcours() {
     $('#barre [data-barre="chantiers"]').click(); await pause(400);
     const ligne = $('#vue-carnet .chantier-l');
     if (ligne) { (ligne.querySelector('button, [data-id]') || ligne).click(); await pause(500); mesurer('fiche d’un chantier'); }
+    /* La fiche en étapes du lot b1 : un chantier de chaque statut ouvert,
+       toutes ses étapes dépliées (champs de facture et de paiement compris),
+       puis les feuilles qu'elle ouvre. */
+    const nLignes = document.querySelectorAll('#vue-carnet [data-chouvrir]').length;
+    for (let i = 0; i < Math.min(nLignes, 7); i++) {
+      $('#barre [data-barre="chantiers"]').click(); await pause(300);
+      const o = document.querySelectorAll('#vue-carnet [data-chouvrir]')[i]; if (!o) continue;
+      o.click(); await pause(450);
+      [].forEach.call(document.querySelectorAll('#f-etapes details'), function (d) { d.open = true; });
+      await pause(150);
+      mesurer('fiche d’un chantier ' + (i + 1) + ', étapes dépliées');
+    }
+    const portes = ['#f-reperage', '#f-rendement', '#f-fournitures', '#f-estim', '#f-identite', '#f-peuplement', '#f-statut'];
+    for (let p = 0; p < portes.length; p++) {
+      const b = $(portes[p]); if (!b) continue;
+      b.click(); await pause(400); mesurer('fiche › ' + portes[p]); await fermer();
+    }
     $('#b-menu').click(); await pause(200);
     const menus = liste('#modale [data-menu]', 'menu');
     await fermer();

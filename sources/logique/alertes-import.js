@@ -632,6 +632,8 @@ var M = {
   totalFait: totalFait, totalAVenir: totalAVenir,
   delaiPaiement: delaiPaiement, retardPaiement: retardPaiement,
   CHAMPS_FICHE: CHAMPS_FICHE, champsManquants: champsManquants, ficheComplete: ficheComplete,
+  ETAPES_FICHE: ETAPES_FICHE, etapeChantier: etapeChantier, tvaParTaux: tvaParTaux,
+  partsChantier: partsChantier, avancement: avancement, troisChiffres: troisChiffres,
   journeesPrevues: journeesPrevues, fermeteDe: fermeteDe, occupation: occupation,
   RISQUES_FICHE: RISQUES_FICHE, RESEAUX_FICHE: RESEAUX_FICHE, nomReseau: nomReseau,
   nomRisque: nomRisque, risquesCoches: risquesCoches, manquesFiche: manquesFiche,

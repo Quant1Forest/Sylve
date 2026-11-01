@@ -25,6 +25,7 @@ Statuts :
 - **fait (lot c1)** — en place depuis la 4.88.0 (Agenda, fiche du jour, placement).
 - **en partie (lot c1)** — en place depuis la 4.88.0 ; ce qui reste est dit après les deux-points.
 - **fait (lot c2)** — en place depuis la 4.89.0 (Ma journée, finitions de l'Agenda).
+- **fait (lot b1)** — en place depuis la 4.90.0 (fiche du chantier en étapes).
 
 ---
 
@@ -96,7 +97,7 @@ venir** · **Derniers jours**.
 | Rappel d'échéances (prélèvements des charges fixes, 3 jours) | Bloc « Prélèvements à venir », séparé des tâches ; horizon 7 jours (la maquette), réglable dans Relances et calendrier | en partie (lot 5b) : bloc en place, 7 jours (le préavis plus long d'une échéance annuelle ou semestrielle est gardé) ; aucun réglage n'existait, rien d'ajouté — validé (30/10) ; horizon : proposé |
 | Rappel de devis en attente de réponse | Bientôt : « Relancer le devis ? » (délai de relance des Réglages) | fait (lot 5b) — validé (V2) |
 | Rappels fermables par × (reviennent au lancement suivant) | Chaque ligne d'En retard et de Bientôt garde un × « masquer jusqu'à demain » ; elle revient tant que ce n'est pas réglé | fait (lot 5b) ; les prélèvements gardent aussi leur × — proposé |
-| Bulle « journées à planifier » | Bientôt : « À programmer : N j à placer » par chantier engagé (« temps à estimer » s'il n'a pas d'estimation) → Agenda en mode placement, retour à Aujourd'hui à la fin | fait (lot c1) : « Fini de placer » ramène à Aujourd'hui ; « temps à estimer » ouvre la fiche, comme « Estimer » d'À programmer — validé (31/10, P1, P2) |
+| Bulle « journées à planifier » | Bientôt : « À programmer : N j à placer » par chantier engagé (« temps à estimer » s'il n'a pas d'estimation) → Agenda en mode placement, retour à Aujourd'hui à la fin | fait (lot c1) : « Fini de placer » ramène à Aujourd'hui ; « temps à estimer » ouvre la fiche, comme « Estimer » d'À programmer (lot b1 : sur l'étape Devis) — validé (31/10, P1, P2) |
 | Bulle « devis signés » | Même ligne « À programmer » (signé = à programmer) ; liste complète dans Chantiers | fait (lot 5b) — proposé |
 | Bulle « chantiers en cours » | Bloc « Chantiers en cours » (points d'étape, montant, situation) | fait (lot 5b) : tous les chantiers non soldés, comme la V2 — validé (V2 ; confirmé le 31/10 : on garde ce titre et ce contenu) |
 | Bulle « factures en attente » (+ « N en retard ») | En retard : « Facture impayée » quand l'échéance est dépassée ; total « Facturé, pas encore payé » dans Argent ▸ Mois | en partie (lot 5b) : la ligne est en place ; le total est le « en attente » du Bilan d'Argent (Argent ▸ Mois : lot d), à côté duquel « À facturer : N chantiers · X € » est revenu au 5b2 (appui → carnet filtré « Travaux terminés ») — validé (V2) |
@@ -140,63 +141,64 @@ Structure V2 : en-tête (← Chantiers, sélecteur) · titre et ligne lieu /
 surface / essences · encadré vert « Facturé à / Donneur d'ordre » · bulles
 d'étape et ligne d'état · trois chiffres · étapes repliables **Infos et
 repérage → Devis → Travaux → Facture → Payé** (celle en cours ouverte) ·
-tuiles Rendement, Fiche sécurité, Fournitures, Note.
+tuiles Rendement, Fiche sécurité, Fournitures, Note. En place au lot b1 (4.90.0) ;
+en bas, discrets : « Corriger l’étape à la main » et « Supprimer ce chantier ».
 
 | Ancien bloc ou bouton | Nouvel endroit | Statut |
 |---|---|---|
-| Sélecteur du chantier affiché | En-tête de la fiche | validé (V2) |
-| Précédente / Suivante | Gardées, à côté du sélecteur en tête de fiche | validé (31/10 : retrait refusé, R3) |
-| Le chantier : nom, lieu | Titre et ligne sous le titre | validé (V2) |
-| Le chantier : client, donneur d'ordre | Encadré vert | validé (V2) |
-| ✎ identité (fenêtre Le chantier, position comprise) | Appui sur l'encadré | proposé |
-| État sur la carte : Voir / Placer / Déplacer | Étape Infos et repérage : « Pas encore sur la carte » + « Je suis dessus » (position du téléphone) / « Placer sur la carte » ; une fois placé, « Sur la carte » + Voir | validé (31/10, maquette tour 2) |
-| Badge de statut | Bulles d'étape et ligne d'état | validé (V2) |
-| Facture et paiement résumés | Résumé replié des étapes Facture et Payé | validé (V2) |
-| « Il manque… » | Dans l'étape concernée | proposé |
-| ← Carnet | ← Chantiers | validé (V2) |
-| Changer le statut | Les gestes des étapes (Signé / Refusé, Travaux terminés, Facturer au montant du devis, Noter le paiement) + « Corriger l'étape à la main », discret en bas de la fiche, pour revenir en arrière ou rattraper un cas hors norme | validé (V2) ; correction à la main : proposé |
-| Bouton Fiche de chantier | Tuile « Fiche sécurité » | validé (V2) |
-| Ce que ça vaut / Ce que ça a rapporté : montant, jours, par journée | Trois chiffres : devis HT · journées faites / estimées · par jour (réel, au rythme actuel ou au devis) | validé (V2) |
-| … et l'objectif (prix de journée du chantier) | Sous le troisième chiffre (« objectif 300 € ») | proposé |
-| Fenêtre « L'objectif de ce chantier » (chantier soldé) et sa porte « Noter du temps » | ✎ sur le troisième chiffre ; « Noter du temps » → rattrapage de l'étape Travaux | proposé |
-| Bloc Le devis : numéro, dates, lignes, total HT, TVA, pied « le devis disait… » | Étape Devis : n°, envoyé le, signé le ou « en attente de réponse », lignes (quantité × prix, taux), total HT, TVA par taux, TTC, part prestation / vente | validé (V2) |
-| … validité du devis | Étape Devis (absente de la maquette, à garder) | proposé |
-| … temps estimé (✎, fenêtre L'estimation) | Étape Devis ▸ « Temps estimé », facultatif | validé (31/10) |
-| + Ligne ; Modifier / ✕ d'une ligne | Étape Devis | validé (V2) |
-| Attacher un devis (chantier sans devis) | Étape Devis ▸ « Saisir le devis » | validé (V2) |
-| Modifier le devis (après facturation) | ✎ de l'étape Devis | proposé |
-| Statut « Devis envoyé / signé », date de signature qui fait passer à « à programmer » | Étape Devis, mêmes effets | validé (V2) |
-| Refus + motif (statut, bloc Sans suite) | Étape Devis ▸ Refusé, qui demande le motif ; le chantier va dans « Sans suite » | proposé |
-| Bloc La facture : numéro, date, échéance | Étape Facture : « Facturer au montant du devis » (n° du logiciel de facturation + date), échéance | validé (31/10) |
-| Saisir la facture ; facture différente du devis (« le devis disait… ») | Étape Facture ▸ « Le montant change ? Modifier les lignes » : lignes de facture distinctes, comparaison au devis gardée | validé (31/10) |
-| Statut « Facturé » qui demande le n° de facture | Même geste « Facturer » | validé (V2) |
-| Payé le / Réglé par (la date fait passer à « Payé ») | Étape Payé ▸ « Noter le paiement » (date et « réglé par ») | validé (V2) |
-| Bloc Les journées : Date · Fait · Prévu ; fait / reste / estimé | Étape Travaux : avancement ligne par ligne du devis (pondéré par le montant), liste des jours prévus et faits (heures, quantités), total heures · jours · km, « terminé le » | validé (V2) |
-| … rendements | Tuile Rendement, facultative ; c'est aussi là qu'on note une cadence comptée (Q1) | validé (30/10, 31/10) |
-| … bilan « le devis paie / j'y ai passé » | Troisième chiffre et étape Travaux | proposé |
-| Poser des dates | Étape Travaux ▸ « Placer des jours dans l'Agenda » (mode placement, retour à la fiche à la fin) | en partie (lot c1) : le bouton s'appelle « Placer dans l'Agenda » et « Fini de placer » ramène à la fiche ; il passera dans l'étape Travaux avec la fiche (lot b) — validé (31/10, P1, P2) |
-| ✎ des journées (fenêtre Les journées : estimées + dates à la main) | Journées estimées → étape Devis (un seul endroit) ; dates → Agenda en mode placement ; la saisie de dates à la main sort | en partie (lot c1) : plus de dates dans la fenêtre, qui garde les journées estimées et reçoit « Placer dans l'Agenda » ; l'estimation partira dans l'étape Devis (lot b) — retrait accepté (31/10, R6) ; estimées : proposé |
-| + Du temps fait | + ▸ Ma journée (avec choix de la date) | retrait accepté (31/10, R4) |
-| Saisie sans date « rattrapage » (temps global d'un ancien chantier) | Étape Travaux ▸ « Ajouter du temps sans date (rattrapage) » | proposé (gardée) |
-| Case « Ce chantier est terminé » (Ma journée) → « Terminé, à facturer » | Inchangée ; et bouton « Travaux terminés » de l'étape Travaux | validé (V2) |
-| Bloc Fournitures : consommation, refacturé, coût, marge | Tuile Fournitures ; sorties du stock automatiques, quantités réservées dès le devis signé | validé (31/10) |
-| Bloc Le peuplement (✎) | Étape Infos et repérage : bloc « Peuplement » (essence · densité · surface, « à préciser » tant que vide) ; se remplit aussi par « Noter le repérage » | validé (31/10, maquette tour 2) |
-| Bloc Déplacements (km) | Étape Travaux : total km, détail par jour | proposé |
-| Bloc Note (✎) | Tuile Note | validé (V2) |
-| Supprimer ce chantier (corbeille) | Bas de la fiche | proposé (inchangé) |
-| Infos : dates d'annonce et de repérage | Discrètes ; en avant la note pratique (accès, code du portail) | validé (31/10) |
-| (nouveau) Noter le repérage | Étape Infos et repérage : feuille « Noter le repérage » (date, position « je suis dessus » ou carte, essence, densité, surface, « Ce que j'ai vu ») ; facultatif, le chantier peut passer au devis sans | validé (V2 ; 31/10, C2) |
-| (nouveau) Étape Devis d'un chantier sans devis choisi | Ouverte dès la création, sous Infos : « Saisir le devis » / « Pas de devis : à programmer » (le chantier passe à Travaux, « à programmer ») ; « Finalement, saisir un devis » pour revenir ; lien « Temps estimé (facultatif) » | validé (30/10 ; maquette tour 2) |
-| Toutes les portes vers la fiche (Ouvrir du Carnet, alerte À traiter, bulle à un seul chantier, rappel de devis, carte Journée ▸ Ouvrir, À planifier ▸ Estimer, fiche d'un jour ▸ Fiche, fin d'un placement, Estimer ▸ Créer le devis) | Ligne de Chantiers, toute ligne d'Aujourd'hui liée à un chantier, Agenda (carte Journée, fiche d'un jour, À programmer), fin d'un placement, Estimer ▸ Créer le devis | proposé |
+| Sélecteur du chantier affiché | En-tête de la fiche | fait (lot b1) — validé (V2) |
+| Précédente / Suivante | Gardées, à côté du sélecteur en tête de fiche | fait (lot b1) — validé (31/10 : retrait refusé, R3) |
+| Le chantier : nom, lieu | Titre et ligne sous le titre | fait (lot b1) — validé (V2) |
+| Le chantier : client, donneur d'ordre | Encadré vert | fait (lot b1) : « Facturé à » = le propriétaire (champ « Client » de la fenêtre Le chantier) — validé (V2) |
+| ✎ identité (fenêtre Le chantier, position comprise) | Appui sur l'encadré | fait (lot b1) — proposé |
+| État sur la carte : Voir / Placer / Déplacer | Étape Infos et repérage : « Pas encore sur la carte » + « Je suis dessus » (position du téléphone) / « Placer sur la carte » ; une fois placé, « Sur la carte » + Voir | fait (lot b1) : une fois placé, « Déplacer » reste à côté de Voir — validé (31/10, maquette tour 2) |
+| Badge de statut | Bulles d'étape et ligne d'état | fait (lot b1) : le badge reste sur la ligne d’état — validé (V2) |
+| Facture et paiement résumés | Résumé replié des étapes Facture et Payé | fait (lot b1) — validé (V2) |
+| « Il manque… » | Dans l'étape concernée | fait (lot b1) — proposé |
+| ← Carnet | ← Chantiers | fait (lot b1) — validé (V2) |
+| Changer le statut | Les gestes des étapes (Signé / Refusé, Travaux terminés, Facturer au montant du devis, Noter le paiement) + « Corriger l'étape à la main », discret en bas de la fiche, pour revenir en arrière ou rattraper un cas hors norme | fait (lot b1) : gestes Devis envoyé, Signé, Refusé, Travaux terminés, Facturer au montant du devis, Noter le paiement ; « Corriger l’étape à la main » ouvre l’ancienne liste des statuts — validé (V2) ; correction à la main : proposé |
+| Bouton Fiche de chantier | Tuile « Fiche sécurité » | fait (lot b1) : l’écran lui-même garde son nom et sa forme jusqu’au lot b2 — validé (V2) |
+| Ce que ça vaut / Ce que ça a rapporté : montant, jours, par journée | Trois chiffres : devis HT · journées faites / estimées · par jour (réel, au rythme actuel ou au devis) | fait (lot b1) : réel et au devis identiques à l’ancienne fiche ; « au rythme actuel » quand l’avancement se mesure (lignes en plants, ha, unités, ml) ; montant hors débours, vente comprise, comme avant — validé (V2) |
+| … et l'objectif (prix de journée du chantier) | Sous le troisième chiffre (« objectif 300 € ») | fait (lot b1) — proposé |
+| Fenêtre « L'objectif de ce chantier » (chantier soldé) et sa porte « Noter du temps » | ✎ sur le troisième chiffre ; « Noter du temps » → rattrapage de l'étape Travaux | fait (lot b1) — proposé |
+| Bloc Le devis : numéro, dates, lignes, total HT, TVA, pied « le devis disait… » | Étape Devis : n°, envoyé le, signé le ou « en attente de réponse », lignes (quantité × prix, taux), total HT, TVA par taux, TTC, part prestation / vente | fait (lot b1) : une fois facturé, l’étape Devis montre le devis figé et les lignes passent à l’étape Facture — validé (V2) |
+| … validité du devis | Étape Devis (absente de la maquette, à garder) | fait (lot b1) — proposé |
+| … temps estimé (✎, fenêtre L'estimation) | Étape Devis ▸ « Temps estimé », facultatif | fait (lot b1) — validé (31/10) |
+| + Ligne ; Modifier / ✕ d'une ligne | Étape Devis | fait (lot b1) : dans l’étape Devis, puis dans l’étape Facture une fois facturé — validé (V2) |
+| Attacher un devis (chantier sans devis) | Étape Devis ▸ « Saisir le devis » | fait (lot b1) : « Saisir le devis » (étape Infos) ; « Finalement, saisir un devis » (chantier sans devis) — validé (V2) |
+| Modifier le devis (après facturation) | ✎ de l'étape Devis | fait (lot b1) — proposé |
+| Statut « Devis envoyé / signé », date de signature qui fait passer à « à programmer » | Étape Devis, mêmes effets | fait (lot b1) : boutons « Devis envoyé » et « Signé » (date du jour proposée) — validé (V2) |
+| Refus + motif (statut, bloc Sans suite) | Étape Devis ▸ Refusé, qui demande le motif ; le chantier va dans « Sans suite » | fait (lot b1) — proposé |
+| Bloc La facture : numéro, date, échéance | Étape Facture : « Facturer au montant du devis » (n° du logiciel de facturation + date), échéance | fait (lot b1) — validé (31/10) |
+| Saisir la facture ; facture différente du devis (« le devis disait… ») | Étape Facture ▸ « Le montant change ? Modifier les lignes » : lignes de facture distinctes, comparaison au devis gardée | fait (lot b1) : « Le montant change ? Modifier les lignes » fige le devis tout de suite ; « Toute la facture » garde la fenêtre complète — validé (31/10) |
+| Statut « Facturé » qui demande le n° de facture | Même geste « Facturer » | fait (lot b1) — validé (V2) |
+| Payé le / Réglé par (la date fait passer à « Payé ») | Étape Payé ▸ « Noter le paiement » (date et « réglé par ») | fait (lot b1) — validé (V2) |
+| Bloc Les journées : Date · Fait · Prévu ; fait / reste / estimé | Étape Travaux : avancement ligne par ligne du devis (pondéré par le montant), liste des jours prévus et faits (heures, quantités), total heures · jours · km, « terminé le » | fait (lot b1) : fait / reste à faire / estimé gardés sous la liste — validé (V2) |
+| … rendements | Tuile Rendement, facultative ; c'est aussi là qu'on note une cadence comptée (Q1) | fait (lot b1) : la tuile montre le rendement et ouvre « + Cadence », chantier prérempli (Q1) — validé (30/10, 31/10) |
+| … bilan « le devis paie / j'y ai passé » | Troisième chiffre et étape Travaux | fait (lot b1) : dans l’étape Travaux — proposé |
+| Poser des dates | Étape Travaux ▸ « Placer des jours dans l'Agenda » (mode placement, retour à la fiche à la fin) | fait (lot b1) : « Placer des jours dans l’Agenda », dans l’étape Travaux — validé (31/10, P1, P2) |
+| ✎ des journées (fenêtre Les journées : estimées + dates à la main) | Journées estimées → étape Devis (un seul endroit) ; dates → Agenda en mode placement ; la saisie de dates à la main sort | fait (lot b1) : la fenêtre « Les journées » est retirée ; l’alerte « plus de jours placés qu’estimés » passe à la fenêtre L’estimation — retrait accepté (31/10, R6) ; estimées : proposé |
+| + Du temps fait | + ▸ Ma journée (avec choix de la date) | fait (lot b1) : plus de bouton dans la fiche — retrait accepté (31/10, R4) |
+| Saisie sans date « rattrapage » (temps global d'un ancien chantier) | Étape Travaux ▸ « Ajouter du temps sans date (rattrapage) » | fait (lot b1) — proposé (gardée) |
+| Case « Ce chantier est terminé » (Ma journée) → « Terminé, à facturer » | Inchangée ; et bouton « Travaux terminés » de l'étape Travaux | fait (lot b1) — validé (V2) |
+| Bloc Fournitures : consommation, refacturé, coût, marge | Tuile Fournitures ; sorties du stock automatiques, quantités réservées dès le devis signé | fait (lot b1) : la tuile ouvre le détail (consommation, refacturé, coût, marge) — validé (31/10) |
+| Bloc Le peuplement (✎) | Étape Infos et repérage : bloc « Peuplement » (essence · densité · surface, « à préciser » tant que vide) ; se remplit aussi par « Noter le repérage » | fait (lot b1) : la surface s’y ajoute (case facultative, accord du 01/11) — validé (31/10, maquette tour 2) |
+| Bloc Déplacements (km) | Étape Travaux : total km, détail par jour | fait (lot b1) : total km et carburant estimé, km de chaque jour dans sa ligne — proposé |
+| Bloc Note (✎) | Tuile Note | fait (lot b1) : la même note se lit « Ce que je sais » dans l’étape Infos — validé (V2) |
+| Supprimer ce chantier (corbeille) | Bas de la fiche | fait (lot b1) — proposé (inchangé) |
+| Infos : dates d'annonce et de repérage | Discrètes ; en avant la note pratique (accès, code du portail) | fait (lot b1) : l’annonce est la date « Entré le » de la fenêtre Le chantier — validé (31/10) |
+| (nouveau) Noter le repérage | Étape Infos et repérage : feuille « Noter le repérage » (date, position « je suis dessus » ou carte, essence, densité, surface, « Ce que j'ai vu ») ; facultatif, le chantier peut passer au devis sans | fait (lot b1) : la date, « ce que j’ai vu » et la surface sont trois cases nouvelles, facultatives (accord du 01/11, sans migration) — validé (V2 ; 31/10, C2) |
+| (nouveau) Étape Devis d'un chantier sans devis choisi | Ouverte dès la création, sous Infos : « Saisir le devis » / « Pas de devis : à programmer » (le chantier passe à Travaux, « à programmer ») ; « Finalement, saisir un devis » pour revenir ; lien « Temps estimé (facultatif) » | fait (lot b1) : « Finalement, saisir un devis » ne fait pas reculer l’étape — validé (30/10 ; maquette tour 2) |
+| Toutes les portes vers la fiche (Ouvrir du Carnet, alerte À traiter, bulle à un seul chantier, rappel de devis, carte Journée ▸ Ouvrir, À planifier ▸ Estimer, fiche d'un jour ▸ Fiche, fin d'un placement, Estimer ▸ Créer le devis) | Ligne de Chantiers, toute ligne d'Aujourd'hui liée à un chantier, Agenda (carte Journée, fiche d'un jour, À programmer), fin d'un placement, Estimer ▸ Créer le devis | fait (lot b1) : « temps à estimer » (Aujourd’hui, Agenda) et Estimer ▸ Créer le devis ouvrent l’étape Devis ; fiche du jour ▸ Fiche et fin d’un placement, l’étape Travaux ; les autres, l’étape en cours — proposé |
 
 ### 3.3 Fiche de chantier → Fiche sécurité
 
 | Ancien | Nouvel endroit | Statut |
 |---|---|---|
-| Onglet « Fiche de chantier », bouton de la fiche | Tuile « Fiche sécurité » de la fiche ; le mot « Fiche sécurité » partout | validé (V2) |
+| Onglet « Fiche de chantier », bouton de la fiche | Tuile « Fiche sécurité » de la fiche ; le mot « Fiche sécurité » partout | en partie (lot b1) : la tuile et le mot sont sur la fiche ; l’écran et son onglet gardent « Fiche de chantier » jusqu’au lot b2 — validé (V2) |
 | Choix du filtre et du chantier | Gardé dans l'écran (on y entre aussi par le chantier) | proposé |
 | Alerte « fiche obligatoire » (plus de 4 ha), « Il manque » + Compléter le chantier, Qui / où / quoi, Période d'intervention, « Déjà connu ici » + Reprendre ses risques, familles de risques, Secours (accès, réseau, « Sa position, je suis dessus »), Co-activité et croquis, Aperçu, Imprimer / PDF | Inchangés | proposé (inchangé) |
-| Rappel « à préparer avant les travaux » | Sous-titre de la tuile | validé (V2) |
+| Rappel « à préparer avant les travaux » | Sous-titre de la tuile | fait (lot b1) : « obligatoire, plus de 4 ha » au-delà du seuil — validé (V2) |
 
 ---
 
@@ -216,7 +218,7 @@ tuiles Rendement, Fiche sécurité, Fournitures, Note.
 | Fenêtres Déplacer la journée, Jour non travaillé, Poser un chantier (sur un jour) | Inchangées, ouvertes depuis la fiche du jour ; « Poser un chantier » est la porte « par le jour » du placement (durée 1 h à 8 h) | fait (lot c1) : « Déplacer la journée » est aussi proposé sur un jour à venir posé (maquette) — validé (31/10, P1) ; lot c2 : elles montent du bas et portent « ← jour » |
 | Onglet Carte | Chantiers ▸ Carte | validé (V2) |
 | Onglet Carnet | Retiré (même écran que Chantiers) | fait (lot c1) : aucune fonction ne passait que par lui (même vue que Chantiers ▸ Carnet) — retrait accepté (31/10, R1) |
-| Historique des jours et des heures | Agenda, sous la grille : le mois jour par jour, groupé par semaine (heures, quantités, km ; appui → Ma journée) ; et dans chaque chantier (étape Travaux) | fait (lot c1) : sous la grille, la semaine la plus récente ouverte ; dans chaque chantier : avec la fiche (lot b) — validé (31/10, maquette 5b) |
+| Historique des jours et des heures | Agenda, sous la grille : le mois jour par jour, groupé par semaine (heures, quantités, km ; appui → Ma journée) ; et dans chaque chantier (étape Travaux) | fait (lot c1) : sous la grille, la semaine la plus récente ouverte ; fait (lot b1) : dans chaque chantier, étape Travaux — validé (31/10, maquette 5b) |
 
 ---
 
@@ -346,22 +348,22 @@ fournisseur, entrées de listes (Réglages) · Coller depuis Excel · Importer
 | Fenêtre | Ouverte depuis (après la refonte) | Statut |
 |---|---|---|
 | Nouveau chantier | + ▸ Chantier | validé (31/10, maquette tour 2) |
-| Le chantier (identité) | Encadré de la fiche | proposé |
-| L'estimation | Étape Devis ▸ Temps estimé | proposé |
-| Le devis | Étape Devis | validé (V2) |
-| La facture | Étapes Facture et Payé | validé (V2) |
-| Le peuplement | Étape Infos et repérage | proposé |
-| Note du chantier | Tuile Note | validé (V2) |
-| Ligne de travaux | Étape Devis (et Facture si les lignes changent) | validé (V2) |
+| Le chantier (identité) | Encadré de la fiche | fait (lot b1) — proposé |
+| L'estimation | Étape Devis ▸ Temps estimé ; ✎ du troisième chiffre | fait (lot b1) — proposé |
+| Le devis | Étape Devis | fait (lot b1) — validé (V2) |
+| La facture | Étapes Facture et Payé | fait (lot b1) — validé (V2) |
+| Le peuplement | Étape Infos et repérage | fait (lot b1) : reçoit la surface — proposé |
+| Note du chantier | Tuile Note | fait (lot b1) — validé (V2) |
+| Ligne de travaux | Étape Devis (et Facture si les lignes changent) | fait (lot b1) — validé (V2) |
 | Temps passé | Fusionnée dans Ma journée ; rattrapage sans date dans l'étape Travaux | retrait accepté (31/10, R4) |
-| Les journées | Éclatée : estimées → Devis ; dates → Agenda (placement) | en partie (lot c1) : dates → Agenda (placement) ; estimées encore dans la fenêtre, jusqu'à l'étape Devis (lot b) — retrait accepté (31/10, R6) |
-| Statut (+ motif de refus, + n° de facture) | Gestes des étapes ; « Corriger l'étape à la main » | proposé |
-| L'objectif de ce chantier | ✎ du troisième chiffre | proposé |
+| Les journées | Éclatée : estimées → Devis ; dates → Agenda (placement) | fait (lot b1) : fenêtre retirée, chaque porte a son nouvel endroit — retrait accepté (31/10, R6) |
+| Statut (+ motif de refus, + n° de facture) | Gestes des étapes ; « Corriger l'étape à la main » | fait (lot b1) — proposé |
+| L'objectif de ce chantier | ✎ du troisième chiffre | fait (lot b1) — proposé |
 | Ma journée | + ; Aujourd'hui (ligne de saisie) ; fiche du jour ; historique de l'Agenda et Derniers jours (modifier) | fait (lot c2) : forme retenue du tour 1, pied fixe ; aucun champ ne se refait pendant la frappe — validé (31/10, maquette 5b) |
 | Fiche d'un jour | Appui sur un jour de l'Agenda ; Aujourd'hui ▸ Trancher ; ligne à trancher et bouton Aujourd'hui de l'Agenda. Absorbe la carte Journée et « Que s'est-il passé ? » | fait (lot c1) — validé (31/10, R7, R8) |
 | Que s'est-il passé ? | Fondue dans la fiche du jour (état « à trancher ») | fait (lot c1) — retrait accepté (31/10, R8) |
 | Déplacer la journée · Jour non travaillé · Poser un chantier | Depuis la fiche du jour | fait (lot c1) — validé (31/10) |
-| Placer un chantier sur la carte | Étape Infos ; Chantiers ▸ Carte | proposé |
+| Placer un chantier sur la carte | Étape Infos ; Chantiers ▸ Carte | en partie (lot b1) : étape Infos ; Chantiers ▸ Carte au lot b2 — proposé |
 | Dépense | + ▸ Dépense ; liste Argent ▸ Dépenses (modifier, supprimer dans la feuille) | validé (31/10, D1-D5) |
 | Charge fixe | + ▸ Charge fixe ; liste Charges fixes (modifier) | validé (31/10) |
 | Mouvement (versement / récupération) | Année ▸ Déclarations | proposé |
@@ -371,7 +373,7 @@ fournisseur, entrées de listes (Réglages) · Coller depuis Excel · Importer
 | Sortie de stock | Stock ▸ Sorties ; automatique depuis la facture | proposé |
 | Import de fournitures | Stock ▸ Importer | proposé (inchangé) |
 | (nouvelle) Compter le stock | Stock ▸ Inventaire, Stock ▸ Pertes, fiche d'un produit | validé (31/10, S3) |
-| (nouvelle) Noter le repérage | Fiche ▸ étape Infos et repérage | validé (31/10, C2) |
+| (nouvelle) Noter le repérage | Fiche ▸ étape Infos et repérage | fait (lot b1) — validé (31/10, C2) |
 | Achat à venir | + ▸ Achat à prévoir ; Ma liste (ligne) | validé (V2) |
 | Fiche du véhicule · Relevé du compteur · Poste d'entretien | ☰ ▸ Véhicule | proposé (inchangé) |
 | Intervention | + ▸ Noter une intervention ; Véhicule ▸ Carnet (modifier) | validé (V2) |
@@ -474,7 +476,7 @@ La fonction reste toujours accessible ; seule la porte en double part.
 - **C1** — Chantier à l'étape Infos : une ligne « Devis à faire » dans Bientôt, « pas encore repéré » en petit ; plus de « Repérage à faire ».
 - **C1, confirmé le 31/10 (5b2)** — « Devis à faire » = statut « Devis à envoyer », même si le devis est rédigé, tant qu'il n'est pas envoyé. Rien à changer.
 - **Chantier « en retard », confirmé le 31/10 (5b2)** — reste seulement dans « À traiter » du carnet, pas dans Aujourd'hui.
-- **C2** — « Noter le repérage » en une fois : date, position, peuplement, ce que j'ai vu.
+- **C2** — « Noter le repérage » en une fois : date, position, peuplement, ce que j'ai vu. Fait (lot b1) ; la date, « ce que j'ai vu » et la surface sont trois cases nouvelles du chantier (accord du 01/11).
 - **S1** — Le stock baisse à « Travaux terminés » (comportement actuel), pas à la facture.
 - **S2** — « À recommander » compte aussi le réservé : disponible sous zéro = alerte, même au-dessus du seuil.
 - **S3** — Compter : une seule feuille, écart daté dans Pertes, surplus au coût moyen sans dépense.

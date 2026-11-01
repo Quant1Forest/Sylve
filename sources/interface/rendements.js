@@ -246,7 +246,7 @@ function ouvrirDetailRendement(travail) {
     });
   });
 }
-function ouvrirCadence(travail, unite) {
+function ouvrirCadence(travail, unite, surChantier) {
   var u = unite || C.courtUnite(C.uniteDe(travail));
   /* Les chantiers qui portent cette prestation d'abord : c'est sur l'un
      d'eux qu'il vient de la chronométrer. */
@@ -274,7 +274,8 @@ function ouvrirCadence(travail, unite) {
     '<div class="champ"><label class="eyebrow" for="cd-ch">Constaté sur</label>' +
     '<select id="cd-ch"><option value="">— sans chantier —</option>' +
     chs.map(function (c) {
-      return '<option value="' + c.id + '">' + esc(C.nomChantier(c)) + '</option>';
+      return '<option value="' + c.id + '"' + (c.id === surChantier ? ' selected' : '') + '>' +
+        esc(C.nomChantier(c)) + '</option>';
     }).join('') + '</select></div>' +
     '<div class="champ"><label class="eyebrow" for="cd-note">Dans quel contexte</label>' +
     '<input type="text" id="cd-note" autocomplete="off" ' +
@@ -306,7 +307,7 @@ function ouvrirCadence(travail, unite) {
       chantier: $('#cd-ch').value, note: $('#cd-note').value.trim(), date: Date.now()
     });
     Promise.resolve(sauverCfg()).then(function () {
-      fermerModale(); renderRendements(); toast('Cadence enregistrée.');
+      fermerModale(); renderRendements(); renderFiche(); toast('Cadence enregistrée.');
     });
   });
 }

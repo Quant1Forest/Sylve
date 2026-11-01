@@ -26,7 +26,7 @@
 
 module.exports = {
   /* ouvrirEnteteCh, ouvrirIdentiteCh, ouvrirDevisCh, ouvrirFactureCh,
-     ouvrirEstimationCh, ouvrirJourneesCh, ouvrirPeuplementCh, ouvrirNoteCh,
+     ouvrirEstimationCh, ouvrirPeuplementCh, ouvrirReperageCh, ouvrirNoteCh,
      figerDevis, la fiche de chantier, et l'import CSV.
      `temps` est une lecture des journées, pas une saisie — mais elle est
      stockée, et les scénarios la sèment pour partir d'un état donné. */
@@ -36,7 +36,9 @@ module.exports = {
     'joursEstimes', 'prixJour', 'criteres', 'notes', 'fiche', 'devisFige',
     'numeroDevis', 'dateDevis', 'validiteDevis', 'dateEnvoi', 'dateSignature',
     'numeroFacture', 'dateFacture', 'echeancePaiement', 'datePaiement',
-    'moyenPaiement', 'dateFin', 'debut'],
+    'moyenPaiement', 'dateFin', 'debut',
+    /* Lot b1 : le repérage (C2), accordé le 01/11 — trois cases facultatives. */
+    'dateReperage', 'vuReperage', 'surface'],
 
   /* ouvrirCharge : var maj = { libelle, beneficiaire, ttc, periodicite,
      debut, jour, moisReference, taux, categorie, dansDepenses, arretee, maj }.

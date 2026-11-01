@@ -294,23 +294,41 @@ function brancher() {
   $('#fiche-chantier').addEventListener('change', function (e) {
     if (e.target && e.target.id === 'f-choix' && e.target.value) ouvrirChantier(e.target.value);
   });
+  /* Ce qu'il déplie ou replie se garde tant qu'il reste sur ce chantier :
+     enregistrer une ligne redessine la fiche, pas ses étapes. « toggle » ne
+     remonte pas : on l'écoute à la descente. */
+  $('#fiche-chantier').addEventListener('toggle', function (e) {
+    var d = e.target;
+    if (!d || !d.dataset || d.dataset.etape == null || !A.ficheVue) return;
+    A.ficheVue.ouvertes[Number(d.dataset.etape)] = d.open;
+  }, true);
   $('#fiche-chantier').addEventListener('click', function (e) {
     var id = A.chOuvert, c = chantier(id);
     var voisin = e.target.closest('[data-voisin]');
     if (voisin) { ouvrirChantier(voisin.dataset.voisin); return; }
     if (e.target.closest('[data-chretour]')) { aller('carnet'); return; }
     if (!c) return;
-    /* Chaque bloc de la fiche ouvre son propre formulaire : on ne cherche
-       plus le numéro de devis au milieu des essences. */
+    var aujourdhui = C.minuit(Date.now()) + 12 * 3600000;
+    /* Chaque étape ouvre son propre formulaire : on ne cherche plus le
+       numéro de devis au milieu des essences. */
     if (e.target.closest('#f-identite')) { ouvrirIdentiteCh(id); return; }
-    if (e.target.closest('#f-estim')) { ouvrirEstimationCh(id); return; }
+    if (e.target.closest('#f-estim') || e.target.closest('#f-objectif')) { ouvrirEstimationCh(id); return; }
     if (e.target.closest('#f-devis')) { ouvrirDevisCh(id); return; }
-    if (e.target.closest('#f-facture')) { ouvrirFactureCh(id); return; }
+    if (e.target.closest('#f-devis-oui')) { ouvrirDevisCh(id, true); return; }
+    if (e.target.closest('#f-facture') || e.target.closest('[data-fiact="facture"]')) {
+      ouvrirFactureCh(id); return;
+    }
     if (e.target.closest('#f-peuplement')) { ouvrirPeuplementCh(id); return; }
+    if (e.target.closest('#f-reperage')) { ouvrirReperageCh(id); return; }
     if (e.target.closest('#f-note')) { ouvrirNoteCh(id); return; }
-    if (e.target.closest('#f-jours')) { ouvrirJourneesCh(id); return; }
+    if (e.target.closest('#f-rendement')) { ouvrirRendementCh(id); return; }
+    if (e.target.closest('#f-fournitures')) { ouvrirFournituresCh(id); return; }
     if (e.target.closest('#f-statut')) { ouvrirStatut(id); return; }
     var fc = e.target.closest('[data-fcarte]');
+    if (fc && fc.dataset.fcarte === 'moi') {
+      releverPosition(fc, function (pt) { majChantier(c, { gps: pt }, 'Position enregistrée.'); });
+      return;
+    }
     if (fc) { montrerSurCarte(c, fc.dataset.fcarte === 'placer'); return; }
     if (e.target.closest('#f-fichech')) {
       A.fch = id;
@@ -324,6 +342,61 @@ function brancher() {
     if (e.target.closest('#f-ligne')) { ouvrirLigne(id, null); return; }
     if (e.target.closest('#f-temps')) { ouvrirTemps(id); return; }
     if (e.target.closest('#f-planifier')) { demarrerPlacement(id, 'fiche'); return; }
+    /* Les gestes des étapes : chacun fait ce que faisait le statut choisi à
+       la main, avec les mêmes dates posées en passant. */
+    if (e.target.closest('#f-sansdevis')) {
+      majChantier(c, { aDevis: false, numeroDevis: '', dateDevis: null, dateSignature: null,
+        validiteDevis: null, statut: c.statut === 'devis' || c.statut === 'envoye' ? 'accepte' : c.statut },
+        'Sans devis — chantier « ' + C.nomStatut('accepte', { aDevis: false }) + ' ».');
+      return;
+    }
+    if (e.target.closest('#f-envoye')) { majChantier(c, { statut: 'envoye' }, 'Devis envoyé.'); return; }
+    if (e.target.closest('#f-signe')) {
+      var signe = { dateSignature: versDate($('#f-signe-date').value) || aujourdhui };
+      if (C.rangStatut(c.statut) < C.rangStatut('accepte')) signe.statut = 'accepte';
+      majChantier(c, signe, 'Devis signé — chantier « ' + C.nomStatut('accepte', c) + ' ».');
+      return;
+    }
+    if (e.target.closest('#f-refuse')) {
+      c.statut = 'sansuite'; horodaterStatut(c); c.maj = Date.now();
+      demanderMotifRefus(c);
+      return;
+    }
+    if (e.target.closest('#f-termine')) {
+      majChantier(c, { statut: 'termine' }, 'Travaux terminés — chantier « ' + C.nomStatut('termine', c) + ' ».');
+      return;
+    }
+    /* Le montant change : le devis se fige maintenant, tel qu'il a été signé,
+       et les lignes deviennent celles de la facture. C'est la photo qui dira
+       ensuite laquelle a été ajoutée ou modifiée. */
+    if (e.target.closest('#f-modlignes')) {
+      figerDevis(c); c.maj = Date.now();
+      A.ficheVue.ouvertes[3] = true;
+      sauverChantiers().then(function () {
+        renderFiche();
+        toast('Les lignes sont maintenant celles de la facture ; le devis est gardé pour comparaison.');
+      });
+      return;
+    }
+    var ech = e.target.closest('[data-ffech]');
+    if (ech) {
+      var base = versDate($('#ff-date').value) || C.minuit(Date.now());
+      $('#ff-ech').value = versChamp(base + Number(ech.dataset.ffech) * C.JOUR);
+      return;
+    }
+    if (e.target.closest('#f-facturer')) {
+      var num = lireNumero('F', 'ff-num');
+      majChantier(c, { numeroFacture: num, dateFacture: versDate($('#ff-date').value) || aujourdhui,
+        echeancePaiement: versDate($('#ff-ech').value), statut: 'facture' },
+        'Facturé' + (num ? ' — n° ' + num : '') + '.');
+      return;
+    }
+    if (e.target.closest('#f-payer')) {
+      majChantier(c, { datePaiement: versDate($('#fp-date').value) || aujourdhui,
+        moyenPaiement: $('#fp-moyen').value || null, statut: 'paye' },
+        'Paiement noté — chantier « ' + C.nomStatut('paye', c) + ' ».');
+      return;
+    }
     var lm = e.target.closest('[data-lmod]'), ls = e.target.closest('[data-lsup]'),
       ts = e.target.closest('[data-tsup]');
     if (lm) { ouvrirLigne(id, Number(lm.dataset.lmod)); return; }
@@ -394,7 +467,7 @@ function brancher() {
     A.chantiers.push(ch);
     sauverChantiers().then(function () {
       renderCarnet(); renderAccueil();
-      ouvrirChantier(ch.id);
+      ouvrirChantier(ch.id, 'devis');
       toast('Devis créé — complétez le nom et le donneur d’ordre.');
     });
   });
@@ -795,7 +868,7 @@ function brancher() {
   });
   $('#cal-aplanifier').addEventListener('click', function (e) {
     var p = e.target.closest('[data-aplacer]'), es = e.target.closest('[data-aestimer]');
-    if (es) { ouvrirChantier(es.dataset.aestimer); return; }
+    if (es) { ouvrirChantier(es.dataset.aestimer, 'devis'); return; }
     if (p) demarrerPlacement(p.dataset.aplacer, 'agenda');
   });
   /* « toggle » ne remonte pas : on l'écoute à la descente. Replié une fois,

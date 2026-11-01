@@ -734,3 +734,96 @@ function enRetard(ch, maintenant) {
 }
 
 
+
+/* ------------------------------------------------- la fiche en étapes
+   Cinq étapes, qui se lisent sur le statut sans rien stocker de plus : la
+   fiche, les points d'Aujourd'hui et les bulles disent la même chose.
+   « Devis à envoyer » est encore l'étape Infos (C1) ; un devis refusé
+   s'arrête au Devis ; « Payé » a franchi les cinq. */
+var ETAPES_FICHE = ['Infos et repérage', 'Devis', 'Travaux', 'Facture', 'Payé'];
+var ETAPE_STATUT = { devis: 0, envoye: 1, sansuite: 1, accepte: 2, encours: 2,
+  termine: 3, facture: 4, paye: 5 };
+function etapeChantier(ch) {
+  var e = ETAPE_STATUT[ch && ch.statut];
+  return e == null ? 0 : e;
+}
+/* La TVA taux par taux, comme sur le papier du client. Chaque taux porte sa
+   base : c'est ce qu'une déclaration demande, et ce qui explique un total
+   où deux taux se mêlent. */
+function tvaParTaux(ch) {
+  var par = {};
+  ((ch && ch.lignes) || []).forEach(function (l) {
+    var t = tauxLigne(l, ch), k = String(t);
+    par[k] = par[k] || { taux: t, base: 0, tva: 0 };
+    par[k].base += montantLigne(l);
+    par[k].tva += montantLigne(l) * t / 100;
+  });
+  return Object.keys(par).map(function (k) {
+    return { taux: par[k].taux, base: arr(par[k].base, 2), tva: arr(par[k].tva, 2) };
+  }).sort(function (a, b) { return b.taux - a.taux; });
+}
+/* La part prestation et la part vente : la nature de la ligne décide de
+   l'abattement, c'est elle qu'on additionne. Le débours reste à part. */
+function partsChantier(ch) {
+  var p = { prestation: 0, vente: 0, debours: 0 };
+  ((ch && ch.lignes) || []).forEach(function (l) {
+    var k = l.nature === 'vente' ? 'vente' : l.nature === 'debours' ? 'debours' : 'prestation';
+    p[k] += montantLigne(l);
+  });
+  p.prestation = arr(p.prestation, 2); p.vente = arr(p.vente, 2); p.debours = arr(p.debours, 2);
+  return p;
+}
+/* Où en sont les travaux, ligne par ligne du devis : ce que les journées ont
+   compté face à ce que la ligne annonce. Seules les prestations qui se
+   comptent (plants, hectares, unités, mètres) entrent : un forfait ou une
+   journée ne dit pas combien il en reste. Chaque ligne pèse son montant —
+   finir les gaines ne fait pas la moitié d'une plantation.
+   Une quantité notée sur un travail que deux lignes portent remplit la
+   première avant la suivante. */
+function avancement(ch) {
+  var lignes = ((ch && ch.lignes) || []).filter(function (l) {
+    var u = trouve(UNITES, l.unite);
+    return l.nature !== 'vente' && l.nature !== 'debours' && u && u.quantifiee &&
+      nb(l.quantite) > 0 && montantLigne(l) > 0;
+  });
+  if (!lignes.length) return null;
+  var faits = {};
+  ((ch && ch.temps) || []).forEach(function (t) {
+    if (t.activite && nb(t.quantite) > 0) faits[t.activite] = (faits[t.activite] || 0) + nb(t.quantite);
+  });
+  var poids = 0, fait = 0;
+  var out = lignes.map(function (l) {
+    var q = nb(l.quantite), f = 0;
+    travauxDeLigne(l).forEach(function (tv) {
+      var pris = Math.min(faits[tv] || 0, q - f);
+      if (pris > 0) { f += pris; faits[tv] -= pris; }
+    });
+    var m = montantLigne(l);
+    poids += m; fait += m * f / q;
+    return { titre: l.note || nomTravauxLigne(l), unite: l.unite, quantite: q,
+      fait: arr(f, 3), part: arr(f / q, 4) };
+  });
+  return { lignes: out, taux: poids > 0 ? arr(fait / poids, 4) : 0 };
+}
+/* Les trois chiffres en tête de fiche : ce que le chantier vaut, le temps
+   qu'il prend, et ce que la journée rapporte. Le prix de journée se lit
+   selon ce qu'on sait : réel une fois les travaux finis, au rythme actuel
+   tant qu'ils tournent et que l'avancement se mesure, au devis sinon. Réel
+   et au devis sont ceux de l'ancienne fiche, au centime près. */
+function troisChiffres(ch, cfg) {
+  var m = montantHorsDebours(ch), solde = chantierSolde(ch);
+  var faites = solde ? tempsPasse(ch, cfg) : tempsMoi(ch, cfg);
+  var est = joursPrevus(ch), av = avancement(ch);
+  var r = { montant: m, faites: faites, estimees: est, saisi: tempsMoi(ch, cfg) > 0,
+    parJour: null, mode: null, vise: prixJourVise(ch, cfg) || null, avancement: av };
+  if (!(m > 0)) return r;
+  if (solde) {
+    if (faites > 0) { r.parJour = m / faites; r.mode = 'reel'; }
+  } else if ((ch.statut === 'encours' || ch.statut === 'accepte') && faites > 0 &&
+    av && av.taux > 0) {
+    r.parJour = m / (faites / Math.min(1, av.taux)); r.mode = 'rythme';
+  } else if (est > 0) {
+    r.parJour = m / est; r.mode = 'devis';
+  }
+  return r;
+}

@@ -92,42 +92,6 @@ function partsPossibles(courante) {
       x.n + '</option>';
   }).join('');
 }
-/* Les journées estimées du chantier. Les dates ne se tapent plus ici (R6) :
-   elles se posent dans l'Agenda, qui montre le mois et les jours déjà pris,
-   et qui reçoit l'alerte « jour déjà pris ». Le nombre estimé reste ici
-   jusqu'à ce que l'étape Devis l'accueille. */
-function ouvrirJourneesCh(id) {
-  var c = chantier(id); if (!c) return;
-  var place = C.totalPlace(c);
-  modale('Les journées',
-    '<div class="champ"><label class="eyebrow" for="ce-jest">Journées estimées</label>' +
-    '<input type="text" id="ce-jest" inputmode="decimal" autocomplete="off" value="' +
-    (c.joursEstimes != null ? esc(String(c.joursEstimes).replace('.', ',')) : '') + '"></div>' +
-    '<p class="muted" style="font-size:12px;margin:0">Placées dans l’Agenda : ' +
-    '<b id="ce-total-jours" class="num">' + (place ? E.fmt(place, place % 1 ? 1 : 0) : '—') +
-    '</b>. Les dates se posent dans l’Agenda : il montre le mois et les jours déjà pris.</p>' +
-    '<div class="btn-rang" style="margin-top:11px">' +
-    '<button class="btn" id="cj-placer">Placer dans l’Agenda</button>' +
-    '<button class="btn primaire" id="cj-ok">Valider</button></div>');
-  var estimees = function () { var j = C.nb($('#ce-jest').value); return j > 0 ? j : null; };
-  $('#cj-ok').addEventListener('click', function () {
-    var jest = estimees();
-    if (jest && place > jest) {
-      var tropDe = C.arr(place - jest, 2);
-      if (!confirm('Vous avez placé ' + E.fmt(place, place % 1 ? 1 : 0) + ' journées pour ' +
-        E.fmt(jest, jest % 1 ? 1 : 0) + ' estimées, soit ' +
-        String(tropDe).replace('.', ',') + ' de trop.\n\nEnregistrer quand même ?')) return;
-    }
-    majChantier(c, { joursEstimes: jest }, 'Journées enregistrées.');
-  });
-  /* Ce qui vient d'être tapé n'est pas perdu en partant placer : le compte
-     du bandeau s'en sert. */
-  $('#cj-placer').addEventListener('click', function () {
-    c.joursEstimes = estimees(); c.maj = Date.now();
-    sauverChantiers().then(function () { demarrerPlacement(c.id, 'fiche'); });
-  });
-}
-
 /* La création d'un chantier tenait en vingt-trois champs : le devis, la
    facture, les journées, le peuplement, le statut, la note. Tout cela se
    remplit maintenant bloc par bloc sur la fiche, une fois le chantier ouvert.
@@ -527,17 +491,26 @@ function ouvrirEstimationCh(id) {
   }
   $('#es-ok').addEventListener('click', function () {
     var jest = C.nb($('#es-jest').value);
+    /* L'alerte vivait dans la fenêtre « Les journées », partie au lot b1 :
+       l'estimation n'a plus qu'un endroit, elle la reprend. */
+    var place = C.totalPlace(c);
+    if (!solde && jest > 0 && place > jest) {
+      var tropDe = C.arr(place - jest, 2);
+      if (!confirm('Vous avez placé ' + E.fmt(place, place % 1 ? 1 : 0) + ' journées pour ' +
+        E.fmt(jest, jest % 1 ? 1 : 0) + ' estimées, soit ' +
+        String(tropDe).replace('.', ',') + ' de trop.\n\nEnregistrer quand même ?')) return;
+    }
     majChantier(c, { joursEstimes: jest > 0 ? jest : null,
       prixJour: C.nb($('#es-pj').value) || null }, 'Estimation enregistrée.');
   });
 }
 
 /* --- le devis, quand il y en a un --- */
-function ouvrirDevisCh(id) {
+function ouvrirDevisCh(id, cocher) {
   var c = chantier(id); if (!c) return;
   modale('Le devis',
     '<label class="ligne-check" style="display:flex;align-items:flex-start;gap:8px;font-size:13.5px;margin:0">' +
-    '<input type="checkbox" id="dv-a"' + (C.aDevis(c) ? ' checked' : '') + ' style="margin-top:2px">' +
+    '<input type="checkbox" id="dv-a"' + (C.aDevis(c) || cocher ? ' checked' : '') + ' style="margin-top:2px">' +
     '<span>J’ai fait un devis pour ce chantier' +
     '<span class="muted" style="display:block;font-size:11.5px">Décoché, les étapes de devis ' +
     'disparaissent du statut et rien d’autre n’est à remplir ici.</span></span></label>' +
@@ -647,7 +620,10 @@ function ouvrirPeuplementCh(id) {
     '<select id="ce-ess">' + optionsEssenceCh(cr.essence) + '</select></div>' +
     '<div class="champ"><label class="eyebrow" for="ce-dens">Densité (tiges ou plants/ha)</label>' +
     '<input type="text" id="ce-dens" inputmode="numeric" autocomplete="off" value="' +
-    (cr.densite || '') + '"></div></div>' +
+    (cr.densite || '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="ce-surf">Surface (ha)</label>' +
+    '<input type="text" id="ce-surf" inputmode="decimal" autocomplete="off" value="' +
+    (c.surface != null ? esc(String(c.surface).replace('.', ',')) : '') + '"></div></div>' +
     '<p class="muted" style="font-size:12px;margin:7px 0 0">L’essence pour vos statistiques, ' +
     'la densité parce que multipliée par la surface elle vous donne le nombre de plants.</p>' +
     '<div class="btn-rang" style="margin-top:11px">' +
@@ -656,9 +632,10 @@ function ouvrirPeuplementCh(id) {
   $('#pe-ok').addEventListener('click', function () {
     var essv = $('#ce-ess').value;
     if (essv === '__ajouter') essv = '';
-    majChantier(c, { criteres: Object.assign({}, c.criteres || {}, {
-      essence: essv || null, densite: C.nb($('#ce-dens').value) || null
-    }) }, 'Peuplement enregistré.');
+    majChantier(c, { surface: C.nb($('#ce-surf').value) || null,
+      criteres: Object.assign({}, c.criteres || {}, {
+        essence: essv || null, densite: C.nb($('#ce-dens').value) || null
+      }) }, 'Peuplement enregistré.');
   });
 }
 
@@ -1086,7 +1063,7 @@ function ouvrirTemps(id, quand) {
 
 function ouvrirStatut(id) {
   var c = chantier(id); if (!c) return;
-  modale('Statut — ' + C.nomChantier(c),
+  modale('Corriger l’étape — ' + C.nomChantier(c),
     C.statutsPossibles(c).map(function (s) {
       return '<button class="liste-item" data-setstatut="' + s.c + '" style="width:100%;text-align:left;background:none;border:none;border-bottom:1px solid var(--trait);cursor:pointer">' +
         '<span class="pastille" style="background:' + COUL_STATUT[s.c] + '"></span>' +
@@ -1095,7 +1072,7 @@ function ouvrirStatut(id) {
     }).join('') +
     (C.aDevis(c) ? '' : '<p class="muted" style="font-size:12px;margin:11px 0 0">' +
       'Ce chantier n’a pas de devis : les étapes de devis n’y figurent pas. ' +
-      'Cochez la case dans le bloc « Le devis » pour les faire apparaître.</p>'));
+      '« Finalement, saisir un devis », dans l’étape Devis, les fait apparaître.</p>'));
   $('#modale-corps').addEventListener('click', function (e) {
     var b = e.target.closest('[data-setstatut]'); if (!b) return;
     var avant = c.statut;
@@ -1113,3 +1090,108 @@ function ouvrirStatut(id) {
 }
 
 
+/* --- le repérage, noté en une fois (C2) ---
+   Date, position, peuplement et ce qu'on a vu : tout ce que le passage sur
+   place apprend, dans une feuille. Facultatif — un chantier passe au devis
+   sans repérage. Ce qui est déjà su est repris, rien n'est écrasé par du
+   vide. */
+function ouvrirReperageCh(id) {
+  var c = chantier(id); if (!c) return;
+  var cr = c.criteres || {}, gps = c.gps || null;
+  modale('Noter le repérage',
+    '<div class="champ"><label class="eyebrow" for="rp-date">Date</label>' +
+    '<input type="date" id="rp-date" value="' + versChamp(c.dateReperage || Date.now()) + '"></div>' +
+    '<div class="champ"><p class="eyebrow" style="margin:0 0 4px">Position</p>' +
+    '<div class="btn-rang"><button type="button" class="btn" id="rp-moi">' +
+    (gps && gps.lat != null ? 'Position enregistrée ✓' : 'Je suis dessus') + '</button>' +
+    '<button type="button" class="btn" id="rp-carte">Placer sur la carte</button></div>' +
+    '<p class="muted" style="font-size:11.5px;margin:5px 0 0">Facultatif. « Placer sur la carte » ' +
+    'enregistre d’abord ce qui est noté ici.</p></div>' +
+    '<div class="grille g2">' +
+    '<div class="champ"><label class="eyebrow" for="rp-ess">Essence</label>' +
+    '<select id="rp-ess">' + optionsEssenceCh(cr.essence) + '</select></div>' +
+    '<div class="champ"><label class="eyebrow" for="rp-dens">Densité (plants/ha)</label>' +
+    '<input type="text" id="rp-dens" inputmode="numeric" autocomplete="off" value="' +
+    (cr.densite || '') + '"></div></div>' +
+    '<div class="champ"><label class="eyebrow" for="rp-surf">Surface (ha)</label>' +
+    '<input type="text" id="rp-surf" inputmode="decimal" autocomplete="off" value="' +
+    (c.surface != null ? esc(String(c.surface).replace('.', ',')) : '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="rp-vu">Ce que j’ai vu</label>' +
+    '<textarea id="rp-vu" rows="3" placeholder="pente, accès, état du peuplement…">' +
+    esc(c.vuReperage || '') + '</textarea></div>' +
+    '<div class="btn-rang fi-pied"><button class="btn primaire plein" id="rp-ok">Enregistrer le repérage</button></div>');
+  $('#modale').classList.add('feuille-nav');
+  brancherEssenceCh('rp-ess', cr.essence || '');
+  var lire = function () {
+    var essv = $('#rp-ess').value;
+    if (essv === '__ajouter') essv = '';
+    return { dateReperage: versDate($('#rp-date').value) || C.minuit(Date.now()) + 12 * 3600000,
+      vuReperage: $('#rp-vu').value.trim(), gps: gps,
+      surface: C.nb($('#rp-surf').value) || c.surface || null,
+      criteres: Object.assign({}, c.criteres || {}, {
+        essence: essv || cr.essence || null, densite: C.nb($('#rp-dens').value) || cr.densite || null }) };
+  };
+  $('#rp-moi').addEventListener('click', function () {
+    var b = this;
+    releverPosition(b, function (pt) { gps = pt; b.textContent = 'Position enregistrée ✓'; });
+  });
+  $('#rp-carte').addEventListener('click', function () {
+    majChantier(c, lire(), '').then(function () { montrerSurCarte(c, true); });
+  });
+  $('#rp-ok').addEventListener('click', function () {
+    majChantier(c, lire(), 'Repérage noté.');
+  });
+}
+
+/* --- la tuile Rendement ---
+   Ce que ce chantier a mesuré, prestation par prestation, et la cadence
+   comptée sur place (Q1) : chantier prérempli, prestation prise parmi ses
+   lignes. */
+function ouvrirRendementCh(id) {
+  var c = chantier(id); if (!c) return;
+  var travaux = [];
+  (c.lignes || []).forEach(function (l) {
+    if (l.travail && !C.estFourniture(l.travail) && travaux.indexOf(l.travail) < 0) travaux.push(l.travail);
+  });
+  modale('Rendement — ' + C.nomChantier(c),
+    (travaux.length ? travaux.map(function (tv) {
+      var r = C.rendementTravail(c, tv, A.cfg);
+      return '<div class="liste-item"><div class="li-c"><b>' + esc(C.nomTravail(tv)) + '</b><small>' +
+        (r ? E.fmt(r.rendement, r.rendement < 10 ? 2 : 0) + ' ' + C.courtUnite(r.unite) +
+          ' / jour-homme · ' + E.fmt(r.quantite, 0) + ' ' + C.courtUnite(r.unite) + ' en ' +
+          E.fmt(r.jours, 1) + ' j' : 'pas encore mesuré : il faut la quantité et le temps') +
+        '</small></div><button class="btn-min" data-rdcad="' + esc(tv) + '">+ Cadence</button></div>';
+    }).join('') : '<p class="muted" style="font-size:12.5px;margin:0">Aucune prestation sur ce ' +
+      'chantier : ajoutez une ligne au devis.</p>') +
+    '<p class="muted" style="font-size:12px;margin:11px 0 0">Facultatif. Le rendement se mesure ' +
+    'seul, d’après les quantités et le temps de vos journées ; une cadence est ce que vous ' +
+    'comptez montre en main.</p>');
+  $('#modale-corps').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-rdcad]'); if (!b) return;
+    ouvrirCadence(b.dataset.rdcad, null, c.id);
+  });
+}
+
+/* --- la tuile Fournitures ---
+   Ce que le chantier prend au stock, ce qu'il en refacture et la marge. */
+function ouvrirFournituresCh(id) {
+  var c = chantier(id); if (!c) return;
+  var conso = ST.consommationChantier(A.articles, c.id);
+  var mg = conso.length ? ST.margeChantier(A.articles, c, C.montantLigne) : null;
+  modale('Fournitures — ' + C.nomChantier(c),
+    (conso.length ? conso.map(function (x) {
+      return '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13.5px">' +
+        '<span>' + esc(x.article.nom || '') + ' <span class="muted">' +
+        E.fmt(x.qte, 0) + ' ' + ST.courtUniteArt(x.article.unite) + '</span></span>' +
+        '<span class="num muted">' + eur(x.cout) + '</span></div>';
+    }).join('') +
+      (mg && mg.vendu ? '<div class="kpi" style="margin-top:11px">' +
+        '<div class="carte2"><b class="num">' + eur(mg.vendu) + '</b><small>refacturé</small></div>' +
+        '<div class="carte2"><b class="num">' + eur(mg.cout) + '</b><small>coût du stock</small></div>' +
+        '<div class="carte2"><b class="num" style="color:' + (mg.marge >= 0 ? 'var(--accent)' : 'var(--alerte)') +
+        '">' + eur(mg.marge) + '</b><small>marge' + (mg.taux != null ? ' · ' + mg.taux + ' %' : '') +
+        '</small></div></div>' : '')
+      : '<p class="muted" style="font-size:12.5px;margin:0">Aucune fourniture du stock sur ce chantier.</p>') +
+    '<p class="muted" style="font-size:12px;margin:11px 0 0">Une ligne du devis qui désigne un ' +
+    'produit le réserve dès la signature ; il sort du stock à « Travaux terminés ».</p>');
+}

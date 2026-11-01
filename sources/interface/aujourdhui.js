@@ -149,7 +149,7 @@ function lignesBientot() {
       titre: 'À programmer : ' + (estimer ? 'temps à estimer' : E.fmt(a.jours, a.jours % 1 ? 1 : 0) + ' j à placer'),
       sous: C.nomChantier(a.chantier) + (a.chantier.donneur ? ' · ' + a.chantier.donneur : ''),
       etiq: estimer ? 'Estimer' : 'Placer',
-      ouvre: (estimer ? 'fiche:' : 'placer:') + a.chantier.id });
+      ouvre: (estimer ? 'estimer:' : 'placer:') + a.chantier.id });
   });
   A.chantiers.forEach(function (c) {
     if (['accepte', 'encours', 'termine'].indexOf(c.statut) < 0) return;
@@ -320,6 +320,7 @@ function renderAujourdhui() {
    placer » ramène ici (P2). */
 var OUVRIR_AUJ = {
   fiche: function (id) { ouvrirChantier(id); },
+  estimer: function (id) { ouvrirChantier(id, 'devis'); },
   trancher: function (ts) { ouvrirFicheJour(Number(ts)); },
   placer: function (id) { demarrerPlacement(id, 'aujourdhui'); },
   sauvegarde: function () { allerReglages('sauvegarde'); },

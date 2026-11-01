@@ -233,6 +233,18 @@ Calendrier).
 7. **Le peuplement** (✎). 8. **Déplacements** (si des km). 9. **Sans suite**
    (si refusé). 10. **Note** (✎). 11. **Supprimer ce chantier**.
 
+**Depuis le lot b1 (4.90.0)**, ces blocs sont rangés en étapes : en-tête
+(← Chantiers, sélecteur, Précédente / Suivante) · titre et lieu · encadré
+« Facturé à / Donneur d'ordre » (✎ identité) · bulles d'étape et ligne d'état ·
+trois chiffres (montant HT · journées faites / estimées · par jour, objectif ✎) ·
+étapes repliables **Infos et repérage · Devis · Travaux · Facture · Payé** ·
+tuiles Rendement, Fiche sécurité, Fournitures, Note · « Corriger l'étape à la
+main » et « Supprimer ce chantier ». La fenêtre « Les journées » est retirée
+(estimées → étape Devis, dates → Agenda). Où va chaque bloc : section 3.2 de
+`docs/correspondance-refonte.md` ; les scénarios « Fiche en étapes : rien de
+l'ancienne fiche ne s'est perdu » lisent cette table et jouent la preuve de
+chaque ligne.
+
 **Fiche de chantier** (le document obligatoire imprimé) — fiche ▸ « Fiche de
 chantier », ou onglet. Blocs : choix du filtre et du chantier · alerte « fiche
 obligatoire » (> 4 ha) · « Il manque » + bouton **Compléter le chantier** ·
