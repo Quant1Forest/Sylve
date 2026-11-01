@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML servi, recollé depuis `sources/` sans rien transformer ; aucune
 dépendance, tout fonctionne hors ligne.
 
-Version courante : **4.87.2-20261101-0901**
+Version courante : **4.88.0-20261101-1012**
 
 ---
 
@@ -75,10 +75,12 @@ npm run controle   # fabrication + vérificateur + service worker + tests + larg
 
 Doit afficher **« index.html fabriqué »**, puis **« Bon pour livraison »**,
 puis **« le service worker tient »** (33 vérifications), puis la suite au
-vert — 2364 à ce jour — puis **« largeur : … aucune page plus large que l’écran »** (mesure dans un vrai Chrome à 320 et 360 px, `outils/largeur.js` ; sans Chrome elle le dit et passe), puis **« Sylve.html est conforme »**.
+vert — 2481 à ce jour, et 650 à chaque date figée — puis la même suite **à date figée**, le 1er puis le dernier jour d'un mois
+(scénarios qui touchent au temps seulement, `SYLVE_DATE` et `--motif=` : `docs/tests-et-pieges.md`) — puis **« largeur : … aucune page plus large que l’écran »** (mesure dans un vrai Chrome à 320 et 360 px, `outils/largeur.js` ; sans Chrome elle le dit et passe), puis **« Sylve.html est conforme »**.
 
-Compter **trois minutes** : 187 à 221 s mesurées au lot 4b, 260 s au lot 5b (selon la charge
-du poste ; 17 minutes avant, en séquentiel). Les scénarios se jouent en
+Compter **sept minutes** : 425 s au lot c1, dont 230 s pour les deux passes à date figée
+(trois minutes avant elles : 187 à 260 s aux lots 4b et 5b, selon la charge du poste ;
+17 minutes avant, en séquentiel). Les scénarios se jouent en
 parallèle, un processus par cœur moins un ; le contrôle affiche à la fin le
 temps de chaque étape. Ne jamais revenir à une attente devinée dans les tests :
 `ouvrir()` sonde `data-pret` — pourquoi, et ce qui reste long, dans
@@ -202,7 +204,7 @@ Débordements à connaître : `prix-de-revient.js` finit par les réglages
 Chantiers, Veille et Démarrage, puis l'appel d'`init` ; `carte.js` par les
 fenêtres « numéro de facture » et « motif de refus ».
 
-**La navigation (lots 5a, 5b, 5b2 et 5b3, 4.86.0 à 4.87.2)** — détail dans
+**La navigation (lots 5a, 5b, 5b2, 5b3 et c1, 4.86.0 à 4.88.0)** — détail dans
 `docs/design-navigation.md`, *Le cadre du lot 5a* et *L'écran Aujourd'hui* :
 
 - Démarrage → **Aujourd'hui** (vue `accueil`) : saisie · En retard · Bientôt ·
@@ -219,6 +221,7 @@ fenêtres « numéro de facture » et « motif de refus ».
   flèche, `accueil-ouvert` et crans d'historique suivent seuls.
 - Dans les tests : `parBarre(t, 'agenda')`, `parMenu(t, 'reglages')`.
 - **5b2** : « Facture à faire » dès le lendemain de « Terminé » (alerte du carnet comprise) ; chemin de la corbeille dans une constante, `B.CHEMIN_CORBEILLE`.
+- **c1 (Agenda)** : une seule fiche du jour, en feuille (`ouvrirFicheJour` ; l'état « à trancher » remplace « Que s'est-il passé ? ») ; un seul placement, `demarrerPlacement(id, 'fiche' | 'agenda' | 'aujourdhui')`, et « Fini de placer » ramène au départ ; plus d'onglet Carnet dans l'Agenda ni d'« Aujourd'hui » dans le bandeau ; « À programmer » partout. Détail : `docs/calendrier-journees.md`, *L'Agenda du lot c1*. Dans les tests, un jour de la grille se vise par `caseDuJour(t, ts)` / `cliquerJour(t, ts)`, qui amènent d'abord son mois.
 
 ---
 
@@ -267,6 +270,7 @@ mention d'un autre fichier.
 - **On n'écrit jamais dans une liste dérivée** (`c.temps` se refait depuis `A.journees`) — `docs/calendrier-journees.md`.
 - **Un champ que rien n'écrit ne se lit plus** : `outils/vocabulaire.js` est un cliquet — `docs/tests-et-pieges.md`.
 - **Deux gardes qui se couvrent ne s'éprouvent pas** : placer le cas où une seule tient.
+- **L'Agenda n'affiche qu'un mois** : un jour « il y a deux jours » n'y est pas le 1er ni le 2 ; viser par `caseDuJour`, et nommer un scénario du temps avec un mot du motif des passes datées.
 
 ---
 

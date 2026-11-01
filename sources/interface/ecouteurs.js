@@ -109,7 +109,6 @@ function brancher() {
   $('#b-ctx').addEventListener('click', function (e) {
     var b = e.target.closest('button'); if (!b) return;
     if (b.id === 'b-entete2') ouvrirEntete();
-    else if (b.id === 'b-aujourdhui') { A.calMois = null; A.calJour = Date.now(); renderCalendrier(); aller('calendrier'); }
   });
   brancherAujourdhui();
   document.addEventListener('click', function (ev) {
@@ -324,14 +323,7 @@ function brancher() {
     }
     if (e.target.closest('#f-ligne')) { ouvrirLigne(id, null); return; }
     if (e.target.closest('#f-temps')) { ouvrirTemps(id); return; }
-    if (e.target.closest('#f-planifier')) {
-      A.planifie = id;
-      var pl = C.journeesPlacees(c);
-      /* journeesPlacees rend des {d, p} : c'est .d qui est la date. */
-      A.calMois = pl.length ? C.minuit(pl[0].d) : Date.now();
-      renderCalendrier(); allerModule('calendrier', 'calendrier');
-      return;
-    }
+    if (e.target.closest('#f-planifier')) { demarrerPlacement(id, 'fiche'); return; }
     var lm = e.target.closest('[data-lmod]'), ls = e.target.closest('[data-lsup]'),
       ts = e.target.closest('[data-tsup]');
     if (lm) { ouvrirLigne(id, Number(lm.dataset.lmod)); return; }
@@ -781,66 +773,49 @@ function brancher() {
     var d = new Date(A.calMois); A.calMois = new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime();
     renderCalendrier();
   });
+  /* Un seul bouton Aujourd'hui (celui du bandeau est parti) : il mène au mois
+     courant et ouvre la fiche du jour (P5). En placement, un appui sur un
+     jour pose : rien ne s'ouvre par-dessus. */
   $('#cal-auj').addEventListener('click', function () {
-    A.calMois = null; A.calJour = Date.now(); renderCalendrier();
+    A.calMois = null; renderCalendrier();
+    if (!A.planifie) ouvrirFicheJour(Date.now());
   });
   $('#cal-grille').addEventListener('click', function (e) {
     var b = e.target.closest('[data-jour]'); if (!b) return;
     var ts = Number(b.dataset.jour);
-    if (A.planifie) {
-      var c = chantier(A.planifie);
-      if (c) {
-        C.placerJour(c, ts); c.maj = Date.now();
-        sauverChantiers().then(function () { renderCalendrier(); renderCarnet(); renderAccueil(); });
-      }
-      return;
-    }
+    if (A.planifie) { toucherPlacement(ts); return; }
     /* « Cliquer sur n'importe quel jour doit ouvrir une fiche jour. » La
        saisie ne se faisait que depuis la fiche du chantier. */
-    A.calJour = ts;
-    renderCalendrier();
     ouvrirFicheJour(ts);
   });
   $('#cal-planif').addEventListener('click', function (e) {
-    if (e.target.closest('#cal-planif-fin')) {
-      var c = chantier(A.planifie);
-      A.planifie = null; renderCalendrier();
-      if (c) toast(E.fmt(C.totalPlace(c), 1).replace(',0', '') + ' journées placées.');
-      /* On repart de la fiche : y rester après avoir posé ses jours obligeait
-         à refaire tout le chemin pour retrouver son chantier. */
-      if (c) ouvrirChantier(c.id);
-    }
+    if (e.target.closest('#cal-planif-fin')) finirPlacement();
+    else if (e.target.closest('#cal-pl-garder')) { A.placeAvert = null; renderBandeauPlanif(); }
+    else if (e.target.closest('#cal-pl-suivant')) deplacerAuJourLibre();
   });
   $('#cal-aplanifier').addEventListener('click', function (e) {
     var p = e.target.closest('[data-aplacer]'), es = e.target.closest('[data-aestimer]');
     if (es) { ouvrirChantier(es.dataset.aestimer); return; }
-    if (!p) return;
-    var c = chantier(p.dataset.aplacer); if (!c) return;
-    A.planifie = c.id;
-    var pl = C.journeesPlacees(c);
-    A.calMois = pl.length ? C.minuit(pl[pl.length - 1].d) : Date.now();
-    renderCalendrier();
+    if (p) demarrerPlacement(p.dataset.aplacer, 'agenda');
   });
+  /* « toggle » ne remonte pas : on l'écoute à la descente. Replié une fois,
+     le bloc le reste jusqu'au prochain lancement. */
+  $('#cal-aplanifier').addEventListener('toggle', function (e) {
+    if (e.target.id === 'cal-aprog') A.aprogReplie = !e.target.open;
+  }, true);
   $('#cal-trancher').addEventListener('click', function () {
     var l = C.joursAResoudre(A.chantiers, A.cfg, absences(), Date.now());
-    if (l.length) ouvrirResolutionJour(l[0].d);
+    if (l.length) ouvrirFicheJour(l[0].d);
   });
-  $('#cal-saisir').addEventListener('click', function () {
-    ouvrirFicheJour(A.calJour || Date.now());
+  $('#cal-histo').addEventListener('click', function (e) {
+    var mj = e.target.closest('[data-histomj]'), j = e.target.closest('[data-histojour]');
+    if (mj) ouvrirJournee(mj.dataset.histomj);
+    else if (j) ouvrirFicheJour(Number(j.dataset.histojour));
   });
-  $('#cal-detail').addEventListener('click', function (e) {
-    var o = e.target.closest('[data-caljour-ouvrir]'), s = e.target.closest('[data-caljour-sup]');
-    if (o) { ouvrirChantier(o.dataset.caljourOuvrir); return; }
-    if (s) {
-      var k = s.dataset.caljourSup.split('_'), c = chantier(k[0]);
-      if (!c || !confirm('Retirer cette saisie de temps ?')) return;
-      c.temps = c.temps.filter(function (t) { return t.date !== Number(k[1]); });
-      c.maj = Date.now();
-      sauverChantiers().then(function () {
-        renderCalendrier(); renderCarnet(); renderRendements(); renderAccueil();
-      });
-    }
-  });
+  $('#cal-histo').addEventListener('toggle', function (e) {
+    var s = e.target.dataset && e.target.dataset.sem;
+    if (s) { A.semOuvertes = A.semOuvertes || {}; A.semOuvertes[s] = e.target.open; }
+  }, true);
 
   /* --- alertes --- */
   $('#bandeau-alertes').addEventListener('click', function (e) {

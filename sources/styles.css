@@ -22,6 +22,10 @@
      mais c'est le classeur qui a la grume sous les yeux, pas Sylve. Le rouge
      est réservé à ce qui est faux, pas à ce qui mérite un second regard. */
   --tiede:#7A5E12; --tiede-fond:#FBF2DC; --tiede-trait:#E2CFA4;
+  /* Un jour = un statut = une couleur (P5) : la bande sous le numéro, et le
+     fond teinté de la case. Mêmes teintes que les pastilles d'avant. */
+  --st-trav:#1D6FB8; --st-trav-f:#E4EEF8; --st-conf:#2E7D46; --st-conf-f:#E3EFE7;
+  --st-prev:#B98A00; --st-prev-f:#FBF2DC; --st-abs:#8E8878; --st-abs-f:#ECE7DF;
   /* La couleur vive de l'application. Le bleu avait été validé le 3 août ;
      il l'a repris le 23 pour un vert, « qui respire plus l'esprit de
      l'application ». Le nom Sylve, lui, garde le vert de la marque
@@ -242,6 +246,19 @@ body:not(.m-ent) .mod-ent{display:none}
   border:1px solid var(--trait);border-left-width:4px;border-radius:var(--r-s);
   background:var(--carte2)}
 .fj-etat b{display:block;font-size:14.5px}
+.fj-pt{flex:none;width:14px;height:14px;border-radius:4px;background:var(--trait-fort)}
+.fj-etat.st-travaille{border-left-color:var(--st-trav)} .fj-etat.st-travaille .fj-pt{background:var(--st-trav)}
+.fj-etat.st-confirme{border-left-color:var(--st-conf)} .fj-etat.st-confirme .fj-pt{background:var(--st-conf)}
+.fj-etat.st-prevu{border-left-color:var(--st-prev)} .fj-etat.st-prevu .fj-pt{background:var(--st-prev)}
+.fj-etat.st-absent{border-left-color:var(--st-abs)} .fj-etat.st-absent .fj-pt{background:var(--st-abs)}
+.fj-etat.st-trancher{background:var(--tiede-fond);border-color:var(--tiede-trait);border-left-color:var(--tiede)}
+.fj-etat.st-trancher .fj-pt{background:var(--tiede)}
+.fj-sous{font-size:13px;font-weight:700;color:var(--gris);margin:14px 0 6px}
+.fj-aide{font-size:12.5px;color:var(--gris);margin:6px 0 0}
+.fj-choix{display:grid;gap:8px;margin-top:14px}
+.fj-choix .btn{justify-content:flex-start;text-align:left}
+.fj-txt{text-align:left;min-width:0}
+.pastille.fj-ferme{background:var(--st-conf)} .pastille.fj-provisoire{background:var(--st-prev)}
 .fj-etat small{display:block;font-size:11.5px;color:var(--gris)}
 /* La fiche de chantier. Le même dessin sert à l'aperçu et à l'impression :
    deux feuilles de style auraient fini par diverger, et c'est justement
@@ -286,12 +303,75 @@ body:not(.m-ent) .mod-ent{display:none}
   max-height:58vh;overflow:auto}
 .cal button.sel.we{background:var(--encre)}
 .cal .n{font-size:13px;font-family:var(--mono)}
-.cal .pts{display:flex;gap:2px;height:9px}
-/* Un cerne clair détache la pastille du fond de la case : sans lui, le vert
-   et le bleu se ressemblent au soleil. */
-.cal .pts i{width:9px;height:9px;border-radius:50%;display:block;
-  box-shadow:0 0 0 1.5px var(--carte)}
-.cal button.sel .pts i{box-shadow:0 0 0 1.5px var(--encre)}
+/* La bande pleine sous le numéro et le fond teinté (P5) : la pastille de
+   9 px se confondait au soleil, le vert et le bleu surtout. */
+.cal .bande{display:block;width:78%;height:6px;border-radius:3px;margin-top:3px}
+.cal button.st-travaille{background:var(--st-trav-f)} .cal button.st-travaille .bande{background:var(--st-trav)}
+.cal button.st-confirme{background:var(--st-conf-f)} .cal button.st-confirme .bande{background:var(--st-conf)}
+.cal button.st-prevu{background:var(--st-prev-f)} .cal button.st-prevu .bande{background:var(--st-prev)}
+.cal button.st-absent .bande{background:var(--st-abs)}
+.cal button.trancher{border:2px dashed var(--tiede)}
+.cal button.sel,.cal button.sel.st-travaille,.cal button.sel.st-confirme,.cal button.sel.st-prevu{background:var(--encre);color:var(--papier)}
+.cal button.sel .bande{background:var(--trait-fort)}
+.cal .cal-q,.cal-trancher .cal-q{position:absolute;top:2px;right:2px;width:14px;height:14px;border-radius:50%;
+  background:var(--tiede);color:var(--carte);font-size:10px;font-weight:800;display:flex;
+  align-items:center;justify-content:center;line-height:1}
+.cal .n sup{font-size:8px}
+.legende i.lg-travaille{background:var(--st-trav)} .legende i.lg-confirme{background:var(--st-conf)}
+.legende i.lg-prevu{background:var(--st-prev)} .legende i.lg-absent{background:var(--st-abs)}
+.legende i.lg-sel{background:var(--encre)}
+.legende i.lg-trancher{border:2px dashed var(--tiede);width:11px;height:11px}
+.legende .lg-prel{color:var(--brun-marque);font-weight:800}
+.cal-k4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.cal-k4 b{font-size:15px}
+.cal-k4 small{display:block;line-height:1.25}
+/* La ligne « à trancher » en tête de l'Agenda (P3). */
+.cal-trancher{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;margin-bottom:11px;
+  border-radius:11px;background:var(--tiede-fond);border:1px solid var(--tiede-trait);text-align:left}
+.cal-trancher .cal-q{position:static;flex:none;width:20px;height:20px;font-size:12px}
+.cal-trancher .ct-txt{flex:1;min-width:0;display:grid}
+.cal-trancher small{color:var(--tiede);font-size:12px}
+.cal-trancher .aj-etiq{background:var(--carte);color:var(--tiede)}
+/* « À programmer », repliable. */
+details.aprog{border:1px solid var(--trait);border-radius:11px;background:var(--carte2);margin-bottom:11px}
+details.aprog summary,details.semaine summary{list-style:none;cursor:pointer;display:flex;align-items:center;
+  gap:8px;padding:10px 12px}
+details.aprog summary::-webkit-details-marker,details.semaine summary::-webkit-details-marker{display:none}
+details.aprog summary b{flex:1;min-width:0;font-size:13.5px}
+details.aprog summary small{color:var(--doux);font-size:12.5px;text-align:right;min-width:0}
+details.aprog summary .pic,details.semaine summary .pic{width:16px;height:16px;flex:none;color:var(--gris);
+  transition:transform .15s}
+details.aprog[open] summary .pic,details.semaine[open] summary .pic{transform:rotate(90deg)}
+.aprog-l{display:flex;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--trait)}
+.aprog-txt{flex:1;min-width:0;display:grid}
+.aprog-txt b{font-size:13.5px;font-weight:600;overflow-wrap:anywhere}
+.aprog-txt small{color:var(--doux);font-size:12px}
+.aprog-situ{font-size:12px;color:var(--accent);font-weight:600}
+.aprog-situ.tiede{color:var(--tiede)}
+/* Le bandeau du placement : il reste en vue quand on fait défiler le mois. */
+.placement{position:sticky;top:calc(57px + env(safe-area-inset-top,0px));z-index:15;margin-bottom:11px;
+  background:var(--encre);color:var(--papier);border-radius:13px;padding:11px 13px;display:grid;gap:5px;
+  box-shadow:var(--ombre)}
+.placement .pl-t{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.placement .pl-t b{min-width:0;overflow-wrap:anywhere;font-size:13.5px}
+.placement .pl-t .btn{flex:none;white-space:nowrap;background:var(--carte);color:var(--encre)}
+.placement .pl-c{font-weight:700;font-size:13px}
+.placement small{color:var(--trait-fort);font-size:12px}
+.pl-avert{background:var(--alerte-fond);color:var(--alerte);border-radius:10px;padding:9px 10px;
+  font-size:13px;display:grid;gap:8px}
+.pl-avert .btn-rang{margin:0}
+.pl-avert .btn{background:var(--carte);color:var(--encre)}
+/* L'historique du mois, rangé par semaine. */
+details.semaine{border:1px solid var(--trait);border-radius:11px;background:var(--carte);margin-top:8px}
+details.semaine summary{justify-content:space-between;font-weight:600;font-size:13.5px}
+details.semaine summary span:first-child{flex:1}
+.histo-l{display:flex;align-items:center;gap:8px;width:100%;padding:9px 12px;border-top:1px solid var(--trait);
+  text-align:left}
+.histo-l .txt{flex:1;min-width:0;display:grid}
+.histo-l b{font-size:13.5px;font-weight:600;overflow-wrap:anywhere}
+.histo-l small{color:var(--doux);font-size:12px;overflow-wrap:anywhere}
+.histo-l .pic{width:16px;height:16px;flex:none;color:var(--gris)}
+.histo-tot{font-size:12.5px;white-space:nowrap}
 .alerte{
   display:flex;align-items:flex-start;gap:9px;padding:10px 12px;border-radius:11px;
   border:1px solid var(--trait);background:var(--carte);margin-bottom:7px;cursor:pointer;
@@ -520,8 +600,8 @@ input.mini{padding:6px 7px;border:1px solid var(--trait);border-radius:7px;font-
 .chantier-l .pastille{margin-top:3px}
 /* Le prélèvement se voit sans se confondre avec le statut du jour : une
    marque dans l'angle, pas une seconde pastille. */
-.cal-prel{position:absolute;top:1px;right:3px;font-size:11px;line-height:1;
-  color:var(--encre);font-weight:700;opacity:.75}
+.cal-prel{position:absolute;top:2px;left:4px;font-size:10.5px;line-height:1;
+  color:var(--brun-marque);font-weight:800}
 /* Le compté n'est pas le mesuré : il porte l'ocre des prévisions, pas le
    vert de ce qui a eu lieu. */
 .compte{color:#B98A00}

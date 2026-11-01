@@ -389,3 +389,54 @@ il criera le jour où l'on renommera les deux d'un coup.
 **Et un défaut trouvé en corrigeant le mot** : l'alerte annonçait « en retard
 depuis le **Invalid Date** ». Elle lisait `ch.fin`, l'échéance de chantier
 retirée depuis longtemps. Elle date maintenant la dernière journée posée.
+
+## L'Agenda du lot c1 (4.88.0) : une fiche du jour, un placement
+
+Maquette `maquettes/refonte-5b-temps.html` (validée le 31/10, P1 à P5, R1,
+R6 à R8). Le détail ligne à ligne est dans `docs/correspondance-refonte.md`,
+section 4.
+
+- **Une seule fiche du jour** (`ouvrirFicheJour`), qui monte du bas comme le
+  + et le ☰. Elle a absorbé la carte « Journée » du bas de l'Agenda (R7) et la
+  fenêtre « Que s'est-il passé ? » (R8, `ouvrirResolutionJour` est partie).
+  Un jour passé posé sans temps est **« à trancher »** (`estATrancher`, la
+  règle de `joursAResoudre` pour un seul jour) : la fiche montre alors les
+  cinq réponses (comme prévu, toutes comme prévu, autrement, un autre jour,
+  je n'y étais pas), plus « Poser un autre chantier ». Rien de l'ancienne
+  fiche ne manque : « Poser un chantier » et « Jour non travaillé » restent
+  sur un jour travaillé. Le ✕ d'une saisie passe par `retirerSaisie` : celui
+  de l'ancienne carte effaçait `c.temps`, une liste refaite depuis
+  `A.journees` (la saisie revenait au rendu suivant).
+- **Ses portes** : un appui sur un jour ; Aujourd'hui ▸ En retard ▸
+  Trancher ; la ligne à trancher en tête de l'Agenda (P3) ; le bouton
+  Aujourd'hui, qui ramène au mois courant et l'ouvre (P5). Le « Aujourd'hui »
+  du bandeau est parti : il doublait celui-là.
+- **Libellé** (retour du 01/11) : « Journée du jeudi 29 octobre non saisie »
+  (`libelleNonSaisie`), dans Aujourd'hui et dans la ligne de l'Agenda ; à
+  plusieurs jours, l'Agenda dit « N journées à trancher ».
+- **Grille (P5)** : une bande pleine sous le numéro et le fond teinté du
+  statut (variables `--st-*` du `:root`) ; « ? » et bord pointillé pour un
+  jour à trancher ; « € » dans le coin gauche ; quatre compteurs, fait,
+  confirmé dont à trancher, prévu, non travaillé (celui-ci même à zéro).
+- **Sous la grille**, le mois jour par jour (`renderHistorique`), rangé par
+  semaine, la plus récente ouverte : heures, quantités, km ; un appui rouvre
+  la journée, une absence ouvre la fiche du jour.
+- **« À programmer »** remplace « À planifier » partout, statut compris
+  (« Devis signé, à programmer » ; l'ancien nom reste lu à l'import). Le bloc
+  se replie, et le reste jusqu'au lancement suivant.
+- **Un seul placement** (`demarrerPlacement(id, depuis)`, P1). Entrées : la
+  fiche (« Placer dans l'Agenda », bloc Les journées et sa fenêtre), À
+  programmer, Aujourd'hui ▸ Bientôt ; la fiche du jour garde « Poser un
+  chantier » pour un seul jour. **« Fini de placer »** (`finirPlacement`)
+  ramène à la fiche, à l'Agenda ou à Aujourd'hui (P2). Le placement s'ouvre
+  sur le mois du **dernier** jour placé, sinon du prochain jour ouvré.
+- **R6** : la fenêtre « Les journées » ne pose plus de dates ; elle garde le
+  nombre estimé (jusqu'à l'étape Devis du lot b) et mène au placement. Son
+  alerte « jour déjà pris » est dans le bandeau du placement : un jour tenu
+  par un autre chantier (ou marqué non travaillé) se pose quand même, puis
+  **Garder les deux** ou **Prendre le jour libre suivant** (week-ends sautés
+  sauf réglage, jours pris sautés aussi).
+- **R1** : l'onglet Carnet de l'Agenda est parti ; c'était la vue de
+  Chantiers ▸ Carnet, rien ne passait que par lui.
+- Les boutons qui ouvrent « Ma journée » ouvrent la fenêtre actuelle, datée
+  du jour : le formulaire P4 est le lot c2.

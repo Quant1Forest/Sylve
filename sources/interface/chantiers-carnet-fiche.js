@@ -17,7 +17,7 @@ function renderCarnet() {
       n(t.nFactures, 'facture') + '</small></div>' +
       '<div class="carte2"><b class="num">' + eur(t.encaisse) + '</b><small>encaissé</small></div>' +
       '<div class="carte2"><b class="num">' + (t.nSignes || '—') + '</b><small>devis signé' +
-      (t.nSignes > 1 ? 's' : '') + (t.nSignes ? ' · ' + eur(t.signes) : ', à planifier') +
+      (t.nSignes > 1 ? 's' : '') + (t.nSignes ? ' · ' + eur(t.signes) : ', à programmer') +
       '</small></div>' +
       /* Qui le fait vivre. Le pourcentage est l'information : un donneur
          d'ordre à soixante pour cent n'est pas un client, c'est un risque. */
@@ -68,7 +68,7 @@ function renderFiltreChantiers() {
   if (avecDevis) tete.push(['avecdevis', 'Avec devis', avecDevis]);
   tete.push(['ouverts', 'Chantiers ouverts', nf('ouverts')],
     ['clos', 'Chantiers clos', nf('clos')],
-    ['afaire', 'En cours ou à planifier', nf('afaire')]);
+    ['afaire', 'En cours ou à programmer', nf('afaire')]);
   if (incomplets) tete.push(['acompleter', 'À compléter', incomplets]);
   /* Les familles tout en bas : « c'est le truc que je vais utiliser le moins
      souvent ». */
@@ -757,7 +757,7 @@ function blocJournees(c, bil, pj, vise, rends, mixteNonMarque) {
       '</b><small>estimé au devis</small></div>' : '') +
     '</div>' +
     '<div class="btn-rang" style="margin-top:11px">' +
-    '<button class="btn btn-min" id="f-planifier">Poser des dates</button>' +
+    '<button class="btn btn-min" id="f-planifier">Placer dans l’Agenda</button>' +
     '<button class="btn primaire btn-min" id="f-temps">+ Du temps fait</button></div>' +
 
     /* Ce que ce temps rapporte, et ce qu'il dit des rendements. */

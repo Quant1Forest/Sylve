@@ -168,7 +168,7 @@ preuve sans ligne, le fait crier.
 | Accueil ▸ marque (logo, « Sylve », sous-titre) | Écran de démarrage | `demarrage-marque` |
 | Accueil ▸ ⚙ | ☰ ▸ Réglages | `menu-reglages` |
 | Accueil ▸ rappel de sauvegarde | Aujourd'hui ▸ En retard, dernière ligne « Sauvegarde à faire » → ☰ ▸ Sauvegarde (carte Sauvegarde des Réglages) | `retard-sauvegarde` |
-| Accueil ▸ rappel « journées à trancher » | Aujourd'hui ▸ En retard, une ligne par jour « … non saisi » → fenêtre « Que s'est-il passé ? » | `retard-trancher` |
+| Accueil ▸ rappel « journées à trancher » | Aujourd'hui ▸ En retard, une ligne par jour « Journée du … non saisie » → fiche du jour, état « à trancher » (fenêtre « Que s'est-il passé ? » jusqu'en 4.87) | `retard-trancher` |
 | Accueil ▸ rappel d'échéances des charges fixes | Aujourd'hui ▸ Prélèvements à venir (7 jours, ou le préavis s'il est plus long ; total) → Argent ▸ Charges fixes | `prelevements` |
 | Accueil ▸ rappel de devis en attente | Aujourd'hui ▸ Bientôt « Relancer le devis ? », un par devis → sa fiche (la liste filtrée reste dans Chantiers) | `bientot-relancer` |
 | Accueil ▸ tuile Mon entreprise (chantiers ouverts) | Barre ▸ Chantiers ; le chiffre : compte de « Chantiers en cours » | `encours-compte` |

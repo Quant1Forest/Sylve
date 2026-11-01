@@ -221,7 +221,9 @@ var MODULES = {
   },
   calendrier: {
     nom: 'Calendrier', defaut: 'calendrier', groupe: 'entreprise',
-    vues: [['calendrier', 'Agenda'], ['carte', 'Carte'], ['carnet', 'Carnet']]
+    /* L'onglet Carnet est parti (R1) : c'était l'écran de Chantiers, sous
+       un autre onglet de la barre. */
+    vues: [['calendrier', 'Agenda'], ['carte', 'Carte']]
   },
   rendements: {
     nom: 'Rendements', defaut: 'rendements', groupe: 'entreprise',
@@ -528,8 +530,9 @@ function moduleValide(m) {
    il passe par la page, jamais par le haut. Restent celles qui n'ont pas
    encore d'équivalent ailleurs. */
 var ACTIONS_MODULE = {
-  cubage: [['b-entete2', 'En-tête']],
-  calendrier: [['b-aujourdhui', 'Aujourd’hui']]
+  /* Le « Aujourd’hui » de l'Agenda en est sorti (lot c1) : il doublait le
+     bouton à côté de ‹ ›, qui ouvre aussi la fiche du jour. */
+  cubage: [['b-entete2', 'En-tête']]
 };
 function majBandeauModule() {
   if (!$('#b-ctx')) return;

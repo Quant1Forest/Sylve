@@ -16,11 +16,20 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 const OPTIONS = process.argv.slice(2);
+/* Les scénarios qui touchent au temps, rejoués le 1er et le dernier jour d'un
+   mois : l'Agenda n'affiche qu'un mois, et « il y a deux jours » tombe dans le
+   précédent le 1er et le 2 (10 vérifications rouges le 1er novembre, lot 5b3).
+   Toute la suite y passe aussi (vérifié au lot c1), mais en triplerait la
+   durée : on ne rejoue que ce qui lit le calendrier. */
+const SENSIBLES_A_LA_DATE = '--motif=calendrier|agenda|journée|journees|journées|aujourd|trancher|placer|' +
+  'placement|fiche du jour|bientôt|retard|prélèvement|échéance';
 const ETAPES = [
   ['fabrication', 'construire.js', []],
   ['vérificateur', 'verifier.js', []],
   ['service worker', 'tests-sw.js', []],
   ['scénarios', 'tests.js', OPTIONS],
+  ['scénarios au 1er du mois', 'tests.js', OPTIONS.concat(SENSIBLES_A_LA_DATE), { SYLVE_DATE: '2026-12-01' }],
+  ['scénarios au dernier jour du mois', 'tests.js', OPTIONS.concat(SENSIBLES_A_LA_DATE), { SYLVE_DATE: '2026-11-30' }],
   ['largeur (Chrome)', 'largeur.js', []],
   ['fichier autonome', 'comparer.js', []]
 ];
@@ -29,9 +38,10 @@ const sec = ms => (ms / 1000).toFixed(1).replace('.', ',') + ' s';
 const debut = Date.now();
 const durees = [];
 
-for (const [nom, fichier, args] of ETAPES) {
+for (const [nom, fichier, args, env] of ETAPES) {
   const depart = Date.now();
-  const r = spawnSync(process.execPath, [path.join(__dirname, fichier)].concat(args), { stdio: 'inherit' });
+  const r = spawnSync(process.execPath, [path.join(__dirname, fichier)].concat(args),
+    { stdio: 'inherit', env: Object.assign({}, process.env, env || {}) });
   durees.push([nom, Date.now() - depart]);
   if (r.status !== 0) {
     console.log('\n✕ étape « ' + nom + ' » en échec (' +

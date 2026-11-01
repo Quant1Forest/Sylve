@@ -396,3 +396,30 @@ comme les deux tests qui lisent le CSS.
 Piège du banc : le profil de Chrome garde le `localStorage` d'une exécution à
 l'autre ; le script vide donc le stockage avant de semer, et travaille dans un
 dossier temporaire jeté ensuite.
+
+## Un test qui ment le 1er et le 2 du mois (lot c1, 4.88.0)
+
+Le 1er novembre, dix vérifications du Calendrier et de Ma journée étaient
+rouges, sur la 4.87.1 comme sur la 4.87.2 : leurs scénarios visaient un jour
+« il y a deux jours » dans un Agenda qui n'affiche que le mois en cours. Le 1er
+et le 2, ce jour est dans le mois d'avant, sa case n'existe pas. Corrigé dans
+les tests, pas dans l'application : `caseDuJour(t, ts)` amène la grille sur le
+mois du jour visé avant d'en chercher la case, `cliquerJour(t, ts)` l'ouvre.
+
+**Pour que le piège ne revienne pas, le contrôle rejoue la suite à date
+figée.** `SYLVE_DATE=AAAA-MM-JJ` fait croire au banc ET à l'application (son
+`Date`, posé dans JSDOM avant le démarrage) qu'on est ce jour-là à 10 h. Le
+contrôle ajoute deux étapes : le 1er du mois (`2026-12-01`) et le dernier
+(`2026-11-30`). Toute la suite y passait (vérifié au lot c1, avant la refonte
+de l'Agenda) ; pour ne pas tripler la durée, ces deux passes ne jouent que les
+scénarios dont le nom touche au temps (`--motif=calendrier|agenda|journée|…`,
+la liste est dans `outils/controle.js`). Un nouveau scénario sensible à la
+date doit porter un de ces mots dans son nom.
+
+```bash
+SYLVE_DATE=2026-12-01 node outils/tests.js index.html "calendrier"
+node outils/tests.js index.html "--motif=fiche du jour|placement"
+```
+
+Vu crier : sans `caseDuJour`, les dix vérifications d'origine tombent à la
+date du 1er ; avec, elles passent aux trois dates.

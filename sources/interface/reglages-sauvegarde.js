@@ -775,6 +775,11 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.88', quoi: [
+    { t: 'Agenda : une seule fiche du jour, qui monte du bas — un appui sur un jour, sur « Aujourd’hui » ou sur « Trancher »', vue: 'calendrier' },
+    { t: 'Chaque jour a sa couleur, « ? » pour un jour à trancher ; sous la grille, le mois jour par jour', vue: 'calendrier' },
+    { t: 'Placer des jours : « Fini de placer » vous ramène d’où vous êtes parti', vue: 'calendrier' }
+  ] },
   { v: '4.87.2', quoi: [
     { t: 'Plus d’écran trop large : la rangée de pastilles d’Argent défile sur elle-même, la barre du bas reste en bas', vue: 'finances' }
   ] },

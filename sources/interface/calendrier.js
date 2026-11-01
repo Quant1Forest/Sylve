@@ -3,23 +3,116 @@ var JOURS_COURTS = ['lun', 'mar', 'mer', 'jeu', 'ven', 'sam', 'dim'];
 var MOIS_NOMS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin',
   'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 
+/* Le bandeau du placement. « Terminer » est devenu « Fini de placer » et
+   ramène là d'où l'on est parti (P2). L'alerte « jour déjà pris » y vit
+   désormais : elle était dans la fenêtre « Les journées » de la fiche, qui ne
+   pose plus de dates (R6) — c'est ici qu'on voit le mois et ce qui est pris. */
 function renderBandeauPlanif() {
   var z = $('#cal-planif'); if (!z) return;
   var c = A.planifie ? chantier(A.planifie) : null;
   var lg = $('#cal-leg-sel'); if (lg) lg.hidden = !c;
   if (!c) { z.innerHTML = ''; return; }
   var placees = C.totalPlace(c), reste = C.resteAPlacer(c);
-  z.innerHTML = '<div class="carte2" style="margin-bottom:11px;border-color:var(--encre)">' +
-    '<b style="font-size:13.5px">Placement — ' + esc(C.nomChantier(c)) + '</b>' +
-    '<div class="muted" style="font-size:12.5px;margin-top:2px">' +
+  var avert = '';
+  if (A.placeAvert != null && C.partDuJour(c, A.placeAvert) > 0) {
+    var pris = prisPar(A.placeAvert, c);
+    if (pris.length) {
+      avert = '<div class="pl-avert" id="cal-pl-avert"><span><b>Le ' + esc(jourCourt(A.placeAvert)) +
+        ' est déjà pris</b> : ' + esc(pris.join(', ')) + '.</span>' +
+        '<div class="btn-rang">' +
+        '<button class="btn btn-min" id="cal-pl-garder">Garder les deux</button>' +
+        '<button class="btn btn-min" id="cal-pl-suivant">Prendre le jour libre suivant</button>' +
+        '</div></div>';
+    }
+  }
+  z.innerHTML = '<div class="placement">' +
+    '<div class="pl-t"><b>Placement — ' + esc(C.nomChantier(c)) + '</b>' +
+    '<button class="btn btn-min" id="cal-planif-fin">Fini de placer</button></div>' +
+    '<div class="pl-c num">' +
     (reste == null
       ? placees + ' journée' + (placees > 1 ? 's' : '') + ' placée' + (placees > 1 ? 's' : '')
       : placees + ' / ' + Math.ceil(C.joursPrevus(c)) + ' journées placées' +
         (reste > 0 ? ' — encore ' + reste : (reste < 0 ? ' — ' + (-reste) + ' de trop' : ' — compte atteint'))) +
-    '. Appuyez sur les jours voulus — ils passent en noir. Une seconde ' +
-    'pression donne une demi-journée, une troisième retire le jour.</div>' +
-    '<div class="btn-rang" style="margin-top:8px">' +
-    '<button class="btn primaire btn-min" id="cal-planif-fin">Terminer</button></div></div>';
+    '</div><small>Appuyez sur les jours voulus : une fois pour la journée, deux fois pour ' +
+    'une demi-journée, trois fois pour retirer.</small>' + avert + '</div>';
+}
+/* Ce qui tient déjà un jour, hors du chantier qu'on place. On n'interdit pas
+   de doubler — une demi-journée ici, une demi-journée là — mais il doit le
+   voir au moment où il pose, pas après. */
+function prisPar(ts, c) {
+  var o = occupationDu(ts), vus = {}, l = [];
+  o.prevus.concat(o.reels).forEach(function (p) {
+    var ch = p.chantier;
+    if (!ch || ch.id === c.id || vus[ch.id]) return;
+    vus[ch.id] = 1; l.push(C.nomChantier(ch));
+  });
+  if (C.estAbsent(absences(), ts)) l.push('marqué non travaillé');
+  return l;
+}
+function sautable(ts) { return C.estWeekend(ts) && !(A.cfg && A.cfg.weekends); }
+function jourLibreSuivant(ts, c) {
+  var j = C.ajouteJours(ts, 1), garde = 0;
+  while (garde++ < 120 && (sautable(j) || C.partDuJour(c, j) > 0 || prisPar(j, c).length)) {
+    j = C.ajouteJours(j, 1);
+  }
+  return j;
+}
+function prochainJourOuvre(ts) {
+  var j = C.ajouteJours(ts, 1), garde = 0;
+  while (garde++ < 14 && sautable(j)) j = C.ajouteJours(j, 1);
+  return j;
+}
+/* Un seul outil pour poser les jours d'un chantier (P1). On y entre par le
+   chantier — sa fiche, « À programmer », Aujourd'hui ▸ Bientôt — et l'on y
+   arrive sur le mois du dernier jour placé : c'est là qu'on continue. Sans
+   jour placé, sur celui du prochain jour ouvré, pas forcément le mois en
+   cours (P2). */
+function demarrerPlacement(id, depuis) {
+  var c = chantier(id); if (!c) return;
+  A.planifie = c.id;
+  A.placeDepuis = depuis || 'agenda';
+  A.placeAvert = null;
+  var pl = C.journeesPlacees(c);
+  A.calMois = pl.length ? C.minuit(pl[pl.length - 1].d) : prochainJourOuvre(Date.now());
+  fermerModale();
+  allerModule('calendrier', 'calendrier');
+}
+function finirPlacement() {
+  var c = chantier(A.planifie), depuis = A.placeDepuis;
+  A.planifie = null; A.placeDepuis = null; A.placeAvert = null;
+  if (c) {
+    var n = C.totalPlace(c);
+    toast(E.fmt(n, n % 1 ? 1 : 0) + ' journée' + (n > 1 ? 's' : '') + ' placée' +
+      (n > 1 ? 's' : '') + ' — ' + C.nomChantier(c) + '.');
+  }
+  if (depuis === 'fiche' && c) ouvrirChantier(c.id);
+  else if (depuis === 'aujourdhui') allerAccueil();
+  else renderCalendrier();
+}
+/* L'appui sur un jour, en placement. Un jour déjà tenu par autre chose se
+   pose quand même, et l'alerte propose les deux issues. */
+function toucherPlacement(ts) {
+  var c = chantier(A.planifie); if (!c) return;
+  var avant = C.partDuJour(c, ts);
+  C.placerJour(c, ts); c.maj = Date.now();
+  if (!avant && prisPar(ts, c).length) A.placeAvert = ts;
+  else if (A.placeAvert === ts && !C.partDuJour(c, ts)) A.placeAvert = null;
+  sauverChantiers().then(function () { renderCalendrier(); renderCarnet(); renderAccueil(); });
+}
+function deplacerAuJourLibre() {
+  var c = chantier(A.planifie), k = A.placeAvert;
+  if (!c || k == null) return;
+  var part = C.partDuJour(c, k) || 1;
+  var libre = jourLibreSuivant(k, c);
+  C.placerJour(c, k, 0);
+  C.placerJour(c, libre, part);
+  c.maj = Date.now();
+  A.placeAvert = null;
+  A.calMois = libre;
+  sauverChantiers().then(function () {
+    renderCalendrier(); renderCarnet(); renderAccueil();
+    toast('Posé le ' + jourCourt(libre) + ', premier jour libre.');
+  });
 }
 /* Les jours non travaillés — congé, arrêt, intempérie. C'est la seule pièce
    du modèle qui n'était écrite nulle part. Petite liste que l'utilisateur
@@ -46,37 +139,61 @@ function occupationDu(ts) {
   return C.occupation(A.chantiers, ts, ts, A.cfg)[C.jourCle(ts)] || { prevus: [], reels: [] };
 }
 
-/* La fiche d'un jour : son statut, ce qui s'y rattache, et de quoi le
-   changer. « Cliquer sur n'importe quel jour doit ouvrir une fiche jour. »
-   Elle sert aussi à corriger après coup — prévu jeudi, fait mercredi : on
-   ouvre mercredi et on y note ce qu'on a fait, jeudi redevient libre dès
-   qu'on y retire le chantier. Pas de fonction séparée : c'est la même fiche. */
+/* « jeudi 29 octobre » : le jour tel qu'on le dit. */
+function jourEnLettres(ts, avecAnnee) {
+  var d = new Date(ts);
+  return JOURS_LONGS[d.getDay()] + ' ' + d.getDate() + ' ' + MOIS_NOMS[d.getMonth()] +
+    (avecAnnee ? ' ' + d.getFullYear() : '');
+}
+/* Retour du 01/11 : « jeudi 29 non saisi » ne disait pas ce qui manquait. */
+function libelleNonSaisie(ts) { return 'Journée du ' + jourEnLettres(ts) + ' non saisie'; }
+/* Un jour posé que la date a dépassé sans qu'on ait dit ce qui s'y est
+   passé : la même règle que joursAResoudre, lue pour un seul jour. Le jour
+   même n'est pas fini, il n'est jamais à trancher. */
+function estATrancher(ts, o) {
+  ts = C.minuit(ts);
+  if (ts >= C.minuit(Date.now())) return false;
+  var st = C.statutJour(o || occupationDu(ts), absences(), ts);
+  return st === 'prevu' || st === 'confirme';
+}
+var ETAT_A_TRANCHER = { n: 'À trancher', aide: 'posé, passé, sans temps noté' };
+
+/* La fiche du jour : une seule, en feuille (R7, R8). Elle a absorbé la carte
+   « Journée » du bas de l'Agenda et la fenêtre « Que s'est-il passé ? » :
+   tous leurs boutons sont ici, selon l'état du jour. « Cliquer sur n'importe
+   quel jour doit ouvrir une fiche jour. » Elle sert aussi à corriger après
+   coup — prévu jeudi, fait mercredi : on ouvre mercredi et on y note ce qu'on
+   a fait, jeudi redevient libre dès qu'on y retire le chantier. */
 function ouvrirFicheJour(ts) {
   ts = C.minuit(ts);
+  A.calJour = ts;
+  var auj = C.minuit(Date.now());
   var o = occupationDu(ts);
   var st = C.statutJour(o, absences(), ts);
   var abs = C.estAbsent(absences(), ts);
-  var passe = ts < C.minuit(Date.now());
-  var d = new Date(ts);
-  var titre = JOURS_COURTS[(d.getDay() + 6) % 7] + ' ' + d.getDate() + ' ' +
-    MOIS_NOMS[d.getMonth()] + ' ' + d.getFullYear();
+  /* On peut avoir travaillé un jour passé ou aujourd'hui, jamais demain. */
+  var ouvert = ts <= auj;
+  var tr = estATrancher(ts, o);
+  var etat = tr ? ETAT_A_TRANCHER : { n: C.nomStatutJour(st), aide: trouveAide(st) };
 
-  var bandeau = '<div class="fj-etat" style="border-color:' + C.coulStatutJour(st) + '">' +
-    '<span class="pastille" style="background:' + C.coulStatutJour(st) + '"></span>' +
-    '<div><b>' + esc(C.nomStatutJour(st)) + '</b>' +
-    '<small>' + esc(trouveAide(st)) + '</small></div></div>';
+  var h = '<div class="fj-etat st-' + (tr ? 'trancher' : st) + '"><span class="fj-pt"></span>' +
+    '<div><b>' + esc(etat.n) + '</b><small>' + esc(etat.aide) + '</small></div></div>';
 
-  var corps = '';
   if (o.reels.length) {
-    corps += '<p class="eyebrow" style="margin:14px 0 6px">Ce que vous y avez fait</p>' +
+    h += '<p class="fj-sous">Ce que vous y avez fait</p>' +
       o.reels.map(function (r) {
-        return '<div class="liste-item"><div class="li-c"><b>' +
-          esc(C.nomChantier(r.chantier)) + '</b><small>' +
+        var txt = '<b>' + esc(C.nomChantier(r.chantier)) + '</b><small>' +
           C.ditDuree(C.heuresSaisie(r.temps, A.cfg), A.cfg) +
           (C.nb(r.temps.personnes) > 1 ? ' × ' + C.nb(r.temps.personnes) + ' pers.' : '') +
-          (r.temps.activite ? ' · ' + esc(C.nomTravail(r.temps.activite)) : '') + '</small></div>' +
+          (r.temps.activite ? ' · ' + esc(C.nomTravail(r.temps.activite)) : '') + '</small>';
+        /* Un appui sur la ligne rouvre la journée qui porte ce temps. */
+        return '<div class="liste-item">' +
+          (r.temps.jrn
+            ? '<button type="button" class="li-c fj-txt" data-fjmj="' + esc(r.temps.jrn) + '">' + txt + '</button>'
+            : '<div class="li-c">' + txt + '</div>') +
+          '<button class="btn-min" data-fjouvrir="' + r.chantier.id + '">Fiche</button>' +
           '<button class="btn-min" data-fjsup="' + r.chantier.id + '_' +
-          (r.chantier.temps || []).indexOf(r.temps) + '">✕</button>' +
+          (r.chantier.temps || []).indexOf(r.temps) + '" aria-label="Retirer ce temps">✕</button>' +
           '</div>';
       }).join('');
   }
@@ -84,11 +201,10 @@ function ouvrirFicheJour(ts) {
   o.reels.forEach(function (r) { faits[r.chantier.id] = 1; });
   var enAttente = o.prevus.filter(function (p) { return !faits[p.chantier.id]; });
   if (enAttente.length) {
-    corps += '<p class="eyebrow" style="margin:14px 0 6px">' +
-      (o.reels.length ? 'Posé ce jour-là, sans temps noté' : 'Ce qui est posé ce jour-là') + '</p>' +
+    h += '<p class="fj-sous">' +
+      (o.reels.length || ts < auj ? 'Posé ce jour-là, sans temps noté' : 'Ce qui est posé ce jour-là') + '</p>' +
       enAttente.map(function (p) {
-        return '<div class="liste-item"><span class="pastille" style="background:' +
-          (p.fermete === 'ferme' ? '#2E7D46' : '#B98A00') + '"></span>' +
+        return '<div class="liste-item"><span class="pastille fj-' + p.fermete + '"></span>' +
           '<div class="li-c"><b>' + esc(C.nomChantier(p.chantier)) + '</b><small>' +
           C.ditDuree(C.nb(p.part != null ? p.part : 1) * C.HEURES_JOUR(A.cfg), A.cfg) +
           ' prévues · ' +
@@ -98,9 +214,63 @@ function ouvrirFicheJour(ts) {
           '<button class="btn-min" data-fjretirer="' + p.chantier.id + '">Retirer</button></div>';
       }).join('');
   }
+  if (abs) {
+    h += '<p class="fj-sous">Non travaillé</p>' +
+      '<div class="liste-item"><div class="li-c"><b>' + esc(abs.note || 'Sans précision') + '</b></div>' +
+      '<button class="btn-min" id="fj-libre">Retirer la marque</button></div>' +
+      (enAttente.length ? '<p class="fj-aide">Un chantier est encore posé ce jour-là : à vous ' +
+        'de le déplacer ou de le retirer.</p>' : '');
+  }
   var pr = prelevementsDuJour(ts);
+  if (!o.reels.length && !o.prevus.length && !abs && !pr.length) {
+    h += '<p class="fj-aide">Rien de posé ni de noté ce jour-là.</p>';
+  }
+
+  /* Ce qu'on peut en faire, selon l'état. « Travaillé » ne se coche pas : il
+     se saisit — c'est « Ma journée » qui le crée, datée de ce jour, et c'est
+     elle qui porte le chantier, les prestations et le temps. */
+  var b = [];
+  var bouton = function (id, txt, primaire) {
+    b.push('<button class="btn plein' + (primaire ? ' primaire' : '') + '" id="' + id + '">' + txt + '</button>');
+  };
+  var reste = [];
+  if (tr) {
+    /* L'ancienne fenêtre « Que s'est-il passé ? » : mêmes réponses (R8). */
+    reste = C.joursAResoudre(A.chantiers, A.cfg, absences(), Date.now());
+    h += '<p class="fj-sous">Que s’est-il passé ?</p>' +
+      '<p class="fj-aide">Un jour passé finit toujours par « travaillé » ou « non travaillé » : ' +
+      'sans ça, il reste au planning et vos rendements se vident en silence.</p>';
+    bouton('fj-prevu', 'C’était comme prévu — ' + C.ditDuree(heuresPrevues(enAttente), A.cfg), true);
+    if (reste.length > 1) bouton('fj-tout', 'Toutes comme prévu — ' + reste.length + ' journées');
+    bouton('fj-autrement', 'J’y ai travaillé, mais autrement');
+    bouton('fj-deplacer', 'C’était un autre jour');
+    bouton('fj-nonla', 'Je n’y étais pas');
+    bouton('fj-poser', 'Poser un autre chantier');
+  } else if (o.reels.length) {
+    bouton('fj-travaille', 'Modifier ma journée', true);
+    bouton('fj-autre', 'Autre chose ce jour-là');
+    bouton('fj-poser', 'Poser un autre chantier');
+    if (!abs) bouton('fj-absent', 'Jour non travaillé');
+  } else if (abs) {
+    if (ouvert) bouton('fj-travaille', 'J’y ai travaillé quand même', true);
+    bouton('fj-poser', enAttente.length ? 'Poser un autre chantier' : 'Poser un chantier');
+  } else {
+    /* Posée, faite comme prévu : le cas courant, réglé d'un seul geste.
+       Aujourd'hui seulement — un jour passé posé est « à trancher ». */
+    if (ouvert && enAttente.length) {
+      bouton('fj-prevu', 'C’était comme prévu — ' + C.ditDuree(heuresPrevues(enAttente), A.cfg), true);
+      bouton('fj-autrement', 'J’y ai travaillé, mais autrement');
+    } else if (ouvert) {
+      bouton('fj-travaille', ts === auj ? 'J’ai travaillé aujourd’hui' : 'J’ai travaillé ce jour-là', true);
+    }
+    if (enAttente.length) bouton('fj-deplacer', 'Déplacer la journée');
+    bouton('fj-poser', enAttente.length ? 'Poser un autre chantier' : 'Poser un chantier', !ouvert && !enAttente.length);
+    bouton('fj-absent', 'Jour non travaillé');
+  }
+  h += '<div class="fj-choix">' + b.join('') + '</div>';
+
   if (pr.length) {
-    corps += '<p class="eyebrow" style="margin:14px 0 6px">Prélevé ce jour-là</p>' +
+    h += '<p class="fj-sous">Prélevé ce jour-là</p>' +
       pr.map(function (x) {
         return '<div class="liste-item"><div class="li-c"><b>' +
           esc(x.charge.libelle || 'Charge fixe') + '</b><small>' +
@@ -109,81 +279,49 @@ function ouvrirFicheJour(ts) {
           '<span class="num">' + eur(C.nb(x.charge.ttc)) + '</span></div>';
       }).join('');
   }
-  if (abs) {
-    corps += '<p class="eyebrow" style="margin:14px 0 6px">Non travaillé</p>' +
-      '<p style="font-size:13.5px;margin:0">' + esc(abs.note || 'Sans précision') + '</p>';
-  }
-  if (!o.reels.length && !o.prevus.length && !abs && !pr.length) {
-    corps += '<p class="muted" style="font-size:13px;margin:14px 0 0">' +
-      'Rien de posé ni de noté ce jour-là.</p>';
-  }
 
-  /* Ce qu'on peut en faire. « Travaillé » ne se coche pas : il se saisit —
-     c'est la fiche « Ma journée » qui le crée, et c'est elle qui porte le
-     chantier, les prestations et le temps. */
-  /* Une journée posée, passée, dont rien n'est encore noté : c'est le cas
-     courant, et il se règle d'un seul geste. */
-  var validable = (passe || ts === C.minuit(Date.now())) && !o.reels.length && enAttente.length;
-  var actions = (validable
-    ? '<div class="btn-rang" style="margin-top:14px">' +
-      '<button class="btn primaire plein" id="fj-prevu">C’était comme prévu — ' +
-      C.ditDuree(heuresPrevues(enAttente), A.cfg) + '</button></div>'
-    : '') +
-    '<div class="btn-rang" style="margin-top:9px">' +
-    (passe || ts === C.minuit(Date.now())
-      ? '<button class="btn' + (validable ? '' : ' primaire') + ' btn-min" id="fj-travaille">' +
-        (o.reels.length ? 'Modifier ma journée'
-          : validable ? 'Autre chose' : 'J’y ai travaillé') + '</button>'
-      : '') +
-    '<button class="btn btn-min" id="fj-poser">Poser un chantier</button>' +
-    (abs
-      ? '<button class="btn btn-min" id="fj-libre">Ce n’est plus un jour off</button>'
-      : '<button class="btn btn-min" id="fj-absent">Non travaillé</button>') +
-    '</div>';
-
-  modale(titre, bandeau + corps + actions +
-    (abs || (!passe && ts !== C.minuit(Date.now()))
-      ? ''
-      : '<p class="muted" style="font-size:11.5px;margin:11px 0 0">Un jour passé finit ' +
-        'toujours par « travaillé » ou « non travaillé » : sans ça il reste ' +
-        'indéfiniment au planning.</p>'));
+  modale(majuscule(jourEnLettres(ts, true)), h);
+  $('#modale').classList.add('feuille-nav');
 
   var refaire = function (message) {
     fermerModale();
-    renderCalendrier(); renderAccueil(); renderCarnet(); renderFiche();
+    renderCalendrier(); renderAccueil(); renderCarnet(); renderFiche(); renderRendements();
     if (message) toast(message);
   };
-  if ($('#fj-prevu')) {
-    $('#fj-prevu').addEventListener('click', function () {
-      validerCommePrevu(ts, enAttente).then(function () {
-        refaire('Journée validée.');
-      });
-    });
-  }
-  if ($('#fj-travaille')) {
-    $('#fj-travaille').addEventListener('click', function () {
-      fermerModale();
-      A.calJour = ts;
-      var jd = journeeDuJour(ts);
-      ouvrirJournee(jd ? jd.id : null, jd ? null : { date: ts });
-    });
-  }
-  $('#fj-poser').addEventListener('click', function () {
+  /* Ouvrir « Ma journée » datée de ce jour : celle qui existe, sinon une
+     nouvelle, avec le chantier posé s'il y en a un. */
+  var maJournee = function (nouvelle, chantierPose) {
     fermerModale();
-    ouvrirPoserChantier(ts);
+    var jd = nouvelle ? null : journeeDuJour(ts);
+    ouvrirJournee(jd ? jd.id : null, jd ? null : {
+      date: ts, chantier: chantierPose && enAttente[0] ? enAttente[0].chantier.id : ''
+    });
+  };
+  var sur = function (id, fn) { if ($('#' + id)) $('#' + id).addEventListener('click', fn); };
+  sur('fj-prevu', function () {
+    validerCommePrevu(ts, enAttente).then(function () { refaire('Journée validée.'); });
   });
-  if ($('#fj-absent')) {
-    $('#fj-absent').addEventListener('click', function () {
-      fermerModale();
-      ouvrirAbsence(ts);
-    });
-  }
-  if ($('#fj-libre')) {
-    $('#fj-libre').addEventListener('click', function () {
-      retirerAbsence(ts).then(function () { refaire('Jour rendu au planning.'); });
-    });
-  }
+  sur('fj-tout', function () {
+    /* On écrit quarante-sept journées d'un coup : le geste se confirme, et il
+       dit ce qu'il va écrire. */
+    if (!confirm('Enregistrer les ' + reste.length + ' journées passées telles ' +
+      'qu’elles étaient prévues ?\n\nLes heures de l’agenda et les prestations de ' +
+      'chaque chantier sont reprises. Chaque journée reste modifiable ensuite.')) return;
+    validerTousLesJoursPrevus().then(function (n) { refaire(n + ' journées enregistrées.'); });
+  });
+  sur('fj-autrement', function () { maJournee(false, true); });
+  sur('fj-travaille', function () { maJournee(false, false); });
+  sur('fj-autre', function () { maJournee(true, false); });
+  sur('fj-deplacer', function () { fermerModale(); ouvrirDeplacerJour(ts); });
+  sur('fj-nonla', function () { fermerModale(); ouvrirAbsence(ts); });
+  sur('fj-absent', function () { fermerModale(); ouvrirAbsence(ts); });
+  sur('fj-poser', function () { fermerModale(); ouvrirPoserChantier(ts); });
+  sur('fj-libre', function () {
+    retirerAbsence(ts).then(function () { refaire('Jour rendu au planning.'); });
+  });
   $('#modale-corps').addEventListener('click', function (e) {
+    var mj = e.target.closest('[data-fjmj]');
+    if (mj) { fermerModale(); ouvrirJournee(mj.dataset.fjmj); return; }
     var ouv = e.target.closest('[data-fjouvrir]');
     if (ouv) { fermerModale(); ouvrirChantier(ouv.dataset.fjouvrir); return; }
     var ret = e.target.closest('[data-fjretirer]');
@@ -198,8 +336,7 @@ function ouvrirFicheJour(ts) {
     if (sup) {
       var p = sup.dataset.fjsup.split('_');
       var c2 = chantier(p[0]); if (!c2) return;
-      var rang = Number(p[1]);
-      var t2 = (c2.temps || [])[rang];
+      var t2 = (c2.temps || [])[Number(p[1])];
       if (!t2) return;
       if (!retirerSaisie(t2)) { toast('Cette saisie ne se retire pas d’ici.'); return; }
       indexerJournees();
@@ -283,85 +420,6 @@ function trouveAide(st) {
 function journeeDuJour(ts) {
   var k = C.jourCle(ts);
   return (A.journees || []).filter(function (j) { return C.jourCle(j.date) === k; })[0] || null;
-}
-
-/* « Pas de jour prévu qui reste indéfiniment dans le passé sans statut
-   final. » Un jour posé que la date a dépassé pose une question à trois
-   réponses, et il faut en choisir une. Le rappel de l'accueil ouvre ici.
-   On ne ferme jamais la porte : le rappel se chasse d'un doigt, comme les
-   deux autres — forcer sans échappatoire, c'est se faire ignorer. */
-function ouvrirResolutionJour(ts) {
-  ts = C.minuit(ts);
-  var o = occupationDu(ts);
-  var reste = C.joursAResoudre(A.chantiers, A.cfg, absences(), Date.now());
-  var rang = 0;
-  reste.forEach(function (x, i) { if (C.jourCle(x.d) === C.jourCle(ts)) rang = i; });
-  var d = new Date(ts);
-  var noms = o.prevus.map(function (p) { return C.nomChantier(p.chantier); });
-
-  modale('Le ' + d.toLocaleDateString('fr-FR') + ' — que s’est-il passé ?',
-    '<p class="sous-titre-bloc">Ce jour était <b>' +
-    esc(C.nomStatutJour(C.statutJour(o, absences(), ts))) + '</b> pour ' +
-    esc(noms.join(', ') || 'un chantier') + ', et il est passé. Tranchez : sinon il ' +
-    'reste au planning pour toujours, et vos rendements se vident en silence.</p>' +
-    '<div class="btn-rang" style="flex-direction:column;gap:8px">' +
-    '<button class="btn primaire plein" id="rj-prevu">C’était comme prévu — ' +
-    C.ditDuree(heuresPrevues(o.prevus), A.cfg) + '</button>' +
-    '<button class="btn plein" id="rj-oui">J’y ai travaillé, mais autrement</button>' +
-    '<button class="btn plein" id="rj-deplacer">C’était un autre jour</button>' +
-    '<button class="btn plein" id="rj-non">Je n’y étais pas</button>' +
-    '</div>' +
-    (reste.length > 1
-      ? '<p class="muted" style="font-size:11.5px;margin:12px 0 0">' +
-        (reste.length - 1) + ' autre' + (reste.length > 2 ? 's' : '') + ' journée' +
-        (reste.length > 2 ? 's' : '') + ' attend' + (reste.length > 2 ? 'ent' : '') +
-        ' encore une réponse.</p>' +
-        '<div class="btn-rang" style="margin-top:9px">' +
-        '<button class="btn btn-min plein" id="rj-tout">Toutes comme prévu — ' +
-        reste.length + ' journées</button></div>'
-      : ''));
-
-  /* Y avoir travaillé, c'est ouvrir « Ma journée » à cette date : elle porte
-     le chantier, les prestations et le temps. */
-  if ($('#rj-tout')) {
-    $('#rj-tout').addEventListener('click', function () {
-      /* On écrit quarante-sept journées d'un coup : le geste se confirme,
-         et il dit ce qu'il va écrire. */
-      if (!confirm('Enregistrer les ' + reste.length + ' journées passées telles ' +
-        'qu’elles étaient prévues ?\n\nLes heures de l’agenda et les prestations de ' +
-        'chaque chantier sont reprises. Chaque journée reste modifiable ensuite.')) return;
-      validerTousLesJoursPrevus().then(function (n) {
-        fermerModale();
-        renderCalendrier(); renderAccueil(); renderCarnet(); renderFiche(); renderRendements();
-        toast(n + ' journées enregistrées.');
-      });
-    });
-  }
-  $('#rj-prevu').addEventListener('click', function () {
-    validerCommePrevu(ts, o.prevus).then(function () {
-      fermerModale();
-      renderCalendrier(); renderAccueil(); renderCarnet(); renderFiche(); renderRendements();
-      toast('Journée validée.');
-    });
-  });
-  $('#rj-oui').addEventListener('click', function () {
-    fermerModale();
-    A.calJour = ts;
-    var jd = journeeDuJour(ts);
-    ouvrirJournee(jd ? jd.id : null, jd ? null : {
-      date: ts, chantier: (o.prevus[0] || {}).chantier ? o.prevus[0].chantier.id : ''
-    });
-  });
-  /* Le déplacer : on retire le jour de son chantier et on le repose ailleurs.
-     « Prévu jeudi mais chantier fait mercredi. » */
-  $('#rj-deplacer').addEventListener('click', function () {
-    fermerModale();
-    ouvrirDeplacerJour(ts);
-  });
-  $('#rj-non').addEventListener('click', function () {
-    fermerModale();
-    ouvrirAbsence(ts);
-  });
 }
 
 /* Déplacer ce qui était posé un jour vers un autre. Les chantiers du jour
@@ -556,7 +614,7 @@ function renderFicheChantier() {
   var tete = '<div class="carte">' +
     '<div class="champ"><label class="eyebrow" for="fch-filtre">Parmi</label>' +
     '<select id="fch-filtre">' +
-    [['ouverts', 'Chantiers ouverts'], ['encours', 'En cours'], ['accepte', 'À planifier'],
+    [['ouverts', 'Chantiers ouverts'], ['encours', 'En cours'], ['accepte', 'À programmer'],
       ['envoye', 'Devis envoyés'], ['tous', 'Tous']].map(function (o) {
       return '<option value="' + o[0] + '"' + (f === o[0] ? ' selected' : '') + '>' +
         esc(o[1]) + '</option>';
@@ -926,30 +984,29 @@ function chantiersAPlanifier() {
     return ea - eb || (b.reste || 0) - (a.reste || 0);
   });
 }
+/* « À programmer », son mot pour l'ancien « À planifier ». Repliable : une
+   fois lu, le bloc ne doit pas repousser la grille. */
 function renderAPlanifier() {
   var z = $('#cal-aplanifier'); if (!z) return;
   /* Pendant un placement, le bandeau du chantier en cours prend la place. */
   var l = A.planifie ? [] : chantiersAPlanifier();
   if (!l.length) { z.innerHTML = ''; return; }
   var total = l.reduce(function (s, x) { return s + (x.reste || 0); }, 0);
-  z.innerHTML = '<div class="carte2" style="margin-bottom:11px">' +
-    '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">' +
-    '<b style="font-size:13.5px">À planifier</b>' +
-    '<span class="muted num" style="font-size:12.5px;white-space:nowrap">' +
-    (total ? esc(C.fmtJours(total)) + ' sur ' : '') + l.length + ' chantier' +
-    (l.length > 1 ? 's' : '') + '</span></div>' +
+  z.innerHTML = '<details class="aprog" id="cal-aprog"' + (A.aprogReplie ? '' : ' open') + '>' +
+    '<summary><b>À programmer</b>' +
+    '<small class="num">' + (total ? esc(C.fmtJours(total)) + ' sur ' : '') + l.length + ' chantier' +
+    (l.length > 1 ? 's' : '') + '</small>' + picto('chevron') + '</summary>' +
     l.map(function (x) {
       var engage = C.statutEngage(x.c.statut);
-      return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0 0">' +
-        '<span style="flex:1;min-width:0"><span style="display:block;font-size:13.5px">' +
-        esc(C.nomChantier(x.c)) + '</span>' +
-        '<small class="muted">' + (engage ? '' : 'devis en attente · ') +
-        (x.reste == null ? 'à estimer' : esc(C.fmtJours(x.reste)) + ' à placer') + '</small></span>' +
+      return '<div class="aprog-l"><span class="aprog-txt"><b>' + esc(C.nomChantier(x.c)) + '</b>' +
+        '<small>' + esc([x.c.donneur, engage ? '' : 'devis en attente'].filter(Boolean).join(' · ')) + '</small>' +
+        '<span class="aprog-situ' + (x.reste == null ? ' tiede' : '') + '">' +
+        (x.reste == null ? 'temps à estimer' : esc(C.fmtJours(x.reste)) + ' à placer') + '</span></span>' +
         (x.reste == null
           ? '<button class="btn btn-min" data-aestimer="' + x.c.id + '">Estimer</button>'
-          : '<button class="btn btn-min" data-aplacer="' + x.c.id + '">Placer</button>') +
+          : '<button class="btn primaire btn-min" data-aplacer="' + x.c.id + '">Placer</button>') +
         '</div>';
-    }).join('') + '</div>';
+    }).join('') + '</details>';
 }
 function renderCalendrier() {
   var g = $('#cal-grille'); if (!g) return;
@@ -968,63 +1025,68 @@ function renderCalendrier() {
     new Date(an, mo + 1, 7).getTime(), A.cfg);
   var prel = prelevementsDuMois(an, mo);
   var ajd = C.minuit(Date.now());
-  var sel = A.calJour ? C.minuit(A.calJour) : null;
+  var cp = A.planifie ? chantier(A.planifie) : null;
+  var nTrancher = 0;
 
   var h = '<div class="cal">' + JOURS_COURTS.map(function (j) { return '<div class="jn">' + j + '</div>'; }).join('');
   for (var i = 0; i < decalage; i++) h += '<button class="vide" disabled></button>';
   for (var d = 1; d <= dernier.getDate(); d++) {
     var ts = new Date(an, mo, d).getTime();
     var k = C.jourCle(ts), o = occ[k] || { prevus: [], reels: [] };
-    /* Un jour, un statut, une pastille. La case en empilait jusqu'à trois. */
+    /* Un jour, un statut, une couleur : la bande sous le numéro et le fond
+       de la case (P5). « La différence entre le vert et le bleu n'est pas
+       flagrante » : une pastille de 9 px ne suffisait pas au soleil. */
     var st = C.statutJour(o, absences(), ts);
-    var pts = st === 'libre' ? ''
-      : '<i style="background:' + C.coulStatutJour(st) + '"></i>';
+    /* Le jour passé resté au planning portait la couleur d'un jour à venir :
+       il se repère au « ? » et au bord pointillé. */
+    var tr = ts < ajd && (st === 'prevu' || st === 'confirme');
+    if (tr) nTrancher++;
     var cls = ['jour', 'st-' + st];
+    if (tr) cls.push('trancher');
     if (ts === ajd) cls.push('auj');
     var demi = false;
-    if (A.planifie) {
-      var cp = chantier(A.planifie);
-      var part = cp ? C.partDuJour(cp, ts) : 0;
+    if (cp) {
+      var part = C.partDuJour(cp, ts);
       if (part > 0) { cls.push('sel'); if (part < 1) demi = true; }
-    } else if (sel === ts) cls.push('sel');
+    }
     if (C.estWeekend(ts)) cls.push('we');
-    /* Le repère du prélèvement ne remplace pas la pastille du statut : il se
+    /* Le repère du prélèvement ne remplace pas la couleur du statut : il se
        pose dans l'angle, et il annonce son montant au survol. */
     var pr = prel[k] || [];
     var somme = pr.reduce(function (t2, x) { return t2 + C.nb(x.charge.ttc); }, 0);
-    h += '<button class="' + cls.join(' ') + '" data-jour="' + ts + '">' +
+    h += '<button class="' + cls.join(' ') + '" data-jour="' + ts + '" aria-label="' +
+      esc(jourEnLettres(ts) + ', ' + C.nomStatutJour(st) + (tr ? ', à trancher' : '') +
+        (pr.length ? ', prélèvement' : '')) + '">' +
       (pr.length ? '<span class="cal-prel" title="' +
         esc(pr.map(function (x) { return x.charge.libelle || 'charge fixe'; }).join(', ')) +
         (somme ? ' — ' + eur(C.arr(somme, 2)) : '') + '">€</span>' : '') +
-      '<span class="n">' + d + (demi ? '<sup style="font-size:8px">½</sup>' : '') + '</span>' +
-      '<span class="pts">' + pts + '</span></button>';
+      (tr ? '<span class="cal-q" aria-hidden="true">?</span>' : '') +
+      '<span class="n">' + d + (demi ? '<sup>½</sup>' : '') + '</span>' +
+      '<span class="bande"></span></button>';
   }
   h += '</div>';
   g.innerHTML = h;
 
   renderResteATrancher();
+  /* Quatre compteurs (P5) : fait, confirmé dont à trancher, prévu, non
+     travaillé. Le non travaillé se montre même à zéro : un compteur qui
+     apparaît et disparaît d'un mois à l'autre ne se lit plus. */
   var cm = C.chargeMois(A.chantiers, an, mo, A.cfg);
-  $('#cal-charge').innerHTML = '<div class="kpi" style="margin-top:11px">' +
-    '<div class="carte2"><b class="num">' + cm.fermes + '</b><small>jours confirmés</small></div>' +
-    '<div class="carte2"><b class="num">' + cm.provisoires + '</b><small>jours provisoires</small></div>' +
-    '<div class="carte2"><b class="num">' + E.fmt(cm.joursReels, 1) + '</b><small>jours-homme faits</small></div>' +
-    (function () {
-      var n = (absences() || []).filter(function (a) {
-        var da = new Date(a.d);
-        return da.getFullYear() === an && da.getMonth() === mo;
-      }).length;
-      return n ? '<div class="carte2"><b class="num">' + n +
-        '</b><small>jour' + (n > 1 ? 's' : '') + ' non travaillé' + (n > 1 ? 's' : '') +
-        '</small></div>' : '';
-    })() +
+  var nAbs = (absences() || []).filter(function (a) {
+    var da = new Date(a.d);
+    return da.getFullYear() === an && da.getMonth() === mo;
+  }).length;
+  var j = function (n) { return E.fmt(n, n % 1 ? 1 : 0) + ' j'; };
+  $('#cal-charge').innerHTML = cp ? '' : '<div class="kpi cal-k4">' +
+    '<div class="carte2"><b class="num">' + j(cm.joursReels) + '</b><small>fait</small></div>' +
+    '<div class="carte2"><b class="num">' + j(cm.fermes) + '</b><small>confirmé' +
+    (nTrancher ? ' · dont ' + nTrancher + ' à trancher' : '') + '</small></div>' +
+    '<div class="carte2"><b class="num">' + j(cm.provisoires) + '</b><small>prévu</small></div>' +
+    '<div class="carte2"><b class="num">' + j(nAbs) + '</b><small>non travaillé</small></div>' +
     '</div>';
-  renderJourDetail();
+  renderHistorique();
 }
 
-/* Les jours passés restés au planning, annoncés en tête de l'agenda. Le
-   rappel de l'accueil ne suffisait pas : c'est ici qu'il travaille, et un
-   jour non tranché ne se voit nulle part sur la grille — sa pastille dit
-   « confirmé » comme un jour à venir. */
 /* Les prélèvements d'un mois, rangés par jour. Les charges arrêtées et
    celles qui n'ont pas encore commencé n'en sont pas : echeances() borne
    déjà sur charge.debut et charge.fin. */
@@ -1046,50 +1108,88 @@ function prelevementsDuJour(ts) {
   var d = new Date(C.minuit(ts));
   return prelevementsDuMois(d.getFullYear(), d.getMonth())[C.jourCle(ts)] || [];
 }
+/* Les jours passés restés au planning, en tête de l'Agenda (P3) : « à
+   l'ouverture de l'appli ou à l'accès au calendrier ». Aujourd'hui ▸ En
+   retard en porte une ligne par jour ; ici, une seule ligne pour tous. */
 function renderResteATrancher() {
   var z = $('#cal-trancher'); if (!z) return;
-  var l = C.joursAResoudre(A.chantiers, A.cfg, absences(), Date.now());
+  var l = A.planifie ? [] : C.joursAResoudre(A.chantiers, A.cfg, absences(), Date.now());
   if (!l.length) { z.innerHTML = ''; return; }
   var p = l[0];
-  var nom = ((p.chantiers[0] || {}).nom) || 'chantier';
-  z.innerHTML = '<button class="alerte" id="cal-trancher-btn" style="width:100%">' +
-    '<span class="ic" style="background:#B98A00"></span>' +
-    '<span><b>' + (l.length === 1
-      ? 'Le ' + dateCourte(p.d) + ' reste à trancher'
-      : l.length + ' journées passées restent à trancher') + '</b>' +
-    '<small>' + esc(nom) + (l.length > 1 ? ', et ' + (l.length - 1) + ' autre' +
-      (l.length > 2 ? 's' : '') : '') + ' — y avez-vous travaillé ?</small></span></button>';
+  z.innerHTML = '<button class="cal-trancher" id="cal-trancher-btn">' +
+    '<span class="cal-q" aria-hidden="true">?</span>' +
+    '<span class="ct-txt"><b>' + esc(l.length === 1 ? libelleNonSaisie(p.d)
+      : l.length + ' journées à trancher') + '</b>' +
+    '<small>' + esc(l.length === 1
+      ? 'Prévu : ' + p.chantiers.map(function (c) { return C.nomChantier(c); }).join(', ')
+      : l.slice(0, 4).map(function (x) { return jourCourt(x.d); }).join(', ') +
+        (l.length > 4 ? '…' : '')) + '</small></span>' +
+    '<span class="aj-etiq">Trancher</span></button>';
 }
-function renderJourDetail() {
-  var z = $('#cal-detail'); if (!z) return;
-  var ts = C.minuit(A.calJour || Date.now());
-  var d = new Date(ts);
-  $('#cal-jour-titre').textContent = JOURS_COURTS[(d.getDay() + 6) % 7] + ' ' + d.getDate() + ' ' + MOIS_NOMS[d.getMonth()];
-  var occ = C.occupation(A.chantiers, ts, ts, A.cfg)[C.jourCle(ts)] || { prevus: [], reels: [] };
-
-  var h = '';
-  if (occ.prevus.length) {
-    h += '<p class="eyebrow" style="margin:0 0 6px">Prévu</p>' + occ.prevus.map(function (p) {
-      return '<div class="liste-item"><span class="pastille" style="background:' +
-        (p.fermete === 'ferme' ? '#2E7D46' : '#B98A00') + '"></span>' +
-        '<div class="li-c"><b>' + esc(C.nomChantier(p.chantier)) + '</b><small>' +
-        esc([p.chantier.donneur || p.chantier.client, C.nomStatut(p.chantier.statut, p.chantier)].filter(Boolean).join(' · ')) +
-        (p.part != null && p.part < 1 ? ' · demi-journée' : '') +
-        (p.fermete === 'provisoire' ? ' — provisoire' : '') + '</small></div>' +
-        '<button class="btn-min" data-caljour-ouvrir="' + p.chantier.id + '">Ouvrir</button></div>';
-    }).join('');
-  }
-  if (occ.reels.length) {
-    h += '<p class="eyebrow" style="margin:12px 0 6px">Fait</p>' + occ.reels.map(function (r) {
-      return '<div class="liste-item"><span class="pastille" style="background:#1D6FB8"></span>' +
-        '<div class="li-c"><b>' + esc(C.nomChantier(r.chantier)) + ' — ' + E.fmt(r.jours, 2) + ' j-h</b>' +
-        '<small>' + E.fmt(C.nb(r.temps.duree), 1) + (r.temps.unite === 'h' ? ' h' : ' j') +
-        (C.nb(r.temps.personnes) > 1 ? ' × ' + C.nb(r.temps.personnes) + ' pers.' : '') +
-        (r.temps.activite ? ' · ' + esc(C.nomTravail(r.temps.activite)) : '') + '</small></div>' +
-        '<button class="btn-min" data-caljour-sup="' + r.chantier.id + '_' + r.temps.date + '">✕</button></div>';
-    }).join('');
-  }
-  z.innerHTML = h || '<div class="vide"><p>Rien de prévu ni de saisi ce jour-là.</p></div>';
+/* Sous la grille, l'historique du mois (R7 : la place de la carte Journée).
+   « L'Agenda me sert surtout d'historique. » Le mois jour par jour, rangé par
+   semaine, la plus récente ouverte ; un appui rouvre la journée. */
+function renderHistorique() {
+  var z = $('#cal-histo'); if (!z) return;
+  if (A.planifie) { z.innerHTML = ''; return; }
+  var cur = new Date(A.calMois), an = cur.getFullYear(), mo = cur.getMonth();
+  var debut = new Date(an, mo, 1).getTime(), fin = new Date(an, mo + 1, 1).getTime();
+  var jours = {};
+  var jourDe = function (ts) {
+    var k = C.jourCle(ts);
+    return (jours[k] = jours[k] || { ts: C.minuit(ts), jrn: [], abs: null });
+  };
+  (A.journees || []).forEach(function (j) {
+    var ts = C.minuit(C.nb(j.date));
+    if (ts >= debut && ts < fin) jourDe(ts).jrn.push(j);
+  });
+  absences().forEach(function (a) {
+    var ts = C.minuit(a.d);
+    if (ts >= debut && ts < fin) jourDe(ts).abs = a;
+  });
+  var semaines = {}, totH = 0, totKm = 0;
+  Object.keys(jours).forEach(function (k) {
+    var x = jours[k], dd = new Date(x.ts);
+    var lundi = new Date(dd.getFullYear(), dd.getMonth(), dd.getDate() - (dd.getDay() + 6) % 7).getTime();
+    (semaines[lundi] = semaines[lundi] || []).push(x);
+    x.jrn.forEach(function (j) { totH += C.heuresJournee(j); totKm += C.nb(j.km); });
+  });
+  var h1 = function (h) { return E.fmt(C.arr(h, 1), h % 1 ? 1 : 0) + ' h'; };
+  var lundis = Object.keys(semaines).map(Number).sort(function (a, b) { return b - a; });
+  A.semOuvertes = A.semOuvertes || {};
+  z.innerHTML = '<div class="carte"><div class="carte-titre"><h2>Ce mois-ci, jour par jour</h2>' +
+    (totH || totKm ? '<span class="muted num histo-tot">' + h1(totH) +
+      (totKm ? ' · ' + E.fmt(totKm, 0) + ' km' : '') + '</span>' : '') + '</div>' +
+    (lundis.length ? lundis.map(function (lu, i) {
+      var ks = semaines[lu].sort(function (a, b) { return b.ts - a.ts; });
+      var sh = ks.reduce(function (s, x) {
+        return s + x.jrn.reduce(function (s2, j) { return s2 + C.heuresJournee(j); }, 0);
+      }, 0);
+      var ouverte = A.semOuvertes[lu] != null ? A.semOuvertes[lu] : i === 0;
+      return '<details class="semaine" data-sem="' + lu + '"' + (ouverte ? ' open' : '') + '>' +
+        '<summary><span>Semaine du ' + esc(jourCourt(lu)) + '</span>' +
+        '<span class="num muted">' + (sh ? h1(sh) : '') + '</span>' + picto('chevron') + '</summary>' +
+        ks.map(function (x) {
+          var l = x.jrn.map(function (j) {
+            var c = j.chantier ? chantier(j.chantier) : null;
+            var dit = faitsDeJournee(j);
+            if (C.nb(j.km)) dit.push(E.fmt(C.nb(j.km), 0) + ' km');
+            if (j.fin) dit.push('chantier terminé');
+            return '<button type="button" class="histo-l" data-histomj="' + esc(j.id) + '">' +
+              '<span class="txt"><b>' + esc(jourCourt(x.ts, true) + ' · ' +
+                (c ? C.nomChantier(c) : (j.lieu || 'sans chantier')) + ' · ' + h1(C.heuresJournee(j))) + '</b>' +
+              (dit.length ? '<small>' + esc(dit.join(' · ')) + '</small>' : '') + '</span>' +
+              picto('chevron') + '</button>';
+          }).join('');
+          if (x.abs && !x.jrn.length) {
+            l += '<button type="button" class="histo-l" data-histojour="' + x.ts + '">' +
+              '<span class="txt"><b>' + esc(jourCourt(x.ts, true) + ' · Non travaillé') + '</b>' +
+              (x.abs.note ? '<small>' + esc(x.abs.note) + '</small>' : '') + '</span>' +
+              picto('chevron') + '</button>';
+          }
+          return l;
+        }).join('') + '</details>';
+    }).join('') : '<div class="vide"><p>Rien de noté ce mois-ci.</p></div>') + '</div>';
 }
 
 /* ------------------------------------------------------------- alertes */

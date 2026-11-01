@@ -97,9 +97,8 @@ function ligneSaisie() {
 function lignesRetard() {
   var now = Date.now(), l = [];
   C.joursAResoudre(A.chantiers, A.cfg, absences(), now).forEach(function (p) {
-    var d = new Date(p.d);
     l.push({ cle: 'trancher:' + C.jourCle(p.d), ton: 'tiede', picto: 'horloge',
-      titre: majuscule(JOURS_LONGS[d.getDay()]) + ' ' + d.getDate() + ' ' + MOIS_NOMS[d.getMonth()] + ' non saisi',
+      titre: libelleNonSaisie(p.d),
       sous: 'Prévu : ' + p.chantiers.map(function (c) { return C.nomChantier(c); }).join(', '),
       etiq: 'Trancher', ouvre: 'trancher:' + p.d });
   });
@@ -264,6 +263,15 @@ function lignesPrelevements() {
   }));
 }
 
+/* Ce qu'une journée a fait, prestation par prestation : « Plantation 200
+   plants ». Partagé avec l'historique de l'Agenda. */
+function faitsDeJournee(j) {
+  return (j.postes || []).map(function (p) {
+    return C.nomTravail(p.travaux) + (C.nb(p.quantite)
+      ? ' ' + E.fmt(C.nb(p.quantite), C.nb(p.quantite) % 1 ? 2 : 0) + ' ' + C.courtUnite(C.uniteDe(p.travaux))
+      : '');
+  });
+}
 /* Les trois derniers jours saisis : de quoi corriger hier sans ouvrir
    l'Agenda. Un appui rouvre la fenêtre Ma journée sur ce jour-là. */
 function lignesDerniersJours() {
@@ -272,11 +280,7 @@ function lignesDerniersJours() {
     .sort(function (a, b) { return C.nb(b.date) - C.nb(a.date); }).slice(0, 3)
     .map(function (j) {
       var c = j.chantier ? chantier(j.chantier) : null;
-      var faits = (j.postes || []).map(function (p) {
-        return C.nomTravail(p.travaux) + (C.nb(p.quantite)
-          ? ' ' + E.fmt(C.nb(p.quantite), C.nb(p.quantite) % 1 ? 2 : 0) + ' ' + C.courtUnite(C.uniteDe(p.travaux))
-          : '');
-      });
+      var faits = faitsDeJournee(j);
       var h = C.heuresJournee(j);
       return '<button type="button" class="aj-jour" data-ajouvre="journee:' + esc(j.id) + '">' +
         '<span class="aj-txt"><b>' + esc(majuscule(jourCourt(j.date, true)) + ' · ' +
@@ -311,18 +315,13 @@ function renderAujourdhui() {
   renderNotes();
 }
 
-/* Où mène chaque ligne. Le placement est celui de l'Agenda (« À planifier »)
-   : il s'ouvre sur le mois du dernier jour déjà posé. */
+/* Où mène chaque ligne. « Trancher » ouvre la fiche du jour, à l'état « à
+   trancher » (R8) ; « Placer », le placement de l'Agenda, et « Fini de
+   placer » ramène ici (P2). */
 var OUVRIR_AUJ = {
   fiche: function (id) { ouvrirChantier(id); },
-  trancher: function (ts) { ouvrirResolutionJour(Number(ts)); },
-  placer: function (id) {
-    var c = chantier(id); if (!c) return;
-    A.planifie = c.id;
-    var pl = C.journeesPlacees(c);
-    A.calMois = pl.length ? C.minuit(pl[pl.length - 1].d) : Date.now();
-    allerModule('calendrier', 'calendrier');
-  },
+  trancher: function (ts) { ouvrirFicheJour(Number(ts)); },
+  placer: function (id) { demarrerPlacement(id, 'aujourdhui'); },
   sauvegarde: function () { allerReglages('sauvegarde'); },
   stock: function () { allerModule('stock'); },
   vehicule: function () { allerModule('vehicule', 'echeancesv'); },

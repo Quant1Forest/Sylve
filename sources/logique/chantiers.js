@@ -126,8 +126,8 @@ function analyseRefus(chantiers) {
 var STATUTS = [
   { c: 'devis', n: 'Devis à envoyer', devisSeul: true, ouvert: true, engage: false },
   { c: 'envoye', n: 'Devis envoyé', devisSeul: true, ouvert: true, engage: false },
-  { c: 'accepte', n: 'Devis signé, à planifier', sansDevis: 'À planifier',
-    alias: ['Accepté, à planifier', 'Accepté'], ouvert: true, engage: true },
+  { c: 'accepte', n: 'Devis signé, à programmer', sansDevis: 'À programmer',
+    alias: ['Devis signé, à planifier', 'À planifier', 'Accepté, à planifier', 'Accepté'], ouvert: true, engage: true },
   { c: 'encours', n: 'En cours', ouvert: true, engage: true },
   { c: 'termine', n: 'Terminé, à facturer', ouvert: true, engage: true },
   { c: 'facture', n: 'Facturé', ouvert: true, engage: true },

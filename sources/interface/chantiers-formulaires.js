@@ -66,27 +66,6 @@ function majFinValidite() {
    celle où il en est réellement. */
 
 
-var ceJours = [], ceChantierId = null;
-
-/* Ce qui est déjà retenu sur les jours qu'il est en train de poser. On ne
-   l'empêche pas de doubler — il lui arrive de faire une demi-journée ici et
-   une demi-journée là — mais il doit le voir avant de valider. */
-function occupationCeJours() {
-  var ds = ceJours.map(function (j) { return j.d; }).filter(Boolean);
-  if (!ds.length) return {};
-  return C.occupation(A.chantiers, Math.min.apply(null, ds), Math.max.apply(null, ds), A.cfg);
-}
-function prisCeJour(occ, ts) {
-  var o = ts ? occ[C.jourCle(ts)] : null; if (!o) return [];
-  var vus = {}, r = [];
-  o.prevus.concat(o.reels).forEach(function (p) {
-    var ch = p.chantier;
-    if (!ch || ch.id === ceChantierId || vus[ch.id]) return;
-    vus[ch.id] = 1; r.push(C.nomChantier(ch));
-  });
-  return r;
-}
-
 /* Une journée ne se découpe pas qu'en deux. Le bouton ne proposait que « 1 j »
    ou « ½ j » ; on part parfois trois heures sur un chantier avant d'aller
    ailleurs. Les heures sont converties en part de journée d'après le réglage
@@ -113,135 +92,39 @@ function partsPossibles(courante) {
       x.n + '</option>';
   }).join('');
 }
-function renderCeJours() {
-  var z = $('#ce-jours'); if (!z) return;
-  var total = ceJours.reduce(function (s, j) { return s + C.nb(j.p); }, 0);
-  var vise = C.nb($('#ce-jest') ? $('#ce-jest').value : 0);
-  var occ = occupationCeJours(), nbPris = 0, vusDates = {};
-  z.innerHTML = ceJours.map(function (j, i) {
-    var pris = prisCeJour(occ, j.d);
-    var doublon = j.d && vusDates[j.d];
-    if (j.d) vusDates[j.d] = 1;
-    if (pris.length) nbPris++;
-    return '<div style="margin-bottom:6px">' +
-      '<div style="display:flex;gap:7px;align-items:center">' +
-      '<input type="date" data-cej="' + i + '" value="' + versChamp(j.d) + '" style="flex:1' +
-      (pris.length || doublon ? ';border-color:#B98A00' : '') + '">' +
-      '<select data-cepart="' + i + '" style="flex:none;width:5.6em">' +
-      partsPossibles(C.nb(j.p)) + '</select>' +
-      '<button type="button" class="btn-min" data-cedel="' + i + '" style="flex:none">✕</button></div>' +
-      (doublon
-        ? '<div class="jour-pris">Ce jour est déjà posé plus haut.' +
-          '<button type="button" class="btn-min" data-cedel="' + i + '" ' +
-          'style="margin-left:7px">Retirer celui-ci</button></div>'
-        : pris.length
-          ? '<div class="jour-pris"><b>Le ' + dateCourte(j.d) + ' est déjà pris</b> — ' +
-            esc(pris.join(', ')) + '.' +
-            '<button type="button" class="btn-min" data-cesuivant="' + i + '" ' +
-            'style="margin-left:7px">Prendre le jour libre suivant</button>' +
-            '<button type="button" class="btn-min" data-cedel="' + i + '" ' +
-            'style="margin-left:5px">Annuler</button></div>'
-          : '') +
-      '</div>';
-  }).join('') +
-    '<button type="button" class="btn-min" id="ce-plusjour">+ une journée</button>' +
-    (nbPris ? '<p class="jour-pris" style="margin:8px 0 0">' + nbPris + ' journée' +
-      (nbPris > 1 ? 's' : '') + ' tombe' + (nbPris > 1 ? 'nt' : '') + ' sur un jour déjà retenu. ' +
-      'Rien ne l’interdit — quelques heures de chaque côté, par exemple — mais vérifiez.</p>' : '');
-  var tj = $('#ce-total-jours');
-  if (tj) {
-    tj.textContent = total ? E.fmt(total, total % 1 ? 1 : 0) : '—';
-    tj.style.color = (vise && total > vise) ? '#B4231F' : '';
-    tj.title = vise ? 'sur ' + vise + ' estimées' : '';
-  }
-}
-function lireCeJours() {
-  $$('#ce-jours [data-cej]').forEach(function (i) {
-    var d = versDate(i.value);
-    if (d) ceJours[Number(i.dataset.cej)].d = d;
-  });
-  $$('#ce-jours [data-cepart]').forEach(function (s) {
-    var p = C.nb(s.value);
-    if (p > 0) ceJours[Number(s.dataset.cepart)].p = p;
-  });
-}
-/* Ajouter, retirer, corriger une date posée. Partagé par le formulaire de
-   création et celui des journées : deux copies auraient fini par diverger. */
-function brancherCeJours() {
-  $('#ce-jours').addEventListener('click', function (e) {
-    var plus = e.target.closest('#ce-plusjour'), del = e.target.closest('[data-cedel]');
-    var suivant = e.target.closest('[data-cesuivant]');
-    if (plus || suivant) {
-      lireCeJours();
-      /* on propose le prochain jour réellement libre : ni week-end, ni déjà
-         posé ici, ni retenu par un autre chantier. Il peut toujours le
-         changer à la main derrière.
-         Le même calcul déplace une date qui tombe sur un jour déjà pris : il
-         demandait qu'on le lui dise « avant, pas après », et le dire sans rien
-         proposer l'obligeait à chercher le jour libre lui-même. */
-      var rang = suivant ? Number(suivant.dataset.cesuivant) : -1;
-      var depuis = suivant ? ceJours[rang].d + C.JOUR
-        : (ceJours.length ? ceJours[ceJours.length - 1].d + C.JOUR : Date.now());
-      var base = C.minuit(depuis);
-      var occLibre = C.occupation(A.chantiers, base, base + 90 * C.JOUR, A.cfg);
-      var posesIci = {};
-      ceJours.forEach(function (j, n) { if (j.d && n !== rang) posesIci[j.d] = 1; });
-      var garde = 0;
-      while (garde++ < 90 && (
-        (C.estWeekend(base) && !(A.cfg && A.cfg.weekends)) ||
-        posesIci[base] || prisCeJour(occLibre, base).length)) base += C.JOUR;
-      if (suivant) ceJours[rang].d = base;
-      else ceJours.push({ d: base, p: 1 });
-      renderCeJours();
-    } else if (del) {
-      lireCeJours();
-      ceJours.splice(Number(del.dataset.cedel), 1);
-      renderCeJours();
-    }
-  });
-  $('#ce-jours').addEventListener('change', function () { lireCeJours(); renderCeJours(); });
-}
-
-/* Les dates posées se modifiaient dans l'en-tête, au milieu de vingt-deux
-   autres champs. Elles ont leur formulaire, comme chaque bloc de la fiche.
-   Le calendrier reste la façon naturelle d'en poser une ; ceci sert à
-   corriger une date ou une demi-journée sans y aller. */
+/* Les journées estimées du chantier. Les dates ne se tapent plus ici (R6) :
+   elles se posent dans l'Agenda, qui montre le mois et les jours déjà pris,
+   et qui reçoit l'alerte « jour déjà pris ». Le nombre estimé reste ici
+   jusqu'à ce que l'étape Devis l'accueille. */
 function ouvrirJourneesCh(id) {
   var c = chantier(id); if (!c) return;
-  ceJours = C.journeesPlacees(c).map(function (x) { return { d: x.d, p: x.p }; });
-  ceChantierId = id;
+  var place = C.totalPlace(c);
   modale('Les journées',
     '<div class="champ"><label class="eyebrow" for="ce-jest">Journées estimées</label>' +
     '<input type="text" id="ce-jest" inputmode="decimal" autocomplete="off" value="' +
     (c.joursEstimes != null ? esc(String(c.joursEstimes).replace('.', ',')) : '') + '"></div>' +
-    '<p class="eyebrow" style="margin:14px 0 6px">Les dates posées</p>' +
-    '<div id="ce-jours"></div>' +
-    '<p class="muted" style="font-size:12px;margin:9px 0 0">Total placé : ' +
-    '<b id="ce-total-jours" class="num">—</b>. Pour poser une date en voyant le mois, ' +
-    'passez par l’agenda.</p>' +
+    '<p class="muted" style="font-size:12px;margin:0">Placées dans l’Agenda : ' +
+    '<b id="ce-total-jours" class="num">' + (place ? E.fmt(place, place % 1 ? 1 : 0) : '—') +
+    '</b>. Les dates se posent dans l’Agenda : il montre le mois et les jours déjà pris.</p>' +
     '<div class="btn-rang" style="margin-top:11px">' +
+    '<button class="btn" id="cj-placer">Placer dans l’Agenda</button>' +
     '<button class="btn primaire" id="cj-ok">Valider</button></div>');
-  renderCeJours();
-  $('#ce-jest').addEventListener('input', renderCeJours);
-  brancherCeJours();
+  var estimees = function () { var j = C.nb($('#ce-jest').value); return j > 0 ? j : null; };
   $('#cj-ok').addEventListener('click', function () {
-    lireCeJours();
-    var jest = C.nb($('#ce-jest').value);
-    var pose = ceJours.reduce(function (s2, j) { return s2 + C.nb(j.p); }, 0);
-    if (jest > 0 && pose > jest) {
-      var tropDe = C.arr(pose - jest, 2);
-      if (!confirm('Vous placez ' + E.fmt(pose, pose % 1 ? 1 : 0) + ' journées pour ' +
+    var jest = estimees();
+    if (jest && place > jest) {
+      var tropDe = C.arr(place - jest, 2);
+      if (!confirm('Vous avez placé ' + E.fmt(place, place % 1 ? 1 : 0) + ' journées pour ' +
         E.fmt(jest, jest % 1 ? 1 : 0) + ' estimées, soit ' +
         String(tropDe).replace('.', ',') + ' de trop.\n\nEnregistrer quand même ?')) return;
     }
-    var vus = {};
-    majChantier(c, {
-      joursEstimes: jest > 0 ? jest : null,
-      jours: ceJours.filter(function (j) {
-        if (!j.d || vus[j.d]) return false;
-        vus[j.d] = 1; return true;
-      }).sort(function (x, y) { return x.d - y.d; })
-    }, 'Journées enregistrées.');
+    majChantier(c, { joursEstimes: jest }, 'Journées enregistrées.');
+  });
+  /* Ce qui vient d'être tapé n'est pas perdu en partant placer : le compte
+     du bandeau s'en sert. */
+  $('#cj-placer').addEventListener('click', function () {
+    c.joursEstimes = estimees(); c.maj = Date.now();
+    sauverChantiers().then(function () { demarrerPlacement(c.id, 'fiche'); });
   });
 }
 
@@ -286,7 +169,7 @@ function ouvrirEnteteCh() {
     '<button type="button" class="chip" data-cedevis="non" aria-pressed="false">Sans devis</button>' +
     '</div>' +
     '<p class="muted" style="font-size:11.5px;margin:5px 0 12px">Avec : il part en « Devis ' +
-    'à envoyer ». Sans : il part directement en « À planifier ».</p>' +
+    'à envoyer ». Sans : il part directement en « À programmer ».</p>' +
     /* « Il faut que je puisse estimer rapidement le nombre de jours à prévoir,
        ou la surface. » Les deux restent facultatifs. */
     '<div class="grille g2">' +

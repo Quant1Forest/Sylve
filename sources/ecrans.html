@@ -679,20 +679,18 @@
         <div id="cal-trancher"></div>
         <div id="cal-aplanifier"></div>
         <div id="cal-grille"></div>
-        <div class="legende" style="margin-top:10px">
-          <span><i style="background:#2E7D46"></i>confirmé</span>
-          <span><i style="background:#B98A00"></i>prévu (devis)</span>
-          <span><i style="background:#1D6FB8"></i>travaillé</span>
-          <span><i style="background:#8E8878"></i>non travaillé</span>
-          <span id="cal-leg-sel" hidden><i style="background:var(--encre)"></i>jour retenu pour ce chantier</span>
+        <div class="legende cal-legende" style="margin-top:10px">
+          <span id="cal-leg-sel" hidden><i class="lg-sel"></i>jour retenu pour ce chantier</span>
+          <span><i class="lg-travaille"></i>travaillé</span>
+          <span><i class="lg-confirme"></i>confirmé</span>
+          <span><i class="lg-prevu"></i>prévu (devis en attente)</span>
+          <span><i class="lg-absent"></i>non travaillé</span>
+          <span><i class="lg-trancher"></i>à trancher</span>
+          <span><b class="lg-prel">€</b>prélèvement</span>
         </div>
         <div id="cal-charge"></div>
       </div>
-      <div class="carte">
-        <div class="carte-titre"><h2 id="cal-jour-titre">Journée</h2>
-          <button class="btn primaire btn-min" id="cal-saisir">J'ai travaillé</button></div>
-        <div id="cal-detail"></div>
-      </div>
+      <div id="cal-histo"></div>
     </section>
 
     <section class="vue" id="vue-estimer" role="tabpanel">

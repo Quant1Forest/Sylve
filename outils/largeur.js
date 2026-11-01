@@ -9,9 +9,12 @@
    Argent). On ouvre donc l'application dans Chrome sans tête, dans un cadre
    de la largeur d'un petit téléphone, avec de vraies données aux noms longs,
    et l'on parcourt chaque écran : barre du bas, pastilles, ☰, fenêtres du +,
-   fiche d'un chantier. À chaque pas, deux mesures :
+   fiche d'un chantier, Agenda (À programmer déplié, fiche du jour normale et
+   à trancher, placement avec l'alerte « jour déjà pris »). À chaque pas,
+   trois mesures :
 
      - la page n'est pas plus large que l'écran (scrollWidth ≤ clientWidth) ;
+     - une fenêtre ouverte ne déborde pas de son cadre ;
      - la barre du bas est entière dans l'écran visible.
 
    Sans Chrome sur le poste (variable SYLVE_CHROME pour le désigner), l'étape
@@ -56,7 +59,9 @@ function graine() {
       dateFacture: new Date(an, i % 10, 10, 12).getTime(), numeroFacture: 'F-' + an + '-' + (100 + i),
       lignes: [{ travail: 'PLANT', unite: 'ha', quantite: 8 + i, prix: 1200, nature: 'prestation' },
         { travail: 'DEGAG', unite: 'ha', quantite: 3, prix: 880, nature: 'prestation' }],
-      temps: [], jours: []
+      temps: [], jours: i === 1 ? [{ d: maintenant - 2 * JOUR, p: 1 }, { d: maintenant + 3 * JOUR, p: 1 }] : [],
+      /* Deux chantiers engagés à estimer ou à placer : « À programmer ». */
+      joursEstimes: i === 1 || i === 2 ? 6 : undefined
     });
     journees.push({ id: 'j' + i, date: new Date(an, new Date().getMonth(), 1 + i, 12).getTime(),
       chantier: 'c' + i, km: 40 + i, personnes: 1 });
@@ -108,6 +113,16 @@ function parcours() {
         fautifs.push(e.tagName.toLowerCase() + (e.id ? '#' + e.id : '') + (e.className && typeof e.className === 'string' ? '.' + e.className.split(' ')[0] : ''));
       });
     }
+    /* Une fenêtre est posée en position fixe : ce qui y dépasse n'élargit pas
+       la page, il se mesure donc à part, dans son cadre. Pour l'Agenda
+       seulement (lot c1) : « + Commande » et « + Intervention » dépassent de
+       quelques pixels à 320 px, défaut noté hors lot. */
+    const m = $('#modale'), mi = $('.modale-in');
+    if (/^agenda/.test(nom) && m && !m.hidden && mi && mi.scrollWidth > mi.clientWidth + 1) {
+      fautifs.push('fenêtre de ' + mi.scrollWidth + ' px dans un cadre de ' + mi.clientWidth);
+      relevés.push({ ecran: nom, page: mi.scrollWidth, ecranLargeur: mi.clientWidth, trop: true, barre: barreEntiere, fautifs: fautifs.slice(0, 3) });
+      return;
+    }
     relevés.push({ ecran: nom, page: sw, ecranLargeur: lg, trop: sw > lg, barre: barreEntiere, fautifs: fautifs.slice(0, 3) });
   }
   async function pastilles(prefixe) {
@@ -132,6 +147,23 @@ function parcours() {
       /* Sur Aujourd'hui les pastilles sont cachées : celles qu'on y trouverait
          sont celles du module d'avant. */
       if (barres[i] !== 'aujourdhui') await pastilles('barre ' + barres[i]);
+    }
+    /* L'Agenda du lot c1 : le bloc À programmer déplié, la fiche du jour dans
+       ses deux états, et le placement avec son alerte. */
+    $('#barre [data-barre="agenda"]').click(); await pause(400);
+    if ($('#cal-aprog')) { $('#cal-aprog').open = true; await pause(150); mesurer('agenda › À programmer déplié'); }
+    let cases = document.querySelectorAll('#cal-grille [data-jour]');
+    if (cases.length) { cases[cases.length - 1].click(); await pause(400); mesurer('agenda › fiche du jour'); await fermer(); }
+    if ($('#cal-trancher-btn')) { $('#cal-trancher-btn').click(); await pause(400); mesurer('agenda › fiche du jour à trancher'); await fermer(); }
+    const placer = $('#cal-aplanifier [data-aplacer]');
+    if (placer) {
+      placer.click(); await pause(450); mesurer('agenda › placement');
+      /* Dans trois jours, un autre chantier est posé : l'alerte paraît. */
+      const pris = new Date(Date.now() + 3 * 86400000); pris.setHours(0, 0, 0, 0);
+      const vise = '#cal-grille [data-jour="' + pris.getTime() + '"]';
+      if (!$(vise)) { $('#cal-suiv').click(); await pause(300); }
+      if ($(vise)) { $(vise).click(); await pause(450); mesurer('agenda › placement, jour déjà pris' + ($('#cal-pl-avert') ? '' : ' (sans alerte)')); }
+      if ($('#cal-planif-fin')) { $('#cal-planif-fin').click(); await pause(400); }
     }
     $('#barre [data-barre="chantiers"]').click(); await pause(400);
     const ligne = $('#vue-carnet .chantier-l');
