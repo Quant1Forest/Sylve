@@ -440,3 +440,44 @@ section 4.
   Chantiers ▸ Carnet, rien ne passait que par lui.
 - Les boutons qui ouvrent « Ma journée » ouvrent la fenêtre actuelle, datée
   du jour : le formulaire P4 est le lot c2.
+
+## Ma journée du lot c2 (4.89.0) : la forme retenue, et P4
+
+Maquette `maquettes/refonte-5b-temps.html`, écran Ma journée (validée le
+31/10). Le modèle des journées ne change pas : rien à migrer.
+
+- **La forme** : « Comme le … » en tête (date et lieu de la dernière
+  journée ; copie le chantier, le lieu, les km, les prestations — jamais la
+  date ni les heures). Puis trois blocs titrés : **Quand, où** (date, chantier
+  ou journée libre, forêt, commune) ; **Mon temps** (temps total, prestations
+  avec heures productives et quantité, **le rendement par jour sous chaque
+  prestation**, la ligne hors production déduite) ; **Trajet** (heures, km,
+  personnes). Ensuite « Ce chantier est terminé » et la Note. Le **pied reste
+  en vue** : total en heures, en journées, montant au prix de journée du
+  chantier, et Enregistrer — Supprimer à côté en modification.
+- **Jamais de reconstruction pendant la frappe.** Les champs des prestations
+  ne se refont que quand une ligne s'ajoute ou s'en va. Avant le lot, le
+  « change » d'un champ texte — à la sortie du champ — refaisait toutes les
+  lignes : passer des heures à la quantité refermait le clavier. Changer de
+  prestation ne change plus que l'étiquette de la quantité.
+- **Choisir le chantier remplit** forêt, commune, km (ceux de la dernière
+  journée sur ce chantier, `kmHabituels`) et une ligne par prestation, sans
+  heures — seulement ce qui est vide.
+- **P4** : pour une nouvelle journée, un chantier posé ce jour-là est
+  pré-choisi (`posesLe`) ; s'il y en a plusieurs, aucun, et ils passent en
+  tête de la liste. Revu à chaque changement de date tant qu'il n'a pas
+  choisi lui-même : ce que le pré-choix avait rempli et qu'il n'a pas touché
+  repart avec lui. Un chantier venu de la porte (« Comme le … ») ou une
+  journée qu'on modifie ne sont jamais pré-choisis. La fiche du jour ne passe
+  plus de chantier à Ma journée : c'est P4 qui choisit, pour toutes les portes.
+- Les anciennes journées « non facturées » gardent leur marque dans le pied ;
+  la case n'existe plus.
+- **Finitions de c1** : « Toutes comme prévu » se confirme dans une feuille,
+  « Annuler » ramène au jour ; Déplacer la journée, Jour non travaillé et
+  Poser un chantier montent du bas et portent un lien « ← jour ».
+
+**Champs et boutons gardés** (inventaire de non-perte, lu par le scénario
+« Ma journée : rien de la fenêtre ne s'est perdu ») : `mj-date` · `mj-ch` ·
+`mj-lieu` · `mj-commune` · `mj-hier` · `mj-total` · `mj-postes` ·
+`pst-plus` · `data-pstsup` · `mj-horsprod` · `mj-trajet` · `mj-km` ·
+`mj-pers` · `mj-fin` · `mj-note` · `mj-apercu` · `mj-ok` · `mj-sup`.

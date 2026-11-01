@@ -114,11 +114,12 @@ function parcours() {
       });
     }
     /* Une fenêtre est posée en position fixe : ce qui y dépasse n'élargit pas
-       la page, il se mesure donc à part, dans son cadre. Pour l'Agenda
-       seulement (lot c1) : « + Commande » et « + Intervention » dépassent de
-       quelques pixels à 320 px, défaut noté hors lot. */
+       la page, il se mesure donc à part, dans son cadre : la feuille du +,
+       chaque fenêtre qu'elle ouvre (Ma journée et son pied fixe compris) et
+       celles de l'Agenda. Au lot c1, « + Commande » et « + Intervention »
+       dépassaient de 2 à 10 px à 320 px ; corrigé au lot c2. */
     const m = $('#modale'), mi = $('.modale-in');
-    if (/^agenda/.test(nom) && m && !m.hidden && mi && mi.scrollWidth > mi.clientWidth + 1) {
+    if (/^agenda|^\+ |^fenêtre \+/.test(nom) && m && !m.hidden && mi && mi.scrollWidth > mi.clientWidth + 1) {
       fautifs.push('fenêtre de ' + mi.scrollWidth + ' px dans un cadre de ' + mi.clientWidth);
       relevés.push({ ecran: nom, page: mi.scrollWidth, ecranLargeur: mi.clientWidth, trop: true, barre: barreEntiere, fautifs: fautifs.slice(0, 3) });
       return;

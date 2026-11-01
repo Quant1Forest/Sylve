@@ -289,29 +289,21 @@ function ouvrirFicheJour(ts) {
     if (message) toast(message);
   };
   /* Ouvrir « Ma journée » datée de ce jour : celle qui existe, sinon une
-     nouvelle, avec le chantier posé s'il y en a un. */
-  var maJournee = function (nouvelle, chantierPose) {
+     nouvelle. Le chantier posé, Ma journée le choisit elle-même (P4) : un
+     seul, il est pré-choisi ; plusieurs, aucun, ils passent en tête. */
+  var maJournee = function (nouvelle) {
     fermerModale();
     var jd = nouvelle ? null : journeeDuJour(ts);
-    ouvrirJournee(jd ? jd.id : null, jd ? null : {
-      date: ts, chantier: chantierPose && enAttente[0] ? enAttente[0].chantier.id : ''
-    });
+    ouvrirJournee(jd ? jd.id : null, jd ? null : { date: ts });
   };
   var sur = function (id, fn) { if ($('#' + id)) $('#' + id).addEventListener('click', fn); };
   sur('fj-prevu', function () {
     validerCommePrevu(ts, enAttente).then(function () { refaire('Journée validée.'); });
   });
-  sur('fj-tout', function () {
-    /* On écrit quarante-sept journées d'un coup : le geste se confirme, et il
-       dit ce qu'il va écrire. */
-    if (!confirm('Enregistrer les ' + reste.length + ' journées passées telles ' +
-      'qu’elles étaient prévues ?\n\nLes heures de l’agenda et les prestations de ' +
-      'chaque chantier sont reprises. Chaque journée reste modifiable ensuite.')) return;
-    validerTousLesJoursPrevus().then(function (n) { refaire(n + ' journées enregistrées.'); });
-  });
-  sur('fj-autrement', function () { maJournee(false, true); });
-  sur('fj-travaille', function () { maJournee(false, false); });
-  sur('fj-autre', function () { maJournee(true, false); });
+  sur('fj-tout', function () { fermerModale(); ouvrirToutesCommePrevu(ts); });
+  sur('fj-autrement', function () { maJournee(false); });
+  sur('fj-travaille', function () { maJournee(false); });
+  sur('fj-autre', function () { maJournee(true); });
   sur('fj-deplacer', function () { fermerModale(); ouvrirDeplacerJour(ts); });
   sur('fj-nonla', function () { fermerModale(); ouvrirAbsence(ts); });
   sur('fj-absent', function () { fermerModale(); ouvrirAbsence(ts); });
@@ -422,13 +414,44 @@ function journeeDuJour(ts) {
   return (A.journees || []).filter(function (j) { return C.jourCle(j.date) === k; })[0] || null;
 }
 
+/* Les fenêtres qu'ouvre la fiche du jour montent du bas comme elle, et un
+   lien « ← jour » y ramène : sans lui, fermer renvoyait à l'Agenda, et il
+   fallait rouvrir le jour pour continuer. */
+function feuilleDuJour(titre, ts, html) {
+  modale(titre, '<button type="button" class="retour-jour" id="retour-jour">' + picto('retour') +
+    esc(majuscule(jourEnLettres(ts))) + '</button>' + html);
+  $('#modale').classList.add('feuille-nav');
+  $('#retour-jour').addEventListener('click', function () { fermerModale(); ouvrirFicheJour(ts); });
+}
+/* On écrit quarante-sept journées d'un coup : le geste se confirme, et il
+   dit ce qu'il va écrire. Dans une feuille, plus par la fenêtre du téléphone
+   (maquette, validé le 01/11) ; « Annuler » ramène au jour. */
+function ouvrirToutesCommePrevu(ts) {
+  ts = C.minuit(ts);
+  var n = C.joursAResoudre(A.chantiers, A.cfg, absences(), Date.now()).length;
+  feuilleDuJour('Toutes comme prévu', ts,
+    '<p class="fj-aide">Enregistrer les ' + n + ' journées passées telles qu’elles étaient ' +
+    'prévues ? Les heures de l’agenda et les prestations de chaque chantier sont reprises. ' +
+    'Chaque journée reste modifiable ensuite.</p>' +
+    '<div class="fj-choix"><button class="btn primaire plein" id="ft-ok">Enregistrer les ' + n +
+    ' journées</button><button class="btn plein" id="ft-annuler">Annuler</button></div>');
+  $('#ft-annuler').addEventListener('click', function () { fermerModale(); ouvrirFicheJour(ts); });
+  $('#ft-ok').addEventListener('click', function () {
+    validerTousLesJoursPrevus().then(function (k) {
+      fermerModale();
+      renderCalendrier(); renderAccueil(); renderCarnet(); renderFiche(); renderRendements();
+      toast(k + ' journées enregistrées.');
+    });
+  });
+}
+
 /* Déplacer ce qui était posé un jour vers un autre. Les chantiers du jour
    d'origine suivent en bloc : c'est le cas courant — une journée repoussée. */
 function ouvrirDeplacerJour(ts) {
   ts = C.minuit(ts);
   var o = occupationDu(ts);
   var d = new Date(ts);
-  modale('Déplacer la journée du ' + d.toLocaleDateString('fr-FR'),
+  feuilleDuJour('Déplacer la journée du ' + d.toLocaleDateString('fr-FR'), ts,
     '<p class="sous-titre-bloc">' +
     esc(o.prevus.map(function (p) { return C.nomChantier(p.chantier); }).join(', ')) +
     ' — vers quel jour ?</p>' +
@@ -463,9 +486,10 @@ function ouvrirDeplacerJour(ts) {
 }
 
 function ouvrirAbsence(ts) {
+  ts = C.minuit(ts);
   var abs = C.estAbsent(absences(), ts);
   var d = new Date(ts);
-  modale('Jour non travaillé — ' + d.toLocaleDateString('fr-FR'),
+  feuilleDuJour('Jour non travaillé — ' + d.toLocaleDateString('fr-FR'), ts,
     '<div class="champ"><label class="eyebrow" for="ab-note">Pourquoi</label>' +
     '<input type="text" id="ab-note" class="gros" autocomplete="off" ' +
     'placeholder="congé, pluie, arrêt…" value="' + esc(abs ? abs.note || '' : '') + '"></div>' +
@@ -485,12 +509,13 @@ function ouvrirAbsence(ts) {
 /* Poser un chantier sur un jour, depuis le calendrier. Le chemin inverse —
    depuis la fiche du chantier — existe déjà ; celui-ci manquait. */
 function ouvrirPoserChantier(ts) {
+  ts = C.minuit(ts);
   var d = new Date(ts);
   var libres = A.chantiers.filter(function (c) {
     return ['devis', 'envoye', 'accepte', 'encours'].indexOf(c.statut) >= 0;
   }).sort(function (a, b) { return C.dateChantier(b) - C.dateChantier(a); });
   if (!libres.length) { toast('Aucun chantier à poser.'); return; }
-  modale('Poser un chantier — ' + d.toLocaleDateString('fr-FR'),
+  feuilleDuJour('Poser un chantier — ' + d.toLocaleDateString('fr-FR'), ts,
     '<div class="champ"><label class="eyebrow" for="pj-ch">Chantier</label>' +
     '<select id="pj-ch">' + libres.map(function (c) {
       return '<option value="' + c.id + '">' + esc(C.nomChantier(c)) + '</option>';

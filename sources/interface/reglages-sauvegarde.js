@@ -775,6 +775,11 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.89', quoi: [
+    { t: 'Ma journée en trois blocs : quand et où, mon temps, le trajet ; le total reste en bas, avec Enregistrer' },
+    { t: 'Le chantier posé ce jour-là est choisi d’office, et le clavier ne se referme plus pendant la saisie' },
+    { t: 'Agenda : « Toutes comme prévu » se confirme dans une feuille, et « ← jour » ramène à la fiche du jour', vue: 'calendrier' }
+  ] },
   { v: '4.88', quoi: [
     { t: 'Agenda : une seule fiche du jour, qui monte du bas — un appui sur un jour, sur « Aujourd’hui » ou sur « Trancher »', vue: 'calendrier' },
     { t: 'Chaque jour a sa couleur, « ? » pour un jour à trancher ; sous la grille, le mois jour par jour', vue: 'calendrier' },

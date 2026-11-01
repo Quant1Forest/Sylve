@@ -24,6 +24,7 @@ Statuts :
 - **en partie (lot 5b)** — en place depuis la 4.87.0 ; ce qui reste est dit après les deux-points.
 - **fait (lot c1)** — en place depuis la 4.88.0 (Agenda, fiche du jour, placement).
 - **en partie (lot c1)** — en place depuis la 4.88.0 ; ce qui reste est dit après les deux-points.
+- **fait (lot c2)** — en place depuis la 4.89.0 (Ma journée, finitions de l'Agenda).
 
 ---
 
@@ -62,7 +63,7 @@ Statuts :
 | Accueil ▸ tuile Mon entreprise (chantiers ouverts) | Barre du bas ; le chiffre « ouverts » disparaît au profit des groupes de Chantiers (voir 11) | en partie (lot 5b) : tuile retirée ; son chiffre est le compte de « Chantiers en cours » d'Aujourd'hui, les groupes de Chantiers viennent avec la liste — validé (30/10) |
 | Accueil ▸ tuiles Cubage (m³) et Bois de chauffage (stères) | ☰ ▸ Outils de terrain, chaque tuile avec son chiffre (m³ comme aujourd'hui pour le cubage, stères pour le bois) | fait (lot 5a) — validé (30/10) ; chiffre : proposé |
 | Accueil ▸ bouton « Enregistrer ma journée » | + ▸ Ma journée | fait (lot 5b) : bouton retiré ; la ligne de saisie d'Aujourd'hui ouvre aussi Ma journée — validé (30/10) |
-| Accueil ▸ ligne « Déjà saisie / Rien de saisi · X h sur 7 jours » | Haut d'Aujourd'hui (« Rien de saisi aujourd'hui · Cette semaine : X h sur N jours »), information seule | fait (lot 5b) : la semaine part du lundi ; un appui ouvre Ma journée (pré-choix du chantier, P4 : lot c) — validé (V2) |
+| Accueil ▸ ligne « Déjà saisie / Rien de saisi · X h sur 7 jours » | Haut d'Aujourd'hui (« Rien de saisi aujourd'hui · Cette semaine : X h sur N jours »), information seule | fait (lot 5b, P4 au lot c2) : la semaine part du lundi ; un appui ouvre Ma journée, chantier posé pré-choisi — validé (V2) |
 | Accueil ▸ les quatre rappels | Aujourd'hui (détail en section 2) | fait (lot 5b) — validé (V2) |
 | Mon entreprise (l'écran) | Disparaît ; contenu redistribué ci-dessous | fait (lot 5b) — validé (31/10) |
 | Mon entreprise ▸ marque de l'entreprise (logo et nom) | Écran de démarrage, sous le logo Sylve, si renseignés | fait (lot 5a, déjà en place depuis 4.7x) — proposé |
@@ -210,9 +211,9 @@ tuiles Rendement, Fiche sécurité, Fournitures, Note.
 | Bloc À planifier (Placer, Estimer par ligne) | Agenda, en haut, nommé « À programmer », repliable : engagés d'abord, devis en attente marqués, « temps à estimer » → Estimer, total de jours | fait (lot c1) : déplié d'abord ; replié, il le reste jusqu'au prochain lancement — validé (31/10, maquette 5b) |
 | Grille du mois (une pastille par jour, repère € d'un prélèvement), légende, compteurs du mois | Inchangés sur le fond ; la pastille devient une bande pleine sous le numéro avec fond teinté du statut ; « ? » et bord pointillé pour un jour à trancher ; « € » dans le coin ; 4 compteurs (fait, confirmé dont à trancher, prévu, non travaillé) | fait (lot c1) : couleurs en variables du :root ; « € » à gauche, « ? » à droite ; le compteur « non travaillé » se montre même à zéro — validé (31/10, P5) |
 | Carte Journée du jour retenu (Prévu, Fait, Ouvrir, ✕, J'ai travaillé) | Fusionnée dans la fiche du jour (tous ses boutons gardés) ; « J'ai travaillé » ouvre Ma journée datée de ce jour ; sous la grille, la place va à l'historique | fait (lot c1) : « Ouvrir » s'appelle « Fiche » ; ✕ retire la saisie à la source (la carte l'effaçait de la liste refaite ensuite) — retrait accepté (31/10, R7) |
-| Appui sur un jour → fiche d'un jour (C'était comme prévu, Non travaillé, J'y ai travaillé, Modifier ma journée, Autre chose, Poser un chantier, Fiche, Prélevé ce jour-là) | Une seule fiche du jour, en feuille : statut, Fait (✕, Fiche, appui → Ma journée), Posé (Fiche, Retirer), boutons selon l'état, Prélevé ce jour-là ; en mode placement, l'appui pose le jour | fait (lot c1) : la fiche monte du bas ; « Poser un chantier » et « Jour non travaillé » restent proposés sur un jour travaillé ou à trancher, comme avant ; « Ce n'est plus un jour off » devient « Retirer la marque » (maquette) — validé (31/10, R7) |
-| Fenêtre « Que s'est-il passé ? » (comme prévu, toutes comme prévu, je n'étais pas là, autrement, un autre jour) | Devient la fiche du jour à l'état « à trancher » : mêmes réponses (comme prévu, toutes comme prévu, autrement, un autre jour, je n'y étais pas) ; ouverte depuis Aujourd'hui ▸ Trancher, la ligne à trancher de l'Agenda et le jour | fait (lot c1) : « Toutes comme prévu » demande toujours confirmation — retrait accepté (31/10, R8) |
-| Fenêtres Déplacer la journée, Jour non travaillé, Poser un chantier (sur un jour) | Inchangées, ouvertes depuis la fiche du jour ; « Poser un chantier » est la porte « par le jour » du placement (durée 1 h à 8 h) | fait (lot c1) : « Déplacer la journée » est aussi proposé sur un jour à venir posé (maquette) — validé (31/10, P1) |
+| Appui sur un jour → fiche d'un jour (C'était comme prévu, Non travaillé, J'y ai travaillé, Modifier ma journée, Autre chose, Poser un chantier, Fiche, Prélevé ce jour-là) | Une seule fiche du jour, en feuille : statut, Fait (✕, Fiche, appui → Ma journée), Posé (Fiche, Retirer), boutons selon l'état, Prélevé ce jour-là ; en mode placement, l'appui pose le jour | fait (lot c1) : la fiche monte du bas ; « Poser un chantier » et « Jour non travaillé » restent proposés sur un jour travaillé ou à trancher, comme avant ; « Ce n'est plus un jour off » devient « Retirer la marque » (maquette) — validé (31/10, R7) ; les trois choix faits au lot c1 (Poser un autre chantier, Retirer la marque, Déplacer sur un jour à venir) validés le 01/11 |
+| Fenêtre « Que s'est-il passé ? » (comme prévu, toutes comme prévu, je n'étais pas là, autrement, un autre jour) | Devient la fiche du jour à l'état « à trancher » : mêmes réponses (comme prévu, toutes comme prévu, autrement, un autre jour, je n'y étais pas) ; ouverte depuis Aujourd'hui ▸ Trancher, la ligne à trancher de l'Agenda et le jour | fait (lot c1) : « Toutes comme prévu » demande toujours confirmation — retrait accepté (31/10, R8) ; lot c2 : « Toutes comme prévu » se confirme dans une feuille, « Annuler » ramène au jour |
+| Fenêtres Déplacer la journée, Jour non travaillé, Poser un chantier (sur un jour) | Inchangées, ouvertes depuis la fiche du jour ; « Poser un chantier » est la porte « par le jour » du placement (durée 1 h à 8 h) | fait (lot c1) : « Déplacer la journée » est aussi proposé sur un jour à venir posé (maquette) — validé (31/10, P1) ; lot c2 : elles montent du bas et portent « ← jour » |
 | Onglet Carte | Chantiers ▸ Carte | validé (V2) |
 | Onglet Carnet | Retiré (même écran que Chantiers) | fait (lot c1) : aucune fonction ne passait que par lui (même vue que Chantiers ▸ Carnet) — retrait accepté (31/10, R1) |
 | Historique des jours et des heures | Agenda, sous la grille : le mois jour par jour, groupé par semaine (heures, quantités, km ; appui → Ma journée) ; et dans chaque chantier (étape Travaux) | fait (lot c1) : sous la grille, la semaine la plus récente ouverte ; dans chaque chantier : avec la fiche (lot b) — validé (31/10, maquette 5b) |
@@ -265,7 +266,7 @@ propres créations.
 
 | Ancienne porte de création | Nouvel endroit | Statut |
 |---|---|---|
-| Enregistrer ma journée (accueil) | + ▸ Ma journée ; aussi la ligne de saisie en tête d'Aujourd'hui ; un chantier posé ce jour-là est pré-choisi | en partie (lot 5a) : + ▸ Ma journée ouvre la fenêtre actuelle ; ligne d'Aujourd'hui et pré-choix (P4) à venir — validé (30/10 ; 31/10, P4) |
+| Enregistrer ma journée (accueil) | + ▸ Ma journée ; aussi la ligne de saisie en tête d'Aujourd'hui ; un chantier posé ce jour-là est pré-choisi | fait (lot c2) : toutes les portes ouvrent la nouvelle feuille, et P4 y choisit le chantier posé ce jour-là — validé (30/10 ; 31/10, P4) |
 | J'ai travaillé / J'y ai travaillé / Modifier ma journée / Autre chose (Agenda, fiche d'un jour, Que s'est-il passé ?) | Gardées dans la fiche du jour : elles ouvrent Ma journée datée du jour concerné | fait (lot c1) : Ma journée actuelle, datée du jour (le formulaire P4 : lot c2) — validé (31/10, R7, R8) |
 | Temps (Carnet), + Du temps fait (fiche) | + ▸ Ma journée | retrait accepté (31/10, R2, R4) |
 | Nouveau chantier (avec ou sans devis) | (en partie, lot 5a : + ▸ Chantier ouvre le formulaire actuel ; le formulaire court vient ensuite) + ▸ Chantier (« on m'en a parlé ») : formulaire court = étape Infos. Pour qui (donneur d'ordre + offre d'ajout ; propriétaire facultatif, « souvent connu plus tard », + offre d'ajout puis question SIREN) · Où, quoi (commune, forêt, type de travaux par familles, quantité ou surface selon l'unité) · Ce que je sais (accès, code du portail) · nom composé affiché · « Annoncé aujourd'hui · changer » · Créer le chantier → la fiche, étapes Infos et Devis ouvertes. Le choix avec / sans devis se fait ensuite dans l'étape Devis | validé (30/10 ; maquette tour 2, 31/10) |
@@ -356,7 +357,7 @@ fournisseur, entrées de listes (Réglages) · Coller depuis Excel · Importer
 | Les journées | Éclatée : estimées → Devis ; dates → Agenda (placement) | en partie (lot c1) : dates → Agenda (placement) ; estimées encore dans la fenêtre, jusqu'à l'étape Devis (lot b) — retrait accepté (31/10, R6) |
 | Statut (+ motif de refus, + n° de facture) | Gestes des étapes ; « Corriger l'étape à la main » | proposé |
 | L'objectif de ce chantier | ✎ du troisième chiffre | proposé |
-| Ma journée | + ; Aujourd'hui (ligne de saisie) ; fiche du jour ; historique de l'Agenda et Derniers jours (modifier) | validé (31/10, maquette 5b) |
+| Ma journée | + ; Aujourd'hui (ligne de saisie) ; fiche du jour ; historique de l'Agenda et Derniers jours (modifier) | fait (lot c2) : forme retenue du tour 1, pied fixe ; aucun champ ne se refait pendant la frappe — validé (31/10, maquette 5b) |
 | Fiche d'un jour | Appui sur un jour de l'Agenda ; Aujourd'hui ▸ Trancher ; ligne à trancher et bouton Aujourd'hui de l'Agenda. Absorbe la carte Journée et « Que s'est-il passé ? » | fait (lot c1) — validé (31/10, R7, R8) |
 | Que s'est-il passé ? | Fondue dans la fiche du jour (état « à trancher ») | fait (lot c1) — retrait accepté (31/10, R8) |
 | Déplacer la journée · Jour non travaillé · Poser un chantier | Depuis la fiche du jour | fait (lot c1) — validé (31/10) |
@@ -406,7 +407,7 @@ fournisseur, entrées de listes (Réglages) · Coller depuis Excel · Importer
 | TVA | Toujours nommée : « TVA facturée », « TVA déductible », « À reverser » / « À récupérer » |
 | Journées passées non tranchées | « À trancher » partout |
 | Factures non payées | « Impayée » si échue ; « Facturé, pas encore payé » sinon ; « en attente » réservé au devis (« en attente de réponse ») |
-| À planifier | « À programmer » (son mot) partout : étape, bloc de l'Agenda, ligne d'Aujourd'hui — fait (lot c1), « À planifier » reste lu à l'import |
+| À planifier | « À programmer » (son mot) partout : étape, bloc de l'Agenda, ligne d'Aujourd'hui — fait (lot c1), « À planifier » reste lu à l'import ; « Devis signé, à programmer » validé le 01/11 |
 | Dépenses / achats / acheté | « Dépenses » partout ; « Achats à venir » garde son nom de module |
 | Notes | « Mes notes » = pense-bêtes ; « Note » = celle d'un chantier, d'une journée, d'un achat |
 | Fiche / Fiche de chantier | « Fiche » (le dossier) ; « Fiche sécurité » (le document imprimé) |
@@ -458,10 +459,10 @@ La fonction reste toujours accessible ; seule la porte en double part.
 - **P1** — Placement : un seul outil, le mode placement de l'Agenda. Entrées par le chantier (fiche ▸ Travaux, Agenda ▸ À programmer, Aujourd'hui ▸ Bientôt) et par le jour (fiche du jour ▸ Poser un chantier).
 - **P2** — « Fini de placer » ramène au point de départ ; le placement s'ouvre sur le mois du dernier jour placé, sinon du prochain jour ouvré.
 - **P3** — La ligne « N jours à trancher » est aussi en tête de l'Agenda, en plus d'Aujourd'hui ▸ En retard.
-- **P4** — Ma journée : un chantier posé ce jour-là est pré-choisi (forêt, commune, km et prestations remplis s'ils sont vides, jamais par-dessus ce qui est tapé).
+- **P4** — fait (lot c2). Ma journée : un chantier posé ce jour-là est pré-choisi (forêt, commune, km et prestations remplis s'ils sont vides, jamais par-dessus ce qui est tapé).
 - **P5** — Grille : bande pleine sous le numéro et fond teinté par statut ; « ? » et bord pointillé pour un jour à trancher ; « € » dans le coin ; le bouton Aujourd'hui ouvre la fiche du jour.
 - **R6, R7, R8** acceptés (section 12).
-- Ma journée, forme retenue : bouton « Comme le … » en tête ; blocs « Quand, où » (date, chantier, forêt, commune) / « Mon temps » (temps total, prestations avec heures productives et quantité, rendement par jour sous chacune, ligne hors production) / « Trajet » (heures, km, personnes) ; puis « Ce chantier est terminé » et Note ; pied fixe avec le total (heures, journées, montant au prix de journée du chantier) et Enregistrer. Le formulaire ne se reconstruit jamais pendant la frappe : le clavier ne doit pas se refermer.
+- Ma journée, forme retenue — fait (lot c2) : bouton « Comme le … » en tête ; blocs « Quand, où » (date, chantier, forêt, commune) / « Mon temps » (temps total, prestations avec heures productives et quantité, rendement par jour sous chacune, ligne hors production) / « Trajet » (heures, km, personnes) ; puis « Ce chantier est terminé » et Note ; pied fixe avec le total (heures, journées, montant au prix de journée du chantier) et Enregistrer. Le formulaire ne se reconstruit jamais pendant la frappe : le clavier ne doit pas se refermer.
 
 ### Étape 5b, tour 2 (maquette `maquettes/refonte-5b-tour2.html`, validée le 31/10)
 
