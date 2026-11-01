@@ -567,9 +567,12 @@ input.mini{padding:6px 7px;border:1px solid var(--trait);border-radius:7px;font-
 /* ---------------------------------------------------------- pastilles */
 /* Les onglets d'un module, en haut de l'écran (lot 5a) : une rangée qui
    défile de côté si elle déborde, l'onglet ouvert en plein. */
+/* width:100% : avec « margin:0 auto » dans #app (flex en colonne), la rangée
+   perdait l'étirement et prenait la largeur de ses pastilles — Argent en
+   portait quatre, et c'était la page entière qui s'élargissait. */
 .onglets{
-  display:flex;gap:6px;overflow-x:auto;max-width:1240px;margin:0 auto;
-  padding:12px 14px 2px;scrollbar-width:none;
+  display:flex;gap:6px;overflow-x:auto;width:100%;max-width:1240px;margin:0 auto;
+  padding:12px 14px 2px;scrollbar-width:none;overscroll-behavior-x:contain;
 }
 .onglets::-webkit-scrollbar{display:none}
 .onglets button{
@@ -7971,6 +7974,9 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.87.2', quoi: [
+    { t: 'Plus d’écran trop large : la rangée de pastilles d’Argent défile sur elle-même, la barre du bas reste en bas', vue: 'finances' }
+  ] },
   { v: '4.87.1', quoi: [
     { t: 'Facture à faire dès le lendemain de « Travaux terminés »' },
     { t: 'Argent ▸ Bilan : le total « à facturer », un appui ouvre les chantiers concernés', vue: 'finances' },
@@ -8322,6 +8328,7 @@ function aller(v) {
   noterParcours(v);
   A.vue = v;
   $$('.onglets button').forEach(function (b) { b.setAttribute('aria-selected', String(b.dataset.vue === v)); });
+  amenerPastilleEnVue();
   $$('main > .vue').forEach(function (s) { s.classList.toggle('actif', s.id === 'vue-' + v); });
   if (v === 'bordereau') renderBordereau();
   if (v === 'syntheses') renderSyntheses();
@@ -9909,6 +9916,17 @@ function majOnglets() {
     return '<button role="tab" data-vue="' + v[0] + '" aria-selected="' + String(A.vue === v[0]) + '">' +
       '<span class="ic">' + picto(v[0]) + '</span>' + v[1] + '</button>';
   }).join('');
+  amenerPastilleEnVue();
+}
+/* Une rangée trop longue défile de côté (styles.css, .onglets) : la pastille
+   ouverte doit s'y trouver, pas rester hors de l'écran. On ne touche qu'au
+   défilement de la rangée — scrollIntoView aurait aussi remonté la page. */
+function amenerPastilleEnVue() {
+  var nav = $('#onglets'); if (!nav) return;
+  var b = nav.querySelector('[aria-selected="true"]');
+  if (!b || nav.scrollWidth <= nav.clientWidth) { nav.scrollLeft = 0; return; }
+  var r = b.getBoundingClientRect(), n = nav.getBoundingClientRect();
+  nav.scrollLeft = Math.max(0, r.left - n.left + nav.scrollLeft - (nav.clientWidth - r.width) / 2);
 }
 /* Quel module porte cette vue. Une liste tenue à la main vivait ici : elle ne
    connaissait aucune vue du cubage, si bien qu'une note de mise à jour pointant
@@ -20879,7 +20897,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.87.1-20261031-2230';
+var VERSION = '4.87.2-20261101-0901';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

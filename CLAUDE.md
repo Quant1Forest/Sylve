@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML servi, recollé depuis `sources/` sans rien transformer ; aucune
 dépendance, tout fonctionne hors ligne.
 
-Version courante : **4.87.1-20261031-2230**
+Version courante : **4.87.2-20261101-0901**
 
 ---
 
@@ -70,12 +70,12 @@ mains dans la terre.
 
 ```bash
 npm install        # une seule fois : jsdom
-npm run controle   # fabrication + vérificateur + service worker + tests + conformité
+npm run controle   # fabrication + vérificateur + service worker + tests + largeur (Chrome) + conformité
 ```
 
 Doit afficher **« index.html fabriqué »**, puis **« Bon pour livraison »**,
 puis **« le service worker tient »** (33 vérifications), puis la suite au
-vert — 2364 à ce jour — puis **« Sylve.html est conforme »**.
+vert — 2364 à ce jour — puis **« largeur : … aucune page plus large que l’écran »** (mesure dans un vrai Chrome à 320 et 360 px, `outils/largeur.js` ; sans Chrome elle le dit et passe), puis **« Sylve.html est conforme »**.
 
 Compter **trois minutes** : 187 à 221 s mesurées au lot 4b, 260 s au lot 5b (selon la charge
 du poste ; 17 minutes avant, en séquentiel). Les scénarios se jouent en
@@ -172,7 +172,7 @@ l'ancien code. Le vérificateur refuse de passer si les deux divergent.
 | `sw.js` | Service worker. Sa constante `VERSION` doit être identique à celle de `sources/installation.js`. |
 | `manifest.webmanifest` | Nom, couleurs, icônes de la PWA. |
 | `icone-*.png` | Icônes d'installation, dont une *maskable* pour Android. |
-| `outils/` | Fabrication, `controle.js` (enchaîne les étapes et les chronomètre), vérificateur, tests (en parallèle), tests du service worker, conformité du fichier autonome, reprise du carnet, vocabulaire des magasins. |
+| `outils/` | Fabrication, `controle.js` (enchaîne les étapes et les chronomètre), vérificateur, tests (en parallèle), tests du service worker, `largeur.js` (mesure de la largeur des pages dans Chrome), conformité du fichier autonome, reprise du carnet, vocabulaire des magasins. |
 | `docs/` | L'historique des décisions, rangé par thème. Voir *Où trouver quoi*. |
 | `rapports/` | Rapports de fin de lot. **Non versionné**, reste sur ce poste. |
 
@@ -202,7 +202,7 @@ Débordements à connaître : `prix-de-revient.js` finit par les réglages
 Chantiers, Veille et Démarrage, puis l'appel d'`init` ; `carte.js` par les
 fenêtres « numéro de facture » et « motif de refus ».
 
-**La navigation (lots 5a, 5b et 5b2, 4.86.0 à 4.87.1)** — détail dans
+**La navigation (lots 5a, 5b, 5b2 et 5b3, 4.86.0 à 4.87.2)** — détail dans
 `docs/design-navigation.md`, *Le cadre du lot 5a* et *L'écran Aujourd'hui* :
 
 - Démarrage → **Aujourd'hui** (vue `accueil`) : saisie · En retard · Bientôt ·

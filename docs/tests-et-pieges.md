@@ -370,3 +370,29 @@ En branchant le vérificateur sur les morceaux, une vieille erreur est
 apparue : pour une fonction déclarée deux fois, il cherchait dans le fichier
 la copie *nettoyée* du bloc, qui n'y est pas, et annonçait une ligne fausse
 (10 478 au lieu de 16 689). Il cite maintenant la bonne ligne, et le morceau.
+
+## Une page plus large que l'écran, que JSDOM ne voit pas (lot 5b3, 4.87.2)
+
+Sur Argent, la rangée de pastilles (Bilan · Dépenses · Charges fixes ·
+Analyses) élargissait **toute la page** : on pouvait la glisser à droite, et la
+barre du bas sortait de l'écran. Cause : `.onglets` avait `margin:0 auto` dans
+`#app`, un flex en colonne ; une marge automatique y supprime l'étirement, la
+rangée prend alors la largeur de ses pastilles (`overflow-x:auto` n'y change
+rien) et c'est la page qui s'étire. Corrigé par `width:100%`. Même mécanisme
+possible pour toute rangée qui défile, d'où la règle : **un bloc qui défile de
+côté est borné à la largeur de l'écran**.
+
+JSDOM ne calcule aucune mise en page : ce défaut y est invisible, et 2 364
+vérifications vertes n'en ont rien su. `outils/largeur.js` mesure donc dans un
+vrai Chrome sans tête, dans un cadre de 320 puis 360 px (la fenêtre de Chrome
+ne descend pas sous ~500 px, le cadre si), avec des données aux noms longs,
+sur chaque écran (barre, pastilles, ☰, fenêtres du +, fiche d'un chantier) :
+`scrollWidth ≤ clientWidth` et barre du bas entière. Éprouvé en retirant
+`width:100%` : il crie sur Argent, Chantiers, Agenda… Sans Chrome (variable
+`SYLVE_CHROME`), l'étape le dit et passe — elle ne déclare pas vert ce qu'elle
+n'a pas mesuré. En JSDOM ne reste que la cause en texte (scénario « Largeur »),
+comme les deux tests qui lisent le CSS.
+
+Piège du banc : le profil de Chrome garde le `localStorage` d'une exécution à
+l'autre ; le script vide donc le stockage avant de semer, et travaille dans un
+dossier temporaire jeté ensuite.

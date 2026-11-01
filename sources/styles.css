@@ -554,9 +554,12 @@ input.mini{padding:6px 7px;border:1px solid var(--trait);border-radius:7px;font-
 /* ---------------------------------------------------------- pastilles */
 /* Les onglets d'un module, en haut de l'écran (lot 5a) : une rangée qui
    défile de côté si elle déborde, l'onglet ouvert en plein. */
+/* width:100% : avec « margin:0 auto » dans #app (flex en colonne), la rangée
+   perdait l'étirement et prenait la largeur de ses pastilles — Argent en
+   portait quatre, et c'était la page entière qui s'élargissait. */
 .onglets{
-  display:flex;gap:6px;overflow-x:auto;max-width:1240px;margin:0 auto;
-  padding:12px 14px 2px;scrollbar-width:none;
+  display:flex;gap:6px;overflow-x:auto;width:100%;max-width:1240px;margin:0 auto;
+  padding:12px 14px 2px;scrollbar-width:none;overscroll-behavior-x:contain;
 }
 .onglets::-webkit-scrollbar{display:none}
 .onglets button{

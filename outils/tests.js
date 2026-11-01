@@ -9486,6 +9486,62 @@ scenario('Fiche : « Poser des dates » ouvre l’Agenda sur le mois du premier 
 });
 
 /* --------------------------------------------------------------------- */
+/* --------------------------------------------------------------------- */
+/* Lot 5b3 (4.87.2) : plus d'écran trop large. JSDOM ne calcule aucune mise en
+   page : la mesure réelle (360 et 320 px, tous les écrans) est dans
+   outils/largeur.js, jouée par le contrôle. Ici on garde la CAUSE : une rangée
+   de pastilles qui défile de côté doit être bornée à la largeur de l'écran,
+   sans quoi elle prend celle de ses pastilles et élargit la page entière. */
+scenario('Largeur : les rangées qui défilent de côté sont bornées à l’écran', async () => {
+  const regle = sel => {
+    const i = html.indexOf('\n' + sel + '{');
+    return i < 0 ? '' : html.slice(i, html.indexOf('}', i));
+  };
+  const onglets = regle('.onglets');
+  verifierVrai('la rangée des pastilles est trouvée', onglets);
+  verifierVrai('elle défile de côté', /overflow-x:auto/.test(onglets));
+  verifierVrai('et ne dépasse pas l’écran : width:100% (margin auto la détendait)', /(^|[;{\s])width:100%/.test(onglets));
+  const bouton = html.slice(html.indexOf('.onglets button{'), html.indexOf('}', html.indexOf('.onglets button{')));
+  verifierVrai('chaque pastille garde sa taille et fait défiler la rangée', /flex:none/.test(bouton) && /white-space:nowrap/.test(bouton));
+  /* Les autres rangées et blocs qui défilent, de la même façon. */
+  ['.ruban', '.tab-boite', '.sous-onglets'].forEach(sel => {
+    verifierVrai(sel + ' défile dans son bloc', /overflow-x:auto/.test(regle(sel)));
+  });
+  verifierVrai('la barre du bas est collée à l’écran, pas à la page', /\.barre\{[^}]*position:fixed[^}]*left:0;right:0;bottom:0/.test(html));
+});
+
+scenario('Largeur : la pastille ouverte est amenée en vue dans la rangée', async () => {
+  /* Argent a quatre pastilles, Analyses est la dernière : sur un petit écran
+     elle est hors de vue tant que la rangée n'a pas défilé jusqu'à elle. JSDOM
+     n'a pas de géométrie : on la lui prête (rangée de 300 px sur 600, pastilles
+     de 120 px) et l'on vérifie le défilement demandé. */
+  const t = await ouvrir(Object.assign({}, VIDE, {}), { avant: w => {
+    w.HTMLElement.prototype.getBoundingClientRect = function () {
+      const nav = this.closest && this.closest('#onglets');
+      if (this.id === 'onglets') return { left: 0, width: 300, right: 300, top: 0, bottom: 40, height: 40 };
+      if (nav && this.tagName === 'BUTTON') {
+        const rang = Array.prototype.indexOf.call(nav.children, this);
+        return { left: rang * 120 - nav.scrollLeft, width: 120, right: rang * 120 + 120, top: 0, bottom: 40, height: 40 };
+      }
+      return { left: 0, width: 0, right: 0, top: 0, bottom: 0, height: 0 };
+    };
+    Object.defineProperty(w.HTMLElement.prototype, 'scrollWidth', { configurable: true,
+      get() { return this.id === 'onglets' ? 600 : 0; } });
+    Object.defineProperty(w.HTMLElement.prototype, 'clientWidth', { configurable: true,
+      get() { return this.id === 'onglets' ? 300 : 0; } });
+  } });
+  await parBarre(t, 'argent');
+  verifier('Bilan est ouvert : rien à défiler', 0, t.$('#onglets').scrollLeft);
+  t.clic('#onglets [data-vue="analyses"]'); await t.pause(200);
+  verifier('Analyses est ouverte, 4e pastille (360 à 480)', 'analyses', t.$('#onglets [aria-selected="true"]').dataset.vue);
+  /* gauche 360, largeur 120, rangée 300 : centrée, la rangée est à 360 − 90 */
+  verifier('la rangée a défilé pour la centrer', 270, t.$('#onglets').scrollLeft);
+  t.clic('#onglets [data-vue="finances"]'); await t.pause(200);
+  verifier('de retour sur Bilan, la rangée revient au début', 0, t.$('#onglets').scrollLeft);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
 /* Un troisième argument ne joue que les scénarios dont le nom le contient.
    Sert à éprouver un contrôle en le cassant exprès : rejouer les quarante
    autres pour vérifier qu'un seul crie coûte deux minutes pour rien.

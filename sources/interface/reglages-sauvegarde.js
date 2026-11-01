@@ -775,6 +775,9 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.87.2', quoi: [
+    { t: 'Plus d’écran trop large : la rangée de pastilles d’Argent défile sur elle-même, la barre du bas reste en bas', vue: 'finances' }
+  ] },
   { v: '4.87.1', quoi: [
     { t: 'Facture à faire dès le lendemain de « Travaux terminés »' },
     { t: 'Argent ▸ Bilan : le total « à facturer », un appui ouvre les chantiers concernés', vue: 'finances' },

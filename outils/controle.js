@@ -21,6 +21,7 @@ const ETAPES = [
   ['vérificateur', 'verifier.js', []],
   ['service worker', 'tests-sw.js', []],
   ['scénarios', 'tests.js', OPTIONS],
+  ['largeur (Chrome)', 'largeur.js', []],
   ['fichier autonome', 'comparer.js', []]
 ];
 

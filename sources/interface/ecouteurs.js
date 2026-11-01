@@ -53,6 +53,7 @@ function aller(v) {
   noterParcours(v);
   A.vue = v;
   $$('.onglets button').forEach(function (b) { b.setAttribute('aria-selected', String(b.dataset.vue === v)); });
+  amenerPastilleEnVue();
   $$('main > .vue').forEach(function (s) { s.classList.toggle('actif', s.id === 'vue-' + v); });
   if (v === 'bordereau') renderBordereau();
   if (v === 'syntheses') renderSyntheses();

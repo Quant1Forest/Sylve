@@ -552,6 +552,17 @@ function majOnglets() {
     return '<button role="tab" data-vue="' + v[0] + '" aria-selected="' + String(A.vue === v[0]) + '">' +
       '<span class="ic">' + picto(v[0]) + '</span>' + v[1] + '</button>';
   }).join('');
+  amenerPastilleEnVue();
+}
+/* Une rangée trop longue défile de côté (styles.css, .onglets) : la pastille
+   ouverte doit s'y trouver, pas rester hors de l'écran. On ne touche qu'au
+   défilement de la rangée — scrollIntoView aurait aussi remonté la page. */
+function amenerPastilleEnVue() {
+  var nav = $('#onglets'); if (!nav) return;
+  var b = nav.querySelector('[aria-selected="true"]');
+  if (!b || nav.scrollWidth <= nav.clientWidth) { nav.scrollLeft = 0; return; }
+  var r = b.getBoundingClientRect(), n = nav.getBoundingClientRect();
+  nav.scrollLeft = Math.max(0, r.left - n.left + nav.scrollLeft - (nav.clientWidth - r.width) / 2);
 }
 /* Quel module porte cette vue. Une liste tenue à la main vivait ici : elle ne
    connaissait aucune vue du cubage, si bien qu'une note de mise à jour pointant
