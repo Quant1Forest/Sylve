@@ -406,9 +406,10 @@ et le 2, ce jour est dans le mois d'avant, sa case n'existe pas. Corrigé dans
 les tests, pas dans l'application : `caseDuJour(t, ts)` amène la grille sur le
 mois du jour visé avant d'en chercher la case, `cliquerJour(t, ts)` l'ouvre.
 
-**Pour que le piège ne revienne pas, le contrôle rejoue la suite à date
-figée.** `SYLVE_DATE=AAAA-MM-JJ` fait croire au banc ET à l'application (son
-`Date`, posé dans JSDOM avant le démarrage) qu'on est ce jour-là à 10 h. Le
+**Pour que le piège ne revienne pas, le contrôle sait rejouer la suite à date
+figée** — sur demande : `npm run controle -- --dates` (décidé le 01/11, les deux
+passes portaient le contrôle de 3 à 7 minutes). `SYLVE_DATE=AAAA-MM-JJ` fait croire au banc ET à l'application (son
+`Date`, posé dans JSDOM avant le démarrage) qu'on est ce jour-là à 10 h. Avec `--dates`, le
 contrôle ajoute deux étapes : le 1er du mois (`2026-12-01`) et le dernier
 (`2026-11-30`). Toute la suite y passait (vérifié au lot c1, avant la refonte
 de l'Agenda) ; pour ne pas tripler la durée, ces deux passes ne jouent que les

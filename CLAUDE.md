@@ -71,16 +71,19 @@ mains dans la terre.
 ```bash
 npm install        # une seule fois : jsdom
 npm run controle   # fabrication + vérificateur + service worker + tests + largeur (Chrome) + conformité
+npm run controle -- --dates   # en plus : les scénarios du temps au 1er et au dernier jour du mois
 ```
 
 Doit afficher **« index.html fabriqué »**, puis **« Bon pour livraison »**,
 puis **« le service worker tient »** (33 vérifications), puis la suite au
-vert — 2481 à ce jour, et 650 à chaque date figée — puis la même suite **à date figée**, le 1er puis le dernier jour d'un mois
-(scénarios qui touchent au temps seulement, `SYLVE_DATE` et `--motif=` : `docs/tests-et-pieges.md`) — puis **« largeur : … aucune page plus large que l’écran »** (mesure dans un vrai Chrome à 320 et 360 px, `outils/largeur.js` ; sans Chrome elle le dit et passe), puis **« Sylve.html est conforme »**.
+vert — 2481 à ce jour — puis **« largeur : … aucune page plus large que l’écran »** (mesure dans un vrai Chrome à 320 et 360 px, `outils/largeur.js` ; sans Chrome elle le dit et passe), puis **« Sylve.html est conforme »**.
 
-Compter **sept minutes** : 425 s au lot c1, dont 230 s pour les deux passes à date figée
-(trois minutes avant elles : 187 à 260 s aux lots 4b et 5b, selon la charge du poste ;
-17 minutes avant, en séquentiel). Les scénarios se jouent en
+Compter **trois minutes** : 187 à 260 s aux lots 4b, 5b et c1 (selon la charge du poste ;
+17 minutes avant, en séquentiel). **Avec `--dates`, sept minutes** : les scénarios du
+temps rejoués le 1er puis le dernier jour d'un mois (650 vérifications chacun ;
+`SYLVE_DATE` et `--motif=`, `docs/tests-et-pieges.md`). À lancer **sur demande**, et
+avant de livrer un lot qui touche à l'Agenda, aux journées ou à Aujourd'hui (décidé le
+01/11). Les scénarios se jouent en
 parallèle, un processus par cœur moins un ; le contrôle affiche à la fin le
 temps de chaque étape. Ne jamais revenir à une attente devinée dans les tests :
 `ouvrir()` sonde `data-pret` — pourquoi, et ce qui reste long, dans
