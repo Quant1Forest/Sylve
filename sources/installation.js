@@ -6,7 +6,7 @@
 (function () {
 'use strict';
 
-var VERSION = '4.90.0-20261101-1912';
+var VERSION = '4.91.0-20261101-2100';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

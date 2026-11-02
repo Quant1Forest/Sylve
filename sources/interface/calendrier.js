@@ -653,7 +653,7 @@ function renderFicheChantier() {
 
   if (!c) {
     z.innerHTML = tete + '<div class="carte"><div class="vide"><p>Choisissez un chantier. ' +
-      'Sylve reprendra le client, le donneur d’ordre, le lieu et les travaux ; ' +
+      'Sylve reprendra « Facturé à », le donneur d’ordre, le lieu et les travaux ; ' +
       'vous ne cocherez que les risques.</p></div></div>';
     return;
   }
@@ -680,7 +680,7 @@ function renderFicheChantier() {
       : '') +
 
     '<div class="carte"><h2>Qui, où, quoi</h2>' +
-    paireFiche('Client', c.proprietaire || '—') +
+    paireFiche('Facturé à', c.proprietaire || '—') +
     paireFiche('Donneur d’ordre', c.donneur || c.client || '—') +
     paireFiche('Commune', (c.commune || '—') + (c.departement ? ' (' + c.departement + ')' : '')) +
     paireFiche('Lieu-dit', c.foret || '—') +
@@ -1216,14 +1216,5 @@ function renderHistorique() {
         }).join('') + '</details>';
     }).join('') : '<div class="vide"><p>Rien de noté ce mois-ci.</p></div>') + '</div>';
 }
-
-/* ------------------------------------------------------------- alertes */
-var COUL_ALERTE = { impaye: '#B4231F', retard: '#C4611B', afacturer: '#B98A00',
-  devis: '#7A8471', aprevoir: '#1F5FA9', aplacer: '#2E4A3C', encours: '#7A8471',
-  approche: '#2E7D46' };
-var TITRE_ALERTE = { impaye: 'Facture impayée', retard: 'Journées passées',
-  afacturer: 'À facturer', devis: 'Devis sans réponse',
-  aprevoir: 'À prévoir', aplacer: 'Journées à placer', encours: 'En cours',
-  approche: 'Chantier prévu' };
 
 /* Écran Entreprise : un chiffre parlant sur chaque tuile. */

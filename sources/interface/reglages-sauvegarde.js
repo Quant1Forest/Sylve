@@ -775,6 +775,11 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.91', quoi: [
+    { t: 'Chantiers : chercher en haut, puis les groupes — à faire maintenant, en travaux, devis, payés ; Liste ou Carte d’un appui', vue: 'carnet' },
+    { t: 'Le + ▸ Chantier : une feuille courte, pour qui, où, quoi et ce que vous savez ; la fiche s’ouvre sur Infos et Devis' },
+    { t: 'Aujourd’hui : « Devis à faire » dit si le chantier est repéré ; la fiche de chantier s’appelle maintenant Fiche sécurité', vue: 'fichech' }
+  ] },
   { v: '4.90', quoi: [
     { t: 'La fiche d’un chantier en cinq étapes : Infos et repérage, Devis, Travaux, Facture, Payé ; celle en cours est ouverte', vue: 'carnet' },
     { t: 'En tête, trois chiffres : le montant, les journées faites et estimées, ce que rapporte la journée' },

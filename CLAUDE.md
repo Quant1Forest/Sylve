@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML servi, recollé depuis `sources/` sans rien transformer ; aucune
 dépendance, tout fonctionne hors ligne.
 
-Version courante : **4.90.0-20261101-1912**
+Version courante : **4.91.0-20261101-2100**
 
 ---
 
@@ -76,11 +76,11 @@ npm run controle -- --dates   # en plus : les scénarios du temps au 1er et au d
 
 Doit afficher **« index.html fabriqué »**, puis **« Bon pour livraison »**,
 puis **« le service worker tient »** (33 vérifications), puis la suite au
-vert — 2644 à ce jour — puis **« largeur : … aucune page plus large que l’écran »** (mesure dans un vrai Chrome à 320 et 360 px, `outils/largeur.js` ; sans Chrome elle le dit et passe), puis **« Sylve.html est conforme »**.
+vert — 2724 à ce jour — puis **« largeur : … aucune page plus large que l’écran »** (mesure dans un vrai Chrome à 320 et 360 px, `outils/largeur.js` ; sans Chrome elle le dit et passe), puis **« Sylve.html est conforme »**.
 
 Compter **trois minutes** : 187 à 260 s aux lots 4b, 5b et c1 (selon la charge du poste ;
 17 minutes avant, en séquentiel). **Avec `--dates`, sept minutes** : les scénarios du
-temps rejoués le 1er puis le dernier jour d'un mois (723 vérifications chacun ;
+temps rejoués le 1er puis le dernier jour d'un mois (725 vérifications chacun ;
 `SYLVE_DATE` et `--motif=`, `docs/tests-et-pieges.md`). À lancer **sur demande**, et
 avant de livrer un lot qui touche à l'Agenda, aux journées ou à Aujourd'hui (décidé le
 01/11). Les scénarios se jouent en
@@ -207,14 +207,14 @@ Débordements à connaître : `prix-de-revient.js` finit par les réglages
 Chantiers, Veille et Démarrage, puis l'appel d'`init` ; `carte.js` par les
 fenêtres « numéro de facture » et « motif de refus ».
 
-**La navigation (lots 5a, 5b, 5b2, 5b3, c1, c2 et b1, 4.86.0 à 4.90.0)** — détail dans
+**La navigation (lots 5a, 5b, 5b2, 5b3, c1, c2, b1 et b2, 4.86.0 à 4.91.0)** — détail dans
 `docs/design-navigation.md`, *Le cadre du lot 5a* et *L'écran Aujourd'hui* :
 
 - Démarrage → **Aujourd'hui** (vue `accueil`) : saisie · En retard · Bientôt ·
   Mes notes · Chantiers en cours · Prélèvements · Derniers jours. L'ancien
   accueil et Mon entreprise sont partis. Une ligne se vise par sa clé
   (`data-ajcle`) ; dans les tests, `ligneAuj(t, 'impaye:c1')`.
-- **Barre fixe en bas**, partout : Aujourd'hui · Chantiers (carnet) · **+** ·
+- **Barre fixe en bas**, partout : Aujourd'hui · Chantiers (vue `carnet`, pastille « Liste ») · **+** ·
   Agenda (calendrier) · Argent (finances).
 - **Bandeau** : logo · « ← parent » au second niveau · titre · **☰** (Stock,
   Achats, Véhicule, Rendements, Cubage, Bois, Réglages, Sauvegarde, Corbeille).
@@ -227,6 +227,7 @@ fenêtres « numéro de facture » et « motif de refus ».
 - **c1 (Agenda)** : une seule fiche du jour, en feuille (`ouvrirFicheJour` ; l'état « à trancher » remplace « Que s'est-il passé ? ») ; un seul placement, `demarrerPlacement(id, 'fiche' | 'agenda' | 'aujourdhui')`, et « Fini de placer » ramène au départ ; plus d'onglet Carnet dans l'Agenda ni d'« Aujourd'hui » dans le bandeau ; « À programmer » partout. Détail : `docs/calendrier-journees.md`, *L'Agenda du lot c1*. Dans les tests, un jour de la grille se vise par `caseDuJour(t, ts)` / `cliquerJour(t, ts)`, qui amènent d'abord son mois.
 - **c2 (Ma journée)** : feuille en trois blocs, pied fixe ; les champs des prestations ne se refont que sur ajout ou retrait d'une ligne, jamais pendant la frappe ; P4, un chantier posé ce jour-là pré-choisi (`posesLe`). Détail : `docs/calendrier-journees.md`, *Ma journée du lot c2*.
 - **b1 (Fiche en étapes)** : `renderFiche` (`chantiers-carnet-fiche.js`) = tête · trois chiffres (`C.troisChiffres`) · cinq `details.fi-etape` (`C.etapeChantier`, `data-etape` 0 à 4) · tuiles. `ouvrirChantier(id, 'devis' | 'travaux' …)` ouvre l'étape utile ; ce qui est déplié se garde tant que l'étape ne change pas (`A.ficheVue`). Fenêtre « Les journées » retirée. Repérage : trois cases nouvelles, `dateReperage`, `vuReperage`, `surface` (accord du 01/11). Les lignes vivent dans l'étape Devis, puis Facture dès qu'il y a facture ou devis figé (`lignesDeFacture`). Où va chaque ancien bloc : `docs/correspondance-refonte.md` 3.2, que lisent les scénarios « Fiche en étapes ». Dans les tests : `ficheB1(t, id)`, `etapeB1(t, i)`.
+- **b2 (Liste Chantiers)** : pastilles Liste · Carte · Fiche · Fiche sécurité ; l'Agenda n'a plus de pastille (un module à une vue n'en montre aucune). La liste : recherche (`#c-rech`, hors de ce qui se redessine), groupes de `C.groupesChantiers` (`logique/alertes-import.js` : faire · travaux · devis · payes · anciens · sansuite, ordre fixe), plis `data-pli` gardés dans `A.chPlis` ; en bas, repliés, l'ancien filtre (`#c-filtre`, `#ch-filtre-liste`) et les cumuls (`#carnet-totaux`, jusqu'au lot d). Le bandeau « À traiter » est parti (`renderAlertes` retiré). Création : `ouvrirEnteteCh`, feuille courte, naît « Devis à envoyer » avec devis. « Facturé à » à l'écran, `proprietaire` en base. Pastilles renommées ou déplacées : table de la section 12 de `docs/correspondance-refonte.md`, que lisent les scénarios d'inventaire. Dans les tests : `listeB2(t)`, `groupeB2(t, g)`, `plusChantier(t)`.
 
 ---
 

@@ -271,26 +271,33 @@ function brancher() {
   $('#e-json').addEventListener('click', exportJson);
   $('#fi-corps').addEventListener('click', function (e) {
     if (!e.target.closest('#fi-afacturer')) return;
+    /* Le filtre exact, « Terminé, à facturer » : un chantier fini ce matin
+       n'est pas encore dans « À faire maintenant ». */
     A.filtreCh = 'termine'; A.rechCh = ''; $('#c-rech').value = '';
     allerModule('chantiers', 'carnet');
+    $('#ch-filtre-bloc').open = true;
+    $('#ch-filtre-bloc').scrollIntoView();
   });
   /* --- chantiers --- */
-  $('#c-nouveau').addEventListener('click', function () { ouvrirEnteteCh(null); });
-  $('#c-filtre').addEventListener('change', function () { A.filtreCh = this.value; renderListeChantiers(); });
+  /* La liste se redessine en entier (le tri des payés anciens en fait
+     partie) : on écoute donc l'écran, pas chaque bouton. Le champ de
+     recherche reste hors de ce qui se redessine, le clavier ne tombe pas. */
+  $('#c-filtre').addEventListener('change', function () { A.filtreCh = this.value; renderFiltreListe(); });
   $('#c-rech').addEventListener('input', function () { A.rechCh = this.value; renderListeChantiers(); });
-  $('#c-tri').addEventListener('change', function () {
-    A.triCh = this.value; renderListeChantiers();
+  $('#vue-carnet').addEventListener('change', function (e) {
+    if (e.target && e.target.id === 'c-tri') { A.triCh = e.target.value; renderListeChantiers(); }
   });
-  $('#c-sens').addEventListener('click', function () {
-    A.triAncien = !A.triAncien; renderListeChantiers();
+  $('#vue-carnet').addEventListener('click', function (e) {
+    var o = e.target.closest('[data-chouvrir]');
+    if (o) { ouvrirChantier(o.dataset.chouvrir); return; }
+    if (e.target.closest('#c-sens')) { A.triAncien = !A.triAncien; renderListeChantiers(); }
   });
-  $('#liste-chantiers').addEventListener('click', function (e) {
-    var o = e.target.closest('[data-chouvrir]'), t = e.target.closest('[data-chtemps]'),
-      s = e.target.closest('[data-chstatut]');
-    if (o) ouvrirChantier(o.dataset.chouvrir);
-    else if (t) ouvrirTemps(t.dataset.chtemps);
-    else if (s) ouvrirStatut(s.dataset.chstatut);
-  });
+  $('#vue-carnet').addEventListener('toggle', function (e) {
+    var d = e.target;
+    if (!d || !d.dataset || !d.dataset.pli) return;
+    A.chPlis = A.chPlis || {};
+    A.chPlis[d.dataset.pli] = d.open;
+  }, true);
   $('#fiche-chantier').addEventListener('change', function (e) {
     if (e.target && e.target.id === 'f-choix' && e.target.value) ouvrirChantier(e.target.value);
   });
@@ -891,10 +898,6 @@ function brancher() {
   }, true);
 
   /* --- alertes --- */
-  $('#bandeau-alertes').addEventListener('click', function (e) {
-    var b = e.target.closest('[data-alerte]');
-    if (b) ouvrirChantier(b.dataset.alerte);
-  });
   brancherReglagesAlertes();
   brancherReglagesMarque();
   $('#c-notes-maj').addEventListener('click', function (e) {

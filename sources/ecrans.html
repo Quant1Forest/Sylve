@@ -268,7 +268,7 @@
         </div>
         <div class="champ"><label class="eyebrow" for="r-ent-adr">Adresse</label>
           <input type="text" id="r-ent-adr" autocomplete="off"></div>
-        <p class="muted" style="font-size:11.5px;margin:-4px 0 12px">Repris sur la fiche de chantier, où l’entreprise intervenante doit être identifiée.</p>
+        <p class="muted" style="font-size:11.5px;margin:-4px 0 12px">Repris sur la fiche sécurité, où l’entreprise intervenante doit être identifiée.</p>
         <p class="eyebrow" style="margin:14px 0 7px">Logo</p>
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
           <span class="logo-ent" id="r-ent-apercu" hidden></span>
@@ -503,29 +503,27 @@
     </section>
 
     <!-- ====================================================== chantiers -->
+    <!-- La liste du lot b2 : recherche, puis les groupes (maquette V2) ; en
+         bas, repliés, le filtre de l'ancien carnet et ses cumuls. -->
     <section class="vue" id="vue-carnet" role="tabpanel">
-      <div id="bandeau-alertes"></div>
-      <div class="carte">
-        <div class="carte-titre"><h2>Carnet</h2>
-          <button class="btn primaire btn-min" id="c-nouveau">Nouveau chantier</button></div>
-        <div id="carnet-totaux"></div>
-      </div>
-      <div class="carte">
-        <div class="carte-titre"><h2>Chantiers</h2></div>
-        <div class="champ" style="margin-bottom:8px">
-          <input type="search" id="c-rech" autocomplete="off"
-                 placeholder="Rechercher : nom, donneur, commune, n° de facture…">
-        </div>
-        <div style="display:flex;gap:7px;margin-bottom:11px;flex-wrap:wrap">
-          <div class="champ" style="flex:1;min-width:150px;max-width:230px;margin:0">
-            <select id="c-filtre"></select>
-          </div>
-          <div class="champ" style="flex:1;min-width:150px;max-width:230px;margin:0">
-            <select id="c-tri"></select>
-          </div>
-          <button class="btn-min" id="c-sens" style="flex:none"></button>
-        </div>
+      <div class="ch-liste">
+        <input type="search" id="c-rech" autocomplete="off" aria-label="Chercher un chantier"
+               placeholder="Chercher : nom, donneur d’ordre, commune, n° de facture">
         <div id="liste-chantiers"></div>
+        <details class="ch-replie" id="ch-filtre-bloc">
+          <summary>Tout le carnet, par filtre</summary>
+          <div class="ch-replie-corps">
+            <select id="c-filtre" aria-label="Filtre"></select>
+            <p class="ch-aide">Dans l’ordre choisi pour les payés plus anciens.</p>
+            <div class="aj-zone" id="ch-filtre-liste"></div>
+          </div>
+        </details>
+        <details class="ch-replie" id="ch-cumuls">
+          <summary>Cumuls du carnet, depuis le début</summary>
+          <div class="ch-replie-corps">
+            <div id="carnet-totaux"></div>
+          </div>
+        </details>
       </div>
     </section>
 

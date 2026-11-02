@@ -48,7 +48,7 @@ function trouverChrome() {
    l'application, qui les lit comme elle lit les siennes. */
 function graine() {
   const an = new Date().getFullYear(), maintenant = Date.now(), JOUR = 86400000;
-  const statuts = ['devis', 'accepte', 'encours', 'termine', 'facture', 'paye', 'refuse'];
+  const statuts = ['devis', 'accepte', 'encours', 'termine', 'facture', 'paye', 'sansuite'];
   const chantiers = [], journees = [], depenses = [], articles = [];
   for (let i = 0; i < 14; i++) {
     chantiers.push({
@@ -166,9 +166,27 @@ function parcours() {
       if ($(vise)) { $(vise).click(); await pause(450); mesurer('agenda › placement, jour déjà pris' + ($('#cal-pl-avert') ? '' : ' (sans alerte)')); }
       if ($('#cal-planif-fin')) { $('#cal-planif-fin').click(); await pause(400); }
     }
+    /* La liste du lot b2 : tous ses plis ouverts (payés anciens et leur tri,
+       sans suite, filtre, cumuls), une recherche, et la Fiche sécurité
+       remplie d'un chantier. */
     $('#barre [data-barre="chantiers"]').click(); await pause(400);
-    const ligne = $('#vue-carnet .chantier-l');
-    if (ligne) { (ligne.querySelector('button, [data-id]') || ligne).click(); await pause(500); mesurer('fiche d’un chantier'); }
+    [].forEach.call(document.querySelectorAll('#vue-carnet details'), function (d) { d.open = true; });
+    await pause(200); mesurer('chantiers › liste, plis ouverts');
+    const rech = $('#c-rech');
+    if (rech) {
+      rech.value = 'Plantation'; rech.dispatchEvent(new Event('input', { bubbles: true })); await pause(300);
+      mesurer('chantiers › recherche');
+      rech.value = ''; rech.dispatchEvent(new Event('input', { bubbles: true })); await pause(200);
+    }
+    const fs2 = $('#onglets [data-vue="fichech"]');
+    if (fs2) {
+      fs2.click(); await pause(350);
+      const ch = $('#fch-ch'), o = ch && ch.querySelector('option[value]:not([value=""])');
+      if (o) { ch.value = o.value; ch.dispatchEvent(new Event('change', { bubbles: true })); await pause(400); mesurer('chantiers › fiche sécurité remplie'); }
+    }
+    $('#barre [data-barre="chantiers"]').click(); await pause(400);
+    const ligne = $('#vue-carnet [data-chouvrir]');
+    if (ligne) { ligne.click(); await pause(500); mesurer('fiche d’un chantier'); }
     /* La fiche en étapes du lot b1 : un chantier de chaque statut ouvert,
        toutes ses étapes dépliées (champs de facture et de paiement compris),
        puis les feuilles qu'elle ouvre. */

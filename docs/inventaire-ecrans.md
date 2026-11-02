@@ -211,6 +211,20 @@ Calendrier).
    ligne : nom, donneur, dates, badge de statut, n° de facture, montants
    HT/TTC/TVA, et trois boutons **Ouvrir · Temps · Statut**.
 
+**Depuis le lot b2 (4.91.0)**, le Carnet est la pastille **Liste** de Chantiers
+(Liste · Carte · Fiche · Fiche sécurité) : recherche en haut (elle remplace les
+groupes tant qu'elle est tapée) ; groupes **À faire maintenant** (l'ancien « À
+traiter ») · **En travaux** · **Devis** · **Payés récemment** (moins de 30 jours),
+avec compteurs ; repliés, **Voir les payés plus anciens** (tri et sens du tri) et
+**Sans suite** ; plus bas, repliés aussi, **Tout le carnet, par filtre** (l'ancien
+filtre) et **Cumuls du carnet, depuis le début** (l'ancienne carte Carnet, jusqu'au
+lot d). Chaque ligne : nom, lieu et donneur d'ordre, situation, montant HT, points
+d'étape ; un appui ouvre la fiche à l'étape en cours. Plus de bouton Nouveau
+chantier (+ ▸ Chantier, feuille courte), ni Temps ni Statut (R2). Où va chaque
+élément : section 3.1 de `docs/correspondance-refonte.md`, que lisent les
+scénarios « Liste Chantiers : rien du carnet ni de la Fiche de chantier ne s'est
+perdu ».
+
 **Fiche** — Carnet ▸ Ouvrir (ou alerte, bulle, rappel, calendrier…). Blocs :
 1. Sélecteur du chantier affiché + Précédente / Suivante.
 2. **Le chantier** (✎ identité) : nom, donneur, client, lieu ; état sur la
@@ -253,6 +267,10 @@ Reprendre ses risques) · une carte par famille de risques (cases + consignes) �
 Secours (accès, réseau, bouton **Sa position, je suis dessus**) · Co-activité
 et croquis · boutons **Aperçu** et **Imprimer / PDF**.
 
+**Depuis le lot b2 (4.91.0)**, l'écran et sa pastille s'appellent **Fiche
+sécurité** ; son contenu est inchangé (« Client » y devient « Facturé à »). La
+feuille imprimée garde son titre réglementaire, « Fiche de chantier ».
+
 ### 2.4 Calendrier
 
 **Agenda** — Accueil ▸ Mon entreprise ▸ Calendrier.
@@ -273,6 +291,9 @@ il pose le jour sur le chantier).
 
 **Carte** — onglet « Carte » : carte des chantiers (recherche de commune,
 Ma position, − / + / Tout voir, **Poser un chantier**, fonds de carte, liste).
+
+**Depuis le lot b2 (4.91.0)**, la Carte est une pastille de Chantiers (après
+Liste), intacte ; l'Agenda n'a plus qu'une vue, et donc plus de pastille.
 
 **Carnet** — le même écran que 2.3.
 

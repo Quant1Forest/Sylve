@@ -1,10 +1,14 @@
-/* ------------------------------------------------------------- le carnet */
+/* ------------------------------------------------------- la liste Chantiers
+   Lot b2, maquette V2 : la recherche en haut, puis les groupes — À faire
+   maintenant · En travaux · Devis · Payés récemment · les payés plus anciens
+   et « Sans suite », repliés. En bas, repliés aussi, le filtre de l'ancien
+   carnet (familles, à compléter, avec devis : rien n'en a disparu) et ses
+   cumuls, qui attendent Argent ▸ Année (lot d). */
 function renderCarnet() {
   var z = $('#carnet-totaux'); if (!z) return;
   var t = C.totaux(A.chantiers, A.cfg);
   if (!A.chantiers.length) {
-    z.innerHTML = '<div class="vide"><p>Aucun chantier. Créez une fiche : elle sert de devis, ' +
-      'puis suit le chantier jusqu’au paiement.</p></div>';
+    z.innerHTML = '<p class="muted" style="margin:0">Rien à cumuler : aucun chantier.</p>';
   } else {
     /* Un seul chiffre par tuile, le compte en légende : deux nombres côte à
        côte et on ne sait plus lequel on lit. */
@@ -23,7 +27,7 @@ function renderCarnet() {
          d'ordre à soixante pour cent n'est pas un client, c'est un risque. */
       '<div class="carte2"><b class="num">' + (pd ? eur(pd.montant) : '—') +
       '</b><small>' + (pd
-        ? esc(pd.nom) + (pd.part != null ? ' · ' + pd.part + '\u00A0%' : '')
+        ? esc(pd.nom) + (pd.part != null ? ' · ' + pd.part + ' %' : '')
         : 'premier donneur d’ordre') + '</small></div>' +
       '</div>' +
       /* « En cours » est le nom d'un statut : l'employer pour compter tout ce
@@ -37,7 +41,6 @@ function renderCarnet() {
   }
   renderFiltreChantiers();
   renderListeChantiers();
-  renderAlertes();
   renderAujourdhui();
 }
 function premierDonneur(chantiers, cfg, total) {
@@ -88,84 +91,107 @@ function renderFiltreChantiers() {
     (clos.length ? '<optgroup label="Clos">' + clos.map(opt).join('') + '</optgroup>' : '') +
     (fams.length ? '<optgroup label="Familles de travaux">' + fams.map(opt).join('') + '</optgroup>' : '');
 }
-function renderTriChantiers() {
-  var s = $('#c-tri'); if (!s) return;
+/* Le sens se dit dans les mots du critère : « plus récent » ne veut rien
+   dire d'un montant ni d'un nom. */
+function sensDuTri(crit, vieux) {
+  if (crit === 'montant') return vieux ? '↑ plus petit d’abord' : '↓ plus gros d’abord';
+  if (crit === 'donneur') return vieux ? 'Z → A' : 'A → Z';
+  return vieux ? '↑ plus ancien d’abord' : '↓ plus récent d’abord';
+}
+function triChantiers() {
   var v = A.triCh || 'auto';
-  s.innerHTML = C.TRIS_CH.map(function (o) {
-    return '<option value="' + o.c + '"' + (v === o.c ? ' selected' : '') + '>' +
-      esc(o.n) + '</option>';
-  }).join('');
+  return '<div class="ch-tri"><select id="c-tri" aria-label="Trier par">' +
+    C.TRIS_CH.map(function (o) {
+      return '<option value="' + o.c + '"' + (v === o.c ? ' selected' : '') + '>' +
+        esc(o.n) + '</option>';
+    }).join('') + '</select>' +
+    '<button type="button" class="btn-min" id="c-sens">' + sensDuTri(v, !!A.triAncien) + '</button></div>';
+}
+/* La ligne de la maquette V2, la même que dans Aujourd'hui : nom, lieu,
+   situation, montant HT, points d'étape. Le détail est dans la fiche, qui
+   s'ouvre d'un appui sur l'étape en cours. */
+function ligneChantierListe(c, alerte, now) {
+  var s = situationChantier(c, now);
+  /* Ce que le statut seul ne dit pas, l'alerte le dit : des journées
+     passées, une facture restée sans réponse faute d'échéance écrite. */
+  if (alerte && alerte.type === 'retard') s = { t: majuscule(alerte.texte), ton: 'tiede' };
+  if (alerte && alerte.type === 'impaye' && s.ton !== 'alerte') s = { t: majuscule(alerte.texte), ton: 'alerte' };
+  var m = C.montant(c);
+  var lieu = [c.foret, c.commune && c.commune !== c.foret ? c.commune : ''].filter(Boolean);
+  if (c.donneur || c.client) lieu.push(c.donneur || c.client);
+  return '<button type="button" class="aj-ch" data-chouvrir="' + esc(c.id) + '">' +
+    '<span class="aj-txt"><b>' + esc(C.nomChantier(c)) + '</b>' +
+    (lieu.length ? '<small>' + esc(lieu.join(' · ')) + '</small>' : '') +
+    '<span class="aj-situ' + (s.ton ? ' aj-' + s.ton : '') + '">' + esc(s.t) + '</span>' +
+    /* Une fiche à moitié remplie se perd dans le carnet : elle se signale,
+       sans jamais empêcher de l'enregistrer telle quelle. */
+    (C.champsManquants(c).length ? '<span class="acompleter ch-acomp">à compléter</span>' : '') + '</span>' +
+    '<span class="aj-droite">' + (m ? '<b class="num">' + eur(m) + '</b>' : '') + pointsEtape(c) + '</span>' +
+    '</button>';
+}
+function groupeListe(cle, titre, ton, l, g, now) {
+  if (!l.length) return '';
+  return '<section class="aj-bloc ch-groupe" data-groupe="' + cle + '">' +
+    '<h2 class="aj-sous' + (ton ? ' aj-' + ton : '') + '">' + titre +
+    ' <span class="aj-compte">' + l.length + '</span></h2>' +
+    '<div class="aj-zone">' + l.map(function (c) { return ligneChantierListe(c, g.alerte[c.id], now); }).join('') +
+    '</div></section>';
+}
+/* Un pli qu'il a ouvert reste ouvert tant que l'écran se redessine. */
+function pliListe(cle, titre, corps, n) {
+  if (!n) return '';
+  A.chPlis = A.chPlis || {};
+  return '<details class="ch-replie" data-pli="' + cle + '"' + (A.chPlis[cle] ? ' open' : '') + '>' +
+    '<summary>' + titre + ' <span class="aj-compte">' + n + '</span></summary>' +
+    '<div class="ch-replie-corps">' + corps + '</div></details>';
 }
 function renderListeChantiers() {
   var z = $('#liste-chantiers'); if (!z) return;
-  renderTriChantiers();
+  var now = Date.now(), vieux = !!A.triAncien, crit = A.triCh || 'auto';
   var q = (A.rechCh || '').trim();
-  /* Une recherche passe outre le filtre : un numéro de facture appartient
-     presque toujours à un chantier payé, donc rangé hors des « ouverts ».
-     Taper le bon numéro et ne rien voir sortir serait le pire des deux. */
-  var vieux = !!A.triAncien, crit = A.triCh || 'auto';
-  var l = q ? C.tri(C.chercher(A.chantiers, q), vieux, crit)
-    : C.tri(C.filtre(A.chantiers, A.filtreCh || 'ouverts'), vieux, crit);
-  var bs = $('#c-sens');
-  if (bs) bs.textContent = vieux ? '↑ plus ancien d’abord' : '↓ plus récent d’abord';
-  if (!l.length) {
-    z.innerHTML = '<div class="vide"><p>' + (q
-      ? 'Rien qui corresponde à « ' + esc(q) +' ».'
-      : 'Aucun chantier dans cette vue.') + '</p></div>';
+  var g = C.groupesChantiers(A.chantiers, A.cfg, now);
+  renderFiltreListe(g);
+  if (!A.chantiers.length) {
+    z.innerHTML = '<div class="vide"><p>Aucun chantier. Le + en bas ▸ Chantier : la fiche ' +
+      'suit le chantier de l’annonce au paiement.</p></div>';
     return;
   }
+  /* Une recherche regarde tout le carnet, statut compris : un numéro de
+     facture appartient presque toujours à un chantier payé il y a longtemps. */
+  if (q) {
+    var l = C.tri(C.chercher(A.chantiers, q), vieux, crit);
+    z.innerHTML = l.length
+      ? '<div class="aj-zone" id="ch-trouves">' + l.map(function (c) {
+          return ligneChantierListe(c, g.alerte[c.id], now);
+        }).join('') + '</div>' +
+        '<p class="ch-aide">' + l.length + ' chantier' + (l.length > 1 ? 's' : '') + ' sur ' +
+        A.chantiers.length + ' — la recherche regarde tout le carnet, statut compris.</p>'
+      : '<div class="vide"><p>Rien qui corresponde à « ' + esc(q) + ' ».</p></div>';
+    return;
+  }
+  var anciens = C.tri(g.anciens, vieux, crit);
+  z.innerHTML =
+    groupeListe('faire', 'À faire maintenant', 'alerte', g.faire, g, now) +
+    groupeListe('travaux', 'En travaux', '', g.travaux, g, now) +
+    groupeListe('devis', 'Devis', '', g.devis, g, now) +
+    groupeListe('payes', 'Payés récemment', '', g.payes, g, now) +
+    pliListe('anciens', 'Voir les payés plus anciens', triChantiers() +
+      '<div class="aj-zone">' + anciens.map(function (c) { return ligneChantierListe(c, null, now); }).join('') +
+      '</div>', anciens.length) +
+    pliListe('sansuite', 'Sans suite', '<div class="aj-zone">' +
+      g.sansuite.map(function (c) { return ligneChantierListe(c, null, now); }).join('') + '</div>',
+      g.sansuite.length);
+}
+/* L'ancien filtre du carnet, gardé replié : ses familles, « à compléter » et
+   « avec devis » n'ont pas d'autre place. Même ordre que les payés anciens,
+   et que le sélecteur de la fiche. */
+function renderFiltreListe(g) {
+  var z = $('#ch-filtre-liste'); if (!z) return;
   var now = Date.now();
-  z.innerHTML = l.map(function (c) {
-    var m = C.montant(c), retard = C.enRetard(c, now), tauxCh = C.tauxChantier(c);
-    var manque = C.champsManquants(c);
-    var trav = (c.lignes || []).map(function (x) { return C.nomTravail(x.travail); });
-    var uniq = trav.filter(function (v, i) { return trav.indexOf(v) === i; });
-    var place = C.totalPlace(c);
-    return '<div class="chantier-l">' +
-      '<span class="pastille" style="background:' + (COUL_STATUT[c.statut] || '#7A8471') +
-      '" title="' + esc(C.nomStatut(c.statut, c)) + '"></span>' +
-      '<div><span class="chantier-n">' + esc(C.nomChantier(c)) + '</span>' +
-        '<span class="chantier-d">' + esc([c.donneur || c.client, c.foret,
-          c.parcelles ? 'p. ' + c.parcelles : '',
-          /* La première prestation est dans le titre ; les autres se disent
-             sans se lister, sinon la ligne double de longueur. */
-          uniq.length > 1 ? 'et ' + (uniq.length - 1) + ' autre prestation' +
-            (uniq.length > 2 ? 's' : '') : '']
-          .filter(Boolean).join(' · ') || 'sans donneur d’ordre') +
-        '</span>' +
-      '<span class="chantier-d">' + esc(datesCh(c).concat(
-        place ? [E.fmt(place, place % 1 ? 1 : 0) + ' j placée' + (place > 1 ? 's' : '')] : [],
-        (c.echeance || c.fin) ? ['avant le ' + dateCourte(c.echeance || c.fin)] : []
-      ).join(' · ')) + '</span>' +
-      /* Le badge et sa date tiennent toujours sur leur propre ligne, quel que
-         soit ce qui précède : sinon les lignes de longueur inégale font danser
-         les badges d'un chantier à l'autre. */
-      '<span class="chantier-e">' +
-      /* Le numéro de facture est ce par quoi il retrouve un chantier réglé :
-         il doit se lire dans la liste, pas seulement sur la fiche. */
-      (c.numeroFacture ? '<span class="num-fact">n° ' + esc(c.numeroFacture) + '</span> ' : '') +
-      badgeStatut(c) +
-      (retard ? ' <span class="retard">jours passés</span>' : '') +
-      /* Une fiche à moitié remplie se perd dans le carnet : elle se signale,
-         sans jamais empêcher de l'enregistrer telle quelle. */
-      (manque.length ? ' <span class="acompleter">à compléter</span>' : '') +
-      '</span></div>' +
-      /* Hors taxes et TTC tous les deux en gros : le premier fait le chiffre
-         d'affaires et les déclarations, le second est ce que le client paie. */
-      '<span class="chantier-m num">' + (m
-        ? '<b>' + eur(m) + ' HT</b><b>' + eur(C.ttcChantier(c)) + ' TTC</b>' +
-          '<small>TVA ' + (tauxCh != null
-            ? String(tauxCh).replace('.', ',') + ' %\u00A0· ' : 'mêlée\u00A0· ') +
-          eur(C.tvaChantier(c)) + '</small>'
-        : '') + '</span>' +
-      '<div class="chantier-act">' +
-      '<button class="btn-min" data-chouvrir="' + c.id + '">Ouvrir</button>' +
-      '<button class="btn-min" data-chtemps="' + c.id + '">Temps</button>' +
-      '<button class="btn-min" data-chstatut="' + c.id + '">Statut</button></div></div>';
-  }).join('') +
-    (q ? '<p class="muted" style="font-size:12px;margin:9px 0 0">' + l.length + ' chantier' +
-      (l.length > 1 ? 's' : '') + ' sur ' + A.chantiers.length + ' — la recherche regarde tout ' +
-      'le carnet, statut compris.</p>' : '');
+  g = g || C.groupesChantiers(A.chantiers, A.cfg, now);
+  var l = C.tri(C.filtre(A.chantiers, A.filtreCh || 'ouverts'), !!A.triAncien, A.triCh || 'auto');
+  z.innerHTML = l.length ? l.map(function (c) { return ligneChantierListe(c, g.alerte[c.id], now); }).join('')
+    : '<div class="vide"><p>Aucun chantier dans cette vue.</p></div>';
 }
 
 /* ------------------------------------------------- du chantier au stock

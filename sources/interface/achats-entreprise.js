@@ -221,36 +221,8 @@ function situationModule(m) {
   return { n: '—', u: '', s: '' };
 }
 
-function renderAlertes() {
-  var z = $('#bandeau-alertes'); if (!z) return;
-  /* Le seul « À traiter » depuis la 4.82 : l'écran Entreprise le répétait,
-     et il l'y trouvait de trop. Les journées à placer et le travail qui
-     approche vivent dans Aujourd'hui et sur le calendrier ; ici on ne garde
-     que ce qui porte un nom de chantier et attend une action. */
-  var al = C.alertes(A.chantiers, A.cfg, Date.now()).filter(function (a2) {
-    return ['retard', 'afacturer', 'impaye'].indexOf(a2.type) >= 0;
-  });
-  A.nbAlertes = al.length;
-  if (!al.length) { z.innerHTML = ''; majPastilleEntreprise(); return; }
-  z.innerHTML = '<div class="carte"><div class="carte-titre"><h2>À traiter (' + al.length + ')</h2></div>' +
-    al.map(function (a) {
-      /* Qui, combien, depuis quand : d'un impayé, c'est tout ce qu'on veut
-         savoir sans ouvrir la fiche. Le montant vivait sur l'écran
-         Entreprise ; il suit l'alerte ici. */
-      var m = C.montant(a.chantier);
-      return '<button class="alerte" data-alerte="' + a.chantier.id + '">' +
-        '<span class="ic" style="background:' + (COUL_ALERTE[a.type] || '#7A8471') + '"></span>' +
-        '<span><b>' + esc(TITRE_ALERTE[a.type] || '') + ' — ' + esc(C.nomChantier(a.chantier)) +
-        (m ? ' · ' + eur(m) : '') + '</b>' +
-        '<small>' + esc(a.texte) + (a.chantier.donneur ? ' · ' + esc(a.chantier.donneur) : '') + '</small></span></button>';
-    }).join('') + '</div>';
-  majPastilleEntreprise();
-}
-function majPastilleEntreprise() {
-  var b = $('#b-pastille');
-  if (b && A.module === 'chantiers') b.textContent = '';
-}
-
+/* « À traiter » est devenu le groupe « À faire maintenant » de la liste
+   Chantiers (lot b2) : groupesChantiers() relit les mêmes alertes. */
 function renderReglagesAlertes() {
   if ($('#r-cot')) $('#r-cot').value = (A.cfg && A.cfg.tauxCotisations != null) ? A.cfg.tauxCotisations : '';
   if ($('#r-imp')) $('#r-imp').value = (A.cfg && A.cfg.tauxImpot != null) ? A.cfg.tauxImpot : '';
@@ -289,13 +261,13 @@ function brancherReglagesAlertes() {
   if (rd) rd.addEventListener('change', function () {
     var v = C.nb(this.value);
     if (v < 1 || v > 365) { toast('Entre 1 et 365 jours.'); renderReglagesAlertes(); return; }
-    A.cfg.joursRelanceDevis = v; sauverCfg(); renderAlertes();
+    A.cfg.joursRelanceDevis = v; sauverCfg(); renderCarnet();
   });
   var rf = $('#r-rf');
   if (rf) rf.addEventListener('change', function () {
     var v = C.nb(this.value);
     if (v < 1 || v > 365) { toast('Entre 1 et 365 jours.'); renderReglagesAlertes(); return; }
-    A.cfg.joursRelanceFacture = v; sauverCfg(); renderAlertes();
+    A.cfg.joursRelanceFacture = v; sauverCfg(); renderCarnet();
   });
   var we = $('#r-we');
   if (we) we.addEventListener('change', function () {

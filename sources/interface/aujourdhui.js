@@ -176,15 +176,18 @@ function lignesBientot() {
       sous: C.nomChantier(a.chantier) + (a.chantier.donneur ? ' · ' + a.chantier.donneur : ''),
       montant: C.montant(a.chantier), petit: a.texte, ouvre: 'fiche:' + a.chantier.id });
   });
-  /* C1 : un chantier qui n'a pas encore de devis. Le repérage n'est pas une
-     donnée de Sylve : seule l'annonce se date. */
+  /* C1 : un chantier « Devis à envoyer », même rédigé, tant qu'il n'est pas
+     envoyé. Le repérage n'est pas systématique : il ne fait pas une ligne à
+     lui, il se dit en petit (sa date existe depuis le lot b1). */
   A.chantiers.filter(function (c) { return c.statut === 'devis' && !c.dateEnvoi; })
     .sort(function (a, b) { return C.dateEntree(b) - C.dateEntree(a); })
     .forEach(function (c) {
       var quand = C.dateEntree(c);
       l.push({ cle: 'devisafaire:' + c.id, picto: 'carnet', titre: 'Devis à faire',
         sous: C.nomChantier(c) + (c.donneur ? ' · ' + c.donneur : ''),
-        petit: quand ? 'annoncé ' + ilYa(quand) : '', ouvre: 'fiche:' + c.id });
+        petit: c.dateReperage ? 'repéré ' + ilYa(c.dateReperage)
+          : (quand ? 'annoncé ' + ilYa(quand) + ' · ' : '') + 'pas encore repéré',
+        ouvre: 'fiche:' + c.id });
     });
   var ar = ST.aRecommander(A.articles);
   if (ar.length) {
@@ -213,9 +216,14 @@ function pointsEtape(c) {
       return '<i class="' + (i < e ? 'f' : i === e ? 'e' : '') + '"></i>';
     }).join('') + '</span>';
 }
+/* La situation d'un chantier, en une ligne : la même ici et dans la liste
+   Chantiers (lot b2). Le n° de facture y reste : c'est par lui qu'il
+   retrouve un chantier réglé. */
 function situationChantier(c, now) {
   var base = C.nomStatut(c.statut, c);
+  var noF = c.numeroFacture ? ' · n° ' + c.numeroFacture : '';
   if (c.statut === 'devis') {
+    if (c.dateReperage) return { t: 'Repéré le ' + dateCourte(c.dateReperage) + ' · devis à faire', ton: '' };
     var q = C.dateEntree(c);
     return { t: 'Annoncé ' + (q ? ilYa(q) : '') + ' · devis à faire', ton: '' };
   }
@@ -224,16 +232,27 @@ function situationChantier(c, now) {
   }
   if (c.statut === 'accepte' || c.statut === 'encours') {
     var reste = C.resteAPlacer(c);
-    return { t: base + (reste != null && reste > 0 ? ' · ' + C.fmtJours(reste) + ' à placer' : ''),
+    var mot = c.statut === 'encours' ? base : (C.aDevis(c) ? 'Signé' : 'Sans devis') + ' · à programmer';
+    return { t: mot + (reste != null && reste > 0 ? ' · ' + C.fmtJours(reste) + ' à placer' : ''),
       ton: c.statut === 'encours' ? 'vert' : '' };
+  }
+  /* « Comme ça je peux mettre facturé le, ensuite payé le » : l'écart entre
+     les deux est ce qu'il vient lire. */
+  var factLe = c.dateFacture ? 'Facturé le ' + dateCourte(c.dateFacture) : '';
+  if (c.statut === 'paye') {
+    var payeLe = c.datePaiement ? 'payé le ' + dateCourte(c.datePaiement) : '';
+    return { t: ([factLe, payeLe].filter(Boolean).join(' · ') || base).replace(/^p/, 'P') + noF, ton: '' };
+  }
+  if (c.statut === 'sansuite') {
+    return { t: base + (c.motifRefus ? ' · ' + C.nomMotifRefus(c.motifRefus).toLowerCase() : ''), ton: '' };
   }
   if (c.statut === 'termine') {
     return { t: c.dateFin ? 'Terminé ' + ilYa(c.dateFin) + ', à facturer' : base, ton: 'tiede' };
   }
   if (c.statut === 'facture') {
     var r = C.retardPaiement(c, now);
-    if (r != null) return { t: 'Facture échue depuis ' + r + ' j', ton: 'alerte' };
-    return { t: base + (c.echeancePaiement ? ' · à payer avant le ' + dateCourte(c.echeancePaiement) : ''), ton: '' };
+    if (r != null) return { t: 'Facture échue depuis ' + r + ' j' + noF, ton: 'alerte' };
+    return { t: (factLe || base) + (c.echeancePaiement ? ' · à payer avant le ' + dateCourte(c.echeancePaiement) : '') + noF, ton: '' };
   }
   return { t: base, ton: '' };
 }

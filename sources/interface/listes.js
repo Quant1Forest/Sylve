@@ -3,20 +3,20 @@
    se règle ici. Et un nom tapé au vol n'entre jamais dans la liste sans
    qu'on le demande — sinon la moindre faute de frappe s'y installe. */
 var LISTES = {
-  clients: { nom: 'Donneurs d’ordre', champ: 'clients', cle: 'bordcub.clients',
+  clients: { nom: 'Donneurs d’ordre', vos: 'vos donneurs d’ordre', champ: 'clients', cle: 'bordcub.clients',
     aide: 'Ceux qui vous confient les chantiers et à qui part la facture : experts, ' +
       'gestionnaires, confrères en sous-traitance, ou un propriétaire qui vous ' +
       'démarche lui-même.' },
   /* Le mot affiché a changé, la clé jamais : « proprios » reste « proprios »
      en base. Voir le tableau du nommage dans les notes du projet — c'est le
      piège le plus coûteux du fichier. */
-  proprios: { nom: 'Clients', champ: 'proprios', cle: 'bordcub.proprios',
+  proprios: { nom: 'Facturé à', vos: 'votre liste « Facturé à »', champ: 'proprios', cle: 'bordcub.proprios',
     aide: 'Celui à qui vous facturez : propriétaire forestier, gestionnaire, ' +
       'entreprise de travaux. À laisser vide quand c’est le donneur d’ordre ' +
       'lui-même. Son type décide si Sylve vous demande un n° SIREN.' },
-  lieux: { nom: 'Forêts et communes', champ: 'lieuxRegles', cle: 'bordcub.lieux',
+  lieux: { nom: 'Forêts et communes', vos: 'vos forêts et communes', champ: 'lieuxRegles', cle: 'bordcub.lieux',
     aide: 'Proposés à la saisie d’une journée et d’un chantier.' },
-  essencesCh: { nom: 'Essences', champ: 'essencesCh', cfg: true,
+  essencesCh: { nom: 'Essences', vos: 'vos essences', champ: 'essencesCh', cfg: true,
     aide: 'Ce qui s’ajoute à la liste d’origine dans le contexte d’un chantier. ' +
       'Les essences fournies (chêne, hêtre, douglas…) restent toujours proposées.' },
   travaux: { nom: 'Prestations', objets: true,
@@ -34,6 +34,12 @@ function usagesTravail(code) {
     return (j.postes || []).some(function (p) { return p.travaux === code; });
   }).length;
   return { chantiers: ch, journees: jr, total: ch + jr };
+}
+/* « vos donneurs d'ordre », « votre liste « Facturé à » » : le nom d'une
+   pastille ne se met pas toujours au pluriel dans une phrase. */
+function vosListe(k) {
+  var d = LISTES[k];
+  return d ? (d.vos || 'vos ' + d.nom.toLowerCase()) : '';
 }
 function listeDe(k) {
   var d = LISTES[k]; if (!d) return [];
@@ -262,7 +268,7 @@ function proposerAjoutListe(k, nom) {
   if (!nom) return Promise.resolve(false);
   var l = listeDe(k), bas = nom.toLowerCase();
   if (l.some(function (x) { return x.toLowerCase() === bas; })) return Promise.resolve(false);
-  if (!confirm('« ' + nom + ' » n’est pas dans vos ' + LISTES[k].nom.toLowerCase() +
+  if (!confirm('« ' + nom + ' » n’est pas dans ' + vosListe(k) +
     '.\n\nL’ajouter à la liste ?')) return Promise.resolve(false);
   l.push(nom);
   return sauverListe(k).then(function () { return true; });

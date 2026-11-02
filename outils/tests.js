@@ -457,11 +457,12 @@ scenario('Listes : ajouter sans quitter le formulaire', async () => {
   t.clic('[data-vue="carnet"]'); await t.pause(200);
   /* Le « + liste » vit sur le formulaire de création, qui ne garde plus que
      donneur, propriétaire, lieu et travaux. */
-  t.clic('#c-nouveau'); await t.pause(300);
+  await plusChantier(t);
   t.saisir('#ce-donneur', 'Jean Roman');
   t.clic('[data-ajlist="clients"]'); await t.pause(400);
   verifier('le donneur d\'ordre est dans la liste', ['Jean Roman'], t.stock('clients'));
   t.clic('#modale-x'); await t.pause(250);
+  await parBarre(t, 'chantiers');
 
   /* L'essence, elle, a rejoint le bloc « Le peuplement » de la fiche. */
   t.clic('[data-chouvrir="c1"]'); await t.pause(400);
@@ -702,7 +703,8 @@ scenario('Bandeau : rien qui fasse doublon avec la page', async () => {
   /* + Pile, + Chantier, + Dépense, + Commande existent déjà dans leur page :
      il y passe, jamais par le haut. Le bandeau redevient de la navigation. */
   const doublons = [
-    ['bois', '#p-nouvelle'], ['chantiers', '#c-nouveau'],
+    /* Chantiers n'a plus de bouton dans la page (lot b2) : + ▸ Chantier. */
+    ['bois', '#p-nouvelle'],
     /* Le stock crée ses commandes aux Entrées et sorties : « + Commande » a
        quitté l'inventaire, qui n'est qu'un état des lieux. */
     ['finances', '#dep-nouvelle'], ['stock', '#cmd-nouvelle']
@@ -745,7 +747,8 @@ scenario('Pastilles : un dessin partout, le même d’un module à l’autre', a
   for (const mod of modules) {
     const t = await ouvrir(Object.assign({}, VIDE, { module: mod }));
     const onglets = t.$$('#onglets button');
-    verifierVrai(mod + ' : jamais un onglet solitaire', onglets.length >= 2);
+    /* Une vue seule ne montre aucune pastille (l'Agenda depuis le lot b2). */
+    verifierVrai(mod + ' : jamais un onglet solitaire', onglets.length !== 1);
     verifier(mod + ' : tous dessinés', onglets.length,
       onglets.filter(b => b.querySelector('.ic svg.pic')).length);
     verifierVrai(mod + ' : plus aucun caractère de remplissage',
@@ -753,7 +756,7 @@ scenario('Pastilles : un dessin partout, le même d’un module à l’autre', a
   }
   /* Une même vue doit porter le même dessin partout : c'est ce qui rend la
      navigation lisible quand on passe d'une partie à l'autre. */
-  const a = await ouvrir(Object.assign({}, VIDE, { module: 'calendrier' }));
+  const a = await ouvrir(Object.assign({}, VIDE, { module: 'chantiers' }));
   const b = await ouvrir(Object.assign({}, VIDE, { module: 'bois' }));
   const carte = a.$('#onglets [data-vue="carte"] svg').innerHTML;
   const lieux = b.$('#onglets [data-vue="lieux"] svg').innerHTML;
@@ -1279,7 +1282,10 @@ scenario('Carnet : le plus récent en tête, et sa date visible', async () => {
     ]
   }));
   t.clic('[data-vue="carnet"]'); await t.pause(300);
-  const noms = t.$$('#liste-chantiers .chantier-n').map(e => e.textContent.trim());
+  /* Les groupes ont leur ordre fixe ; le plus récent d'abord, c'est le tri
+     de « Tout le carnet, par filtre » (lot b2). */
+  t.choisir('#c-filtre', 'tous'); await t.pause(250);
+  const noms = t.$$('#ch-filtre-liste .aj-txt > b').map(e => e.textContent.trim());
   verifierVrai('le plus récent est en tête', /Accepté ce matin/.test(noms[0] || ''));
   verifierVrai('le vieux devis est en dernier', /Vieux devis/.test(noms[noms.length - 1] || ''));
   /* Le tri lui-même, indépendamment de l'écran. */
@@ -1287,7 +1293,7 @@ scenario('Carnet : le plus récent en tête, et sa date visible', async () => {
   const ordre = C.tri(t.stock('chantiers')).map(c => c.id);
   verifier('l’ordre est bien chronologique inverse', ['recent', 'facture', 'vieux'], ordre);
   verifierVrai('et la date du chantier facturé s’affiche',
-    /facturé le/.test(t.$('#vue-carnet').textContent));
+    /Facturé (le|il y a)/.test(t.$('#vue-carnet').textContent));
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -1346,7 +1352,7 @@ scenario('Navigation : ouvrir une fiche depuis « À traiter » laisse un retour
   /* « À traiter » ne vit plus que dans le carnet depuis la 4.82. Le clic doit
      trouver l'alerte : un clic dans le vide laisserait le masque en place et
      ferait croire à la régression. */
-  verifierVrai('l’alerte est là où l’on clique', t.clic('#bandeau-alertes [data-alerte="c1"]'));
+  verifierVrai('l’alerte est là où l’on clique', t.clic('[data-groupe="faire"] [data-chouvrir="c1"]'));
   await t.pause(300);
   verifier('le masque des menus est levé', false,
     t.d.body.classList.contains('accueil-ouvert'));
@@ -1699,8 +1705,9 @@ scenario('Devis : la case commande les étapes, et les mots qu’elles portent',
   verifierVrai('et « Sans suite » celle de « Devis refusé »', l.indexOf('Sans suite') >= 0);
 
   t.clic('[data-vue="carnet"]'); await t.pause(300);
-  verifierVrai('et le badge du carnet dit « À programmer »',
-    /À programmer/.test(t.$('#liste-chantiers').textContent));
+  /* La ligne V2 dit la situation (lot b2) : « Sans devis · à programmer ». */
+  verifierVrai('et la ligne du carnet dit « à programmer », sans devis',
+    /Sans devis · à programmer/.test(t.$('#liste-chantiers').textContent));
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -1806,8 +1813,10 @@ scenario('Carnet : un numéro de facture retrouve son chantier, même payé', as
     ]
   }));
   t.clic('[data-vue="carnet"]'); await t.pause(300);
-  verifierVrai('le filtre par défaut cache le chantier payé',
-    !/Vaux plantation/.test(t.$('#liste-chantiers').textContent));
+  /* Payé aujourd'hui, il est dans « Payés récemment » ; la recherche, elle,
+     regarde tout le carnet. */
+  verifierVrai('sans recherche, le payé est dans son groupe',
+    !!t.$('[data-groupe="payes"] [data-chouvrir="c1"]'));
 
   t.saisir('#c-rech', 'F-2026-031'); await t.pause(250);
   const z = t.$('#liste-chantiers').textContent;
@@ -1839,7 +1848,9 @@ scenario('Facturé : le numéro est demandé là où on bascule', async () => {
       dateFin: Date.now(), maj: Date.now() }]
   }));
   t.clic('[data-vue="carnet"]'); await t.pause(250);
-  t.clic('[data-chstatut="c1"]'); await t.pause(300);
+  /* Le bouton Statut des lignes est parti (R2) : « Corriger l'étape à la main ». */
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+  t.clic('#f-statut'); await t.pause(300);
   t.clic('[data-setstatut="facture"]'); await t.pause(350);
 
   verifierVrai('le numéro est demandé aussitôt', t.$('#nf-num-rg'));
@@ -1853,7 +1864,9 @@ scenario('Facturé : le numéro est demandé là où on bascule', async () => {
   verifier('et le numéro est posé', 'F-2026-0044', c.numeroFacture);
 
   /* Déjà renseigné, on ne redemande pas. */
-  t.clic('[data-chstatut="c1"]'); await t.pause(300);
+  await parBarre(t, 'chantiers');
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+  t.clic('#f-statut'); await t.pause(300);
   t.clic('[data-setstatut="paye"]'); await t.pause(400);
   verifier('rien n’est redemandé quand le numéro est là', null, t.$('#nf-num-rg'));
   verifier('le statut a bien suivi', 'paye', (t.stock('chantiers') || [])[0].statut);
@@ -2090,7 +2103,7 @@ scenario('Entreprise : chaque bulle d’« Où j’en suis » a son endroit, et 
      sauvegarde, jamais faite ici, en est une autre). */
   verifier('une seule facture en retard', 1, t.$$('#aj-retard [data-ajcle^="impaye:"]').length);
   /* « À traiter » du carnet garde l'impayé, avec les mêmes mots qu'avant. */
-  const at = t.$('#bandeau-alertes').textContent;
+  const at = (t.$('[data-groupe="faire"] [data-chouvrir="c3"]') || {}).textContent || '';
   verifierVrai('« À traiter » le nomme toujours', /Montjoie/.test(at) && /1 800/.test(at) &&
     !/1 800/.test(at) && /70 jours/.test(at) && /Cabinet Dubois/.test(at));
   /* Chiffre d'affaires et TVA déductible : le même calcul que les bulles
@@ -2256,7 +2269,8 @@ scenario('Onglets : plus aucun module ne se réduit à un onglet solitaire', asy
   for (const mod of modules) {
     const t = await ouvrir(Object.assign({}, VIDE, { module: mod }));
     const n = t.$$('#onglets button').length;
-    verifierVrai(mod + ' : ' + n + ' onglets, jamais un seul', n >= 2);
+    /* Zéro est permis : une vue seule ne montre aucune pastille (lot b2). */
+    verifierVrai(mod + ' : ' + n + ' onglets, jamais un seul', n !== 1);
     verifier(mod + ' : aucune erreur', [], t.erreurs);
   }
   const t2 = await ouvrir(Object.assign({}, VIDE, { module: 'finances' }));
@@ -2521,21 +2535,18 @@ scenario('Carnet : les lignes tombent sur une grille, montants alignés', async 
       ligne('c2', 'Dupont', 90, 10)]
   }));
   t.clic('[data-vue="carnet"]'); await t.pause(300);
-  const lignes = t.$$('#liste-chantiers .chantier-l');
-  verifier('deux lignes en grille', 2, lignes.length);
-  const grille = t.w.getComputedStyle(lignes[0]);
-  verifier('trois colonnes', 'grid', grille.display);
-  /* Le montant vit dans sa propre colonne, plus dans le titre. */
-  const montants = lignes.map(l => l.querySelector('.chantier-m').textContent.trim());
+  /* Lot b2 : la ligne V2 (nom, lieu, situation à gauche ; montant HT et
+     points d'étape à droite). */
+  const lignes = t.$$('#liste-chantiers [data-groupe="travaux"] .aj-ch');
+  verifier('deux lignes', 2, lignes.length);
+  const montants = lignes.map(l => l.querySelector('.aj-droite b').textContent.trim());
   verifierVrai('le montant de chaque ligne est à part', montants.every(m => /\u20AC/.test(m)));
   verifierVrai('et il ne double pas le nom',
-    !/\u20AC/.test(lignes[0].querySelector('.chantier-n').textContent));
+    !/\u20AC/.test(lignes[0].querySelector('.aj-txt > b').textContent));
   verifierVrai('le nom long est bien là',
-    /Haute Vallée des Sources/.test(lignes[0].querySelector('.chantier-n').textContent));
-  /* Les boutons ne sont plus étirés ni centrés : ils commencent au même bord. */
-  const actions = lignes.map(l => l.querySelector('.chantier-act'));
-  verifierVrai('chaque ligne porte ses trois boutons',
-    actions.every(a => a.querySelectorAll('.btn-min').length === 3));
+    lignes.some(l => /Haute Vallée des Sources/.test(l.querySelector('.aj-txt > b').textContent)));
+  /* Temps et Statut sont partis (R2) : un appui sur la ligne ouvre la fiche. */
+  verifierVrai('plus aucun bouton dans la ligne', lignes.every(l => !l.querySelector('button')));
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -2579,7 +2590,7 @@ scenario('Carnet : le nom du chantier se compose et ne se tape plus', async () =
       lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 2, prix: 500, nature: 'prestation' }] }]
   }));
   t.clic('[data-vue="carnet"]'); await t.pause(300);
-  const nom = t.$('#liste-chantiers .chantier-n').textContent;
+  const nom = t.$('#liste-chantiers .aj-txt > b').textContent;
   verifier('prestation, propriétaire, commune', 'Dégagement manuel — Martin, Clairbois', nom);
   verifierVrai('l’ancien titre ne s’affiche plus',
     !/vieux titre/.test(t.$('#liste-chantiers').textContent));
@@ -2620,7 +2631,7 @@ scenario('Carnet : un chantier sans rien à composer garde son ancien nom', asyn
   t.clic('[data-vue="carnet"]'); await t.pause(300);
   t.choisir('#c-filtre', 'tous'); await t.pause(300);
   verifier('l’ancien nom tient lieu de nom', 'Reprise carnet 2024',
-    t.$('#liste-chantiers .chantier-n').textContent);
+    t.$('#ch-filtre-liste .aj-txt > b').textContent);
 
   /* Une fourniture ne nomme pas un chantier : c'est la prestation qui parle. */
   const C0 = t.w.BCC;
@@ -2648,18 +2659,18 @@ scenario('Carnet : la ligne ne redit pas le propriétaire, et porte ses dates', 
   }));
   t.clic('[data-vue="carnet"]'); await t.pause(300);
   t.choisir('#c-filtre', 'tous'); await t.pause(300);
-  const ligne = t.$('#liste-chantiers .chantier-l');
-  const sous = [...ligne.querySelectorAll('.chantier-d')].map(x => x.textContent);
+  const ligne = t.$('#ch-filtre-liste .aj-ch');
+  const sous = [ligne.querySelector('.aj-txt small').textContent, ligne.querySelector('.aj-situ').textContent];
 
   verifierVrai('le titre porte le propriétaire',
-    /Martin/.test(ligne.querySelector('.chantier-n').textContent));
+    /Martin/.test(ligne.querySelector('.aj-txt > b').textContent));
   verifierVrai('la ligne d’en dessous ne le redit pas', !/Martin/.test(sous[0]));
   verifierVrai('elle porte le donneur d’ordre', /Cabinet Dubois/.test(sous[0]));
 
   /* Les trois étapes, pas seulement la dernière : c'est l'écart entre la
      facture et le paiement qu'il vient lire. */
-  verifierVrai('le devis est daté', /devis le 04\/02\/2026/.test(sous[1]));
-  verifierVrai('la facture aussi', /facturé le 12\/03\/2026/.test(sous[1]));
+  /* La date du devis est dans la fiche, étape Devis (ligne V2, validée). */
+  verifierVrai('la facture est datée', /Facturé le 12\/03\/2026/.test(sous[1]));
   verifierVrai('et le paiement', /payé le 30\/04\/2026/.test(sous[1]));
   verifierVrai('le numéro de facture reste lisible',
     /F-2026-0016/.test(ligne.textContent));
@@ -2688,7 +2699,7 @@ scenario('Carnet : le tri se choisit, et ce qui n’a pas la date va à la fin',
   }));
   t.clic('[data-vue="carnet"]'); await t.pause(300);
   t.choisir('#c-filtre', 'tous'); await t.pause(300);
-  const noms = () => [...t.$$('#liste-chantiers .chantier-n')].map(x => x.textContent);
+  const noms = () => [...t.$$('#ch-filtre-liste .aj-txt > b')].map(x => x.textContent);
 
   t.choisir('#c-tri', 'facture'); await t.pause(300);
   /* Du plus récent d'abord : F-0002 avant F-0001. Celui sans facture ferme
@@ -2723,13 +2734,12 @@ scenario('Carnet : la date d’entrée se pose seule et se corrige', async () =>
      range les chantiers qui n'ont ni devis ni facture. */
   const t = await ouvrir(Object.assign({}, VIDE, { module: 'chantiers' }));
   t.clic('[data-vue="carnet"]'); await t.pause(300);
-  t.clic('#c-nouveau'); await t.pause(400);
+  await plusChantier(t);
   t.saisir('#ce-proprio', 'Martin');
   t.saisir('#ce-com', 'Clairbois');
   await t.pause(200);
   verifier('le nom se montre avant d’être créé', 'Martin, Clairbois',
     t.$('#ce-nom-apercu').textContent);
-  t.clic('[data-cedevis="oui"]');
   t.clic('#ce-ok'); await t.pause(700);
 
   const c = (t.stock('chantiers') || [])[0];
@@ -2762,7 +2772,7 @@ scenario('Carnet : le filtre ne garde que les chantiers qui ont eu un devis', as
   }));
   t.clic('[data-vue="carnet"]'); await t.pause(300);
   t.choisir('#c-filtre', 'avecdevis'); await t.pause(350);
-  const z = t.$('#liste-chantiers').textContent;
+  const z = t.$('#ch-filtre-liste').textContent;
   verifierVrai('celui qui a un devis est là', /Avecdevis/.test(z));
   verifierVrai('l’autre est écarté', !/Sansdevis/.test(z));
   /* Le compte du filtre ne se devine pas : il est écrit dans l'option. */
@@ -2927,8 +2937,8 @@ scenario('Fiche à compléter : ce qui manque se voit, sans jamais bloquer', asy
     C.champsManquants({ statut: 'sansuite' }));
 
   t.clic('[data-vue="carnet"]'); await t.pause(300);
-  const liste = t.$('#liste-chantiers');
-  verifier('une seule ligne est marquée', 1, liste.querySelectorAll('.acompleter').length);
+  verifier('une seule ligne est marquée', 1, t.$('#liste-chantiers').querySelectorAll('.acompleter').length);
+  const liste = t.$('#ch-filtre-liste');
   /* Et le filtre les rassemble. */
   const options = t.$$('#c-filtre option').map(o => o.value);
   verifierVrai('un filtre « à compléter » apparaît', options.indexOf('acompleter') >= 0);
@@ -2951,7 +2961,7 @@ scenario('Listes : le nom se propose en quittant le champ, pas à la validation'
     module: 'chantiers', clients: ['Cabinet Dubois'], proprios: []
   }));
   t.clic('[data-vue="carnet"]'); await t.pause(250);
-  t.clic('#c-nouveau'); await t.pause(350);
+  await plusChantier(t);
 
   const offre = t.$('#ce-donneur-offre');
   verifierVrai('l’offre existe mais reste muette', offre && !offre.textContent.trim());
@@ -2987,7 +2997,6 @@ scenario('Listes : le nom se propose en quittant le champ, pas à la validation'
   let demande = null;
   t.w.confirm = m => { demande = m; return false; };
   t.saisir('#ce-proprio', 'Vaux');
-  t.clic('[data-cedevis="oui"]');
   t.clic('#ce-ok'); await t.pause(450);
   verifier('la validation ne demande plus rien', null, demande);
   verifier('et le chantier est enregistré', 1, (t.stock('chantiers') || []).length);
@@ -3699,11 +3708,11 @@ scenario('Carnet : le numéro de facture se lit, et le tri se retourne', async (
   }));
   t.clic('[data-vue="carnet"]'); await t.pause(250);
   t.choisir('#c-filtre', 'tous'); await t.pause(300);
-  const liste = t.$('#liste-chantiers');
+  const liste = t.$('#ch-filtre-liste');
   verifierVrai('le numéro de facture est dans la ligne',
     /F-2026-011/.test(liste.textContent));
 
-  const noms = () => t.$$('#liste-chantiers .chantier-n').map(e => e.textContent);
+  const noms = () => t.$$('#ch-filtre-liste .aj-txt > b').map(e => e.textContent);
   verifier('le plus récent d’abord par défaut', 'Récent', noms()[0]);
   verifierVrai('le bouton annonce le sens', /plus récent/.test(t.texte('#c-sens')));
   t.clic('#c-sens'); await t.pause(300);
@@ -4091,8 +4100,9 @@ scenario('Notes de mise à jour : chaque lien mène au module qui porte la vue',
     t.clic('#c-notes-maj [data-notevue="' + v + '"]'); await t.pause(300);
     const section = t.$('#vue-' + v);
     verifierVrai(v + ' : la vue s’ouvre', section && section.classList.contains('actif'));
+    /* Un module d'une seule vue n'a pas de pastille : la vue ouverte suffit. */
     verifierVrai(v + ' : son module la porte en onglet',
-      !!t.$('#onglets button[data-vue="' + v + '"]'));
+      !!t.$('#onglets button[data-vue="' + v + '"]') || !t.$('#onglets button'));
   }
   verifier('aucune erreur', [], t.erreurs);
 });
@@ -4487,7 +4497,7 @@ scenario('Carnet : l’ordre est celui de la comptabilité', async () => {
 
   t.clic('[data-vue="carnet"]'); await t.pause(300);
   t.choisir('#c-filtre', 'tous'); await t.pause(350);
-  const ordre = t.$$('[data-chouvrir]').map(b => b.dataset.chouvrir);
+  const ordre = t.$$('#ch-filtre-liste [data-chouvrir]').map(b => b.dataset.chouvrir);
   verifier('du plus récent au plus ancien', ['neuf', 'devis', 'vieux'], ordre);
   verifier('aucune erreur', [], t.erreurs);
 });
@@ -4560,7 +4570,7 @@ scenario('Carnet : le numéro de facture prime sur la date', async () => {
   t.clic('[data-vue="carnet"]'); await t.pause(300);
   t.choisir('#c-filtre', 'tous'); await t.pause(350);
   verifier('la plus récente en haut, malgré la même date',
-    ['f3', 'f2', 'f1'], t.$$('[data-chouvrir]').map(b => b.dataset.chouvrir));
+    ['f3', 'f2', 'f1'], t.$$('#ch-filtre-liste [data-chouvrir]').map(b => b.dataset.chouvrir));
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -4684,7 +4694,7 @@ scenario('Carnet : les filtres dans l’ordre dicté, et ce qui reste à faire',
 
   const garde = async q => {
     t.choisir('#c-filtre', q); await t.pause(250);
-    return [...new Set(t.$$('#liste-chantiers [data-chouvrir]').map(b => b.dataset.chouvrir))].sort();
+    return [...new Set(t.$$('#ch-filtre-liste [data-chouvrir]').map(b => b.dataset.chouvrir))].sort();
   };
   verifier('« en cours ou à planifier » : le travail qui reste', ['a', 'd'], await garde('afaire'));
   verifier('« clos » : payé et sans suite', ['b', 'f'], await garde('clos'));
@@ -4734,7 +4744,7 @@ scenario('Carnet : filtrer par famille de travaux', async () => {
 
   const garde = async q => {
     t.choisir('#c-filtre', q); await t.pause(250);
-    return [...new Set(t.$$('#liste-chantiers [data-chouvrir]').map(b => b.dataset.chouvrir))].sort();
+    return [...new Set(t.$$('#ch-filtre-liste [data-chouvrir]').map(b => b.dataset.chouvrir))].sort();
   };
   verifier('la plantation : les deux qui en portent', ['m', 'p'], await garde('fam:plantation'));
   verifier('la protection gibier : celui qui mêle les deux', ['m'], await garde('fam:gibier'));
@@ -4834,7 +4844,7 @@ scenario('Bilan : une bulle d’un seul chantier ouvre sa fiche, plusieurs ouvre
   await parBarre(t, 'chantiers');
   t.choisir('#c-filtre', 'encours'); await t.pause(300);
   verifier('deux chantiers en cours : la liste filtrée sur eux', 2,
-    t.$$('#liste-chantiers [data-chouvrir]').length);
+    t.$$('#ch-filtre-liste [data-chouvrir]').length);
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -5292,7 +5302,7 @@ scenario('Création : cinq champs, et le nom qui se montre', async () => {
      par bloc sur la fiche. Il ne reste que ce qu'on sait en arrivant. */
   const t = await ouvrir(Object.assign({}, VIDE, { module: 'chantiers' }));
   t.clic('[data-vue="carnet"]'); await t.pause(250);
-  t.clic('#c-nouveau'); await t.pause(400);
+  await plusChantier(t);
   verifier('le devis n’est plus demandé à la création', null, t.$('#dv-a'));
   verifier('ni la facture', null, t.$('#ce-numfact'));
   verifier('ni le statut', null, t.$('#ce-statut'));
@@ -5315,7 +5325,6 @@ scenario('Création : cinq champs, et le nom qui se montre', async () => {
     'Dégagement manuel — Dupont, Valbrune', t.$('#ce-nom-apercu').textContent);
 
   t.saisir('#ce-donneur', 'Cabinet Dubois');
-  t.clic('[data-cedevis="oui"]');
   t.clic('#ce-ok'); await t.pause(550);
   const c = (t.stock('chantiers') || [])[0];
   /* Rien n'est stocké sous « nom » : le nom se lit, il ne s'écrit pas. */
@@ -6426,7 +6435,7 @@ scenario('Bilan : une facture récente attend, elle n’est pas impayée', async
      cours, sans alerte ; ce qui attend se chiffre dans Argent. */
   const encours = t.texte('#aj-encours');
   verifierVrai('Aujourd’hui la montre en attente, pas impayée',
-    /Facturé · à payer avant le/.test(encours) && !/impayée|échue/.test(t.texte('#vue-accueil')));
+    /Facturé le \d\d\/\d\d\/\d{4} · à payer avant le/.test(encours) && !/impayée|échue/.test(t.texte('#vue-accueil')));
   verifierVrai('avec son montant', /1 000 €/.test(encours));
   /* Facturé il y a trois jours, échéance dans vingt-sept : rien ne chauffe. */
   verifierVrai('et rien ne chauffe pour si peu', !ligneAuj(t, 'impaye:c1') &&
@@ -6435,9 +6444,8 @@ scenario('Bilan : une facture récente attend, elle n’est pas impayée', async
   verifierVrai('Argent chiffre ce qui attend',
     /1 000 €\s*en attente/.test(t.texte('#fi-corps').replace(/ /g, ' ')));
   await parBarre(t, 'chantiers');
-  const ba = t.texte('#bandeau-alertes');
-  verifierVrai('« À traiter » ne réclame rien non plus',
-    ba !== null && !/Facture impayée/.test(ba));
+  verifierVrai('« À faire maintenant » ne réclame rien non plus',
+    !t.$('[data-groupe="faire"]') && !!t.$('[data-groupe="travaux"] [data-chouvrir="c1"]'));
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -6459,7 +6467,7 @@ scenario('Bilan : passé l’échéance, la bulle chauffe et l’alerte le nomme
   verifierVrai('elle dit depuis quand', /échue depuis 12 j/.test(texteLignes(t, 'impaye:c1')));
   verifier('et dit combien sont en retard : une facture', 1,
     t.$$('#aj-retard [data-ajcle^="impaye:"]').length);
-  verifierVrai('« À traiter » le nomme', /Facture impayée/.test(t.texte('#bandeau-alertes')));
+  verifierVrai('« À faire maintenant » le nomme', /Facture échue depuis 12 j/.test(t.texte('[data-groupe="faire"]') || ''));
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -7452,7 +7460,7 @@ scenario('Carnet : « en retard » ne se dit plus d’un chantier, seulement d�
   }));
   t.clic('[data-vue="carnet"]'); await t.pause(350);
   const z = t.texte('#liste-chantiers');
-  verifierVrai('le chantier dit ce que le calcul dit', /jours passés/.test(z));
+  verifierVrai('le chantier dit ce que le calcul dit', /Dernière journée posée le/.test(z));
   verifierVrai('et plus « en retard »', !/en retard/.test(z));
 
   /* L'alerte aussi : elle annonçait « en retard depuis le Invalid Date »,
@@ -7500,14 +7508,18 @@ scenario('Carnet : la ligne porte le hors taxes, le TTC et la TVA', async () => 
   const tout = t.texte('#liste-chantiers');
   verifierVrai('les deux chantiers sont là', /Simple/.test(tout) && /Melange/.test(tout));
 
-  /* Un seul taux : il s'écrit. 1 000 € HT à 20 % font 1 200 € TTC. */
-  verifierVrai('le hors taxes reste là', /1 000 € HT/.test(tout));
-  verifierVrai('le TTC est calculé', /1 200 € TTC/.test(tout));
-  verifierVrai('le taux et la TVA sont dits', /TVA 20 % · 200 €/.test(tout));
-
-  /* Taux mêlés : afficher l'un des deux serait un mensonge. */
-  verifierVrai('les taux mêlés se disent mêlés', /TVA mêlée · /.test(tout));
-  verifierVrai('et jamais un taux inventé', !/TVA 10 % · /.test(tout));
+  /* La ligne V2 (validée) garde le hors taxes ; le TTC et la TVA taux par
+     taux sont dans la fiche, étape Devis (lot b2). */
+  verifierVrai('le hors taxes reste là', /1 000 €/.test(t.texte('[data-chouvrir="c1"] .aj-droite')));
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+  const d1 = t.texte('#f-etapes [data-etape="1"]');
+  verifierVrai('le TTC est calculé', /Total TTC ?1 200 €/.test(d1));
+  verifierVrai('le taux et la TVA sont dits', /TVA 20 %/.test(d1) && /200 €/.test(d1));
+  await parBarre(t, 'chantiers');
+  t.clic('[data-chouvrir="c2"]'); await t.pause(400);
+  /* Taux mêlés : chacun sa ligne, aucun taux inventé. */
+  const d2 = t.texte('#f-etapes [data-etape="1"]');
+  verifierVrai('les taux mêlés se disent chacun', /TVA 20 %/.test(d2) && /TVA 10 %/.test(d2));
 
   /* Le carnet et la fiche passent par le même calcul : deux copies d'un calcul
      de TVA finissent toujours par diverger, et c'est la TVA. */
@@ -7608,11 +7620,12 @@ scenario('Clients : un nom nouveau se range par type, et le SIREN suit', async (
      le formulaire — mais rien ne la reliait au nom qu'il venait de créer. */
   const t = await ouvrir(Object.assign({}, VIDE, { module: 'chantiers' }));
   t.clic('[data-vue="carnet"]'); await t.pause(250);
-  t.clic('#c-nouveau'); await t.pause(400);
+  await plusChantier(t);
 
-  /* Le mot a changé : c'est un client, pas forcément un propriétaire. */
-  verifierVrai('le champ s’appelle « Client »',
-    /Client/.test(t.$('[for="ce-proprio"]').textContent));
+  /* Le mot a changé : un client, pas forcément un propriétaire ; puis
+     « Facturé à » (tranché le 01/11). */
+  verifierVrai('le champ s’appelle « Facturé à »',
+    /Facturé à/.test(t.$('[for="ce-proprio"]').textContent));
 
   t.saisir('#ce-proprio', 'Groupement de Vaux');
   t.$('#ce-proprio').dispatchEvent(new t.w.Event('blur'));
@@ -7642,7 +7655,7 @@ scenario('Clients : un nom nouveau se range par type, et le SIREN suit', async (
     ((cfg.contacts || {})['Groupement de Vaux'] || {}).siren);
   /* La liste ne change pas de forme : ce sont toujours des noms. */
   verifier('la liste reste une liste de noms', ['Groupement de Vaux'], t.stock('proprios'));
-  verifierVrai('et le nom est bien ajouté', /ajouté à vos clients/.test(
+  verifierVrai('et le nom est bien ajouté', /ajouté à votre liste « Facturé à »/.test(
     t.$('#ce-proprio-offre').textContent));
   verifier('aucune erreur', [], t.erreurs);
 });
@@ -7658,7 +7671,7 @@ scenario('Clients : un client connu dont on ignore la réponse se la voit demand
     cfg: { contacts: { 'Cabinet gestionnaire': { type: 'gestion' }, 'Déjà répondu': { siren: false } } }
   }));
   t.clic('[data-vue="carnet"]'); await t.pause(250);
-  t.clic('#c-nouveau'); await t.pause(400);
+  await plusChantier(t);
   verifier('la case du bas a disparu', null, t.$('#ce-siren'));
 
   const quitter = async (nom) => {
@@ -8540,7 +8553,8 @@ scenario('Fiche de chantier : le téléphone du propriétaire n’est pas exigé
   verifier('un seul téléphone est réclamé', 1,
     (f.match(/Téléphoneà compléter/g) || []).length);
   verifierVrai('sans plan, le cadre du croquis est là', t.$('#modale .fv'));
-  t.clic('#modale-fermer'); await t.pause(300);
+  verifierVrai('l’aperçu se ferme', t.clic('#modale-x')); await t.pause(300);
+  verifierVrai('il est fermé', t.$('#modale').hidden);
 
   cocher(t, '#fch-plan', true); await t.pause(300);
   t.clic('#fch-voir'); await t.pause(600);
@@ -8718,7 +8732,7 @@ scenario('Chantier : le SIREN se demande une fois, sous le champ, et n’est plu
      à 20 % de TVA et le client perdait son SIREN. */
   const t = await ouvrir(Object.assign({}, VIDE, { module: 'chantiers' }));
   t.clic('[data-vue="carnet"]'); await t.pause(250);
-  t.clic('#c-nouveau'); await t.pause(450);
+  await plusChantier(t);
   t.saisir('#ce-proprio', 'Martin');
   t.$('#ce-proprio').dispatchEvent(new t.w.Event('blur'));
   await t.pause(200);
@@ -8727,7 +8741,6 @@ scenario('Chantier : le SIREN se demande une fois, sous le champ, et n’est plu
   cocher(t, '#tc-siren', true);
   t.clic('#tc-ok'); await t.pause(400);
   t.saisir('#ce-com', 'Clairbois');
-  t.clic('[data-cedevis="oui"]');
   t.clic('#ce-ok'); await t.pause(600);
   const c = (t.stock('chantiers') || [])[0];
   verifier('le chantier porte le SIREN donné sous le champ', true, c.siren);
@@ -8736,14 +8749,13 @@ scenario('Chantier : le SIREN se demande une fois, sous le champ, et n’est plu
 
   /* Le chantier suivant pour le même client ne repose rien, et reprend. */
   t.clic('[data-chretour]'); await t.pause(300);
-  t.clic('#c-nouveau'); await t.pause(450);
+  await plusChantier(t);
   t.saisir('#ce-proprio', 'Martin');
   t.$('#ce-proprio').dispatchEvent(new t.w.Event('blur'));
   await t.pause(250);
   verifier('aucune question pour un client qui a répondu', '',
     t.$('#ce-proprio-offre').textContent.trim());
   t.saisir('#ce-com', 'Montjoie');
-  t.clic('[data-cedevis="non"]');
   t.clic('#ce-ok'); await t.pause(600);
   const c2 = (t.stock('chantiers') || []).filter(x => x.commune === 'Montjoie')[0];
   verifier('le second chantier reprend la réponse', true, c2 && c2.siren);
@@ -8783,42 +8795,31 @@ scenario('Fiche : un client ajouté depuis « Le chantier » garde son SIREN', a
 scenario('Création : avec ou sans devis, et une estimation', async () => {
   /* « Je crée un chantier, je n'ai pas de devis, et je n'ai pas de statut
      adapté. » Et : « il faut que je puisse estimer rapidement le nombre de
-     jours à prévoir, ou la surface ». */
+     jours à prévoir, ou la surface ». Depuis le lot b2, la surface se tape à
+     la création ; avec ou sans devis et les journées, dans l'étape Devis. */
   const t = await ouvrir(Object.assign({}, VIDE, { module: 'chantiers' }));
-  t.clic('[data-vue="carnet"]'); await t.pause(250);
-  t.clic('#c-nouveau'); await t.pause(400);
+  await plusChantier(t);
   t.saisir('#ce-proprio', 'Martin');
   t.choisir('#ce-trav', 'DEGAG'); await t.pause(200);
-
-  /* Sans choix, rien ne se crée : c'est lui qui décide du statut. */
-  t.clic('#ce-ok'); await t.pause(400);
-  verifier('sans choix du devis, rien n’est créé', 0, (t.stock('chantiers') || []).length);
-
   verifierVrai('la surface se demande dans l’unité des travaux',
     !t.$('#ce-qte-champ').hidden && /Surface \(ha\)/.test(t.$('#ce-qte-l').textContent));
   t.saisir('#ce-qte', '2,5');
-  t.saisir('#ce-jours', '3');
-  t.clic('[data-cedevis="non"]');
-  verifier('le choix se voit', 'true', t.$('[data-cedevis="non"]').getAttribute('aria-pressed'));
   t.clic('#ce-ok'); await t.pause(600);
   const c = (t.stock('chantiers') || [])[0];
   verifierVrai('le chantier est créé', !!c);
-  verifier('sans devis, il part en « à planifier »', 'accepte', c.statut);
-  verifier('et le sait', false, c.aDevis);
-  verifier('les journées estimées sont retenues', 3, c.joursEstimes);
+  verifier('il part en « devis à envoyer », avec devis à saisir', ['devis', true], [c.statut, c.aDevis]);
   verifier('et la surface ouvre la ligne de travaux', 2.5, c.lignes[0].quantite);
+  verifier('sans journées tapées, rien n’est inventé', undefined, c.joursEstimes);
+  /* Sans devis : l'étape Devis le dit, il passe « à programmer ». */
+  t.clic('#f-sansdevis'); await t.pause(450);
+  const c2 = (t.stock('chantiers') || [])[0];
+  verifier('sans devis, il part en « à programmer »', 'accepte', c2.statut);
+  verifier('et le sait', false, c2.aDevis);
   verifierVrai('la fiche le dit « À programmer »', /À programmer/.test(t.texte('#vue-chantier')));
-
-  /* Avec devis, il part en « Devis à envoyer ». */
-  t.clic('[data-chretour]'); await t.pause(300);
-  t.clic('#c-nouveau'); await t.pause(400);
-  t.saisir('#ce-proprio', 'Dupont');
-  t.clic('[data-cedevis="oui"]');
-  t.clic('#ce-ok'); await t.pause(600);
-  const d = (t.stock('chantiers') || []).filter(x => x.proprietaire === 'Dupont')[0];
-  verifier('avec devis, il part en « devis à envoyer »', 'devis', d && d.statut);
-  verifier('et le sait aussi', true, d && d.aDevis);
-  verifier('sans journées tapées, rien n’est inventé', undefined, d && d.joursEstimes);
+  /* Les journées à prévoir : Devis ▸ Temps estimé. */
+  t.clic('#f-estim'); await t.pause(300);
+  t.saisir('#es-jest', '3'); t.clic('#es-ok'); await t.pause(450);
+  verifier('les journées estimées sont retenues', 3, (t.stock('chantiers') || [])[0].joursEstimes);
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -8970,6 +8971,38 @@ function ongletsRetires() {
   }
   return r;
 }
+/* Les pastilles renommées ou déplacées depuis l'inventaire (lot b2), lues
+   dans la table de correspondance : « | Chantiers | Carnet | Liste | » renomme,
+   « | Calendrier | Carte | Chantiers, après Liste | » déplace. */
+function changementsPastilles() {
+  const TABLE = fs.readFileSync(path.join(__dirname, '..', 'docs', 'correspondance-refonte.md'), 'utf8').split(/\r?\n/);
+  const debut = TABLE.findIndex(l => /^### Pastilles renommées ou déplacées/.test(l));
+  const out = [];
+  for (let i = debut + 1; debut >= 0 && i < TABLE.length && !/^#/.test(TABLE[i]); i++) {
+    const m = /^\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|$/.exec(TABLE[i]);
+    if (!m || m[1] === 'Module' || /^-+$/.test(m[1])) continue;
+    const d = /^(\S+), après (.+)$/.exec(m[3]);
+    out.push({ module: m[1], avant: m[2], apres: d ? m[2] : m[3], vers: d ? d[1] : null, apresDe: d ? d[2] : null });
+  }
+  return out;
+}
+/* Ce que les pastilles d'un module doivent montrer : l'inventaire, moins les
+   retraits acceptés, renommages et déplacements appliqués. Une pastille seule
+   ne s'affiche pas (l'Agenda depuis le lot b2). */
+function pastillesAttendues(m) {
+  const partis = ongletsRetires()[m.nom] || [], ch = changementsPastilles();
+  let l = [];
+  m.onglets.filter(o => partis.indexOf(o) < 0).forEach(o => {
+    const c = ch.filter(x => x.module === m.nom && x.avant === o)[0];
+    if (!c) l.push(o); else if (!c.vers) l.push(c.apres);
+  });
+  ch.filter(x => x.vers === m.nom).forEach(x => { l.splice(l.indexOf(x.apresDe) + 1, 0, x.apres); });
+  return l;
+}
+function arriveeAttendue(m) {
+  const c = changementsPastilles().filter(x => x.module === m.nom && x.avant === m.arrivee && !x.vers)[0];
+  return c ? c.apres : m.arrivee;
+}
 /* Les sous-niveaux : « - **Synthèses** (Cubage) : Synthèse · Financière… ». */
 function sousNiveauxInventaire() {
   const debut = INVENTAIRE.findIndex(l => /^### Les sous-niveaux/.test(l));
@@ -9087,15 +9120,19 @@ scenario('Cadre : chaque entrée du + ouvre le formulaire qui existait déjà', 
      garde la signature que sa fenêtre avait, relevée au lot 5a quand les deux
      portes coexistaient. */
   const ancienne = {
-    journee: '#aj-jour', depense: '#dep-nouvelle', chantier: '#c-nouveau', note: null,
+    journee: '#aj-jour', depense: '#dep-nouvelle', chantier: null, note: null,
     commande: '#cmd-nouvelle', achat: '#ach-plus', intervention: '#vh-plus', charge: '#chg-nouvelle'
   };
   const SIGNATURE_PLUS_NOTE = 'Une note à moi-même | nt-couls,nt-ok,nt-titre';
+  /* La création de chantier est devenue la feuille courte (lot b2, table
+     § 6) et son bouton de la page est parti : sa signature est écrite ici. */
+  const SIGNATURES = { note: SIGNATURE_PLUS_NOTE, chantier: 'Nouveau chantier | ce-com,ce-date-changer,ce-date-z,' +
+    'ce-donneur,ce-donneur-offre,ce-foret,ce-nom-apercu,ce-note,ce-ok,ce-proprio,ce-proprio-offre,ce-qte,ce-qte-champ,ce-qte-l,ce-trav' };
   verifier('le « + note » de Mon entreprise est bien parti', null, t.$('#ent-note-plus'));
   for (const cle of Object.keys(ancienne)) {
     /* La porte du véhicule n'est dessinée qu'à l'ouverture de son carnet. */
     if (cle === 'intervention') await parMenu(t, 'vehicule');
-    let avant = SIGNATURE_PLUS_NOTE;
+    let avant = SIGNATURES[cle];
     if (ancienne[cle]) {
       verifierVrai(cle + ' : l’ancienne porte est toujours là', t.clic(ancienne[cle]));
       await t.pause(300);
@@ -9166,17 +9203,17 @@ scenario('Cadre : les pastilles reprennent les onglets de l’inventaire', async
   const t = await ouvrir(VIDE);
   for (const m of mods) {
     verifierVrai(m.nom + ' : joignable par la barre ou le ☰', await allerAuModule(t, m.nom));
-    const partis = ongletsRetires()[m.nom] || [];
+    const partis = ongletsRetires()[m.nom] || [], att = pastillesAttendues(m), seule = att.length < 2;
     verifier(m.nom + ' : mêmes pastilles, même ordre' + (partis.length ? ' (moins ' + partis.join(', ') + ', retrait accepté)' : ''),
-      m.onglets.filter(o => partis.indexOf(o) < 0), pastilles(t));
-    verifier(m.nom + ' : même arrivée', [m.arrivee], pastilleOuverte(t));
+      seule ? [] : att, pastilles(t));
+    verifier(m.nom + ' : même arrivée', seule ? [] : [arriveeAttendue(m)], pastilleOuverte(t));
     /* Aucune mémoire de la dernière pastille, comme avant : on repart de
        l'arrivée. */
     const autre = t.$$('#onglets button').filter(b => b.getAttribute('aria-selected') !== 'true')[0];
     if (autre) { autre.click(); await t.pause(200); }
     await parBarre(t, 'aujourdhui');
     await allerAuModule(t, m.nom);
-    verifier(m.nom + ' : au retour, de nouveau l’arrivée', [m.arrivee], pastilleOuverte(t));
+    verifier(m.nom + ' : au retour, de nouveau l’arrivée', seule ? [] : [arriveeAttendue(m)], pastilleOuverte(t));
     await parBarre(t, 'aujourdhui');
   }
   verifier('aucune erreur', [], t.erreurs);
@@ -9209,7 +9246,11 @@ scenario('Cadre : rien de l’inventaire des écrans ne s’est perdu', async ()
       const ailleurs = mods.filter(x => x.nom !== m.nom && x.onglets.indexOf(o) >= 0).map(x => x.nom);
       verifierVrai(m.nom + ' ▸ ' + o + ' : retrait accepté, la fonction reste dans ' + ailleurs.join(', '), ailleurs.length);
     }
-    for (const o of m.onglets.filter(x => partis.indexOf(x) < 0)) {
+    /* Une pastille partie dans un autre module y est cherchée sous son nom. */
+    for (const c of changementsPastilles().filter(x => x.module === m.nom && x.vers)) {
+      verifierVrai(m.nom + ' ▸ ' + c.avant + ' : passée dans ' + c.vers, pastillesAttendues(mods.filter(x => x.nom === c.vers)[0]).indexOf(c.avant) >= 0);
+    }
+    for (const o of pastillesAttendues(m).filter(x => pastillesAttendues(m).length > 1)) {
       const b = t.$$('#onglets button').filter(x => x.textContent.trim() === o)[0];
       if (!b) { verifierVrai(m.nom + ' ▸ ' + o + ' : pastille présente', false); continue; }
       b.click(); await t.pause(200);
@@ -9472,7 +9513,9 @@ scenario('Aujourd’hui : « Devis à faire » remplace « Repérage à faire »
     lignesAuj(t, 'devisafaire:').map(l => l.dataset.ajcle));
   verifierVrai('l’annonce en petit', /annoncé aujourd’hui/.test(texteLignes(t, 'devisafaire:c2')) &&
     /annoncé il y a 6 j/.test(texteLignes(t, 'devisafaire:c1')));
-  verifierVrai('pas de « Repérage à faire »', !/Repérage|repéré/i.test(t.texte('#vue-accueil')));
+  /* Le repérage se dit en petit depuis le lot b2, jamais en ligne à lui. */
+  verifierVrai('pas de « Repérage à faire »', !/Repérage/i.test(t.texte('#vue-accueil')) &&
+    /pas encore repéré/.test(texteLignes(t, 'devisafaire:c2')));
   verifierVrai('un devis déjà envoyé n’est plus « à faire »', !ligneAuj(t, 'devisafaire:c3'));
   verifier('aucune erreur', [], t.erreurs);
 });
@@ -9545,7 +9588,7 @@ scenario('Pictogrammes : une notion, un dessin', async () => {
   /* Tranché le 31/10 : Aujourd'hui = ☀, Ma journée = horloge, Chantiers =
      carnet, Carte = épingle. Le ☀ du bouton « Enregistrer ma journée » et
      l'épingle de la tuile Chantiers faisaient doublon : ils sont partis. */
-  const t = await ouvrir(Object.assign({}, VIDE, { module: 'calendrier' }));
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'chantiers' }));
   const dessin = s => { const e = t.$(s); return e ? e.innerHTML : null; };
   const soleil = dessin('#barre [data-barre="aujourdhui"] svg');
   const carnet = dessin('#barre [data-barre="chantiers"] svg');
@@ -9558,7 +9601,8 @@ scenario('Pictogrammes : une notion, un dessin', async () => {
   verifier('+ ▸ Ma journée : la même horloge', dessin('#aj-jour svg'), horloge);
   verifierVrai('qui n’est pas le soleil', horloge !== soleil);
   verifier('+ ▸ Chantier : le carnet de la barre', carnet, chantier);
-  await parBarre(t, 'agenda');
+  /* La carte est une pastille de Chantiers depuis le lot b2. */
+  await parBarre(t, 'chantiers');
   const epingle = dessin('#onglets [data-vue="carte"] svg');
   verifierVrai('la Carte : l’épingle', /M12 20.6/.test(epingle || ''));
   verifierVrai('qui n’est plus celle de Chantiers', epingle !== carnet);
@@ -9699,8 +9743,8 @@ scenario('Facture à faire : dès le lendemain de « Terminé », pas le jour m�
   verifierVrai('mais pas celle du jour même', !ligneAuj(t, 'afacturer:c1'));
   /* Les deux écrans disent la même chose : le carnet l'a dans « À traiter ». */
   await parBarre(t, 'chantiers'); t.clic('[data-vue="carnet"]'); await t.pause(300);
-  const at = t.texte('#bandeau-alertes');
-  verifierVrai('« À traiter » du carnet nomme Hier', /Hier/.test(at));
+  const at = t.texte('[data-groupe="faire"]') || '';
+  verifierVrai('« À faire maintenant » nomme Hier', /Hier/.test(at));
   verifierVrai('et ne nomme pas Ce matin', !/Ce matin/.test(at));
   verifier('aucune erreur', [], t.erreurs);
 });
@@ -9727,9 +9771,10 @@ scenario('Argent ▸ Bilan : « à facturer » dit combien, et mène au carnet f
   t.clic('#fi-afacturer'); await t.pause(450);
   verifier('un appui ouvre le carnet', 'vue-carnet', vueActive(t));
   verifier('filtré sur les chantiers terminés', 'termine', t.$('#c-filtre').value);
+  verifierVrai('le filtre est déplié', t.$('#ch-filtre-bloc').open);
   verifier('les trois, et eux seuls', ['Marchand', 'Sans ligne', 'Vaux'],
     ['Vaux', 'Marchand', 'Sans ligne', 'Déjà parti', 'Encore à faire']
-      .filter(n => new RegExp(n).test(t.texte('#liste-chantiers'))).sort());
+      .filter(n => new RegExp(n).test(t.texte('#ch-filtre-liste'))).sort());
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -10369,8 +10414,8 @@ function preuvesB1() {
       t.clic('[data-chouvrir="e"]'); await t.pause(400);
       tout = await sur('Chantiers ▸ Ouvrir', 'Émile', '1') && tout;
       await parBarre(t, 'chantiers');
-      if (t.$('[data-alerte="c"]')) { t.clic('[data-alerte="c"]'); await t.pause(400);
-        tout = await sur('Chantiers ▸ À traiter', 'Charles', '4') && tout; }
+      tout = t.clic('[data-groupe="faire"] [data-chouvrir="c"]') && tout; await t.pause(400);
+      tout = await sur('Chantiers ▸ À faire maintenant', 'Charles', '4') && tout;
       return tout && t.erreurs.length === 0; }
   };
   return P;
@@ -10489,6 +10534,10 @@ scenario('Largeur : les rangées qui défilent de côté sont bornées à l’é
   ['.ruban', '.tab-boite', '.sous-onglets'].forEach(sel => {
     verifierVrai(sel + ' défile dans son bloc', /overflow-x:auto/.test(regle(sel)));
   });
+  /* La mesure dans Chrome l'a trouvé au lot b2 : un risque d'une phrase,
+     sans retour à la ligne, élargissait la Fiche sécurité à 366 px. */
+  verifierVrai('les risques de la Fiche sécurité reviennent à la ligne',
+    /white-space:normal/.test(regle('#fch-corps .chip')) && /max-width:100%/.test(regle('#fch-corps .chip')));
   verifierVrai('la barre du bas est collée à l’écran, pas à la page', /\.barre\{[^}]*position:fixed[^}]*left:0;right:0;bottom:0/.test(html));
 });
 
@@ -10520,6 +10569,449 @@ scenario('Largeur : la pastille ouverte est amenée en vue dans la rangée', asy
   verifier('la rangée a défilé pour la centrer', 270, t.$('#onglets').scrollLeft);
   t.clic('#onglets [data-vue="finances"]'); await t.pause(200);
   verifier('de retour sur Bilan, la rangée revient au début', 0, t.$('#onglets').scrollLeft);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* ===================================================== lot b2 (4.91.0)
+   La liste Chantiers, la création courte, la Fiche sécurité. Un carnet où
+   chaque statut est représenté, et chaque alerte de l'ancien « À traiter ». */
+const B2 = () => ({
+  module: 'chantiers', cfg: { heuresJour: 8, journeesMigrees: true },
+  clients: ['Cabinet Dubois', 'ONF'], proprios: ['Martin'],
+  chantiers: [
+    /* Deux devis à faire, l'un repéré ; un devis envoyé. */
+    { id: 'dv', statut: 'devis', aDevis: true, maj: Date.now(), dateEntree: JCAL(-3),
+      donneur: 'Cabinet Dubois', proprietaire: 'Martin', commune: 'Clairbois', temps: [], jours: [],
+      lignes: [{ travail: 'PLANT', unite: 'plant', quantite: 800, prix: 1.1, nature: 'prestation' }] },
+    { id: 'dr', statut: 'devis', aDevis: true, maj: Date.now(), dateEntree: JCAL(-9), dateReperage: JCAL(-2),
+      donneur: 'ONF', proprietaire: 'Roux', commune: 'Lizon', temps: [], jours: [], lignes: [] },
+    { id: 'en', statut: 'envoye', aDevis: true, maj: Date.now(), dateEntree: JCAL(-20), dateEnvoi: JCAL(-6),
+      donneur: 'ONF', proprietaire: 'Émile', commune: 'Amancey', numeroDevis: 'D-2026-0007', temps: [], jours: [],
+      lignes: [{ travail: 'REGARNI', unite: 'plant', quantite: 500, prix: 1.5, nature: 'prestation' }] },
+    /* À programmer : avec devis signé, et sans devis. */
+    { id: 'ac', statut: 'accepte', aDevis: true, maj: Date.now(), dateEntree: JCAL(-25), dateSignature: JCAL(-4),
+      donneur: 'ONF', proprietaire: 'Hugo', commune: 'Nans', joursEstimes: 2, temps: [], jours: [],
+      lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 1, prix: 750, nature: 'prestation' }] },
+    { id: 'sd', statut: 'accepte', aDevis: false, maj: Date.now(), dateEntree: JCAL(-5),
+      donneur: 'ONF', proprietaire: 'Gaston', commune: 'Mouthier', temps: [], jours: [],
+      lignes: [{ travail: 'ELAG', unite: 'ha', quantite: 1, prix: 800, nature: 'prestation' }] },
+    /* En cours, avec des jours à venir ; ses risques servent à « Déjà connu ici ». */
+    { id: 'ec', statut: 'encours', aDevis: true, maj: Date.now(), dateEntree: JCAL(-30), joursEstimes: 3,
+      donneur: 'Cabinet Dubois', proprietaire: 'Paul', commune: 'Ornans', foret: 'Bois Joli', temps: [],
+      jours: [{ d: JCAL(4), p: 1 }, { d: JCAL(5), p: 1 }, { d: JCAL(6), p: 1 }],
+      fiche: { risques: [1, 9] },
+      lignes: [{ travail: 'PLANT', unite: 'plant', quantite: 1000, prix: 1.2, nature: 'prestation' }] },
+    /* En cours, cinq hectares, même forêt : la fiche sécurité est obligatoire. */
+    { id: 'gr', statut: 'encours', aDevis: true, maj: Date.now(), dateEntree: JCAL(-35),
+      donneur: 'ONF', proprietaire: 'Gilles', commune: 'Ornans', foret: 'Bois Joli', temps: [], jours: [],
+      lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 5, prix: 700, nature: 'prestation' }] },
+    /* En retard : sa seule journée posée est passée, rien à placer de plus. */
+    { id: 'rt', statut: 'encours', aDevis: true, maj: Date.now(), dateEntree: JCAL(-40), joursEstimes: 1,
+      donneur: 'ONF', proprietaire: 'Rémi', commune: 'Vuillafans', temps: [], jours: [{ d: JCAL(-3), p: 1 }],
+      lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 1, prix: 700, nature: 'prestation' }] },
+    /* Terminé il y a cinq jours (à facturer), et terminé aujourd'hui. */
+    { id: 'tf', statut: 'termine', aDevis: true, maj: Date.now(), dateEntree: JCAL(-50), dateFin: JCAL(-5),
+      donneur: 'ONF', proprietaire: 'Bernard', commune: 'Valbrune', temps: [], jours: [],
+      lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 2, prix: 700, nature: 'prestation' }] },
+    { id: 'tn', statut: 'termine', aDevis: true, maj: Date.now(), dateEntree: JCAL(-50), dateFin: Date.now(),
+      donneur: 'ONF', proprietaire: 'Thomas', commune: 'Lods', temps: [], jours: [],
+      lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 1, prix: 700, nature: 'prestation' }] },
+    /* Facturés : l'un échu, l'autre pas encore. */
+    { id: 'fi', statut: 'facture', aDevis: true, maj: Date.now(), dateEntree: JCAL(-90),
+      donneur: 'ONF', proprietaire: 'Charles', commune: 'Lizon', numeroFacture: 'F-2026-0010',
+      dateFacture: JCAL(-40), echeancePaiement: JCAL(-10), temps: [], jours: [],
+      lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 2, prix: 600, nature: 'prestation' }] },
+    { id: 'fa', statut: 'facture', aDevis: true, maj: Date.now(), dateEntree: JCAL(-60),
+      donneur: 'ONF', proprietaire: 'Félix', commune: 'Ornans', numeroFacture: 'F-2026-0011',
+      dateFacture: JCAL(-3), echeancePaiement: JCAL(27), temps: [], jours: [],
+      lignes: [{ travail: 'NETT', unite: 'ha', quantite: 1, prix: 900, nature: 'prestation' }] },
+    /* Payés : un récent, deux plus anciens de montants et de donneurs différents. */
+    { id: 'pr', statut: 'paye', aDevis: false, maj: Date.now(), dateEntree: JCAL(-80),
+      donneur: 'Forêts et Gestion', proprietaire: 'Denis', commune: 'Mouthe', numeroFacture: 'F-2026-0012',
+      dateFacture: JCAL(-20), datePaiement: JCAL(-5), temps: [], jours: [],
+      lignes: [{ travail: 'NETT', unite: 'ha', quantite: 1, prix: 3000, nature: 'prestation' }] },
+    { id: 'p1', statut: 'paye', aDevis: false, maj: Date.now(), dateEntree: JCAL(-300),
+      donneur: 'Zébulon', proprietaire: 'Yves', commune: 'Septmoncel', numeroFacture: 'F-2025-0040',
+      dateFacture: JCAL(-120), datePaiement: JCAL(-100), temps: [], jours: [],
+      lignes: [{ travail: 'NETT', unite: 'ha', quantite: 1, prix: 500, nature: 'prestation' }] },
+    { id: 'p2', statut: 'paye', aDevis: false, maj: Date.now(), dateEntree: JCAL(-400),
+      donneur: 'Albert', proprietaire: 'Xavier', commune: 'Bief', numeroFacture: 'F-2025-0030',
+      dateFacture: JCAL(-220), datePaiement: JCAL(-200), temps: [], jours: [],
+      lignes: [{ travail: 'NETT', unite: 'ha', quantite: 1, prix: 2000, nature: 'prestation' }] },
+    { id: 'ss', statut: 'sansuite', aDevis: true, maj: Date.now(), dateEntree: JCAL(-70),
+      donneur: 'ONF', proprietaire: 'Sylvain', commune: 'Lods', temps: [], jours: [], lignes: [] }
+  ]
+});
+/* Ce que chaque groupe doit porter, dans cet ordre (le plus urgent en haut). */
+const GROUPES_B2 = {
+  faire: ['fi', 'tf', 'rt'], travaux: ['tn', 'ec', 'gr', 'ac', 'sd', 'fa'],
+  devis: ['dr', 'dv', 'en'], payes: ['pr']
+};
+const groupeB2 = (t, g) => t.$$('#liste-chantiers [data-groupe="' + g + '"] [data-chouvrir]').map(b => b.dataset.chouvrir);
+const pliB2 = (t, p) => t.$('#liste-chantiers [data-pli="' + p + '"]');
+const idsPliB2 = (t, p) => { const d = pliB2(t, p); return d ? [...d.querySelectorAll('[data-chouvrir]')].map(b => b.dataset.chouvrir) : []; };
+const situB2 = (t, id) => { const b = t.$('#liste-chantiers [data-chouvrir="' + id + '"] .aj-situ'); return b ? b.textContent : ''; };
+const chB2 = (t, id) => (t.stock('chantiers') || []).filter(c => c.id === id)[0] || {};
+async function listeB2(t) {
+  t = t || await ouvrir(Object.assign({}, VIDE, B2()));
+  await parBarre(t, 'chantiers');
+  return t;
+}
+async function plusChantier(t) {
+  await parBarre(t, 'plus');
+  t.clic('#modale [data-plus="chantier"]'); await t.pause(300);
+}
+
+/* Les lignes « Ancien » des sections 3.1 et 3.3, lues dans la table de
+   correspondance : chacune a ici sa preuve, jouée sur la nouvelle liste ou la
+   Fiche sécurité. Une ligne sans preuve, ou une preuve sans ligne, crie. */
+const lignesTableB2 = () => {
+  const l = fs.readFileSync(path.join(__dirname, '..', 'docs', 'correspondance-refonte.md'), 'utf8').split(/\r?\n/);
+  const out = []; let dedans = false, entete = false;
+  l.forEach(x => {
+    if (/^### 3\.[13] /.test(x)) { dedans = true; entete = true; return; }
+    if (/^##/.test(x)) { dedans = false; return; }
+    if (dedans && /^\| /.test(x)) {
+      if (entete) { entete = false; return; }
+      out.push(x.split('|')[1].trim());
+    }
+  });
+  return out;
+};
+function preuvesB2() {
+  let tL = null;
+  const voir = async () => { if (!tL) tL = await ouvrir(Object.assign({}, VIDE, B2())); return listeB2(tL); };
+  const neuf = async () => listeB2();
+  const fermer = async t => { t.clic('#modale-x'); await t.pause(150); };
+  return {
+    'Accès : Mon entreprise ▸ Chantiers, ou onglet Carnet du Calendrier': async () => { const t = await voir();
+      const ok = vueActive(t) === 'vue-carnet' && pastilles(t)[0] === 'Liste';
+      await parBarre(t, 'agenda');
+      return ok && !t.$('#onglets [data-vue="carnet"]'); },
+    '« À traiter (N) » (journées passées, à facturer, facture impayée)': async () => { const t = await voir();
+      const ok = groupeB2(t, 'faire').join() === GROUPES_B2.faire.join() &&
+        t.texte('[data-groupe="faire"] .aj-compte') === '3' &&
+        /^Facture échue depuis 10 j · n° F-2026-0010$/.test(situB2(t, 'fi')) &&
+        /^Terminé il y a 5 j, à facturer$/.test(situB2(t, 'tf')) &&
+        /^(Dernière journée posée le .*|Toutes les journées posées sont passées), chantier pas encore terminé$/.test(situB2(t, 'rt')) &&
+        !t.$('#bandeau-alertes');
+      await parBarre(t, 'aujourdhui');
+      return ok && !!ligneAuj(t, 'impaye:fi') && !!ligneAuj(t, 'afacturer:tf'); },
+    'Bouton « Nouveau chantier »': async () => { const t = await voir();
+      if (t.$('#c-nouveau')) return false;
+      await plusChantier(t);
+      const ok = t.texte('#modale-titre') === 'Nouveau chantier'; await fermer(t); return ok; },
+    'Carte Carnet : facturé, encaissé, devis signés, premier donneur d\'ordre (tout l\'historique)': async () => {
+      const t = await voir(), d = t.$('#ch-cumuls'), k = sansBlancs(t.texte('#ch-cumuls'));
+      return !!d && !d.open && t.$$('#ch-cumuls .carte2').length === 4 && /7600€facturé·5factures/.test(k) &&
+        /5500€encaissé/.test(k) && /2devissignés·1550€/.test(k) && /3000€ForêtsetGestion·39%/.test(k); },
+    'Ligne de comptes : ouverts, jours-homme cumulés, à facturer, jours passés': async () => { const t = await voir();
+      const k = t.texte('#ch-cumuls');
+      return /12 chantiers ouverts/.test(k) && /jours-homme cumulés/.test(k) && /2 à facturer/.test(k) &&
+        /1 aux jours passés/.test(k) && t.texte('[data-groupe="travaux"] .aj-compte') === '6'; },
+    'Recherche (nom, donneur d\'ordre, commune, n° de facture)': async () => { const t = await voir();
+      const trouve = async q => { t.saisir('#c-rech', q); await t.pause(150);
+        return t.$$('#ch-trouves [data-chouvrir]').map(b => b.dataset.chouvrir).join(); };
+      const ok = await trouve('emile') === 'en' && await trouve('Forêts et Gestion') === 'pr' &&
+        await trouve('septmoncel') === 'p1' && await trouve('F-2025-0030') === 'p2' && !t.$('[data-groupe]');
+      t.saisir('#c-rech', ''); await t.pause(150);
+      return ok && !!t.$('[data-groupe="faire"]'); },
+    'Filtre par statut': async () => { const t = await voir();
+      const groupes = Object.keys(GROUPES_B2).every(g => groupeB2(t, g).join() === GROUPES_B2[g].join());
+      const plis = idsPliB2(t, 'anciens').sort().join() === 'p1,p2' && idsPliB2(t, 'sansuite').join() === 'ss' &&
+        !pliB2(t, 'sansuite').open && !t.$('[data-groupe="sansuite"]') &&
+        t.$('#liste-chantiers > :last-child') === pliB2(t, 'sansuite');
+      /* L'ancien filtre, replié en bas : familles, statuts, « à compléter ». */
+      t.choisir('#c-filtre', 'sansuite'); await t.pause(150);
+      const filtre = t.$$('#ch-filtre-liste [data-chouvrir]').map(b => b.dataset.chouvrir).join() === 'ss' &&
+        t.$$('#c-filtre optgroup').map(g => g.label).join() === 'Ouverts,Clos,Familles de travaux';
+      t.choisir('#c-filtre', 'ouverts'); await t.pause(100);
+      return groupes && plis && filtre; },
+    'Où va « Devis signé, à programmer » (et « À programmer » sans devis)': async () => { const t = await voir();
+      return groupeB2(t, 'travaux').indexOf('ac') >= 0 && groupeB2(t, 'travaux').indexOf('sd') >= 0 &&
+        /^Signé · à programmer · 2 journées à placer$/.test(situB2(t, 'ac')) &&
+        /^Sans devis · à programmer$/.test(situB2(t, 'sd')); },
+    'Tri et sens du tri': async () => { const t = await neuf();
+      const ordre = () => idsPliB2(t, 'anciens').join();
+      const opts = t.$$('#c-tri option').map(o => o.value).join();
+      if (opts !== 'auto,facture,datefacture,paiement,devis,entree,montant,donneur') return false;
+      t.choisir('#c-tri', 'montant'); await t.pause(150);
+      const gros = ordre() === 'p2,p1' && /plus gros d’abord/.test(t.texte('#c-sens'));
+      t.clic('#c-sens'); await t.pause(150);
+      const petit = ordre() === 'p1,p2' && /plus petit d’abord/.test(t.texte('#c-sens'));
+      t.choisir('#c-tri', 'donneur'); await t.pause(150);
+      const za = ordre() === 'p1,p2' && t.texte('#c-sens') === 'Z → A';
+      t.clic('#c-sens'); await t.pause(150);
+      const az = ordre() === 'p2,p1' && t.texte('#c-sens') === 'A → Z';
+      t.choisir('#c-tri', 'paiement'); await t.pause(150);
+      const date = ordre() === 'p1,p2' && /plus récent d’abord/.test(t.texte('#c-sens'));
+      /* Les groupes du haut gardent leur ordre fixe, quel que soit le tri. */
+      return gros && petit && za && az && date && groupeB2(t, 'faire').join() === GROUPES_B2.faire.join(); },
+    'Ligne : nom, donneur, dates, badge de statut, n° de facture, montants HT / TTC / TVA': async () => {
+      const t = await voir(), b = t.$('[data-groupe="payes"] [data-chouvrir="pr"]');
+      return !!b && !!b.querySelector('.aj-txt b').textContent &&
+        b.querySelector('.aj-txt small').textContent === 'Mouthe · Forêts et Gestion' &&
+        /^Facturé le \S+ · payé le \S+ · n° F-2026-0012$/.test(situB2(t, 'pr')) &&
+        sansBlancs(b.querySelector('.aj-droite b').textContent) === '3000€' &&
+        b.querySelectorAll('.aj-points i').length === 5 && b.querySelectorAll('.aj-points i.f').length === 5; },
+    'Ligne ▸ Ouvrir': async () => { const t = await neuf();
+      t.clic('[data-groupe="faire"] [data-chouvrir="fi"]'); await t.pause(400);
+      const impaye = vueActive(t) === 'vue-chantier' && ouvertesB1(t).join() === '4';
+      await parBarre(t, 'chantiers');
+      t.clic('[data-groupe="devis"] [data-chouvrir="en"]'); await t.pause(400);
+      return impaye && ouvertesB1(t).join() === '1' && /Facturé à : Émile/.test(t.texte('#f-bloc-chantier')); },
+    'Ligne ▸ Temps': async () => { const t = await voir();
+      if (t.$('[data-chtemps]')) return false;
+      await parBarre(t, 'plus'); const ok = !!t.$('#modale [data-plus="journee"]'); await fermer(t); return ok; },
+    'Ligne ▸ Statut': async () => { const t = await neuf();
+      if (t.$('[data-chstatut]')) return false;
+      t.clic('[data-chouvrir="ac"]'); await t.pause(400);
+      t.clic('#f-statut'); await t.pause(300); t.clic('[data-setstatut="encours"]'); await t.pause(400);
+      return chB2(t, 'ac').statut === 'encours'; },
+    'Calendrier ▸ onglet Carte (recherche de commune, Ma position, − / + / Tout voir, Poser un chantier, fonds de carte, liste)': async () => {
+      const t = await neuf();
+      t.clic('#onglets [data-vue="carte"]'); await t.pause(400);
+      const tout = vueActive(t) === 'vue-carte' && ['#carte-rech', '#carte-chercher', '#carte-ici', '#carte-moins',
+        '#carte-plus', '#carte-tout', '#carte-poser', '#carte-fonds', '#carte-liste', '#carte-plan'].every(s => t.$(s));
+      t.clic('#carte-poser'); await t.pause(300);
+      t.choisir('#pc-ch', 'dv'); t.clic('#pc-ok'); await t.pause(300);
+      const poser = /Appuyez sur la carte/.test(t.$('#carte-aide').textContent);
+      t.clic('#onglets [data-vue="carnet"]'); await t.pause(300);
+      const retour = vueActive(t) === 'vue-carnet';
+      await parBarre(t, 'agenda');
+      return tout && poser && retour && !t.$('#onglets [data-vue="carte"]'); },
+    'Onglet « Fiche de chantier », bouton de la fiche': async () => { const t = await neuf();
+      const p = t.$('#onglets [data-vue="fichech"]');
+      if (!p || p.textContent.trim() !== 'Fiche sécurité') return false;
+      p.click(); await t.pause(350);
+      const onglet = vueActive(t) === 'vue-fichech' && t.texte('#b-ecran') === 'Fiche sécurité';
+      await parBarre(t, 'chantiers');
+      t.clic('[data-chouvrir="dv"]'); await t.pause(400);
+      t.clic('#f-fichech'); await t.pause(400);
+      const tuile = vueActive(t) === 'vue-fichech' && /Fiche/.test(t.texte('#b-retour'));
+      return onglet && tuile && !/Fiche de chantier/.test(t.texte('#onglets') + t.texte('#b-ecran') + t.texte('#vue-fichech')); },
+    'Choix du filtre et du chantier': async () => { const t = await neuf();
+      t.clic('#onglets [data-vue="fichech"]'); await t.pause(350);
+      const ouverts = t.$$('#fch-ch option').map(o => o.value);
+      t.choisir('#fch-filtre', 'tous'); await t.pause(300);
+      const tous = t.$$('#fch-ch option').map(o => o.value);
+      t.choisir('#fch-ch', 'ec'); await t.pause(400);
+      return ouverts.indexOf('p1') < 0 && tous.indexOf('p1') >= 0 && /Paul/.test(t.texte('#fch-corps')); },
+    'Alerte « fiche obligatoire » (plus de 4 ha), « Il manque » + Compléter le chantier, Qui / où / quoi, Période d\'intervention, « Déjà connu ici » + Reprendre ses risques, familles de risques, Secours (accès, réseau, « Sa position, je suis dessus »), Co-activité et croquis, Aperçu, Imprimer / PDF': async () => {
+      const t = await neuf();
+      t.clic('#onglets [data-vue="fichech"]'); await t.pause(350);
+      t.choisir('#fch-ch', 'gr'); await t.pause(400);
+      const x = t.texte('#fch-corps');
+      const blocs = /Fiche obligatoire/.test(x) && /Il manque/.test(x) && !!t.$('#fch-identite') &&
+        /Qui, où, quoi/.test(x) && /Facturé à/.test(x) && !!t.$('#fch-debut') && !!t.$('#fch-fin') &&
+        /Déjà connu ici/.test(x) && !!t.$('#fch-reprendre') && t.$$('[data-fchr]').length > 10 &&
+        !!t.$('#fch-acces') && t.$$('[data-fchres]').length > 1 && !!t.$('#fch-ici') &&
+        /Co-activité et croquis/.test(x) && !!t.$('#fch-coact') && !!t.$('#fch-plan');
+      t.clic('#fch-voir'); await t.pause(500);
+      const apercu = !t.$('#modale').hidden && /Propriétaire et donneur d’ordre/.test(t.texte('#modale'));
+      await fermer(t);
+      let imprime = '';
+      t.w.print = () => { imprime = t.texte('#vue-impression') || ''; };
+      t.clic('#fch-imprimer'); await t.pause(500);
+      return blocs && apercu && /Fiche de chantier/.test(imprime) && /Gilles/.test(imprime); },
+    'Rappel « à préparer avant les travaux »': async () => { const t = await neuf();
+      t.clic('[data-chouvrir="gr"]'); await t.pause(400);
+      const gros = /obligatoire, plus de 4 ha/.test(t.texte('#f-fichech'));
+      await parBarre(t, 'chantiers'); t.clic('[data-chouvrir="dv"]'); await t.pause(400);
+      return gros && /à préparer avant les travaux/.test(t.texte('#f-fichech')); }
+  };
+}
+for (const moitie of [0, 1]) {
+  scenario('Liste Chantiers : rien du carnet ni de la Fiche de chantier ne s’est perdu (lot b2, ' + (moitie + 1) + '/2)', async () => {
+    const lignes = lignesTableB2(), P = preuvesB2(), cles = Object.keys(P);
+    if (moitie === 0) verifier('les tables 3.1 et 3.3 citent les lignes, chacune avec sa preuve', cles, lignes);
+    const n = Math.ceil(lignes.length / 2);
+    for (const l of lignes.slice(moitie * n, (moitie + 1) * n)) {
+      const p = P[l];
+      let ok = false;
+      try { ok = !!(p && await p()); } catch (e) { console.log('        ' + e.message); }
+      verifierVrai('« ' + l.slice(0, 70) + ' » : retrouvé, même effet', ok);
+    }
+  });
+}
+
+/* --------------------------------------------------------------------- */
+scenario('Liste Chantiers : chaque statut dans son groupe, ordre fixe (lot b2)', async () => {
+  /* La règle des groupes, lue sur la logique seule puis à l'écran : aucun
+     chantier ne se perd entre deux groupes, aucun n'est dans deux. */
+  const t = await ouvrir(Object.assign({}, VIDE, B2()));
+  const C = t.w.BCC, g = C.groupesChantiers(t.stock('chantiers'), {}, Date.now());
+  const ids = l => l.map(c => c.id).join();
+  for (const k of Object.keys(GROUPES_B2)) verifier('groupe « ' + k + ' »', GROUPES_B2[k].join(), ids(g[k]));
+  verifier('les payés anciens', 'p1,p2', ids(g.anciens).split(',').sort().join());
+  verifier('sans suite', 'ss', ids(g.sansuite));
+  const tous = [].concat(g.faire, g.travaux, g.devis, g.payes, g.anciens, g.sansuite).map(c => c.id).sort();
+  verifier('chaque chantier dans un groupe, un seul', t.stock('chantiers').map(c => c.id).sort(), tous);
+  /* Payé il y a 31 jours : plus « récent ». Il y a 29 : encore. */
+  const p = id => t.stock('chantiers').filter(c => c.id === id)[0];
+  const essai = j => C.groupesChantiers([Object.assign({}, p('pr'), { datePaiement: JCAL(-j) })], {}, Date.now());
+  verifier('payé il y a 29 jours : récent', 1, essai(29).payes.length);
+  verifier('payé il y a 31 jours : plus ancien', 1, essai(31).anciens.length);
+  await listeB2(t);
+  verifier('à l’écran, les quatre groupes dans l’ordre de la maquette', 'faire,travaux,devis,payes',
+    t.$$('#liste-chantiers [data-groupe]').map(s => s.dataset.groupe).join());
+  verifier('leurs titres', ['À faire maintenant 3', 'En travaux 6', 'Devis 3', 'Payés récemment 1'],
+    t.$$('#liste-chantiers [data-groupe] h2').map(h => h.textContent.replace(/\s+/g, ' ').trim()));
+  verifier('puis les plis, Sans suite en dernier', ['Voir les payés plus anciens 2', 'Sans suite 1'],
+    t.$$('#liste-chantiers > details summary').map(s => s.textContent.replace(/\s+/g, ' ').trim()));
+  verifierVrai('repliés', t.$$('#liste-chantiers > details').every(d => !d.open));
+  /* Un pli ouvert le reste quand la liste se redessine. */
+  const d = pliB2(t, 'sansuite'); d.open = true; d.dispatchEvent(new t.w.Event('toggle'));
+  t.saisir('#c-rech', 'x'); t.saisir('#c-rech', ''); await t.pause(150);
+  verifierVrai('Sans suite reste ouvert après un nouveau dessin', pliB2(t, 'sansuite').open);
+  verifierVrai('ni Temps ni Statut sur les lignes (R2)', !t.$('[data-chtemps], [data-chstatut]'));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Création courte : + ▸ Chantier, puis la fiche sur Infos et Devis (lot b2)', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, { clients: ['ONF'], proprios: [] }));
+  await plusChantier(t);
+  verifier('la feuille s’ouvre', 'Nouveau chantier', t.texte('#modale-titre'));
+  verifierVrai('elle monte du bas', t.$('#modale').classList.contains('feuille-nav'));
+  const txt = t.texte('#modale-corps');
+  verifier('trois blocs, dans l’ordre', ['Pour qui', 'Où, quoi', 'Ce que je sais'],
+    t.$$('#modale-corps .fj-sous').map(p => p.textContent));
+  verifierVrai('« Facturé à », facultatif, souvent connu plus tard',
+    /Facturé à facultatif · souvent connu plus tard/.test(txt));
+  verifierVrai('ni « Journées à prévoir » ni « Avec un devis ? »',
+    !t.$('#ce-jours') && !t.$('[data-cedevis]') && !/Journées à prévoir|Avec un devis/.test(txt));
+  verifierVrai('annoncé aujourd’hui, à changer', /Annoncé aujourd’hui \(\d\d\/\d\d\/\d{4}\) · changer/.test(txt));
+
+  /* Pour qui : l'offre d'ajout, puis le type et le SIREN sous le champ. */
+  t.saisir('#ce-donneur', 'Cabinet Neuf'); t.$('#ce-donneur').dispatchEvent(new t.w.Event('blur')); await t.pause(100);
+  verifierVrai('le donneur d’ordre inconnu se propose', /n’est pas dans vos donneurs d’ordre/.test(t.texte('#ce-donneur-offre')));
+  t.clic('#ce-donneur-offre [data-offre]'); await t.pause(150);
+  t.clic('#ce-donneur-offre #tc-ok'); await t.pause(300);
+  verifierVrai('il entre dans la liste', (t.stock('clients') || []).indexOf('Cabinet Neuf') >= 0);
+  t.saisir('#ce-proprio', 'Lambert'); t.$('#ce-proprio').dispatchEvent(new t.w.Event('blur')); await t.pause(100);
+  verifierVrai('« Facturé à » inconnu se propose', /n’est pas dans votre liste « Facturé à »/.test(t.texte('#ce-proprio-offre')));
+  t.clic('#ce-proprio-offre [data-offre]'); await t.pause(150);
+  t.choisir('#tc-type', 'proprio'); await t.pause(50);
+  verifierVrai('puis la question du SIREN', !t.$('#tc-siren-l').hidden);
+  cocher(t, '#tc-siren', true); t.clic('#ce-proprio-offre #tc-ok'); await t.pause(300);
+
+  /* Où, quoi : la quantité parle l'unité des travaux. */
+  t.saisir('#ce-com', 'Clairbois'); t.saisir('#ce-foret', 'Bois Joli');
+  t.choisir('#ce-trav', 'DEGAG'); await t.pause(100);
+  verifier('en hectares, une surface', 'Surface (ha)', t.texte('#ce-qte-l'));
+  t.saisir('#ce-qte', '2,5');
+  t.choisir('#ce-trav', 'PLANT'); await t.pause(100);
+  verifierVrai('en plants, une quantité', /^Quantité \(/.test(t.texte('#ce-qte-l')));
+  t.choisir('#ce-trav', 'DEGAG'); await t.pause(100);
+  t.saisir('#ce-note', 'portail 4321, clé chez le voisin');
+  verifierVrai('le nom se compose', /— Lambert, Clairbois$/.test(t.texte('#ce-nom-apercu')));
+  t.clic('#ce-date-changer'); await t.pause(100);
+  t.choisir('#ce-date', jourISO(JCAL(-2)));
+  t.clic('#ce-ok'); await t.pause(500);
+
+  const c = t.stock('chantiers')[0];
+  verifier('à l’étape Infos, avec devis à saisir', ['devis', true], [c.statut, c.aDevis]);
+  verifier('pour qui', ['Cabinet Neuf', 'Lambert', true], [c.donneur, c.proprietaire, c.siren]);
+  verifier('où', ['Clairbois', 'Bois Joli'], [c.commune, c.foret]);
+  verifier('quoi : une ligne de dégagement, 2,5 ha', ['DEGAG', 2.5], [c.lignes[0].travail, c.lignes[0].quantite]);
+  verifier('ce que je sais', 'portail 4321, clé chez le voisin', c.notes);
+  verifier('annoncé avant-hier', jourISO(JCAL(-2)), jourISO(c.dateEntree));
+  verifier('la fiche s’ouvre', 'vue-chantier', vueActive(t));
+  verifier('sur Infos et Devis', '0,1', ouvertesB1(t).join());
+  verifierVrai('ce que je sais s’y lit', /Ce que je sais ?portail 4321/.test(etapeB1(t, 0)));
+  /* Ce que l'ancien formulaire demandait et que la feuille ne demande plus
+     se saisit dans la fiche : avec ou sans devis, les journées à prévoir. */
+  verifierVrai('avec ou sans devis : dans l’étape Devis', !!t.$('#f-devis') && !!t.$('#f-sansdevis'));
+  t.clic('#f-estim'); await t.pause(300);
+  verifierVrai('les journées à prévoir : Devis ▸ Temps estimé', !!t.$('#es-jest'));
+  t.clic('#modale-x'); await t.pause(150);
+  t.clic('#f-identite'); await t.pause(300);
+  verifier('et tout « pour qui, où » se corrige dans Le chantier', ['Cabinet Neuf', 'Lambert', 'Clairbois', 'Bois Joli', jourISO(JCAL(-2))],
+    ['#ic-donneur', '#ic-proprio', '#ic-com', '#ic-foret', '#ic-entree'].map(s => t.$(s).value));
+  t.clic('#modale-x'); await t.pause(150);
+  await parBarre(t, 'chantiers');
+  verifier('il est dans Chantiers ▸ Devis', [c.id], groupeB2(t, 'devis'));
+  await parBarre(t, 'aujourdhui');
+  verifierVrai('et dans Aujourd’hui ▸ Devis à faire', !!ligneAuj(t, 'devisafaire:' + c.id));
+
+  /* Rien de quoi le nommer : la feuille le dit et ne crée rien. */
+  await plusChantier(t);
+  t.clic('#ce-ok'); await t.pause(300);
+  verifier('sans nom possible, rien n’est créé', 1, t.stock('chantiers').length);
+  verifierVrai('la feuille reste ouverte', !t.$('#modale').hidden);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Création depuis une estimation : Rendements ▸ Estimer ▸ Créer le devis, inchangé (lot b2)', async () => {
+  /* Une référence : 500 plants par jour sur un chantier payé. */
+  const t = await ouvrir(Object.assign({}, VIDE, { cfg: { heuresJour: 8, journeesMigrees: true },
+    chantiers: [{ id: 'r', statut: 'paye', aDevis: false, maj: Date.now(), dateEntree: JCAL(-90), temps: [], jours: [],
+      proprietaire: 'Martin', lignes: [{ travail: 'PLANT', unite: 'plant', quantite: 1000, prix: 1.2, nature: 'prestation' }] }],
+    journees: [1, 2].map(i => ({ id: 'j' + i, date: JCAL(-60 + i), chantier: 'r', personnes: 1, nonProd: 0,
+      postes: [{ travaux: 'PLANT', heures: 8, quantite: 500 }] })) }));
+  await parMenu(t, 'rendements');
+  t.clic('#onglets [data-vue="estimer"]'); await t.pause(300);
+  t.choisir('#es-trav', 'PLANT'); await t.pause(200);
+  t.saisir('#es-qte', '1000'); t.saisir('#es-rend', '500');
+  t.clic('#es-go'); await t.pause(300);
+  verifierVrai('le devis se propose', t.clic('#es-devis')); await t.pause(500);
+  const c = (t.stock('chantiers') || []).filter(x => x.id !== 'r')[0] || {};
+  verifier('un chantier au devis prérempli', ['devis', 2, 'PLANT', 1000],
+    [c.statut, c.joursEstimes, (c.lignes || [{}])[0].travail, (c.lignes || [{}])[0].quantite]);
+  verifier('la fiche s’ouvre sur le devis', 'vue-chantier', vueActive(t));
+  verifierVrai('étape Devis ouverte', ouvertesB1(t).indexOf('1') >= 0);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('C1 : un chantier « Devis à envoyer » fait une ligne « Devis à faire » (lot b2)', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, B2()));
+  await parBarre(t, 'aujourdhui');
+  const l = id => ligneAuj(t, 'devisafaire:' + id);
+  verifierVrai('pas encore repéré', l('dv') &&
+    /annoncé il y a 3 j · pas encore repéré/.test(l('dv').textContent));
+  verifierVrai('repéré', l('dr') && /repéré il y a 2 j/.test(l('dr').textContent) &&
+    !/pas encore repéré/.test(l('dr').textContent));
+  verifierVrai('un devis envoyé n’en fait pas', !l('en'));
+  verifier('plus de « Repérage à faire »', null, /Repérage à faire/.exec(t.texte('#vue-accueil')));
+  /* Le geste « Devis envoyé » de la fiche : la ligne s'en va. */
+  await listeB2(t);
+  t.clic('[data-chouvrir="dv"]'); await t.pause(400);
+  t.clic('#f-envoye'); await t.pause(400);
+  await parBarre(t, 'aujourdhui');
+  verifier('le devis parti, la ligne s’en va', null, l('dv'));
+  verifierVrai('l’autre reste', !!l('dr'));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('« Facturé à » : le mot « Client » n’est plus à l’écran pour ce champ (lot b2)', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, B2()));
+  const sansClient = s => !/\bClients?\b/.test(s || '');
+  await plusChantier(t);
+  verifierVrai('création : « Facturé à »', /Facturé à/.test(t.texte('#modale-corps')) && sansClient(t.texte('#modale-corps')));
+  t.clic('#modale-x'); await t.pause(150);
+  await listeB2(t);
+  t.clic('[data-chouvrir="dv"]'); await t.pause(400);
+  verifierVrai('fiche : l’encadré', /Facturé à : Martin/.test(t.texte('#f-bloc-chantier')) && sansClient(t.texte('#vue-chantier')));
+  t.clic('#f-identite'); await t.pause(300);
+  verifier('fenêtre Le chantier : l’intitulé du champ', 'Facturé à', t.$('label[for="ic-proprio"]').firstChild.textContent.trim());
+  verifierVrai('et rien d’autre n’y dit « Client »', sansClient(t.texte('#modale-corps')));
+  t.clic('#modale-x'); await t.pause(150);
+  t.clic('#onglets [data-vue="fichech"]'); await t.pause(350);
+  t.choisir('#fch-ch', 'dv'); await t.pause(400);
+  verifierVrai('Fiche sécurité : « Facturé à »', /Facturé àMartin|Facturé à ?Martin/.test(t.texte('#fch-corps')) &&
+    sansClient(t.texte('#fch-corps')));
+  t.saisir('#c-rech', 'martin'); await t.pause(150);
+  verifierVrai('la recherche trouve par « Facturé à »', t.$$('#ch-trouves [data-chouvrir]').some(b => b.dataset.chouvrir === 'dv'));
+  await parMenu(t, 'reglages');
+  verifierVrai('Réglages ▸ listes : la pastille « Facturé à »',
+    t.$$('#rl-nav [data-liste]').some(b => b.dataset.liste === 'proprios' && b.textContent === 'Facturé à'));
+  verifierVrai('et aucune pastille « Clients »', t.$$('#rl-nav [data-liste]').every(b => sansClient(b.textContent)));
+  /* Les données ne changent pas de nom. */
+  verifier('la donnée reste « proprietaire »', 'Martin', chB2(t, 'dv').proprietaire);
   verifier('aucune erreur', [], t.erreurs);
 });
 

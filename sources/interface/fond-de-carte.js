@@ -120,7 +120,7 @@ function montrerSurCarte(c, placer) {
     v.m = Math.min(v.m, 8 / LB.facteurSol(m.y));
   }
   renderCarteChantiers();
-  allerModule('calendrier', 'carte');
+  allerModule('chantiers', 'carte');
   if (!place && c.commune) centrerSurCommune(c.commune);
   if (placer) toast('Appuyez sur la carte à l’endroit du chantier.');
 }

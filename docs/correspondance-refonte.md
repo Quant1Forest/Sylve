@@ -26,6 +26,7 @@ Statuts :
 - **en partie (lot c1)** — en place depuis la 4.88.0 ; ce qui reste est dit après les deux-points.
 - **fait (lot c2)** — en place depuis la 4.89.0 (Ma journée, finitions de l'Agenda).
 - **fait (lot b1)** — en place depuis la 4.90.0 (fiche du chantier en étapes).
+- **fait (lot b2)** — en place depuis la 4.91.0 (liste Chantiers, création courte, Fiche sécurité).
 
 ---
 
@@ -51,6 +52,10 @@ Statuts :
 - **Lot 5b2 (4.87.1)** : retouches d'Aujourd'hui tranchées le 31/10 — « Facture à
   faire » dès le lendemain, total « à facturer » dans Argent ▸ Bilan, Stock
   aligné sur S2, messages de corbeille et de note, « Poser des dates » sur le bon mois.
+- **Lot b2 (4.91.0)** : liste Chantiers en groupes (recherche, Liste / Carte), création
+  courte par + ▸ Chantier, « Fiche sécurité » et « Facturé à » partout. La carte a quitté
+  l'Agenda, qui n'a plus de pastille ; les cumuls de l'ancien carnet restent repliés en bas
+  de Chantiers jusqu'au lot d.
 
 ---
 
@@ -105,7 +110,7 @@ venir** · **Derniers jours**.
 | Bulle « chiffre d'affaires » | Argent ▸ Mois | en partie (lot 5b) : bulle retirée, le même chiffre est dans Argent ▸ Bilan (année) ; Argent ▸ Mois : lot d — validé (30/10) |
 | Bulle « TVA déductible » | Argent ▸ TVA | en partie (lot 5b) : bulle retirée, le même chiffre est dans Argent ▸ Bilan (année) ; Argent ▸ TVA : lot d — validé (30/10) |
 | Ligne « Aujourd'hui / Demain / Dans N jours » (travail posé à 7 jours) | Bientôt : « N jours prévus · lun. 2 → mer. 4 » | fait (lot 5b) : une ligne par chantier, avec le donneur d'ordre — validé (V2) |
-| (nouveau, issu du déroulé) Devis à faire, Repérage à faire | Bientôt : une seule ligne « Devis à faire » par chantier à l'étape Infos, avec « repéré il y a N j » ou « annoncé il y a N j · pas encore repéré » en petit ; plus de ligne « Repérage à faire » séparée (le repérage n'est pas systématique) | en partie (lot 5b) : une ligne par chantier « Devis à envoyer » pas encore envoyé, « annoncé il y a N j » ; « repéré » attend la donnée (C2, « Noter le repérage ») — validé (V2 ; 31/10, C1) |
+| (nouveau, issu du déroulé) Devis à faire, Repérage à faire | Bientôt : une seule ligne « Devis à faire » par chantier à l'étape Infos, avec « repéré il y a N j » ou « annoncé il y a N j · pas encore repéré » en petit ; plus de ligne « Repérage à faire » séparée (le repérage n'est pas systématique) | fait (lot b2) : une ligne par chantier « Devis à envoyer » pas encore envoyé ; en petit « repéré il y a N j » ou « annoncé il y a N j · pas encore repéré » (date de repérage du lot b1) — validé (V2 ; 31/10, C1) |
 | Mes notes (listes cochables colorées, + note, cocher, modifier le titre, × d'un élément, × de la note → corbeille, ajouter un élément) | Aujourd'hui ▸ Mes notes, juste après Bientôt (N1), toutes ces actions sur place : une carte par note (bande de la couleur à gauche, titre → fenêtre titre / couleur / Supprimer, × → confirmation puis corbeille, « N à faire »), éléments à faire visibles, cochés repliés sous « N faits » (N2 ; un appui les montre, décocher les remet en haut), champ « ajouter… » en bas de chaque note (Entrée ajoute et garde le clavier) ; créer une note : + ▸ Note | en partie (lot 5b) : déplacées avec toutes leurs actions, en cartes ; « + note » retiré (+ ▸ Note) ; cochés repliés (N2) : lot f — validé (31/10, maquette tour 2) |
 | Remontées du lot 1 : ancienne note sur plusieurs lignes = un seul élément ; élément non modifiable | Un appui sur le texte d'un élément le corrige sur place (Entrée ou sortie du champ enregistre, Échap annule, vide = on garde l'ancien texte) ; un élément de plusieurs lignes affiche « N lignes : en faire N éléments », qui le découpe à sa place | validé (31/10, maquette tour 2) ; lot f |
 | (nouveau) Trois derniers jours saisis | Bas d'Aujourd'hui, lien « Tout l'historique dans l'Agenda » | fait (lot 5b) : un appui rouvre Ma journée sur ce jour — validé (V2), à juger à l'usage |
@@ -120,20 +125,20 @@ venir** · **Derniers jours**.
 
 | Ancien | Nouvel endroit | Statut |
 |---|---|---|
-| Accès : Mon entreprise ▸ Chantiers, ou onglet Carnet du Calendrier | Onglet Chantiers de la barre | fait (lot 5a) ; l'onglet Carnet du Calendrier reste jusqu'à R1 — validé (30/10) |
-| « À traiter (N) » (journées passées, à facturer, facture impayée) | Aujourd'hui ▸ En retard, et groupe « À faire maintenant » de Chantiers | validé (V2) |
-| Bouton « Nouveau chantier » | + ▸ Chantier | validé (30/10) |
-| Carte Carnet : facturé, encaissé, devis signés, premier donneur d'ordre (tout l'historique) | Argent ▸ Année (facturé, encaissé, par donneur d'ordre, devis signés et taux), avec un cumul « depuis le début » en bas | proposé |
-| Ligne de comptes : ouverts, jours-homme cumulés, à facturer, jours passés | Ouverts et à facturer : compteurs des groupes ; jours passés : Aujourd'hui ▸ En retard ; jours-homme : Agenda (mois) et Argent ▸ Année | proposé |
-| Recherche (nom, donneur d'ordre, commune, n° de facture) | Haut de Chantiers (absente de la maquette, à ajouter) | proposé |
-| Filtre par statut | Groupes : À faire maintenant · En travaux · Devis · Payés récemment · « Voir les payés plus anciens » · « Sans suite » (replié, en bas) | validé (V2) ; « Sans suite » : proposé |
-| Où va « Devis signé, à programmer » (et « À programmer » sans devis) | Groupe En travaux, situation « signé · à programmer » | proposé |
-| Tri et sens du tri | Ordre fixe dans les groupes (le plus urgent en haut) ; tri au choix (date, montant, donneur d'ordre) gardé dans « payés plus anciens » | proposé |
-| Ligne : nom, donneur, dates, badge de statut, n° de facture, montants HT / TTC / TVA | Ligne V2 : nom, lieu, situation, montant HT, points d'étape ; le détail dans la fiche | validé (V2) |
-| Ligne ▸ Ouvrir | Appui sur la ligne | validé (V2) |
-| Ligne ▸ Temps | + ▸ Ma journée | retrait accepté (31/10, R2) |
-| Ligne ▸ Statut | Dans la fiche (gestes des étapes) | retrait accepté (31/10, R2) |
-| Calendrier ▸ onglet Carte (recherche de commune, Ma position, − / + / Tout voir, Poser un chantier, fonds de carte, liste) | Chantiers ▸ bascule Liste / Carte, carte intacte | validé (V2) |
+| Accès : Mon entreprise ▸ Chantiers, ou onglet Carnet du Calendrier | Onglet Chantiers de la barre ; pastilles Liste · Carte · Fiche · Fiche sécurité | fait (lot b2) : l'onglet Carnet du Calendrier est parti au lot c1 (R1) ; la pastille « Carnet » s'appelle « Liste » — validé (30/10) |
+| « À traiter (N) » (journées passées, à facturer, facture impayée) | Aujourd'hui ▸ En retard, et groupe « À faire maintenant » de Chantiers | fait (lot b2) : le bandeau « À traiter » est devenu le groupe « À faire maintenant », mêmes alertes (le chantier aux jours passés n'est que là) — validé (V2) |
+| Bouton « Nouveau chantier » | + ▸ Chantier | fait (lot b2) : le bouton de la page est retiré — validé (30/10) |
+| Carte Carnet : facturé, encaissé, devis signés, premier donneur d'ordre (tout l'historique) | Argent ▸ Année (facturé, encaissé, par donneur d'ordre, devis signés et taux), avec un cumul « depuis le début » en bas | en partie (lot b2) : en attendant Argent ▸ Année (lot d), les quatre chiffres restent dans « Cumuls du carnet, depuis le début », replié en bas de Chantiers — proposé |
+| Ligne de comptes : ouverts, jours-homme cumulés, à facturer, jours passés | Ouverts et à facturer : compteurs des groupes ; jours passés : Aujourd'hui ▸ En retard ; jours-homme : Agenda (mois) et Argent ▸ Année | en partie (lot b2) : compteurs des groupes en place ; la ligne entière reste aussi dans « Cumuls du carnet » jusqu'au lot d — proposé |
+| Recherche (nom, donneur d'ordre, commune, n° de facture) | Haut de Chantiers (absente de la maquette, à ajouter) | fait (lot b2) : elle regarde tout le carnet, statut compris, et remplace les groupes tant qu'elle est tapée — proposé |
+| Filtre par statut | Groupes : À faire maintenant · En travaux · Devis · Payés récemment · « Voir les payés plus anciens » · « Sans suite » (replié, en bas) | fait (lot b2) : un facturé pas encore échu va dans « En travaux » (aucun groupe à lui) ; « payés récemment » = payés depuis moins de 30 jours ; l'ancien filtre (statuts, familles, à compléter, avec devis) reste replié en bas, « Tout le carnet, par filtre » — validé (V2) ; « Sans suite » : proposé |
+| Où va « Devis signé, à programmer » (et « À programmer » sans devis) | Groupe En travaux, situation « signé · à programmer » | fait (lot b2) : « Signé · à programmer », ou « Sans devis · à programmer » — proposé |
+| Tri et sens du tri | Ordre fixe dans les groupes (le plus urgent en haut) ; tri au choix (date, montant, donneur d'ordre) gardé dans « payés plus anciens » | fait (lot b2) : les anciens critères gardés, plus Montant et Donneur d'ordre ; le sens se dit dans les mots du critère — proposé |
+| Ligne : nom, donneur, dates, badge de statut, n° de facture, montants HT / TTC / TVA | Ligne V2 : nom, lieu, situation, montant HT, points d'étape ; le détail dans la fiche | fait (lot b2) : le lieu porte aussi le donneur d'ordre ; la situation dit « Facturé le … · payé le … » et le n° de facture d'un chantier facturé ou payé ; « à compléter » reste sur la ligne ; TTC, TVA et date du devis : dans la fiche, étape Devis — validé (V2) |
+| Ligne ▸ Ouvrir | Appui sur la ligne | fait (lot b2) — validé (V2) |
+| Ligne ▸ Temps | + ▸ Ma journée | fait (lot b2) — retrait accepté (31/10, R2) |
+| Ligne ▸ Statut | Dans la fiche (gestes des étapes) | fait (lot b2) — retrait accepté (31/10, R2) |
+| Calendrier ▸ onglet Carte (recherche de commune, Ma position, − / + / Tout voir, Poser un chantier, fonds de carte, liste) | Chantiers ▸ bascule Liste / Carte, carte intacte | fait (lot b2) : la pastille Carte, juste après Liste — validé (V2) |
 
 ### 3.2 Fiche (le dossier d'un chantier)
 
@@ -195,9 +200,9 @@ en bas, discrets : « Corriger l’étape à la main » et « Supprimer ce chant
 
 | Ancien | Nouvel endroit | Statut |
 |---|---|---|
-| Onglet « Fiche de chantier », bouton de la fiche | Tuile « Fiche sécurité » de la fiche ; le mot « Fiche sécurité » partout | en partie (lot b1) : la tuile et le mot sont sur la fiche ; l’écran et son onglet gardent « Fiche de chantier » jusqu’au lot b2 — validé (V2) |
-| Choix du filtre et du chantier | Gardé dans l'écran (on y entre aussi par le chantier) | proposé |
-| Alerte « fiche obligatoire » (plus de 4 ha), « Il manque » + Compléter le chantier, Qui / où / quoi, Période d'intervention, « Déjà connu ici » + Reprendre ses risques, familles de risques, Secours (accès, réseau, « Sa position, je suis dessus »), Co-activité et croquis, Aperçu, Imprimer / PDF | Inchangés | proposé (inchangé) |
+| Onglet « Fiche de chantier », bouton de la fiche | Tuile « Fiche sécurité » de la fiche ; le mot « Fiche sécurité » partout | fait (lot b2) : l'écran, sa pastille et le bandeau disent « Fiche sécurité » ; la feuille imprimée garde son titre réglementaire « Fiche de chantier » — validé (V2) |
+| Choix du filtre et du chantier | Gardé dans l'écran (on y entre aussi par le chantier) | fait (lot b2, inchangé) — proposé |
+| Alerte « fiche obligatoire » (plus de 4 ha), « Il manque » + Compléter le chantier, Qui / où / quoi, Période d'intervention, « Déjà connu ici » + Reprendre ses risques, familles de risques, Secours (accès, réseau, « Sa position, je suis dessus »), Co-activité et croquis, Aperçu, Imprimer / PDF | Inchangés | fait (lot b2, inchangé ; « Client » y devient « Facturé à ») — proposé (inchangé) |
 | Rappel « à préparer avant les travaux » | Sous-titre de la tuile | fait (lot b1) : « obligatoire, plus de 4 ha » au-delà du seuil — validé (V2) |
 
 ---
@@ -216,7 +221,7 @@ en bas, discrets : « Corriger l’étape à la main » et « Supprimer ce chant
 | Appui sur un jour → fiche d'un jour (C'était comme prévu, Non travaillé, J'y ai travaillé, Modifier ma journée, Autre chose, Poser un chantier, Fiche, Prélevé ce jour-là) | Une seule fiche du jour, en feuille : statut, Fait (✕, Fiche, appui → Ma journée), Posé (Fiche, Retirer), boutons selon l'état, Prélevé ce jour-là ; en mode placement, l'appui pose le jour | fait (lot c1) : la fiche monte du bas ; « Poser un chantier » et « Jour non travaillé » restent proposés sur un jour travaillé ou à trancher, comme avant ; « Ce n'est plus un jour off » devient « Retirer la marque » (maquette) — validé (31/10, R7) ; les trois choix faits au lot c1 (Poser un autre chantier, Retirer la marque, Déplacer sur un jour à venir) validés le 01/11 |
 | Fenêtre « Que s'est-il passé ? » (comme prévu, toutes comme prévu, je n'étais pas là, autrement, un autre jour) | Devient la fiche du jour à l'état « à trancher » : mêmes réponses (comme prévu, toutes comme prévu, autrement, un autre jour, je n'y étais pas) ; ouverte depuis Aujourd'hui ▸ Trancher, la ligne à trancher de l'Agenda et le jour | fait (lot c1) : « Toutes comme prévu » demande toujours confirmation — retrait accepté (31/10, R8) ; lot c2 : « Toutes comme prévu » se confirme dans une feuille, « Annuler » ramène au jour |
 | Fenêtres Déplacer la journée, Jour non travaillé, Poser un chantier (sur un jour) | Inchangées, ouvertes depuis la fiche du jour ; « Poser un chantier » est la porte « par le jour » du placement (durée 1 h à 8 h) | fait (lot c1) : « Déplacer la journée » est aussi proposé sur un jour à venir posé (maquette) — validé (31/10, P1) ; lot c2 : elles montent du bas et portent « ← jour » |
-| Onglet Carte | Chantiers ▸ Carte | validé (V2) |
+| Onglet Carte | Chantiers ▸ Carte | fait (lot b2) : l'Agenda n'a plus qu'une vue, donc plus de pastille — validé (V2) |
 | Onglet Carnet | Retiré (même écran que Chantiers) | fait (lot c1) : aucune fonction ne passait que par lui (même vue que Chantiers ▸ Carnet) — retrait accepté (31/10, R1) |
 | Historique des jours et des heures | Agenda, sous la grille : le mois jour par jour, groupé par semaine (heures, quantités, km ; appui → Ma journée) ; et dans chaque chantier (étape Travaux) | fait (lot c1) : sous la grille, la semaine la plus récente ouverte ; fait (lot b1) : dans chaque chantier, étape Travaux — validé (31/10, maquette 5b) |
 
@@ -271,9 +276,9 @@ propres créations.
 | Enregistrer ma journée (accueil) | + ▸ Ma journée ; aussi la ligne de saisie en tête d'Aujourd'hui ; un chantier posé ce jour-là est pré-choisi | fait (lot c2) : toutes les portes ouvrent la nouvelle feuille, et P4 y choisit le chantier posé ce jour-là — validé (30/10 ; 31/10, P4) |
 | J'ai travaillé / J'y ai travaillé / Modifier ma journée / Autre chose (Agenda, fiche d'un jour, Que s'est-il passé ?) | Gardées dans la fiche du jour : elles ouvrent Ma journée datée du jour concerné | fait (lot c1) : Ma journée actuelle, datée du jour (le formulaire P4 : lot c2) — validé (31/10, R7, R8) |
 | Temps (Carnet), + Du temps fait (fiche) | + ▸ Ma journée | retrait accepté (31/10, R2, R4) |
-| Nouveau chantier (avec ou sans devis) | (en partie, lot 5a : + ▸ Chantier ouvre le formulaire actuel ; le formulaire court vient ensuite) + ▸ Chantier (« on m'en a parlé ») : formulaire court = étape Infos. Pour qui (donneur d'ordre + offre d'ajout ; propriétaire facultatif, « souvent connu plus tard », + offre d'ajout puis question SIREN) · Où, quoi (commune, forêt, type de travaux par familles, quantité ou surface selon l'unité) · Ce que je sais (accès, code du portail) · nom composé affiché · « Annoncé aujourd'hui · changer » · Créer le chantier → la fiche, étapes Infos et Devis ouvertes. Le choix avec / sans devis se fait ensuite dans l'étape Devis | validé (30/10 ; maquette tour 2, 31/10) |
-| … champ « Journées à prévoir » du formulaire de création | Étape Devis ▸ Temps estimé (facultatif) | validé (31/10, maquette tour 2) |
-| Rendements ▸ Estimer ▸ Créer le devis | Gardé : crée le chantier avec son devis prérempli (suite d'une estimation) | proposé |
+| Nouveau chantier (avec ou sans devis) | + ▸ Chantier (« on m'en a parlé ») : feuille courte = étape Infos. Pour qui (donneur d'ordre + offre d'ajout ; « Facturé à » facultatif, « souvent connu plus tard », + offre d'ajout puis question SIREN) · Où, quoi (commune, forêt, type de travaux par familles, quantité ou surface selon l'unité) · Ce que je sais (accès, code du portail) · nom composé affiché · « Annoncé aujourd'hui · changer » · Créer le chantier → la fiche, étapes Infos et Devis ouvertes. Le choix avec / sans devis se fait ensuite dans l'étape Devis | fait (lot b2) : le chantier naît « Devis à envoyer », avec devis à saisir ; « Pas de devis : à programmer » dans l'étape Devis ; les « + liste » des champs sont gardés — validé (30/10 ; maquette tour 2, 31/10) |
+| … champ « Journées à prévoir » du formulaire de création | Étape Devis ▸ Temps estimé (facultatif) | fait (lot b2) — validé (31/10, maquette tour 2) |
+| Rendements ▸ Estimer ▸ Créer le devis | Gardé : crée le chantier avec son devis prérempli (suite d'une estimation) | fait (lot b2, inchangé) — proposé |
 | Réglages ▸ Entreprise ▸ Import de données (chantiers, dépenses en masse) | Inchangé | proposé (inchangé) |
 | + Dépense | + ▸ Dépense, feuille haute : « Comme la dernière » (fournisseur et catégories, ni date ni montants, D3) · Quand, où (date, fournisseur proposé d'après les dépenses passées, D4) · Le ticket, une ligne par nature d'achat : catégorie en puces (les six plus fréquentes + « Autre… » avec les 19, D1), montant TTC, TVA en boutons 20 / 10 / 5,5 / sans (« sans » d'office et bloqué pour assurance, frais bancaires, prêt, cotisations, D2), litres et prix du litre (carburant), désignation facultative, mention immobilisation · Pour s'y retrouver (n° de pièce, chantier, « concerne le véhicule », carnet + kilométrage si Frais véhicule) · pied fixe (TTC, HT, TVA déductible, immobilisé ; Supprimer en modification, Enregistrer) | en partie (lot 5a) : + ▸ Dépense ouvre la fenêtre actuelle ; la feuille D1-D5 vient ensuite — validé (30/10 ; 31/10, D1-D5) |
 | Case « créer la dépense » (intervention du véhicule), « porter en dépense » (commande) | Inchangées | proposé (inchangé) |
@@ -417,7 +422,7 @@ fournisseur, entrées de listes (Réglages) · Coller depuis Excel · Importer
 | Entreprise | Groupe « Entreprise » du ☰ et pastille « Entreprise » des Réglages (nom et logo y vont) |
 | Terminé | « Travaux terminés » (étape et case de Ma journée) ; fin de placement : « Fini de placer » |
 | Échéances | « Prélèvements » pour les charges fixes ; « Échéances » pour le véhicule ; « échéance » d'une facture |
-| Client / propriétaire | « Propriétaire » partout ; l'encadré de la fiche dit « Facturé à : … » |
+| Client / propriétaire | « Facturé à » partout où le champ est saisi ou affiché (création, fenêtre Le chantier, fiche, Fiche sécurité, réglages des listes) ; la donnée garde son nom (`proprietaire`, `proprios`). La feuille imprimée dit « Propriétaire », comme l'arrêté | fait (lot b2) — tranché le 01/11 |
 | Dépenses (onglet) / Dépenses (pastille d'Année) | Gardés : la liste et l'analyse du même sujet |
 
 ### Libellés (5.3)
@@ -446,6 +451,17 @@ La fonction reste toujours accessible ; seule la porte en double part.
 | R8 | Fenêtre « Que s'est-il passé ? » (fusion) | Fiche du jour à l'état « à trancher », mêmes réponses | accepté (31/10) ; fait (lot c1) |
 | — | Bandeau (logo-bouton, ←, sélecteur), ↩ de Mon entreprise, écrans Accueil et Mon entreprise, bulles et tuiles | Barre du bas, ☰, Aujourd'hui, Argent | fait (lot 5a : bandeau ; lot 5b : Accueil, Mon entreprise, ↩, bulles et tuiles) — validé (30-31/10) |
 
+### Pastilles renommées ou déplacées (lot b2)
+
+L'inventaire des écrans (4.85) n'est pas réécrit : cette table dit ce que chaque pastille
+y est devenue. « Module, après X » : la pastille a changé de module, sous le même nom.
+
+| Module | Pastille de l'inventaire | Devient |
+|---|---|---|
+| Chantiers | Carnet | Liste |
+| Chantiers | Fiche de chantier | Fiche sécurité |
+| Calendrier | Carte | Chantiers, après Liste |
+
 ---
 
 ## 13. Arbitrages du 31/10
@@ -473,7 +489,7 @@ La fonction reste toujours accessible ; seule la porte en double part.
 - **D3** — « Comme la dernière » : reprend le fournisseur et les catégories (et taux) de la dernière dépense hors charges fixes ; ni la date ni les montants ni les litres.
 - **D4** — Fournisseur proposé d'après les dépenses passées (liste qui se remplit seule, rien à régler).
 - **D5** — Supprimer une dépense : dans sa feuille ; la ligne de la liste s'ouvre d'un appui.
-- **C1** — Chantier à l'étape Infos : une ligne « Devis à faire » dans Bientôt, « pas encore repéré » en petit ; plus de « Repérage à faire ».
+- **C1** — Chantier à l'étape Infos : une ligne « Devis à faire » dans Bientôt, « pas encore repéré » en petit ; plus de « Repérage à faire ». Fait (lot b2) : « repéré il y a N j » quand la date de repérage est notée.
 - **C1, confirmé le 31/10 (5b2)** — « Devis à faire » = statut « Devis à envoyer », même si le devis est rédigé, tant qu'il n'est pas envoyé. Rien à changer.
 - **Chantier « en retard », confirmé le 31/10 (5b2)** — reste seulement dans « À traiter » du carnet, pas dans Aujourd'hui.
 - **C2** — « Noter le repérage » en une fois : date, position, peuplement, ce que j'ai vu. Fait (lot b1) ; la date, « ce que j'ai vu » et la surface sont trois cases nouvelles du chantier (accord du 01/11).

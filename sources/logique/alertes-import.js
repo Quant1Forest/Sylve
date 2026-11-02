@@ -305,7 +305,10 @@ var TRIS_CH = [
   { c: 'datefacture', n: 'Date de facture' },
   { c: 'paiement', n: 'Date de paiement' },
   { c: 'devis', n: 'Date du devis' },
-  { c: 'entree', n: 'Date d’entrée' }
+  { c: 'entree', n: 'Date d’entrée' },
+  /* Lot b2 : « date, montant, donneur d'ordre » pour les payés anciens. */
+  { c: 'montant', n: 'Montant' },
+  { c: 'donneur', n: 'Donneur d’ordre' }
 ];
 /* La valeur du critère, ou 0 quand le chantier ne l'a pas. */
 function cleTri(c, quoi) {
@@ -314,6 +317,7 @@ function cleTri(c, quoi) {
   if (quoi === 'paiement') return nb(c.datePaiement);
   if (quoi === 'devis') return nb(c.dateDevis);
   if (quoi === 'entree') return dateEntree(c);
+  if (quoi === 'montant') return montant(c);
   return 0;
 }
 function rangComptable(c) {
@@ -332,6 +336,18 @@ function rangFacture(c) {
   return n ? Number(n[1]) : 0;
 }
 function tri(chantiers, ancienDabord, critere) {
+  /* Un nom se range dans l'ordre de l'alphabet : A → Z par défaut, le bouton
+     du sens le retourne. Ceux qui n'ont pas de donneur d'ordre vont au bout. */
+  if (critere === 'donneur') {
+    var nom = function (c) { return normalise(c.donneur || c.client || ''); };
+    var avecNom = [], sansNom = [];
+    (chantiers || []).forEach(function (c) { (nom(c) ? avecNom : sansNom).push(c); });
+    avecNom.sort(function (a, b) {
+      var x = nom(a), y = nom(b), r = x < y ? -1 : x > y ? 1 : 0;
+      return (ancienDabord ? -r : r) || dateEntree(b) - dateEntree(a);
+    });
+    return avecNom.concat(sansNom.sort(function (a, b) { return dateEntree(b) - dateEntree(a); }));
+  }
   if (critere && critere !== 'auto') {
     /* Ceux qui portent la valeur devant, dans l'ordre demandé ; ceux qui ne
        l'ont pas derrière, par ordre d'arrivée. Les mêler reviendrait à les
@@ -449,6 +465,57 @@ function chercher(chantiers, q) {
     return mots.every(function (m) { return foin.indexOf(m) >= 0; });
   });
 }
+/* Les groupes de la liste Chantiers (lot b2, maquette V2). « À faire
+   maintenant » est l'ancien « À traiter » du carnet : journées passées, à
+   facturer, facture impayée — le chantier « en retard » ne vit que là.
+   Chaque statut a son groupe ; un facturé pas encore échu reste dans « En
+   travaux », faute d'un groupe à lui. L'ordre est fixe, le plus urgent en
+   haut ; seuls les payés plus anciens se trient au choix, à l'écran. */
+var JOURS_PAYE_RECENT = 30;
+var TYPES_A_FAIRE = ['impaye', 'retard', 'afacturer'];
+var RANG_TRAVAUX = { termine: 0, encours: 1, accepte: 2, facture: 3 };
+function datePaye(c) { return nb(c.datePaiement) || nb(c.dateFacture) || dateEntree(c); }
+function groupesChantiers(chantiers, cfg, maintenant) {
+  var now = maintenant || Date.now();
+  var g = { faire: [], travaux: [], devis: [], payes: [], anciens: [], sansuite: [], alerte: {} };
+  alertes(chantiers, cfg, now).forEach(function (a) {
+    if (TYPES_A_FAIRE.indexOf(a.type) < 0 || g.alerte[a.chantier.id]) return;
+    g.alerte[a.chantier.id] = a;
+    g.faire.push(a.chantier);
+  });
+  var limite = minuit(now) - JOURS_PAYE_RECENT * JOUR;
+  (chantiers || []).forEach(function (c) {
+    if (g.alerte[c.id]) return;
+    var st = c.statut;
+    if (st === 'devis' || st === 'envoye') g.devis.push(c);
+    else if (st === 'paye') (datePaye(c) >= limite ? g.payes : g.anciens).push(c);
+    else if (st === 'sansuite') g.sansuite.push(c);
+    else g.travaux.push(c);
+  });
+  var prochain = function (c) {
+    var l = journeesPlacees(c).filter(function (j) { return j.d >= minuit(now); });
+    return l.length ? l[0].d : Infinity;
+  };
+  g.faire.sort(function (a, b) {
+    var x = g.alerte[a.id], y = g.alerte[b.id];
+    return y.gravite - x.gravite || nb(y.jours) - nb(x.jours);
+  });
+  g.travaux.sort(function (a, b) {
+    var ra = RANG_TRAVAUX[a.statut], rb = RANG_TRAVAUX[b.statut];
+    return (ra == null ? 9 : ra) - (rb == null ? 9 : rb) ||
+      (prochain(a) - prochain(b)) || dateEntree(a) - dateEntree(b);
+  });
+  /* Le devis à faire avant celui qui attend une réponse ; le plus vieux
+     d'abord, c'est lui qui presse. */
+  g.devis.sort(function (a, b) {
+    return (a.statut === 'devis' ? 0 : 1) - (b.statut === 'devis' ? 0 : 1) ||
+      (nb(a.dateEnvoi) || dateEntree(a)) - (nb(b.dateEnvoi) || dateEntree(b));
+  });
+  g.payes.sort(function (a, b) { return datePaye(b) - datePaye(a); });
+  g.sansuite.sort(function (a, b) { return dernierEvenement(b) - dernierEvenement(a); });
+  return g;
+}
+
 /* Totaux du carnet : ce qui est signé, ce qui reste à facturer, ce qui est
    encaissé, et ce qui n'est encore qu'une proposition. */
 /* Statistiques par donneur d'ordre : qui apporte le plus de travail. */
@@ -620,7 +687,7 @@ var M = {
   prixJourVise: prixJourVise, bilanJournees: bilanJournees, HEURES_JOUR: HEURES_JOUR,
   prixJour: prixJour, chantierSolde: chantierSolde, rendement: rendement,
   dureePrevue: dureePrevue, enRetard: enRetard, journeesANoter: journeesANoter, tri: tri, filtre: filtre, chercher: chercher,
-  totaux: totaux,
+  totaux: totaux, groupesChantiers: groupesChantiers, JOURS_PAYE_RECENT: JOURS_PAYE_RECENT,
   dernierEvenement: dernierEvenement, rangComptable: rangComptable,
   rangFacture: rangFacture,
   jourCle: jourCle, minuit: minuit, ajouteJours: ajouteJours, estWeekend: estWeekend,

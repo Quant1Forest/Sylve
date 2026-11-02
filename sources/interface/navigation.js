@@ -80,7 +80,7 @@ function init() {
       majOnglets(); renderPiles(); renderStock(); renderLieux(); renderReglagesBois();
       renderCarnet(); renderReglagesCh(); renderReglagesDemarrage(); renderReglagesAlertes(); renderEstimer();
       renderReglagesMarque(); renderNotesMaj();
-      renderRendements(); renderCalendrier(); renderAlertes();
+      renderRendements(); renderCalendrier();
       renderFinances(); renderDepenses(); renderCharges(); renderStockFournitures();
       renderCarteChantiers(); renderAnalyses(); renderCommandes(); renderRevient();
       renderReglagesStock(); renderAccueil();
@@ -107,7 +107,7 @@ function init() {
         var MOD_DE_VUE = { stock: 'bois', bois: 'bois', lieux: 'bois',
           carnet: 'chantiers', chantier: 'chantiers', calendrier: 'calendrier',
           rendements: 'rendements', estimer: 'rendements', finances: 'finances', depenses: 'finances',
-          charges: 'finances', stock2: 'stock', commandes: 'stock', revient: 'stock', carte: 'calendrier', analyses: 'finances',
+          charges: 'finances', stock2: 'stock', commandes: 'stock', revient: 'stock', carte: 'chantiers', analyses: 'finances',
           carnetv: 'vehicule', echeancesv: 'vehicule', coutsv: 'vehicule',
           achats: 'achats', budget: 'achats', fichech: 'chantiers' };
         var mod = MOD_DE_VUE[vd] || 'cubage';
@@ -215,15 +215,19 @@ var MODULES = {
     vues: [['saisie', 'Saisie'], ['bordereau', 'Bordereau'], ['syntheses', 'Synthèses'],
     ['fichiers', 'Bordereaux']]
   },
+  /* Lot b2 : « Liste · Carte » est la bascule de la maquette V2 ; la carte
+     est venue de l'Agenda, intacte. « Carnet » ne nomme plus que celui du
+     véhicule, et le document imprimé s'appelle « Fiche sécurité ». */
   chantiers: {
     nom: 'Chantiers', defaut: 'carnet', groupe: 'entreprise',
-    vues: [['carnet', 'Carnet'], ['chantier', 'Fiche'], ['fichech', 'Fiche de chantier']]
+    vues: [['carnet', 'Liste'], ['carte', 'Carte'], ['chantier', 'Fiche'], ['fichech', 'Fiche sécurité']]
   },
   calendrier: {
     nom: 'Calendrier', defaut: 'calendrier', groupe: 'entreprise',
     /* L'onglet Carnet est parti (R1) : c'était l'écran de Chantiers, sous
-       un autre onglet de la barre. */
-    vues: [['calendrier', 'Agenda'], ['carte', 'Carte']]
+       un autre onglet de la barre. La carte est passée dans Chantiers (lot
+       b2) : il ne reste qu'une vue, et donc aucune pastille. */
+    vues: [['calendrier', 'Agenda']]
   },
   rendements: {
     nom: 'Rendements', defaut: 'rendements', groupe: 'entreprise',
@@ -300,12 +304,12 @@ var BARRE = {
 };
 var ONGLET_DE_MODULE = { chantiers: 'chantiers', calendrier: 'agenda', finances: 'argent' };
 var TITRES_VUE = { accueil: 'Aujourd’hui', reglages: 'Réglages',
-  chantier: 'Chantier', fichech: 'Fiche de chantier' };
+  chantier: 'Chantier', fichech: 'Fiche sécurité' };
 
 /* Trois sortes d'écrans, qui ne remontent pas de la même façon :
    - « barre » : un onglet de la barre ; il remonte à Aujourd'hui ;
    - « fixe » : son parent ne change jamais (la fiche → Chantiers ; la
-     Fiche de chantier → la fiche d'où on l'a ouverte, sinon Chantiers) ;
+     Fiche sécurité → la fiche d’où on l’a ouverte, sinon Chantiers) ;
    - « libre » : ce qu'on ouvre par le ☰ ou par un lien (Stock, Véhicule,
      Cubage, Réglages…) ; il remonte là d'où l'on vient. */
 function typeEcran(e) {
@@ -333,7 +337,7 @@ function memeModule(a, b) {
 function noterParcours(v) {
   var de = A.ecran, vers = { vue: v, module: A.module }, parMenu = !!A.parMenu;
   A.parMenu = false;
-  /* La Fiche de chantier ouverte depuis une fiche y revient (31/10) ; par la
+  /* La Fiche sécurité ouverte depuis une fiche y revient (31/10) ; par la
      pastille du carnet, elle revient aux Chantiers. */
   if (v === 'fichech' && !(de && de.vue === 'fichech')) A.fchDeFiche = !!(de && de.vue === 'chantier');
   if (typeEcran(vers) !== 'libre') { A.pile = []; return; }
@@ -551,7 +555,9 @@ function majOnglets() {
   majBandeauModule();
   /* Les anciens onglets du bas, devenus des pastilles en haut de l'écran :
      mêmes noms, même ordre, même dessin. */
-  $('#onglets').innerHTML = m.vues.map(function (v) {
+  /* Une pastille seule ne propose rien (l'Agenda depuis le lot b2) : la
+     rangée se tait plutôt que d'étirer un onglet solitaire. */
+  $('#onglets').innerHTML = m.vues.length < 2 ? '' : m.vues.map(function (v) {
     return '<button role="tab" data-vue="' + v[0] + '" aria-selected="' + String(A.vue === v[0]) + '">' +
       '<span class="ic">' + picto(v[0]) + '</span>' + v[1] + '</button>';
   }).join('');
