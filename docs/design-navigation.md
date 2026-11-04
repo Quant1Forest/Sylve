@@ -407,3 +407,35 @@ entreprise*, que le scénario de non-perte lit ligne par ligne.
 - **Fiche de chantier ouverte depuis une fiche** : elle y revient (← « Fiche »
   et retour du téléphone, un cran de plus) ; `A.fchDeFiche` le retient,
   posé par `noterParcours()`.
+
+### Aujourd'hui allégé (lot r1, 4.92.0)
+
+Retours d'usage des 02 et 03/11 : « Aujourd'hui me servait peu ». Maquette
+`maquettes/refonte-auj-agenda.html`, A1 à A4 validés le 03/11. Ce qui a bougé,
+ligne par ligne : `docs/correspondance-refonte.md`, section 15 ; la preuve :
+`docs/inventaire-ecrans.md`, *Où sont allés les éléments d'Aujourd'hui et de
+l'Agenda (lot r1)*.
+
+- **Ordre** : date · Ma journée · En retard (seulement s'il y a quelque
+  chose ; sinon « Rien en retard. ») · Chantiers en cours · Prélèvements à
+  venir · Derniers jours · « Autres rappels (N) », un `details` replié
+  (`#aj-autres`, son état se garde tant que l'application est ouverte).
+- **En retard = trois sortes** (`TYPES_EN_RETARD`), dans cet ordre :
+  `impaye`, `afacturer`, `devis` (préavis de 7 jours, `PREAVIS_DEVIS`). La
+  sauvegarde, le stock à recommander et le véhicule vont dans Autres rappels
+  (`lignesAutres()`), avec leur clé et leur × comme avant.
+- **Bientôt n'existe plus**. Ce qu'il disait passe sur la ligne du chantier
+  (`motCalendrier()` : « posé aujourd'hui / demain / dans N j », « plus de
+  jour posé ») ; « Devis à faire · pas encore repéré » est la situation d'un
+  chantier à l'étape Infos (`situationChantier(c, now, true)` — le troisième
+  argument n'agit que sur Aujourd'hui : la liste Chantiers garde ses mots).
+- **Chantiers en cours** : `C.filtre(…, 'ouverts')`, rangés par
+  `C.etapeChantier` puis par `entreeEtape()` (le plus ancien en haut), un
+  intertitre `.aj-etape` par étape ; chaque ligne porte `data-ajch`.
+- **Derniers jours** mêle les journées saisies et les journées d'office
+  (`journeesDOffice()`), avec leur ○ tant que la fiche du jour n'a pas été
+  ouverte ; un appui sur une journée d'office ouvre la fiche du jour
+  (`data-ajouvre="jour:…"`).
+- **Mes notes** ont leur écran, ☰ ▸ Mes notes (module `notes`, vue
+  `vue-notes`, une seule vue donc aucune pastille) ; la zone garde son
+  identifiant `#aj-notes`. Retour « ← ☰ » comme les autres écrans du menu.

@@ -797,6 +797,10 @@ window.BCUI = { toast: toast,
   _importCsv: function (txt) { A.imp = C.analyseCsv(txt); renderImportResultat(); },
   _setCal: function (mois, jour) { A.calMois = mois; A.calJour = jour; renderCalendrier(); },
   _setChantier: function (id, maj) { var c = chantier(id); if (!c) return; Object.keys(maj).forEach(function (k) { c[k] = maj[k]; }); c.maj = Date.now(); sauverChantiers().then(function () { renderCarnet(); renderFiche(); renderAccueil(); }); },
-  _pushPhoto: function (ph) { pPhotos.push(ph); if (typeof renderPhotos === 'function') renderPhotos(); } };
+  _pushPhoto: function (ph) { pPhotos.push(ph); if (typeof renderPhotos === 'function') renderPhotos(); },
+  /* La journée d'office ne s'écrit nulle part : les scénarios la lisent dans
+     l'état en mémoire, là où le temps des chantiers est refait. */
+  _etat: function () { return A; },
+  _ouvrirChantier: function (id, vers) { ouvrirChantier(id, vers); } };
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
 else init();

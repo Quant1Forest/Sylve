@@ -80,6 +80,8 @@ function aller(v) {
   if (v === 'carnetv') renderCarnetV();
   if (v === 'echeancesv') renderEcheancesV();
   if (v === 'coutsv') renderCoutsV();
+  if (v === 'notes') renderNotes();
+  if (v !== 'calendrier') fermerBulleJour();
   majCadre();
   try { if (window.scrollY || window.pageYOffset) window.scrollTo(0, 0); } catch (e) { }
 }
@@ -862,30 +864,53 @@ function brancher() {
   });
   $('#cal-grille').addEventListener('click', function (e) {
     var b = e.target.closest('[data-jour]'); if (!b) return;
+    /* Le doigt qui se lève après un appui long ne rouvre pas la fiche par
+       derrière : la bulle vient de s'ouvrir. */
+    if (A.appuiLong && Date.now() - A.appuiLong < 1000) { A.appuiLong = 0; return; }
     var ts = Number(b.dataset.jour);
     if (A.planifie) { toucherPlacement(ts); return; }
     /* « Cliquer sur n'importe quel jour doit ouvrir une fiche jour. » La
        saisie ne se faisait que depuis la fiche du chantier. */
     ouvrirFicheJour(ts);
   });
+  /* L'appui long (G2) : 500 ms au doigt, le clic droit à la souris. Il ne
+     sélectionne pas de texte et n'ouvre pas le menu du téléphone (styles.css,
+     et le preventDefault du menu contextuel). Pas pendant un placement : là,
+     chaque appui pose. Un doigt qui bouge fait défiler, il n'appuie pas. */
+  var minuteurAppui = null, departAppui = null;
+  var annulerAppui = function () { clearTimeout(minuteurAppui); minuteurAppui = null; };
+  $('#cal-grille').addEventListener('pointerdown', function (e) {
+    var b = e.target.closest('[data-jour]'); if (!b || A.planifie) return;
+    if (e.button != null && e.button > 0) return;
+    A.appuiLong = 0;
+    departAppui = { x: e.clientX || 0, y: e.clientY || 0 };
+    annulerAppui();
+    minuteurAppui = setTimeout(function () {
+      minuteurAppui = null;
+      A.appuiLong = Date.now();
+      ouvrirBulleJour(Number(b.dataset.jour), b);
+    }, 500);
+  });
+  $('#cal-grille').addEventListener('pointermove', function (e) {
+    if (!minuteurAppui || !departAppui) return;
+    if (Math.abs((e.clientX || 0) - departAppui.x) > 10 || Math.abs((e.clientY || 0) - departAppui.y) > 10) annulerAppui();
+  });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (t) {
+    $('#cal-grille').addEventListener(t, annulerAppui);
+  });
+  $('#cal-grille').addEventListener('contextmenu', function (e) {
+    var b = e.target.closest('[data-jour]'); if (!b) return;
+    e.preventDefault();
+    if (A.planifie) return;
+    /* Un clic droit n'est suivi d'aucun clic : rien à avaler ensuite. */
+    annulerAppui();
+    ouvrirBulleJour(Number(b.dataset.jour), b);
+  });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && A.bulle) fermerBulleJour(); });
   $('#cal-planif').addEventListener('click', function (e) {
     if (e.target.closest('#cal-planif-fin')) finirPlacement();
     else if (e.target.closest('#cal-pl-garder')) { A.placeAvert = null; renderBandeauPlanif(); }
     else if (e.target.closest('#cal-pl-suivant')) deplacerAuJourLibre();
-  });
-  $('#cal-aplanifier').addEventListener('click', function (e) {
-    var p = e.target.closest('[data-aplacer]'), es = e.target.closest('[data-aestimer]');
-    if (es) { ouvrirChantier(es.dataset.aestimer, 'devis'); return; }
-    if (p) demarrerPlacement(p.dataset.aplacer, 'agenda');
-  });
-  /* « toggle » ne remonte pas : on l'écoute à la descente. Replié une fois,
-     le bloc le reste jusqu'au prochain lancement. */
-  $('#cal-aplanifier').addEventListener('toggle', function (e) {
-    if (e.target.id === 'cal-aprog') A.aprogReplie = !e.target.open;
-  }, true);
-  $('#cal-trancher').addEventListener('click', function () {
-    var l = C.joursAResoudre(A.chantiers, A.cfg, absences(), Date.now());
-    if (l.length) ouvrirFicheJour(l[0].d);
   });
   $('#cal-histo').addEventListener('click', function (e) {
     var mj = e.target.closest('[data-histomj]'), j = e.target.closest('[data-histojour]');

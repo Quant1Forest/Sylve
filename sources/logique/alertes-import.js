@@ -7,10 +7,11 @@ function fmtJours(n) {
   var v = arr(nb(n), 2);
   return String(v).replace('.', ',') + ' journée' + (v > 1 ? 's' : '');
 }
-/* Deux semaines avant la fin de validité : de quoi passer un coup de fil et
-   laisser le temps de signer. Plus tôt, l'avis s'installe et ne se lit plus ;
-   plus tard, il ne sert qu'à constater. */
-var PREAVIS_DEVIS = 14;
+/* Une semaine avant la fin de validité : de quoi passer un coup de fil et
+   laisser le temps de signer. Le devis remonte désormais dans « En retard »
+   (lot r1, A3), et deux semaines l'y installaient trop tôt : il ne s'y lisait
+   plus. Plus tard, il ne sert qu'à constater. */
+var PREAVIS_DEVIS = 7;
 
 function alertes(chantiers, cfg, maintenant) {
   var now = maintenant || Date.now();
@@ -706,7 +707,7 @@ var M = {
   nomRisque: nomRisque, risquesCoches: risquesCoches, manquesFiche: manquesFiche,
   ficheRequise: ficheRequise, SEUIL_FICHE_HA: SEUIL_FICHE_HA,
   STATUTS_JOUR: STATUTS_JOUR, nomStatutJour: nomStatutJour, coulStatutJour: coulStatutJour,
-  statutJour: statutJour, estAbsent: estAbsent, joursAResoudre: joursAResoudre,
+  statutJour: statutJour, estAbsent: estAbsent, joursDOffice: joursDOffice, fermeteJour: fermeteJour,
   chargeMois: chargeMois, alertes: alertes, fmtJours: fmtJours,
   MOTIFS_REFUS: MOTIFS_REFUS, nomMotifRefus: nomMotifRefus, analyseRefus: analyseRefus,
   kmChantier: kmChantier, kmTotal: kmTotal, coutCarburant: coutCarburant,

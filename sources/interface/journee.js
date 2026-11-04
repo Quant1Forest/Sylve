@@ -94,6 +94,20 @@ function indexerJournees() {
         activite: null, jrn: j.id });
     }
   });
+  /* Les journées d'office (lot r1) entrent ici, sans activité : elles
+     comptent dans le temps passé et le prix par journée, jamais dans un
+     rendement. Elles ne viennent d'aucune journée — rien à retirer, rien à
+     sauvegarder — et disparaissent dès qu'une vraie journée les remplace. */
+  journeesDOffice().forEach(function (o) {
+    o.chantier.temps.push({ date: C.minuit(o.d) + 12 * 3600000, duree: o.heures, unite: 'h',
+      personnes: 1, activite: null, office: true, vu: o.vu || undefined });
+  });
+  A.indexeLe = C.jourCle(Date.now());
+}
+/* Le jour change pendant que l'application reste ouverte : la journée
+   d'office d'hier ne compte qu'une fois l'index refait. */
+function indexAJour() {
+  if (A.indexeLe !== C.jourCle(Date.now())) indexerJournees();
 }
 function majJournees() {
   indexerJournees();
@@ -236,7 +250,9 @@ function ouvrirJournee(id, modele) {
     '<input type="text" id="mj-total" class="gros" inputmode="decimal" autocomplete="off" ' +
     'placeholder="heures, trajet non compris" value="' +
     (j && C.arr(C.heuresPostes(j) + C.nb(j.nonProd), 2) > 0
-      ? C.arr(C.heuresPostes(j) + C.nb(j.nonProd), 2) : '') + '"></div>' +
+      ? C.arr(C.heuresPostes(j) + C.nb(j.nonProd), 2)
+      /* « Préciser ma journée » (lot r1) : la durée comptée d'office. */
+      : !j && modele && C.nb(modele.total) > 0 ? C.nb(modele.total) : '') + '"></div>' +
     '<p class="eyebrow" style="margin:0 0 6px">Ce que j’ai fait</p>' +
     '<div id="mj-postes"></div>' +
     '<p class="muted" id="mj-horsprod" style="font-size:12px;margin:6px 0 0"></p></div>' +

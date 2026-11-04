@@ -489,16 +489,22 @@
     </section>
 
     <!-- =================================================== aujourd'hui -->
-    <!-- L'écran d'arrivée (lot 5b). Il prend la vue « accueil » : c'est
-         elle que la barre, le retour et les raccourcis connaissent. Le haut
-         et le bas se refont ensemble ; les notes à part, pour qu'un élément
-         ajouté ne referme pas le clavier. -->
+    <!-- L'écran d'arrivée (lot 5b, allégé au lot r1). Il prend la vue
+         « accueil » : c'est elle que la barre, le retour et les raccourcis
+         connaissent. Le haut et le bas se refont ensemble. -->
     <section class="vue" id="vue-accueil" role="tabpanel">
       <div class="aj">
         <p class="aj-date" id="aj-date"></p>
         <div id="aj-haut"></div>
-        <section class="aj-bloc" id="aj-notes"></section>
         <div id="aj-bas"></div>
+      </div>
+    </section>
+
+    <!-- Mes notes (lot r1) : un écran à elles, ouvert par le ☰. Elles se
+         refont à part, pour qu'un élément ajouté ne referme pas le clavier. -->
+    <section class="vue" id="vue-notes" role="tabpanel">
+      <div class="aj">
+        <section class="aj-bloc" id="aj-notes"></section>
       </div>
     </section>
 
@@ -674,18 +680,12 @@
           </div>
         </div>
         <div id="cal-planif"></div>
-        <div id="cal-trancher"></div>
-        <div id="cal-aplanifier"></div>
+        <p class="cal-aide">Appui sur un jour : sa fiche. <b>Appui long</b> : saisir, poser, marquer.</p>
         <div id="cal-grille"></div>
-        <div class="legende cal-legende" style="margin-top:10px">
-          <span id="cal-leg-sel" hidden><i class="lg-sel"></i>jour retenu pour ce chantier</span>
-          <span><i class="lg-travaille"></i>travaillé</span>
-          <span><i class="lg-confirme"></i>confirmé</span>
-          <span><i class="lg-prevu"></i>prévu (devis en attente)</span>
-          <span><i class="lg-absent"></i>non travaillé</span>
-          <span><i class="lg-trancher"></i>à trancher</span>
-          <span><b class="lg-prel">€</b>prélèvement</span>
-        </div>
+        <!-- La légende ne dit que ce qui figure dans le mois (lot r1, G1) :
+             renderCalendrier la remplit ; en petit, les deux repères. -->
+        <div class="legende cal-legende" id="cal-legende"></div>
+        <div class="legende cal-leg2" id="cal-leg2"></div>
         <div id="cal-charge"></div>
       </div>
       <div id="cal-histo"></div>

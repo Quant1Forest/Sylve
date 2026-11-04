@@ -83,7 +83,13 @@ function graine() {
       periodicite: 'mensuel', categorie: 'ASSUR', jour: 5, moisReference: 0, maj: maintenant }],
     achats: [{ id: 'h1', quoi: 'Débroussailleuse thermique professionnelle avec harnais', ttc: 890, taux: 20,
       priorite: 'haute', maj: maintenant, cree: maintenant }],
-    versements: [{ id: 'v1', date: maintenant, type: 'urssaf', montant: 1450, periode: 'T1', maj: maintenant }]
+    versements: [{ id: 'v1', date: maintenant, type: 'urssaf', montant: 1450, periode: 'T1', maj: maintenant }],
+    /* Lot r1 : le jour posé il y a deux jours compte d'office (sa fiche porte
+       le cadre « Comptée d'office »), et Mes notes a son écran. */
+    cfg: { heuresJour: 8, journeesMigrees: true, officeDepuis: maintenant - 10 * JOUR,
+      notes: [{ id: 'n1', titre: 'Chantiers à préparer avant la reprise des plantations d’automne', couleur: '#1F5FA9',
+        items: [{ id: 'i1', texte: 'Rappeler le gestionnaire de la Coopérative forestière du Haut-Pays', fait: false },
+          { id: 'i2', texte: 'Commander les protections gaines ventilées', fait: true }] }] }
   };
 }
 
@@ -118,6 +124,17 @@ function parcours() {
        chaque fenêtre qu'elle ouvre (Ma journée et son pied fixe compris) et
        celles de l'Agenda. Au lot c1, « + Commande » et « + Intervention »
        dépassaient de 2 à 10 px à 320 px ; corrigé au lot c2. */
+    /* La bulle de l'appui long (lot r1) est posée en position fixe, elle
+       aussi : elle doit tenir entière dans l'écran, à gauche comme à droite. */
+    const bu = $('#cal-bulle');
+    if (bu) {
+      const rb = bu.getBoundingClientRect();
+      if (rb.left < -0.5 || rb.right > lg + 0.5) {
+        relevés.push({ ecran: nom, page: Math.round(rb.right - Math.min(0, rb.left)), ecranLargeur: lg, trop: true,
+          barre: barreEntiere, fautifs: ['bulle de ' + Math.round(rb.left) + ' à ' + Math.round(rb.right) + ' px'] });
+        return;
+      }
+    }
     const m = $('#modale'), mi = $('.modale-in');
     if (/^agenda|^\+ |^fenêtre \+|^fiche ›/.test(nom) && m && !m.hidden && mi && mi.scrollWidth > mi.clientWidth + 1) {
       fautifs.push('fenêtre de ' + mi.scrollWidth + ' px dans un cadre de ' + mi.clientWidth);
@@ -149,14 +166,35 @@ function parcours() {
          sont celles du module d'avant. */
       if (barres[i] !== 'aujourdhui') await pastilles('barre ' + barres[i]);
     }
-    /* L'Agenda du lot c1 : le bloc À programmer déplié, la fiche du jour dans
-       ses deux états, et le placement avec son alerte. */
+    /* Aujourd'hui du lot r1 : les autres rappels dépliés. */
+    $('#barre [data-barre="aujourdhui"]').click(); await pause(400);
+    if ($('#aj-autres')) { $('#aj-autres').open = true; await pause(150); mesurer('aujourdhui › autres rappels dépliés'); }
+    /* L'Agenda : la fiche du jour, celle d'une journée d'office, la bulle de
+       l'appui long, la feuille Poser un chantier (à venir, puis passé), et
+       le placement avec son alerte. */
     $('#barre [data-barre="agenda"]').click(); await pause(400);
-    if ($('#cal-aprog')) { $('#cal-aprog').open = true; await pause(150); mesurer('agenda › À programmer déplié'); }
     let cases = document.querySelectorAll('#cal-grille [data-jour]');
     if (cases.length) { cases[cases.length - 1].click(); await pause(400); mesurer('agenda › fiche du jour'); await fermer(); }
-    if ($('#cal-trancher-btn')) { $('#cal-trancher-btn').click(); await pause(400); mesurer('agenda › fiche du jour à trancher'); await fermer(); }
-    const placer = $('#cal-aplanifier [data-aplacer]');
+    const office = document.querySelector('#cal-grille .cal-o');
+    if (office) { office.parentNode.click(); await pause(400); mesurer('agenda › fiche d’une journée d’office'); await fermer(); }
+    const auj0 = new Date(); auj0.setHours(0, 0, 0, 0);
+    const poser = async function (ts, nom) {
+      const c = $('#cal-grille [data-jour="' + ts + '"]'); if (!c) return;
+      c.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2 })); await pause(300);
+      mesurer('agenda › bulle de l’appui long' + nom);
+      const b = $('#cal-bulle [data-bulle="poser"]'); if (!b) return;
+      b.click(); await pause(400);
+      const ch = $('#modale [data-pjch]'); if (ch) { ch.click(); await pause(250); }
+      mesurer('agenda › poser un chantier' + nom); await fermer();
+    };
+    cases = document.querySelectorAll('#cal-grille [data-jour]');
+    if (cases.length) await poser(cases[cases.length - 1].dataset.jour, ', jour à venir');
+    const avant = [].filter.call(document.querySelectorAll('#cal-grille [data-jour]'), function (c) { return Number(c.dataset.jour) < auj0.getTime(); });
+    if (avant.length) await poser(avant[0].dataset.jour, ', jour passé');
+    $('#barre [data-barre="chantiers"]').click(); await pause(400);
+    const c1 = $('#vue-carnet [data-chouvrir="c1"]');
+    if (c1) { c1.click(); await pause(450); }
+    const placer = $('#f-planifier');
     if (placer) {
       placer.click(); await pause(450); mesurer('agenda › placement');
       /* Dans trois jours, un autre chantier est posé : l'alerte paraît. */

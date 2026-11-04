@@ -156,11 +156,25 @@ var CORBEILLE = {
   sortie:      { nom: 'Mouvement',   liste: 'sorties',      sauver: function () { return sauverSorties(); } },
   journee:     { nom: 'Journée',     liste: 'journees',     sauver: function () { return sauverJournees(); } },
   /* Les notes vivent dans A.cfg, pas dans une liste de A : elles se reposent elles-mêmes. */
-  note:        { nom: 'Note', reposer: function (o) {
+  note:        { nom: 'Note', feminin: true, reposer: function (o) {
     var l = notes();
     if (o && o.id && l.some(function (x) { return x.id === o.id; })) o.id = uid();
     l.push(o);
     return sauverCfg();
+  } },
+  /* Un jour posé retiré par « Je n'y étais pas » (lot r1) : il vit dans la
+     liste des jours de son chantier, il y retourne. Le chantier parti, il
+     n'a plus où aller. */
+  jour:        { nom: 'Jour posé', reposer: function (o) {
+    var c = o && chantier(o.chantier);
+    if (!c || !o.pose) return Promise.resolve();
+    var k = C.jourCle(o.pose.d), p = { d: C.minuit(o.pose.d), p: C.nb(o.pose.p) || 1 };
+    if (o.pose.ferme != null) p.ferme = !!o.pose.ferme;
+    c.jours = (c.jours || []).filter(function (j) { return jourDePose(j) !== k; }).concat([p]);
+    c.jours.sort(function (a, b) { return tsPose(a) - tsPose(b); });
+    c.maj = Date.now();
+    indexerJournees();
+    return sauverChantiers().then(function () { renderCalendrier(); renderAujourdhui(); renderFiche(); });
   } }
 };
 
@@ -201,7 +215,7 @@ function repecherObjet(e) {
   if (d.reposer) {
     return d.reposer(e.o).then(function () { return Store.del(e.cle); }).then(function () {
       renderNotes(); renderSauvegarde();
-      toast(d.nom + ' récupérée.');
+      toast(d.nom + (d.feminin ? ' récupérée.' : ' récupéré.'));
     });
   }
   var l = A[d.liste] = A[d.liste] || [];
@@ -775,6 +789,11 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.92', quoi: [
+    { t: 'Aujourd’hui allégé : ce qui est en retard, vos chantiers en cours rangés par étape, et les autres rappels repliés en bas ; Mes notes sont dans le ☰' },
+    { t: 'Agenda : trois couleurs, un appui long sur un jour pour saisir, poser ou marquer non travaillé', vue: 'calendrier' },
+    { t: 'Un jour posé et confirmé qui passe compte d’office comme une journée faite, marquée ○ : un appui pour la préciser', vue: 'calendrier' }
+  ] },
   { v: '4.91', quoi: [
     { t: 'Chantiers : chercher en haut, puis les groupes — à faire maintenant, en travaux, devis, payés ; Liste ou Carte d’un appui', vue: 'carnet' },
     { t: 'Le + ▸ Chantier : une feuille courte, pour qui, où, quoi et ce que vous savez ; la fiche s’ouvre sur Infos et Devis' },

@@ -21,18 +21,25 @@ function estWeekend(ts) { var j = new Date(ts).getDay(); return j === 0 || j ===
 /* Journées placées : chacune porte sa part de journée — une journée entière
    ou une demi-journée, parce qu'on ne remplit pas toujours ses huit heures
    sur le même chantier. Format { d: jour, p: part }.
-   L'ancien format (simple liste de dates) est relu comme des journées entières. */
+   L'ancien format (simple liste de dates) est relu comme des journées entières.
+   Deux marques facultatives (lot r1) suivent la pose : « ferme », quand on a
+   choisi un statut contraire à celui du chantier, et « vu », quand la fiche
+   du jour d'une journée d'office a été ouverte. Les perdre ici, c'était les
+   perdre au premier jour posé à côté. */
 function journeesPlacees(ch) {
   var m = {};
   ((ch && ch.jours) || []).forEach(function (x) {
-    var ts, p;
-    if (x && typeof x === 'object') { ts = minuit(x.d); p = nb(x.p) || 1; }
-    else { ts = minuit(x); p = 1; }
+    var ts, o;
+    if (x && typeof x === 'object') {
+      ts = minuit(x.d); o = { d: ts, p: nb(x.p) || 1 };
+      if (x.ferme != null) o.ferme = !!x.ferme;
+      if (x.vu) o.vu = true;
+    } else { ts = minuit(x); o = { d: ts, p: 1 }; }
     if (!ts || isNaN(ts)) return;
-    m[ts] = p;
+    m[ts] = o;
   });
   return Object.keys(m).map(Number).sort(function (a, b) { return a - b; })
-    .map(function (ts) { return { d: ts, p: m[ts] }; });
+    .map(function (ts) { return m[ts]; });
 }
 function totalPlace(ch) {
   return arr(journeesPlacees(ch).reduce(function (s, j) { return s + nb(j.p); }, 0), 2);
@@ -160,6 +167,17 @@ function journeesPrevues(ch, cfg) {
 }
 /* Un jour est « ferme » si le chantier est engagé, « provisoire » sinon. */
 function fermeteDe(ch) { return statutEngage(ch.statut) ? 'ferme' : 'provisoire'; }
+/* La fermeté d'un jour posé (G3) : le choix fait en posant, s'il contredit le
+   chantier ; sinon le chantier, comme avant. Un jour passé avant la signature
+   du devis était posé sur un devis pas signé : le signer ensuite n'en fait
+   pas un jour confirmé, sans quoi il deviendrait d'un coup une journée
+   d'office qu'il n'a jamais faite. */
+function fermeteJour(ch, pose) {
+  if (pose && pose.ferme != null) return pose.ferme ? 'ferme' : 'provisoire';
+  if (fermeteDe(ch) !== 'ferme') return 'provisoire';
+  if (pose && aDevis(ch) && ch.dateSignature && minuit(pose.d) < minuit(ch.dateSignature)) return 'provisoire';
+  return 'ferme';
+}
 
 /* Occupation d'une période : pour chaque jour, les chantiers prévus et le
    temps réellement saisi ce jour-là. */
@@ -169,16 +187,15 @@ function occupation(chantiers, debut, fin, cfg) {
   while (d <= f && garde++ < 800) { jours[jourCle(d)] = { ts: d, prevus: [], reels: [] }; d = lendemain(d); }
   (chantiers || []).forEach(function (ch) {
     if (['sansuite'].indexOf(ch.statut) >= 0) return;
+    var poses = {};
+    journeesPlacees(ch).forEach(function (x) { poses[jourCle(x.d)] = x; });
     journeesPrevues(ch, cfg).forEach(function (j) {
       var k = jourCle(j);
-      if (jours[k]) jours[k].prevus.push({ chantier: ch, fermete: fermeteDe(ch) });
-    });
-    journeesPlacees(ch).forEach(function (x) {
-      var k = jourCle(x.d);
-      if (jours[k]) {
-        var p = jours[k].prevus.filter(function (y) { return y.chantier === ch; })[0];
-        if (p) p.part = x.p;
-      }
+      if (!jours[k]) return;
+      var x = poses[k] || { d: minuit(j) };
+      var p = { chantier: ch, fermete: fermeteJour(ch, x), pose: x };
+      if (poses[k]) p.part = x.p;
+      jours[k].prevus.push(p);
     });
     (ch.temps || []).forEach(function (t) {
       var k = jourCle(t.date);
@@ -286,11 +303,13 @@ function ficheRequise(ch) { return quantite(ch, 'ha') > SEUIL_FICHE_HA; }
    une absence posée à la main l'emporte sur un chantier resté au planning
    — c'est un geste délibéré, la fiche du jour signale alors le chantier à
    déplacer. */
+/* Les mots de la légende du lot r1 (G1) : fait, posé, posé sur un devis pas
+   signé, non travaillé. Les codes ne bougent pas. */
 var STATUTS_JOUR = [
-  { c: 'travaille', n: 'Travaillé', coul: '#1D6FB8', aide: 'ce que vous y avez fait' },
+  { c: 'travaille', n: 'Fait', coul: '#1D6FB8', aide: 'ce que vous y avez fait' },
   { c: 'absent', n: 'Non travaillé', coul: '#8E8878', aide: 'congé, arrêt, intempérie' },
-  { c: 'confirme', n: 'Confirmé', coul: '#2E7D46', aide: 'devis signé ou accord verbal' },
-  { c: 'prevu', n: 'Prévu', coul: '#B98A00', aide: 'devis encore en attente' },
+  { c: 'confirme', n: 'Posé', coul: '#2E7D46', aide: 'devis signé ou sans devis' },
+  { c: 'prevu', n: 'Posé, devis pas signé', coul: '#2E7D46', aide: 'ne compte pas tant que le devis n’est pas signé' },
   { c: 'libre', n: 'Libre', coul: '#B8AB95', aide: 'rien de posé' }
 ];
 function nomStatutJour(c) { var x = trouve(STATUTS_JOUR, c); return x ? x.n : ''; }
@@ -310,28 +329,40 @@ function statutJour(occ, absences, ts) {
   if ((o.prevus || []).length) return 'prevu';
   return 'libre';
 }
-/* Un jour prévu ou confirmé que la date a dépassé sans qu'on ait dit ce qui
-   s'y est passé. « Pas de jour prévu qui reste indéfiniment dans le passé
-   sans statut final. » Le jour même n'est pas fini : on ne réclame rien
-   avant demain. */
-function joursAResoudre(chantiers, cfg, absences, maintenant) {
-  var m = minuit(maintenant), out = [];
-  var debut = m - 400 * JOUR;
-  /* La fenêtre s'arrête la veille : le jour même n'est pas fini, on ne
-     réclame rien avant demain. C'est la seule garde — une seconde, à
-     l'intérieur de la boucle, disait la même chose et empêchait de vérifier
-     celle-ci en la cassant. */
-  var occ = occupation(chantiers, debut, m - JOUR, cfg);
-  Object.keys(occ).forEach(function (k) {
-    var o = occ[k];
-    var st = statutJour(o, absences, o.ts);
-    if (st !== 'prevu' && st !== 'confirme') return;
-    out.push({ d: o.ts, statut: st,
-      chantiers: o.prevus.map(function (p) { return p.chantier; }) });
+/* La journée d'office (lot r1, G4). « Un jour à trancher » forçait la main
+   chaque matin ; la règle du 02/11 la remplace : un jour posé et confirmé
+   que la date a dépassé, sans journée saisie pour ce chantier ce jour-là,
+   compte comme une journée faite — sa part de journée, sans prestation.
+   Elle ne s'écrit nulle part : elle se déduit, comme le statut d'un jour, et
+   s'efface d'elle-même dès qu'une vraie journée la remplace. Jamais deux
+   heures pour la même chose.
+   Bornes : le jour même n'est pas fini (il compte le lendemain) ; un jour
+   d'avant « depuis » — la première ouverture de la 4.92 — reste tel qu'il
+   était, sans rien compter (décidé le 04/11) ; un jour marqué non travaillé
+   n'a pas été travaillé. */
+function joursDOffice(chantiers, journees, absences, cfg, maintenant) {
+  var depuis = nb(cfg && cfg.officeDepuis), out = [];
+  if (!depuis) return out;
+  var m = minuit(maintenant), d0 = minuit(depuis), hj = HEURES_JOUR(cfg);
+  var saisis = {};
+  (journees || []).forEach(function (j) {
+    if (j && j.chantier) saisis[j.chantier + '|' + jourCle(nb(j.date))] = 1;
+  });
+  (chantiers || []).forEach(function (ch) {
+    if (ch.statut === 'sansuite') return;
+    journeesPlacees(ch).forEach(function (x) {
+      if (x.d >= m || x.d < d0) return;
+      if (fermeteJour(ch, x) !== 'ferme') return;
+      if (saisis[ch.id + '|' + jourCle(x.d)]) return;
+      if (estAbsent(absences, x.d)) return;
+      out.push({ chantier: ch, d: x.d, p: x.p, heures: arr(nb(x.p) * hj, 2), vu: !!x.vu });
+    });
   });
   return out.sort(function (a, b) { return a.d - b.d; });
 }
-/* Charge d'un mois : jours ouvrés occupés, fermes et provisoires. */
+/* Charge d'un mois : jours ouvrés occupés, fermes et provisoires. Un jour
+   posé que le chantier a fait ce jour-là n'est plus « posé » : il est fait,
+   et le compter deux fois mêlerait les deux (la journée d'office surtout). */
 function chargeMois(chantiers, annee, mois, cfg) {
   var debut = new Date(annee, mois, 1).getTime();
   var fin = new Date(annee, mois + 1, 0).getTime();
@@ -339,8 +370,10 @@ function chargeMois(chantiers, annee, mois, cfg) {
   var r = { fermes: 0, provisoires: 0, travailles: 0, joursReels: 0 };
   Object.keys(occ).forEach(function (k) {
     var j = occ[k];
+    var faits = {};
+    j.reels.forEach(function (x) { faits[x.chantier.id] = 1; });
     var part = function (f) {
-      return j.prevus.filter(function (p) { return p.fermete === f; })
+      return j.prevus.filter(function (p) { return p.fermete === f && !faits[p.chantier.id]; })
         .reduce(function (s, p) { return s + (p.part != null ? nb(p.part) : 1); }, 0);
     };
     r.fermes += part('ferme');

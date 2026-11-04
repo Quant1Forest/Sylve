@@ -230,6 +230,7 @@ body:not(.m-ent) .mod-ent{display:none}
   aspect-ratio:1;border:1px solid var(--trait);background:var(--carte);border-radius:8px;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
   cursor:pointer;font:inherit;padding:0;position:relative;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:manipulation;
 }
 .cal button.vide{border-color:transparent;background:none;cursor:default}
 .cal button.hors{opacity:.32}
@@ -249,10 +250,17 @@ body:not(.m-ent) .mod-ent{display:none}
 .fj-pt{flex:none;width:14px;height:14px;border-radius:4px;background:var(--trait-fort)}
 .fj-etat.st-travaille{border-left-color:var(--st-trav)} .fj-etat.st-travaille .fj-pt{background:var(--st-trav)}
 .fj-etat.st-confirme{border-left-color:var(--st-conf)} .fj-etat.st-confirme .fj-pt{background:var(--st-conf)}
-.fj-etat.st-prevu{border-left-color:var(--st-prev)} .fj-etat.st-prevu .fj-pt{background:var(--st-prev)}
+.fj-etat.st-prevu{border-left-color:var(--st-conf);border-left-style:dashed}
+.fj-etat.st-prevu .fj-pt{background:transparent;border:2px dashed var(--st-conf)}
 .fj-etat.st-absent{border-left-color:var(--st-abs)} .fj-etat.st-absent .fj-pt{background:var(--st-abs)}
-.fj-etat.st-trancher{background:var(--tiede-fond);border-color:var(--tiede-trait);border-left-color:var(--tiede)}
-.fj-etat.st-trancher .fj-pt{background:var(--tiede)}
+/* Un jour posé resté dans le passé sans rien compter : pâle, sans relance. */
+.fj-etat.passe{opacity:.75}
+/* La journée comptée d'office (lot r1) : le bleu du « fait ». */
+.fj-office{margin-top:12px;padding:11px 12px;border-radius:12px;background:var(--st-trav-f);
+  border:1px solid var(--st-trav);display:grid;gap:8px;font-size:13.5px}
+.fj-office p{margin:0}
+.fj-office b{color:var(--st-trav)}
+.fj-office .btn-rang{margin:0}
 .fj-sous{font-size:13px;font-weight:700;color:var(--gris);margin:14px 0 6px}
 .fj-aide{font-size:12.5px;color:var(--gris);margin:6px 0 0}
 .fj-choix{display:grid;gap:8px;margin-top:14px}
@@ -261,7 +269,36 @@ body:not(.m-ent) .mod-ent{display:none}
 .retour-jour{display:inline-flex;align-items:center;gap:4px;margin:0 0 10px;color:var(--accent);
   font-weight:600;font-size:13.5px}
 .retour-jour .pic{width:16px;height:16px}
-.pastille.fj-ferme{background:var(--st-conf)} .pastille.fj-provisoire{background:var(--st-prev)}
+.pastille.fj-ferme{background:var(--st-conf)}
+.pastille.fj-provisoire{background:transparent;border:2px dashed var(--st-conf)}
+/* Poser un chantier (lot r1) : les chantiers par étape, puis le statut du jour. */
+.pj-liste{display:grid;gap:6px}
+.pj-etape{margin:8px 0 0;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--gris)}
+.pj-ch{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;align-items:center;width:100%;
+  padding:10px 12px;border-radius:12px;border:1px solid var(--trait);background:var(--carte);font:inherit;
+  color:var(--encre);text-align:left;cursor:pointer;min-width:0}
+.pj-ch b{font-weight:600;overflow-wrap:anywhere;min-width:0}
+.pj-ch small{grid-column:1;font-size:12px;color:var(--gris);overflow-wrap:anywhere;min-width:0}
+.pj-ch .aj-points{grid-row:1/3;grid-column:2}
+.pj-ch[aria-pressed="true"]{border:2px solid var(--accent);background:var(--accent-doux)}
+.pj-st{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.pj-st button{display:inline-flex;align-items:center;gap:8px;padding:9px 13px;border-radius:99px;
+  border:1px solid var(--trait-fort);background:var(--carte);font:inherit;font-size:14px;color:var(--encre);cursor:pointer}
+.pj-st button[aria-pressed="true"]{border:2px solid var(--encre);font-weight:650}
+.pj-st i{width:12px;height:12px;border-radius:3px;display:inline-block;flex:none}
+.pj-st i.pj-fait{background:var(--st-trav)} .pj-st i.pj-pose{background:var(--st-conf)}
+.pj-st i.pj-posep{border:2px dashed var(--st-conf)}
+/* La bulle de l'appui long (G2), sous le jour, et le voile qui la ferme. */
+.cal-bulle{position:fixed;z-index:60;width:min(260px,calc(100vw - 24px));background:var(--carte);
+  border:1px solid var(--trait-fort);border-radius:14px;box-shadow:var(--ombre);padding:10px;display:grid;gap:6px}
+.cal-bulle .cb-t{margin:0;padding:2px 4px 4px;font-size:12.5px;font-weight:700;color:var(--gris)}
+.cal-bulle button{display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;border:0;
+  background:var(--carte2);color:var(--encre);font:inherit;font-weight:600;text-align:left;cursor:pointer}
+.cal-bulle button:first-of-type{background:var(--accent);color:var(--accent-texte)}
+.cal-bulle .pic{width:18px;height:18px;flex:none}
+.cal-bulle-fond{position:fixed;inset:0;z-index:59}
+.cal button.appui{outline:3px solid var(--accent);outline-offset:1px}
+.cal-aide{margin:0 0 8px;font-size:12.5px;color:var(--gris)}
 /* Ma journée (lot c2) : des blocs titrés, et un pied qui reste en vue. */
 .mj-copie{display:grid;gap:2px;width:100%;padding:10px 12px;border-radius:11px;text-align:left;
   border:1px solid var(--trait-fort);background:var(--carte)}
@@ -339,46 +376,36 @@ body:not(.m-ent) .mod-ent{display:none}
 .cal .bande{display:block;width:78%;height:6px;border-radius:3px;margin-top:3px}
 .cal button.st-travaille{background:var(--st-trav-f)} .cal button.st-travaille .bande{background:var(--st-trav)}
 .cal button.st-confirme{background:var(--st-conf-f)} .cal button.st-confirme .bande{background:var(--st-conf)}
-.cal button.st-prevu{background:var(--st-prev-f)} .cal button.st-prevu .bande{background:var(--st-prev)}
+/* Posé sur un devis pas signé (G1) : le vert du posé, en pointillés. */
+.cal button.st-prevu{background:var(--carte);border:2px dashed var(--st-conf)}
+.cal button.st-prevu .bande{background:repeating-linear-gradient(90deg,var(--st-conf) 0 5px,transparent 5px 9px)}
+.cal button.passe.st-prevu,.cal button.passe.st-confirme{opacity:.55}
 .cal button.st-absent .bande{background:var(--st-abs)}
-.cal button.trancher{border:2px dashed var(--tiede)}
 .cal button.sel,.cal button.sel.st-travaille,.cal button.sel.st-confirme,.cal button.sel.st-prevu{background:var(--encre);color:var(--papier)}
 .cal button.sel .bande{background:var(--trait-fort)}
-.cal .cal-q,.cal-trancher .cal-q{position:absolute;top:2px;right:2px;width:14px;height:14px;border-radius:50%;
-  background:var(--tiede);color:var(--carte);font-size:10px;font-weight:800;display:flex;
-  align-items:center;justify-content:center;line-height:1}
+/* Le ○ d'une journée comptée d'office, jusqu'à ce qu'on en ouvre la fiche. */
+.cal .cal-o{position:absolute;top:3px;right:3px;width:11px;height:11px;border-radius:50%;
+  border:2.5px solid var(--st-trav);background:var(--carte)}
+.cal button.sel .cal-o{border-color:var(--papier);background:var(--encre)}
 .cal .n sup{font-size:8px}
 .legende i.lg-travaille{background:var(--st-trav)} .legende i.lg-confirme{background:var(--st-conf)}
-.legende i.lg-prevu{background:var(--st-prev)} .legende i.lg-absent{background:var(--st-abs)}
+.legende i.lg-prevu{background:transparent;border:2px dashed var(--st-conf);width:11px;height:11px}
+.legende i.lg-absent{background:var(--st-abs)}
 .legende i.lg-sel{background:var(--encre)}
-.legende i.lg-trancher{border:2px dashed var(--tiede);width:11px;height:11px}
+.legende i.lg-o{width:11px;height:11px;border-radius:50%;border:2.5px solid var(--st-trav)}
+.cal-legende{margin-top:10px}
+.cal-leg2{margin-top:4px;font-size:11.5px}
 .legende .lg-prel{color:var(--brun-marque);font-weight:800}
-.cal-k4{grid-template-columns:repeat(4,minmax(0,1fr))}
-.cal-k4 b{font-size:15px}
-.cal-k4 small{display:block;line-height:1.25}
-/* La ligne « à trancher » en tête de l'Agenda (P3). */
-.cal-trancher{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;margin-bottom:11px;
-  border-radius:11px;background:var(--tiede-fond);border:1px solid var(--tiede-trait);text-align:left}
-.cal-trancher .cal-q{position:static;flex:none;width:20px;height:20px;font-size:12px}
-.cal-trancher .ct-txt{flex:1;min-width:0;display:grid}
-.cal-trancher small{color:var(--tiede);font-size:12px}
-.cal-trancher .aj-etiq{background:var(--carte);color:var(--tiede)}
-/* « À programmer », repliable. */
-details.aprog{border:1px solid var(--trait);border-radius:11px;background:var(--carte2);margin-bottom:11px}
-details.aprog summary,details.semaine summary{list-style:none;cursor:pointer;display:flex;align-items:center;
+.cal-k3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.cal-k3 b{font-size:16px}
+.cal-k3 small{display:block;line-height:1.25}
+/* Les semaines du mois, repliables. */
+details.semaine summary{list-style:none;cursor:pointer;display:flex;align-items:center;
   gap:8px;padding:10px 12px}
-details.aprog summary::-webkit-details-marker,details.semaine summary::-webkit-details-marker{display:none}
-details.aprog summary b{flex:1;min-width:0;font-size:13.5px}
-details.aprog summary small{color:var(--doux);font-size:12.5px;text-align:right;min-width:0}
-details.aprog summary .pic,details.semaine summary .pic{width:16px;height:16px;flex:none;color:var(--gris);
+details.semaine summary::-webkit-details-marker{display:none}
+details.semaine summary .pic{width:16px;height:16px;flex:none;color:var(--gris);
   transition:transform .15s}
-details.aprog[open] summary .pic,details.semaine[open] summary .pic{transform:rotate(90deg)}
-.aprog-l{display:flex;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--trait)}
-.aprog-txt{flex:1;min-width:0;display:grid}
-.aprog-txt b{font-size:13.5px;font-weight:600;overflow-wrap:anywhere}
-.aprog-txt small{color:var(--doux);font-size:12px}
-.aprog-situ{font-size:12px;color:var(--accent);font-weight:600}
-.aprog-situ.tiede{color:var(--tiede)}
+details.semaine[open] summary .pic{transform:rotate(90deg)}
 /* Le bandeau du placement : il reste en vue quand on fait défiler le mois. */
 .placement{position:sticky;top:calc(57px + env(safe-area-inset-top,0px));z-index:15;margin-bottom:11px;
   background:var(--encre);color:var(--papier);border-radius:13px;padding:11px 13px;display:grid;gap:5px;
@@ -502,6 +529,19 @@ body.v-reglages .onglets{display:none}
 .aj-points i.f{background:var(--vert-marque)}
 .aj-points i.e{background:var(--carte);box-shadow:inset 0 0 0 2px var(--accent)}
 .aj-calme,.aj-aide{margin:0;font-size:12.5px;color:var(--doux)}
+/* Chantiers en cours (lot r1, A4) : un intertitre par étape. */
+.aj-etape{margin:0;padding:8px 14px 4px;font-size:11px;font-weight:700;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--gris);background:var(--carte2);border-top:1px solid var(--trait)}
+.aj-mot{font-weight:500;color:var(--gris)}
+.aj-o{color:var(--st-trav);font-weight:800}
+/* Autres rappels (A1) : repliés tout en bas. */
+details.aj-autres{border:1px dashed var(--trait-fort);border-radius:12px;min-width:0}
+details.aj-autres>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;
+  padding:11px 14px;color:var(--gris);font-weight:600;font-size:13.5px}
+details.aj-autres>summary::-webkit-details-marker{display:none}
+details.aj-autres>summary .pic{width:16px;height:16px;margin-left:auto;transition:transform .15s}
+details.aj-autres[open]>summary .pic{transform:rotate(90deg)}
+details.aj-autres .aj-zone{border:0;border-top:1px dashed var(--trait);border-radius:0 0 12px 12px;background:transparent}
 /* La liste Chantiers (lot b2) : les mêmes lignes qu'Aujourd'hui, rangées en
    groupes ; ce qui sert moins se replie en bas. */
 .ch-liste{max-width:640px;margin:0 auto;padding:14px 16px 28px;display:grid;grid-template-columns:minmax(0,1fr);gap:12px}

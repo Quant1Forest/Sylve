@@ -1,11 +1,10 @@
 /* ========================================================== AUJOURD'HUI
-   L'écran d'arrivée (lot 5b). Il reprend ce que portaient l'ancien accueil
-   et Mon entreprise — les rappels, les bulles, la ligne de la journée, les
-   notes — dans l'ordre de la maquette V2 : la journée · En retard · Bientôt
-   · Mes notes · Chantiers en cours · Prélèvements à venir · Derniers jours.
-   Chaque ligne d'En retard et de Bientôt dit une chose à faire et mène là
-   où elle se fait ; aucune ne calcule rien de neuf, toutes relisent les
-   alertes qui existaient déjà. */
+   L'écran d'arrivée (lot 5b), allégé au lot r1 (A1 à A4) : la journée ·
+   En retard · Chantiers en cours · Prélèvements à venir · Derniers jours ·
+   Autres rappels, repliés en bas. « Aujourd'hui me servait peu » : il garde
+   ce qui sert — sa journée, ce qui presse vraiment, ses chantiers en cours.
+   Chaque ligne dit une chose et mène là où elle se fait ; aucune ne calcule
+   rien de neuf, toutes relisent les alertes qui existaient déjà. */
 
 var JOURS_LONGS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
 var MOIS_COURTS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août',
@@ -89,46 +88,36 @@ function ligneSaisie() {
     '<span class="aj-etiq vert">Ma journée</span></button>';
 }
 
-/* En retard : ce qui aurait dû être fait. Les jours à trancher d'abord :
-   « Il faudrait me forcer la main quand la journée est finie, pour que je
-   remplisse. » Une journée posée puis passée sans temps noté vide les
-   rendements en silence. La sauvegarde vient en dernier (B1) : elle ne porte
-   sur aucun chantier. */
+/* En retard (A3) : trois choses, dans cet ordre. Les factures échues d'abord
+   (« le plus important »), puis les chantiers terminés pas facturés, puis
+   les devis sans réponse à une semaine de la fin de leur validité, ou au-delà
+   (sans validité, le délai de relance des réglages). Le reste est parti : les
+   jours à trancher n'existent plus (la journée d'office les remplace), le
+   chantier aux jours passés se dit sur sa ligne, et la sauvegarde, le stock
+   et le véhicule sont dans « Autres rappels ». */
+var TYPES_EN_RETARD = ['impaye', 'afacturer', 'devis'];
 function lignesRetard() {
   var now = Date.now(), l = [];
-  C.joursAResoudre(A.chantiers, A.cfg, absences(), now).forEach(function (p) {
-    l.push({ cle: 'trancher:' + C.jourCle(p.d), ton: 'tiede', picto: 'horloge',
-      titre: libelleNonSaisie(p.d),
-      sous: 'Prévu : ' + p.chantiers.map(function (c) { return C.nomChantier(c); }).join(', '),
-      etiq: 'Trancher', ouvre: 'trancher:' + p.d });
-  });
   var al = C.alertes(A.chantiers, A.cfg, now);
-  al.filter(function (a) { return a.type === 'afacturer'; }).forEach(function (a) {
-    l.push({ cle: 'afacturer:' + a.chantier.id, ton: 'tiede', picto: 'chantier',
-      titre: 'Facture à faire', sous: C.nomChantier(a.chantier) +
-        (a.chantier.donneur ? ' · ' + a.chantier.donneur : ''),
-      montant: C.montant(a.chantier), petit: 'terminé ' + ilYa(a.chantier.dateFin),
-      ouvre: 'fiche:' + a.chantier.id });
-  });
+  var donneur = function (c) { return C.nomChantier(c) + (c.donneur ? ' · ' + c.donneur : ''); };
   al.filter(function (a) { return a.type === 'impaye'; }).forEach(function (a) {
     l.push({ cle: 'impaye:' + a.chantier.id, ton: 'alerte', picto: 'finances',
-      titre: 'Facture impayée', sous: C.nomChantier(a.chantier) +
-        (a.chantier.donneur ? ' · ' + a.chantier.donneur : ''),
+      titre: 'Facture impayée', sous: donneur(a.chantier),
       montant: C.montant(a.chantier),
       petit: a.chantier.echeancePaiement ? 'échue depuis ' + a.jours + ' j' : 'facturée il y a ' + a.jours + ' j',
       ouvre: 'fiche:' + a.chantier.id });
   });
-  echeancesVehicule().filter(function (x) { return x.etat === 'retard'; }).forEach(function (x) {
-    l.push(ligneVehicule(x, 'alerte', 'échéance dépassée'));
+  al.filter(function (a) { return a.type === 'afacturer'; }).forEach(function (a) {
+    l.push({ cle: 'afacturer:' + a.chantier.id, ton: 'tiede', picto: 'chantier',
+      titre: 'Facture à faire', sous: donneur(a.chantier),
+      montant: C.montant(a.chantier), petit: 'terminé ' + ilYa(a.chantier.dateFin),
+      ouvre: 'fiche:' + a.chantier.id });
   });
-  var c = contenuSauvegarde();
-  if (c.length && B.sauvegardeAncienne(A.export, now)) {
-    var q = B.depuisQuand(A.export, now);
-    l.push({ cle: 'sauvegarde', ton: 'alerte', picto: 'sauvegarde', titre: 'Sauvegarde à faire',
-      sous: (q ? 'Dernière copie ' + q : 'Aucune copie n’est sortie de ce téléphone') +
-        ' · ' + listerContenu(c),
-      etiq: 'Sauvegarder', ouvre: 'sauvegarde:' });
-  }
+  al.filter(function (a) { return a.type === 'devis'; }).forEach(function (a) {
+    l.push({ cle: 'relancer:' + a.chantier.id, ton: a.gravite > 1 ? 'alerte' : 'tiede', picto: 'note',
+      titre: 'Relancer le devis ?', sous: donneur(a.chantier),
+      montant: C.montant(a.chantier), petit: a.texte, ouvre: 'fiche:' + a.chantier.id });
+  });
   return l;
 }
 function ligneVehicule(x, ton, quoi) {
@@ -137,58 +126,19 @@ function ligneVehicule(x, ton, quoi) {
     petit: x.aDate != null ? jourCourt(x.aDate) : (x.aKm != null ? E.fmt(x.aKm, 0) + ' km' : ''),
     ouvre: 'vehicule:' };
 }
-
-/* Bientôt : ce qui vient. Le travail posé à sept jours (l'ancienne ligne
-   sous les bulles) se lit par chantier, du premier au dernier jour. */
-function lignesBientot() {
+/* Autres rappels (A1) : ce qui ne porte sur aucun chantier — la sauvegarde
+   du mois, le stock à recommander, l'entretien du véhicule. Repliés tout en
+   bas : ils restent là, sans repousser ce qui presse. Même lien qu'avant. */
+function lignesAutres() {
   var now = Date.now(), l = [];
-  var al = C.alertes(A.chantiers, A.cfg, now);
-  al.filter(function (a) { return a.type === 'aplacer' || a.type === 'aprevoir'; }).forEach(function (a) {
-    var estimer = a.type === 'aprevoir';
-    l.push({ cle: 'programmer:' + a.chantier.id, picto: 'calendrier',
-      titre: 'À programmer : ' + (estimer ? 'temps à estimer' : E.fmt(a.jours, a.jours % 1 ? 1 : 0) + ' j à placer'),
-      sous: C.nomChantier(a.chantier) + (a.chantier.donneur ? ' · ' + a.chantier.donneur : ''),
-      etiq: estimer ? 'Estimer' : 'Placer',
-      ouvre: (estimer ? 'estimer:' : 'placer:') + a.chantier.id });
-  });
-  A.chantiers.forEach(function (c) {
-    if (['accepte', 'encours', 'termine'].indexOf(c.statut) < 0) return;
-    var proches = C.journeesPlacees(c).filter(function (j) {
-      var d = ecartJours(now, j.d);
-      return d >= 0 && d <= 7;
-    });
-    if (!proches.length) return;
-    var n = proches.length, part = proches.reduce(function (s, j) { return s + C.nb(j.p); }, 0);
-    var quand = function (ts, sansMois) {
-      var d = ecartJours(now, ts);
-      return d === 0 ? 'aujourd’hui' : d === 1 ? 'demain' : jourCourt(ts, sansMois);
-    };
-    var prem = proches[0].d, dern = proches[n - 1].d;
-    l.push({ cle: 'prevus:' + c.id, picto: 'calendrier', titre: C.nomChantier(c),
-      sous: n + ' jour' + (n > 1 ? 's' : '') + ' prévu' + (n > 1 ? 's' : '') +
-        (part !== n ? ' · ' + C.fmtJours(part) : '') + (c.donneur ? ' · pour ' + c.donneur : ''),
-      petit: n === 1 ? quand(prem)
-        : quand(prem, new Date(prem).getMonth() === new Date(dern).getMonth()) + ' → ' + quand(dern),
-      ouvre: 'fiche:' + c.id });
-  });
-  al.filter(function (a) { return a.type === 'devis'; }).forEach(function (a) {
-    l.push({ cle: 'relancer:' + a.chantier.id, picto: 'note', titre: 'Relancer le devis ?',
-      sous: C.nomChantier(a.chantier) + (a.chantier.donneur ? ' · ' + a.chantier.donneur : ''),
-      montant: C.montant(a.chantier), petit: a.texte, ouvre: 'fiche:' + a.chantier.id });
-  });
-  /* C1 : un chantier « Devis à envoyer », même rédigé, tant qu'il n'est pas
-     envoyé. Le repérage n'est pas systématique : il ne fait pas une ligne à
-     lui, il se dit en petit (sa date existe depuis le lot b1). */
-  A.chantiers.filter(function (c) { return c.statut === 'devis' && !c.dateEnvoi; })
-    .sort(function (a, b) { return C.dateEntree(b) - C.dateEntree(a); })
-    .forEach(function (c) {
-      var quand = C.dateEntree(c);
-      l.push({ cle: 'devisafaire:' + c.id, picto: 'carnet', titre: 'Devis à faire',
-        sous: C.nomChantier(c) + (c.donneur ? ' · ' + c.donneur : ''),
-        petit: c.dateReperage ? 'repéré ' + ilYa(c.dateReperage)
-          : (quand ? 'annoncé ' + ilYa(quand) + ' · ' : '') + 'pas encore repéré',
-        ouvre: 'fiche:' + c.id });
-    });
+  var c = contenuSauvegarde();
+  if (c.length && B.sauvegardeAncienne(A.export, now)) {
+    var q = B.depuisQuand(A.export, now);
+    l.push({ cle: 'sauvegarde', ton: 'alerte', picto: 'sauvegarde', titre: 'Sauvegarde à faire',
+      sous: (q ? 'Dernière copie ' + q : 'Aucune copie n’est sortie de ce téléphone') +
+        ' · ' + listerContenu(c),
+      etiq: 'Sauvegarder', ouvre: 'sauvegarde:' });
+  }
   var ar = ST.aRecommander(A.articles);
   if (ar.length) {
     l.push({ cle: 'stock', picto: 'stock2',
@@ -200,14 +150,17 @@ function lignesBientot() {
       }).join(' · '),
       ouvre: 'stock:' });
   }
-  echeancesVehicule().filter(function (x) { return x.etat === 'bientot'; }).forEach(function (x) {
-    l.push(ligneVehicule(x, '', 'échéance proche'));
+  echeancesVehicule().forEach(function (x) {
+    if (x.etat === 'retard') l.push(ligneVehicule(x, 'alerte', 'échéance dépassée'));
+    else if (x.etat === 'bientot') l.push(ligneVehicule(x, '', 'échéance proche'));
   });
   return l;
 }
 
-/* Les chantiers qui ne sont pas soldés, du plus avancé au moins avancé :
-   ce qui attend un paiement passe avant ce qui attend un devis. */
+/* Les chantiers en cours (A4) : tous ceux qui ne sont ni payés ni sans
+   suite, de l'annonce à la facture. Rangés par étape, du début du cycle à la
+   fin, et dans chaque étape le plus ancien en haut — « les plus importants
+   arrivent au début ». Une facture envoyée reste là jusqu'au paiement. */
 var ETAPE_DE_STATUT = { devis: 0, envoye: 1, accepte: 2, encours: 2, termine: 3, facture: 4, paye: 5 };
 function pointsEtape(c) {
   var e = ETAPE_DE_STATUT[c.statut] || 0;
@@ -216,22 +169,38 @@ function pointsEtape(c) {
       return '<i class="' + (i < e ? 'f' : i === e ? 'e' : '') + '"></i>';
     }).join('') + '</span>';
 }
+/* Le jour où le chantier est entré dans son étape, quand il se lit ; sinon
+   celui de l'annonce. */
+function entreeEtape(c) {
+  var e = C.etapeChantier(c);
+  var d = e === 1 ? (C.nb(c.dateEnvoi) || C.nb(c.dateDevis))
+    : e === 2 ? C.nb(c.dateSignature)
+    : e === 3 ? C.nb(c.dateFin)
+    : e === 4 ? C.nb(c.dateFacture) : 0;
+  return d || C.dateEntree(c);
+}
 /* La situation d'un chantier, en une ligne : la même ici et dans la liste
    Chantiers (lot b2). Le n° de facture y reste : c'est par lui qu'il
-   retrouve un chantier réglé. */
-function situationChantier(c, now) {
+   retrouve un chantier réglé. Sur Aujourd'hui (lot r1), plus de « N jours à
+   placer » — l'estimation s'affine en route, elle reste dans la fiche — et
+   le chantier à l'étape Infos dit s'il a été repéré (C1, venu de Bientôt). */
+function situationChantier(c, now, surAujourdhui) {
   var base = C.nomStatut(c.statut, c);
   var noF = c.numeroFacture ? ' · n° ' + c.numeroFacture : '';
   if (c.statut === 'devis') {
-    if (c.dateReperage) return { t: 'Repéré le ' + dateCourte(c.dateReperage) + ' · devis à faire', ton: '' };
     var q = C.dateEntree(c);
+    if (surAujourdhui) {
+      return { t: 'Devis à faire · ' + (c.dateReperage ? 'repéré ' + ilYa(c.dateReperage)
+        : (q ? 'annoncé ' + ilYa(q) + ' · ' : '') + 'pas encore repéré'), ton: '' };
+    }
+    if (c.dateReperage) return { t: 'Repéré le ' + dateCourte(c.dateReperage) + ' · devis à faire', ton: '' };
     return { t: 'Annoncé ' + (q ? ilYa(q) : '') + ' · devis à faire', ton: '' };
   }
   if (c.statut === 'envoye') {
     return { t: base + (c.dateEnvoi ? ' ' + ilYa(c.dateEnvoi) + ', sans réponse' : ''), ton: '' };
   }
   if (c.statut === 'accepte' || c.statut === 'encours') {
-    var reste = C.resteAPlacer(c);
+    var reste = surAujourdhui ? null : C.resteAPlacer(c);
     var mot = c.statut === 'encours' ? base : (C.aDevis(c) ? 'Signé' : 'Sans devis') + ' · à programmer';
     return { t: mot + (reste != null && reste > 0 ? ' · ' + C.fmtJours(reste) + ' à placer' : ''),
       ton: c.statut === 'encours' ? 'vert' : '' };
@@ -256,20 +225,47 @@ function situationChantier(c, now) {
   }
   return { t: base, ton: '' };
 }
-function lignesEnCours() {
-  var now = Date.now();
+/* Le mot du calendrier, sur la ligne du chantier (A2) : un jour posé dans les
+   trois jours — ce que disait Bientôt —, ou plus aucun jour posé devant alors
+   que le chantier n'est pas terminé — ce que disait « jours passés ». */
+function motCalendrier(c, now) {
+  var m = C.minuit(now);
+  var prochain = C.journeesPlacees(c).filter(function (x) { return x.d >= m; })[0];
+  if (prochain) {
+    var d = ecartJours(now, prochain.d);
+    if (d > 3) return '';
+    return d === 0 ? 'posé aujourd’hui' : d === 1 ? 'posé demain' : 'posé dans ' + d + ' j';
+  }
+  return C.enRetard(c, now) ? 'plus de jour posé' : '';
+}
+var ETAPES_AUJ = ['Infos et repérage', 'Devis', 'Travaux', 'Facture', 'Paiement'];
+function chantiersEnCours() {
   return C.filtre(A.chantiers, 'ouverts').slice().sort(function (a, b) {
-    return (ETAPE_DE_STATUT[b.statut] || 0) - (ETAPE_DE_STATUT[a.statut] || 0) ||
-      C.dateEntree(b) - C.dateEntree(a);
-  }).map(function (c) {
-    var s = situationChantier(c, now), m = C.montant(c);
-    return '<button type="button" class="aj-ch" data-ajouvre="fiche:' + esc(c.id) + '">' +
+    return C.etapeChantier(a) - C.etapeChantier(b) || entreeEtape(a) - entreeEtape(b);
+  });
+}
+function lignesEnCours() {
+  var now = Date.now(), et = -1;
+  /* Ce qui est en retard se dit en rouge sur sa ligne aussi. */
+  var enRetard = {};
+  C.alertes(A.chantiers, A.cfg, now).forEach(function (a) {
+    if (TYPES_EN_RETARD.indexOf(a.type) >= 0) enRetard[a.chantier.id] = 1;
+  });
+  var h = '';
+  chantiersEnCours().forEach(function (c) {
+    var e = C.etapeChantier(c);
+    if (e !== et) { et = e; h += '<p class="aj-etape" data-etape="' + e + '">' + esc(ETAPES_AUJ[e] || '') + '</p>'; }
+    var s = situationChantier(c, now, true), m = C.montant(c), mot = motCalendrier(c, now);
+    var ton = enRetard[c.id] ? 'alerte' : s.ton;
+    h += '<button type="button" class="aj-ch" data-ajouvre="fiche:' + esc(c.id) + '" data-ajch="' + esc(c.id) + '">' +
       '<span class="aj-txt"><b>' + esc(C.nomChantier(c)) + '</b>' +
       (c.donneur || c.commune ? '<small>' + esc([c.donneur, c.commune].filter(Boolean).join(' · ')) + '</small>' : '') +
-      '<span class="aj-situ' + (s.ton ? ' aj-' + s.ton : '') + '">' + esc(s.t) + '</span></span>' +
+      '<span class="aj-situ' + (ton ? ' aj-' + ton : '') + '">' + esc(s.t) +
+      (mot ? ' <span class="aj-mot">· ' + esc(mot) + '</span>' : '') + '</span></span>' +
       '<span class="aj-droite">' + (m ? '<b class="num">' + eur(m) + '</b>' : '') + pointsEtape(c) + '</span>' +
       '</button>';
   });
+  return h;
 }
 
 /* Les prélèvements des charges fixes, séparés des tâches : on ne les fait
@@ -291,57 +287,65 @@ function faitsDeJournee(j) {
       : '');
   });
 }
-/* Les trois derniers jours saisis : de quoi corriger hier sans ouvrir
-   l'Agenda. Un appui rouvre la fenêtre Ma journée sur ce jour-là. */
+/* Les trois derniers jours : de quoi corriger hier sans ouvrir l'Agenda. Un
+   appui rouvre la fenêtre Ma journée sur ce jour-là. Une journée comptée
+   d'office y est aussi, avec son ○ tant qu'il n'a pas ouvert sa fiche : un
+   appui ouvre la fiche du jour, d'où on la précise. */
 function lignesDerniersJours() {
-  var now = Date.now();
-  return (A.journees || []).filter(function (j) { return C.minuit(C.nb(j.date)) <= C.minuit(now); })
-    .sort(function (a, b) { return C.nb(b.date) - C.nb(a.date); }).slice(0, 3)
-    .map(function (j) {
-      var c = j.chantier ? chantier(j.chantier) : null;
+  var now = Date.now(), h1 = function (h) { return E.fmt(C.arr(h, 1), h % 1 ? 1 : 0) + ' h'; };
+  var l = (A.journees || []).filter(function (j) { return C.minuit(C.nb(j.date)) <= C.minuit(now); })
+    .map(function (j) { return { ts: C.nb(j.date), j: j }; })
+    .concat(journeesDOffice().map(function (o) { return { ts: C.minuit(o.d) + 12 * 3600000, o: o }; }));
+  return l.sort(function (a, b) { return b.ts - a.ts; }).slice(0, 3)
+    .map(function (x) {
+      if (x.o) {
+        return '<button type="button" class="aj-jour" data-ajouvre="jour:' + C.minuit(x.ts) + '">' +
+          '<span class="aj-txt"><b>' + esc(majuscule(jourCourt(x.ts, true)) + ' · ' +
+            C.nomChantier(x.o.chantier) + ' · ' + h1(x.o.heures)) + '</b>' +
+          '<small>' + (x.o.vu ? '' : '<span class="aj-o">○</span> ') +
+          'comptée d’office · un appui pour préciser</small></span></button>';
+      }
+      var j = x.j, c = j.chantier ? chantier(j.chantier) : null;
       var faits = faitsDeJournee(j);
-      var h = C.heuresJournee(j);
       return '<button type="button" class="aj-jour" data-ajouvre="journee:' + esc(j.id) + '">' +
         '<span class="aj-txt"><b>' + esc(majuscule(jourCourt(j.date, true)) + ' · ' +
-          (c ? C.nomChantier(c) : (j.lieu || 'sans chantier')) + ' · ' +
-          E.fmt(C.arr(h, 1), h % 1 ? 1 : 0) + ' h') + '</b>' +
+          (c ? C.nomChantier(c) : (j.lieu || 'sans chantier')) + ' · ' + h1(C.heuresJournee(j))) + '</b>' +
         (faits.length ? '<small>' + esc(faits.join(', ')) + '</small>' : '') + '</span></button>';
     });
 }
 
 function renderAujourdhui() {
   var z = $('#aj-haut'); if (!z) return;
+  indexAJour();
   var d = new Date();
   $('#aj-date').textContent = majuscule(JOURS_LONGS[d.getDay()]) + ' ' + d.getDate() + ' ' + MOIS_NOMS[d.getMonth()];
-  var ret = lignesVisibles(lignesRetard()), bt = lignesVisibles(lignesBientot());
+  var ret = lignesVisibles(lignesRetard());
   z.innerHTML = '<div id="aj-saisie">' + ligneSaisie() + '</div>' +
     (ret.length ? blocAuj('retard', 'En retard', 'alerte',
-      '<div class="aj-zone">' + ret.map(ligneAuj).join('') + '</div>', ret.length) : '') +
-    (bt.length ? blocAuj('bientot', 'Bientôt', 'tiede',
-      '<div class="aj-zone">' + bt.map(ligneAuj).join('') + '</div>', bt.length) : '') +
-    (ret.length || bt.length ? '' : '<p class="aj-calme" id="aj-calme">Rien en retard, rien qui presse.</p>');
-  var ch = lignesEnCours(), pr = lignesPrelevements(), dj = lignesDerniersJours();
+      '<div class="aj-zone">' + ret.map(ligneAuj).join('') + '</div>', ret.length)
+      : '<p class="aj-calme" id="aj-calme">Rien en retard.</p>');
+  var n = chantiersEnCours().length, pr = lignesPrelevements(), dj = lignesDerniersJours();
+  var au = lignesVisibles(lignesAutres());
   $('#aj-bas').innerHTML =
-    (ch.length ? blocAuj('encours', 'Chantiers en cours', '',
-      '<div class="aj-zone">' + ch.join('') + '</div>', ch.length) : '') +
+    (n ? blocAuj('encours', 'Chantiers en cours', '',
+      '<div class="aj-zone">' + lignesEnCours() + '</div>', n) : '') +
     /* Le total, que l'ancien rappel donnait dès deux échéances. */
     (pr.length ? blocAuj('prelevements', 'Prélèvements à venir', '',
       '<div class="aj-zone aj-discrete">' + pr.map(ligneAuj).join('') + '</div>',
       pr.length > 1 ? eur(pr.reduce(function (s, l) { return s + l.montant; }, 0)) : null) : '') +
     blocAuj('jours', 'Derniers jours', '', '<div class="aj-zone aj-discrete">' + dj.join('') +
       '<button type="button" class="aj-lien" data-ajouvre="agenda:">Tout l’historique dans l’Agenda' +
-      picto('chevron') + '</button></div>');
+      picto('chevron') + '</button></div>') +
+    (au.length ? '<details class="aj-autres" id="aj-autres"' + (A.autresOuverts ? ' open' : '') + '>' +
+      '<summary>Autres rappels (' + au.length + ')' + picto('chevron') + '</summary>' +
+      '<div class="aj-zone">' + au.map(ligneAuj).join('') + '</div></details>' : '');
   renderNotes();
 }
 
-/* Où mène chaque ligne. « Trancher » ouvre la fiche du jour, à l'état « à
-   trancher » (R8) ; « Placer », le placement de l'Agenda, et « Fini de
-   placer » ramène ici (P2). */
+/* Où mène chaque ligne. */
 var OUVRIR_AUJ = {
   fiche: function (id) { ouvrirChantier(id); },
-  estimer: function (id) { ouvrirChantier(id, 'devis'); },
-  trancher: function (ts) { ouvrirFicheJour(Number(ts)); },
-  placer: function (id) { demarrerPlacement(id, 'aujourdhui'); },
+  jour: function (ts) { ouvrirFicheJour(Number(ts)); },
   sauvegarde: function () { allerReglages('sauvegarde'); },
   stock: function () { allerModule('stock'); },
   vehicule: function () { allerModule('vehicule', 'echeancesv'); },
@@ -360,14 +364,20 @@ function brancherAujourdhui() {
     var k = o.dataset.ajouvre, i = k.indexOf(':');
     OUVRIR_AUJ[k.slice(0, i)](k.slice(i + 1));
   });
+  /* « toggle » ne remonte pas : on l'écoute à la descente. Déplié, le bloc
+     le reste tant que l'application est ouverte. */
+  $('#vue-accueil').addEventListener('toggle', function (e) {
+    if (e.target.id === 'aj-autres') A.autresOuverts = e.target.open;
+  }, true);
   brancherNotes();
 }
 
 /* ============================================================ MES NOTES
    Les notes qu'il s'écrit à lui-même. Elles vivaient sous les tuiles de Mon
-   entreprise ; elles viennent juste après Bientôt (N1), avec les mêmes
-   gestes. Elles restent tant qu'il ne les efface pas. Une nouvelle note naît
-   du + (+ ▸ Note), comme tout ce qui se crée. */
+   entreprise, puis sur Aujourd'hui ; depuis le lot r1 elles ont leur écran,
+   ☰ ▸ Mes notes, avec les mêmes gestes. Elles restent tant qu'il ne les
+   efface pas. Une nouvelle note naît du + (+ ▸ Note), comme tout ce qui se
+   crée. */
 var COUL_NOTE = [
   { c: '#B4231F', n: 'rouge' }, { c: '#C4611B', n: 'orange' },
   { c: '#B98A00', n: 'or' }, { c: '#2E7D46', n: 'vert' },
@@ -465,7 +475,7 @@ function ouvrirNote(id) {
       fermerModale(); renderNotes();
       /* Créée par le + depuis un autre écran, elle n'est pas sous les yeux :
          on dit où elle est. */
-      toast(id ? 'Note modifiée.' : A.vue === 'accueil' ? 'Note ajoutée.' : 'Note ajoutée dans Aujourd’hui.');
+      toast(id ? 'Note modifiée.' : A.vue === 'notes' ? 'Note ajoutée.' : 'Note ajoutée dans ☰ ▸ Mes notes.');
     });
   });
 }

@@ -780,6 +780,9 @@ function lignesTemps(c) {
     var cible = t.date ? rang(t.date) : sansDate;
     cible.fait += C.heuresSaisie(t, A.cfg);
     cible.km += C.nb(t.km);
+    /* La journée d'office (lot r1) se dit, avec son ○ tant que la fiche de
+       ce jour n'a pas été ouverte. */
+    if (t.office) { cible.office = true; if (!t.vu) cible.rond = true; }
     if (t.activite && cible.actes.indexOf(t.activite) < 0) cible.actes.push(t.activite);
     if (t.activite && C.nb(t.quantite) > 0) {
       cible.qtes[t.activite] = (cible.qtes[t.activite] || 0) + C.nb(t.quantite);
@@ -826,7 +829,8 @@ function corpsTravaux(c, k) {
           return C.nomTravail(a) + (q ? ' ' + E.fmt(q, q % 1 ? 2 : 0) + (u ? ' ' + C.courtUnite(u) : '') : '');
         });
         if (r.km) detail.push(E.fmt(r.km, 0) + ' km');
-        return '<div class="jrang' + (avenir ? ' avenir' : '') + '">' +
+        if (r.office) detail.push((r.rond ? '○ ' : '') + 'comptée d’office');
+        return '<div class="jrang' + (avenir ? ' avenir' : '') + (r.office ? ' office' : '') + '">' +
           '<span class="jd">' + esc(r.sans ? 'sans date' : dateCourte(r.d)) +
           (r.sans ? ' <span class="muted" style="font-size:11.5px">(rattrapage)</span>'
             : avenir ? ' <span class="muted" style="font-size:11.5px">à venir</span>' : '') +

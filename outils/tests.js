@@ -587,6 +587,7 @@ scenario('Temps : tout se note en heures, plus de quarts de journée', async () 
   await parBarre(t, 'agenda');
   await cliquerJour(t, JCAL(4));
   t.clic('#fj-poser'); await t.pause(400);
+  await choisirAPoser(t, 'c1');
   const parts = options(t, '#pj-part');
   verifierVrai('plus de demi ni de quart de journée',
     !parts.some(x => /½|¼|¾/.test(x)));
@@ -671,14 +672,16 @@ scenario('Accueil : des pictogrammes dessinés, plus des caractères de rempliss
      leurs successeurs — les lignes d'Aujourd'hui et les tuiles du ☰ — sont
      tenus à la même règle. */
   const t = await ouvrir(Object.assign({}, VIDE, { export: Date.now() - 45 * 86400000,
-    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'devis', aDevis: true, lignes: [], temps: [], maj: Date.now() }] }));
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'devis', aDevis: true, lignes: [], temps: [], maj: Date.now() },
+      { id: 'c2', nom: 'Combe', statut: 'termine', dateFin: Date.now() - 5 * 86400000, lignes: [], temps: [], maj: Date.now() }] }));
   const pics = t.$$('#vue-accueil .aj-pic');
   verifierVrai('Aujourd’hui porte des pictogrammes (' + pics.length + ')', pics.length >= 3);
   verifierVrai('tous au trait', pics.every(p => p.querySelector('svg.pic')));
   verifierVrai('sans caractère de remplissage', pics.every(p => !/[▤▥▦▧▨▩☀⚙]/.test(p.textContent)));
   t.clic('#b-menu'); await t.pause(200);
   const tuiles = t.$$('#modale [data-menu]');
-  verifierVrai('chaque entrée du ☰ est dessinée', tuiles.length === 9 &&
+  /* Dix depuis le lot r1 : Mes notes y est entrée. */
+  verifierVrai('chaque entrée du ☰ est dessinée', tuiles.length === 10 &&
     tuiles.every(b => b.querySelector('svg.pic') && !/[▤▥▦▧▨▩⚙]/.test(b.textContent)));
   t.clic('#modale-x'); await t.pause(150);
   /* Le logo du bandeau n'est plus un bouton depuis le lot 5a : Aujourd'hui
@@ -876,6 +879,7 @@ scenario('Journées : on pose des heures, et rien que des heures', async () => {
   }));
   await cliquerJour(t, JCAL(3));
   t.clic('#fj-poser'); await t.pause(400);
+  await choisirAPoser(t, 'c1');
   const sel = t.$('#pj-part');
   verifierVrai('la part se choisit dans une liste', sel && sel.tagName === 'SELECT');
   const libelles = [...sel.options].map(o => o.textContent);
@@ -2085,9 +2089,12 @@ scenario('Entreprise : chaque bulle d’« Où j’en suis » a son endroit, et 
   verifier('plus d’écran Mon entreprise', null, t.$('#vue-entreprise'));
   /* Journées à planifier : une posée sur quatre estimées, il en reste trois.
      Devis signés : la même ligne, signé veut dire à programmer. */
-  verifierVrai('journées à planifier → Bientôt « À programmer : 3 j à placer »',
-    /À programmer : 3 j à placer/.test(texteLignes(t, 'programmer:c1')));
-  verifierVrai('le devis signé est cette même ligne', t.$('#aj-bientot [data-ajcle="programmer:c1"]'));
+  /* Lot r1 : « À programmer » est parti d'Aujourd'hui (retrait accepté le
+     03/11) ; le devis signé se lit sur sa ligne de Chantiers en cours, à
+     l'étape Travaux, et l'estimation reste dans la fiche. */
+  verifierVrai('le devis signé → Chantiers en cours, « … à programmer »',
+    /· à programmer/.test(t.texte('#aj-encours [data-ajch="c1"]') || ''));
+  verifierVrai('plus de « N j à placer » sur Aujourd’hui', !/à placer/.test(t.texte('#vue-accueil')));
   verifierVrai('chantiers en cours → leur bloc', /Les Essarts/.test(t.texte('#aj-encours')));
   /* Factures en attente, et combien en retard : la ligne Facture impayée,
      avec ce qu'en disait la bulle et « À traiter » — nom, montant, ancienneté,
@@ -2128,16 +2135,22 @@ scenario('Entreprise : chaque bulle d’« Où j’en suis » a son endroit, et 
 });
 
 /* --------------------------------------------------------------------- */
-scenario('Mes notes : sur Aujourd’hui, des éléments à cocher', async () => {
+scenario('Mes notes : dans ☰ ▸ Mes notes, des éléments à cocher', async () => {
   /* « Chantier à prévoir : il faudrait que je puisse avoir plus de place, ou
      faire des retours à la ligne » — puis, en 4.85, « comme une liste de
-     courses » : chaque élément a sa case. Et : « les notes, faudrait mieux les
-     mettre à la fin », pour arriver sur les modules sans défiler. Au lot 5b,
-     elles quittent Mon entreprise pour Aujourd'hui, juste après Bientôt (N1),
-     avec exactement les mêmes gestes ; une note se crée par le +. */
+     courses » : chaque élément a sa case. Au lot 5b, elles quittent Mon
+     entreprise pour Aujourd'hui ; au lot r1, elles ont leur écran, ☰ ▸ Mes
+     notes, avec exactement les mêmes gestes ; une note se crée par le +. */
   const t = await ouvrir(Object.assign({}, VIDE, { module: 'entreprise',
     chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'devis', aDevis: true, lignes: [], temps: [], maj: Date.now() }] }));
   const zone = () => t.$('#aj-notes');
+  verifierVrai('plus rien de Mes notes sur Aujourd’hui', !t.$('#vue-accueil #aj-notes') &&
+    !/Mes notes/.test(t.texte('#vue-accueil')));
+  verifierVrai('le ☰ les ouvre', await parMenu(t, 'notes'));
+  verifier('sur leur écran', 'vue-notes', vueActive(t));
+  verifier('titré', 'Mes notes', t.texte('#b-ecran'));
+  verifierVrai('le retour ramène au ☰, comme les autres écrans du menu',
+    !t.$('#b-retour').hidden && /Le reste de Sylve/.test(t.$('#b-retour').getAttribute('aria-label')));
   const base = () => ((t.stock('cfg') || {}).notes || []);
   const entrer = async (v) => {
     const c = t.$('[data-nt-ajout]'); c.value = v;
@@ -2145,9 +2158,6 @@ scenario('Mes notes : sur Aujourd’hui, des éléments à cocher', async () => 
     await t.pause(250);
   };
   verifierVrai('la zone invite à s’écrire une note, par le +', /Le \+ en bas ▸ Note/.test(zone().textContent));
-  verifierVrai('elle vient juste après Bientôt',
-    (t.$('#aj-bientot').compareDocumentPosition(zone()) & 4) &&
-    (zone().compareDocumentPosition(t.$('#aj-encours')) & 4));
 
   await plusNote(t);
   t.saisir('#nt-titre', 'Chantiers à prévoir');
@@ -5172,38 +5182,56 @@ scenario('Fini de placer : parti de la fiche, on revient à la fiche', async () 
 });
 
 /* --------------------------------------------------------------------- */
-scenario('Fini de placer : parti de l’Agenda, on reste dans l’Agenda', async () => {
+scenario('Placement : un jour passé touché devient une journée faite (lot r1)', async () => {
+  /* Le placement reste tel quel (bandeau, Fini de placer, jour déjà pris),
+     sauf un jour passé : il a eu lieu, il devient une journée faite — sans
+     pose, sans prestation, la journée entière. */
   const t = await ouvrir(Object.assign({}, VIDE, {
-    module: 'calendrier',
-    chantiers: [{ id: 'c1', nom: 'Coupe des Places', statut: 'accepte', aDevis: false,
+    module: 'chantiers', cfg: { heuresJour: 8, weekends: true, journeesMigrees: true },
+    chantiers: [{ id: 'c1', nom: 'Coupe des Places', statut: 'accepte', aDevis: false, foret: 'Les Places',
       lignes: [], temps: [], joursEstimes: 3, maj: Date.now() }]
   }));
-  await t.pause(200);
-  t.clic('#cal-aplanifier [data-aplacer="c1"]'); await t.pause(400);
-  verifierVrai('« Placer » d’À programmer ouvre le placement', /Placement — Coupe des Places/.test(t.texte('#cal-planif')));
+  const C0 = t.w.BCC;
+  const jrn = () => t.stock('journees') || [];
+  const poses = () => ((t.stock('chantiers') || [])[0].jours || []).map(j => C0.jourCle(j.d));
+  t.clic('[data-vue="carnet"]'); await t.pause(300);
+  t.clic('[data-chouvrir="c1"]'); await t.pause(400);
+  t.clic('#f-planifier'); await t.pause(400);
+  verifierVrai('le placement s’ouvre', /Placement — Coupe des Places/.test(t.texte('#cal-planif')));
+  await cliquerJour(t, JCAL(-2), 500);
+  verifier('le jour passé est une journée faite', 1, jrn().length);
+  verifier('ce jour-là, sur ce chantier', [C0.jourCle(JCAL(-2)), 'c1'], [C0.jourCle(jrn()[0].date), jrn()[0].chantier]);
+  verifier('une journée entière, sans prestation', [8, 0], [jrn()[0].nonProd, (jrn()[0].postes || []).length]);
+  verifier('et rien de posé', [], poses());
+  await cliquerJour(t, JCAL(-2), 500);
+  verifier('le toucher encore ne double rien', 1, jrn().length);
   await cliquerJour(t, JCAL(5), 400);
+  verifier('un jour à venir se pose, comme avant', [C0.jourCle(JCAL(5))], poses());
   t.clic('#cal-planif-fin'); await t.pause(450);
-  verifier('on reste sur l’Agenda', 'vue-calendrier', vueActive(t));
-  verifier('le placement est fini', '', t.$('#cal-planif').innerHTML);
-  verifier('aucune fiche ne s’est ouverte', true, t.$('#modale').hidden);
-  verifierVrai('« À programmer » est revenu, avec ce qui reste', /2 journées à placer/.test(t.texte('#cal-aplanifier')));
+  verifier('« Fini de placer » ramène à la fiche', 'vue-chantier', vueActive(t));
   verifier('aucune erreur', [], t.erreurs);
 });
 
 /* --------------------------------------------------------------------- */
-scenario('Fini de placer : parti d’Aujourd’hui, on revient à Aujourd’hui', async () => {
+scenario('Agenda : plus d’« À programmer » ni de ligne « à trancher » en tête (lot r1)', async () => {
+  /* Retraits acceptés le 03/11 : on place depuis la fiche ▸ Travaux ou par
+     l'appui long, on estime dans l'étape Devis ; un jour posé qui passe
+     compte d'office. Aujourd'hui ne dit plus « N jours à placer ». */
   const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'calendrier', cfg: { heuresJour: 8, journeesMigrees: true, officeDepuis: JCAL(10) },
     chantiers: [{ id: 'c1', nom: 'Coupe des Places', statut: 'accepte', aDevis: false,
-      lignes: [], temps: [], joursEstimes: 3, maj: Date.now() }]
+      lignes: [], temps: [], joursEstimes: 3, jours: [{ d: JCAL(-1), p: 1 }], maj: Date.now() },
+    { id: 'c2', nom: 'Sans estimation', statut: 'accepte', aDevis: true, lignes: [], temps: [], maj: Date.now() }]
   }));
-  await appuyerLigne(t, 'programmer:c1');
-  verifier('Bientôt ▸ Placer ouvre l’Agenda', 'vue-calendrier', vueActive(t));
-  verifierVrai('en placement', /Placement — Coupe des Places/.test(t.texte('#cal-planif')));
-  await cliquerJour(t, JCAL(5), 400);
-  t.clic('#cal-planif-fin'); await t.pause(450);
-  verifier('« Fini de placer » ramène à Aujourd’hui', 'vue-accueil', vueActive(t));
-  verifier('et la barre le dit', ['aujourdhui'], ongletMarque(t));
-  verifierVrai('la ligne compte ce qui reste', /2 j à placer/.test(texteLignes(t, 'programmer:c1')));
+  await t.pause(200);
+  verifier('ni bloc ni ligne en tête de l’Agenda', [null, null, null],
+    [t.$('#cal-aplanifier'), t.$('#cal-trancher'), t.$('#cal-trancher-btn')]);
+  const c = await caseDuJour(t, JCAL(-1));
+  verifierVrai('le jour passé posé ne porte plus de « ? »', c && !c.querySelector('.cal-q') && !/trancher/.test(c.className));
+  verifierVrai('ni « à placer » ni « à estimer » dans l’Agenda', !/à placer|à estimer|À programmer/.test(t.texte('#vue-calendrier')));
+  await parBarre(t, 'aujourdhui');
+  verifier('ni ligne « À programmer » sur Aujourd’hui', 0, lignesAuj(t, 'programmer:').length);
+  verifierVrai('ni « à placer », ni « temps à estimer »', !/à placer|à estimer|estimez et placez/.test(t.texte('#vue-accueil')));
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -6144,87 +6172,113 @@ scenario('Dépense : la case « concerne le véhicule » la rattache', async () 
 });
 
 /* --------------------------------------------------------------------- */
-scenario('Journées : une journée passée sans temps noté se réclame au lancement', async () => {
-  /* « Il faudrait me forcer la main quand la journée est finie, pour que je
-     remplisse. Sinon je me dis : ok, je le ferai plus tard, et après je ne le
-     fais pas et j'oublie. » Sans ce rattrapage, les rendements se vident en
-     silence et le chantier finit par s'annoncer « en retard ». */
-  const JOUR = 86400000;
-  const j = n => { const d = new Date(Date.now() + n * JOUR); d.setHours(12, 0, 0, 0); return d.getTime(); };
-  const jourFR = ts => new Date(ts).toLocaleDateString('fr-FR');
+scenario('Journée d’office : un jour posé et confirmé qui passe compte 8 h, avec son ○', async () => {
+  /* Décisions des 02 et 03/11 (G4) : plus de jour « à trancher ». Un jour
+     posé et confirmé que la date a dépassé, sans journée saisie pour ce
+     chantier ce jour-là, compte comme une journée faite — sa part de
+     journée, sans prestation — avec un ○ jusqu'à ce qu'on en ouvre la fiche.
+     Une journée saisie ce jour-là la remplace : jamais deux fois. */
+  const j = JCAL;
+  const lig = [{ travail: 'DEGAG', unite: 'ha', quantite: 1, prix: 800, nature: 'prestation' }];
   const t = await ouvrir(Object.assign({}, VIDE, {
-    module: 'entreprise', cfg: { heuresJour: 8 },
-    chantiers: [{ id: 'c1', nom: 'Dégagement Martin', statut: 'encours', maj: Date.now(),
-      lignes: [],
-      /* Le temps d'avant-hier est noté : cette journée-là ne doit pas revenir. */
-      temps: [{ date: j(-2), duree: 7, unite: 'h', personnes: 1 }],
-      jours: [
-        { d: j(-3), p: 1 },   /* passée, rien de noté : à réclamer */
-        { d: j(-2), p: 1 },   /* passée, mais notée */
-        { d: j(0), p: 1 },    /* aujourd'hui : la journée n'est pas finie */
-        { d: j(2), p: 1 }     /* à venir */
-      ] }]
+    module: 'calendrier', cfg: { heuresJour: 8, journeesMigrees: true, officeDepuis: j(-10) },
+    chantiers: [
+      { id: 'c1', nom: 'Dégagement Martin', statut: 'encours', aDevis: false, maj: Date.now(), lignes: [], temps: [],
+        jours: [{ d: j(-3), p: 1 }, { d: j(-2), p: 1 }, { d: j(0), p: 1 }, { d: j(2), p: 1 }] },
+      { id: 'c2', nom: 'Les Essarts', statut: 'termine', aDevis: false, dateFin: j(-1), maj: Date.now(),
+        lignes: lig, temps: [], jours: [{ d: j(-4), p: 1 }] }],
+    journees: [{ id: 'jx', date: j(-2), chantier: 'c1', personnes: 1, nonProd: 7, postes: [] }]
   }));
-
-  /* Lot 5b : une ligne par jour dans Aujourd'hui ▸ En retard, « <jour> non
-     saisi », qui porte la clé du jour. */
-  const cle = ts => 'trancher:' + t.w.BCC.jourCle(ts);
-  const lignes = lignesAuj(t, 'trancher:');
-  const dit = texteLignes(t, 'trancher:');
-  /* Une seule journée manque : ni celle qui est notée, ni celle du jour même
-     — elle n'est pas finie — ni celle à venir. */
-  verifier('une seule journée est réclamée, dans En retard', [cle(j(-3))],
-    t.$$('#aj-retard [data-ajcle^="trancher:"]').map(l => l.dataset.ajcle));
-  verifierVrai('elle dit le jour en clair', /non saisi/.test(dit) &&
-    dit.indexOf(' ' + new Date(j(-3)).getDate() + ' ') >= 0);
-  verifierVrai('elle nomme le chantier', /Dégagement Martin/.test(dit));
-  verifierVrai('ni celle du jour même', !ligneAuj(t, cle(j(0))));
-  verifierVrai('ni celle qui est déjà notée', !ligneAuj(t, cle(j(-2))) && lignes.length === 1);
-
-  /* Le rappel ouvre l'écran de résolution : trois issues, jamais une seule.
-     « Pas de jour prévu qui reste indéfiniment dans le passé. » */
-  await appuyerLigne(t, cle(j(-3))); await t.pause(200);
-  verifierVrai('il ouvre l’écran de résolution', t.$('#fj-autrement'));
-  verifierVrai('avec les trois issues', t.$('#fj-deplacer') && t.$('#fj-nonla'));
-  verifierVrai('il nomme le jour et le chantier',
-    /Dégagement Martin/.test(t.texte('#modale')));
-
-  /* « J'y ai travaillé » ouvre Ma journée à cette date-là. */
-  t.clic('#fj-autrement'); await t.pause(600);
-  verifierVrai('« j’y ai travaillé » ouvre Ma journée', t.$('#mj-date'));
-  verifier('à la date restée sans réponse', jourISO(j(-3)), t.$('#mj-date').value);
+  const C0 = t.w.BCC, A0 = () => t.w.BCUI._etat();
+  const office = () => C0.joursDOffice(A0().chantiers, A0().journees, A0().cfg.absences, A0().cfg, Date.now())
+    .map(o => o.chantier.id + ' ' + C0.jourCle(o.d));
+  const ch = id => A0().chantiers.filter(c => c.id === id)[0];
+  const heuresLe = (id, ts) => C0.arr((ch(id).temps || []).filter(x => C0.jourCle(x.date) === C0.jourCle(ts))
+    .reduce((s, x) => s + C0.heuresSaisie(x, A0().cfg), 0), 2);
+  verifier('comptent d’office : le jour passé sans saisie, ni celui qui est saisi, ni aujourd’hui, ni demain',
+    ['c2 ' + C0.jourCle(j(-4)), 'c1 ' + C0.jourCle(j(-3))], office());
+  verifier('8 h ce jour-là, sur ce chantier', 8, heuresLe('c1', j(-3)));
+  verifier('le jour saisi garde ses 7 h, sans journée d’office en plus', 7, heuresLe('c1', j(-2)));
+  verifier('sans prestation : rien pour les rendements', [], (ch('c1').temps || []).filter(x => x.office && x.activite).map(x => x.activite));
+  /* Une journée d'office est une journée : le temps passé et le prix par
+     journée la comptent comme les autres. */
+  verifier('temps passé du chantier terminé : une journée', 1, C0.tempsPasse(ch('c2'), A0().cfg));
+  verifier('prix par journée : le montant sur cette journée', 800, C0.prixJour(ch('c2'), A0().cfg));
+  verifier('et la fiche dit le même prix', 800, C0.troisChiffres(ch('c2'), A0().cfg).parJour);
+  /* Le ○ : dans la grille, la légende, Derniers jours, la fiche ▸ Travaux. */
+  let c = await caseDuJour(t, j(-3));
+  verifierVrai('la case est « fait », avec un ○', /st-travaille/.test(c.className) && c.querySelector('.cal-o'));
+  verifierVrai('la légende dit le ○', /comptée d’office \(8 h\)/.test(t.texte('#cal-leg2')));
+  verifierVrai('« Ce mois-ci » le dit', /Dégagement Martin · 8 h/.test(t.texte('#cal-histo')) || new Date(j(-3)).getMonth() !== new Date(A0().calMois).getMonth());
+  await parBarre(t, 'aujourdhui');
+  const dj = t.$('#aj-jours [data-ajouvre="jour:' + C0.minuit(j(-3)) + '"]');
+  verifierVrai('Derniers jours la montre, avec son ○', dj && /○/.test(dj.textContent) && /comptée d’office/.test(dj.textContent));
+  t.w.BCUI._ouvrirChantier('c1', 'travaux'); await t.pause(350);
+  verifierVrai('la fiche ▸ Travaux aussi', /○ comptée d’office/.test(t.texte('#vue-chantier')));
+  /* Ouvrir la fiche du jour efface le ○. */
+  await parBarre(t, 'aujourdhui');
+  t.clic('#aj-jours [data-ajouvre="jour:' + C0.minuit(j(-3)) + '"]'); await t.pause(500);
+  verifierVrai('un appui ouvre la fiche du jour', /Comptée d’office : 8 h sur Dégagement Martin/.test(t.texte('#fj-office') || ''));
+  verifier('ouverte, le ○ s’efface : la pose est marquée vue', true,
+    ((t.stock('chantiers') || [])[0].jours || []).filter(x => C0.jourCle(x.d) === C0.jourCle(j(-3)))[0].vu);
+  verifierVrai('la journée compte toujours', office().indexOf('c1 ' + C0.jourCle(j(-3))) >= 0);
+  /* Préciser : Ma journée déjà remplie ; enregistrée, elle remplace l'office. */
+  t.clic('#fj-preciser'); await t.pause(500);
+  verifier('Préciser ouvre Ma journée, chantier et durée remplis', [jourISO(j(-3)), 'c1', '8'],
+    [t.$('#mj-date') && t.$('#mj-date').value, t.$('#mj-ch') && t.$('#mj-ch').value, t.$('#mj-total') && t.$('#mj-total').value]);
+  t.clic('#mj-ok'); await t.pause(600);
+  verifier('la journée saisie remplace celle d’office', ['c2 ' + C0.jourCle(j(-4))], office());
+  verifier('jamais 16 h : 8 h ce jour-là', 8, heuresLe('c1', j(-3)));
+  await parBarre(t, 'agenda');
+  c = await caseDuJour(t, j(-3));
+  verifierVrai('et la case n’a plus de ○', c && !c.querySelector('.cal-o'));
   verifier('aucune erreur', [], t.erreurs);
 });
 
 /* --------------------------------------------------------------------- */
-scenario('Journées : le rappel se chasse jusqu’au lendemain', async () => {
-  /* Comme les autres rappels : un rappel qu'on ne peut pas fermer finit par
-     ne plus être lu. Mais le chasser n'efface rien. Lot 5b : il ne revient
-     plus au lancement suivant — un téléphone qu'on rouvre dix fois le
-     remontrait dix fois — mais le lendemain, tant que rien n'est réglé. */
-  const JOUR = 86400000;
-  const hier = new Date(Date.now() - JOUR); hier.setHours(12, 0, 0, 0);
-  const graines = {
-    module: 'entreprise',
-    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'encours', lignes: [], temps: [],
-      jours: [{ d: hier.getTime(), p: 1 }], maj: Date.now() }]
-  };
-  const t = await ouvrir(Object.assign({}, VIDE, graines));
-  const cle = 'trancher:' + t.w.BCC.jourCle(hier.getTime());
-  verifierVrai('le rappel est là', ligneAuj(t, cle));
-  t.clic('[data-ajmasque="' + cle + '"]'); await t.pause(300);
-  verifierVrai('un doigt le chasse', !ligneAuj(t, cle));
-  verifier('mais la journée reste à noter', 1,
-    t.w.BCC.journeesANoter(t.stock('chantiers'), Date.now()).length);
-  verifier('le masque est daté du jour', t.w.BCC.jourCle(Date.now()), (t.stock('masques') || {})[cle]);
-  /* Relancé le même jour : toujours masqué. */
-  const meme = await ouvrir(Object.assign({}, VIDE, graines, { masques: t.stock('masques') }));
-  verifierVrai('relancé le même jour, il reste masqué', !ligneAuj(meme, cle));
-  /* Le lendemain : le masque d'hier ne vaut plus. */
-  const veille = {}; veille[cle] = t.w.BCC.jourCle(Date.now() - JOUR);
-  const demain = await ouvrir(Object.assign({}, VIDE, graines, { masques: veille }));
-  verifierVrai('le lendemain, il revient', ligneAuj(demain, cle));
-  verifier('aucune erreur', [], t.erreurs.concat(meme.erreurs, demain.erreurs));
+scenario('Journée d’office : « Je n’y étais pas » la retire ; devis pas signé et jour d’avant la mise à jour ne comptent pas', async () => {
+  const j = JCAL;
+  const ch = (id, statut, jours, extra) => Object.assign({ id, nom: 'Chantier ' + id, statut, aDevis: true,
+    maj: Date.now(), lignes: [], temps: [], jours }, extra);
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'calendrier', cfg: { heuresJour: 8, journeesMigrees: true, officeDepuis: j(-5) },
+    chantiers: [
+      ch('c1', 'encours', [{ d: j(-3), p: 1 }]),
+      /* Posé sur un devis pas signé : il ne compte pas, il reste pâle. */
+      ch('c2', 'envoye', [{ d: j(-2), p: 1 }]),
+      /* Signé, mais posé « devis pas signé » à la main : il ne compte pas. */
+      ch('c3', 'accepte', [{ d: j(-2), p: 0.5, ferme: false }]),
+      /* D'avant la mise à jour : tel quel, sans rien compter, sans relance. */
+      ch('c4', 'encours', [{ d: j(-8), p: 1 }]),
+      /* Pas signé, mais posé « Posé » à la main : le choix fait foi. */
+      ch('c5', 'envoye', [{ d: j(-1), p: 0.5, ferme: true }]),
+      /* Posé avant la signature : signer ensuite ne le rend pas fait. */
+      ch('c6', 'accepte', [{ d: j(-4), p: 1 }], { dateSignature: j(-1) })]
+  }));
+  const C0 = t.w.BCC, A0 = () => t.w.BCUI._etat();
+  const office = () => C0.joursDOffice(A0().chantiers, A0().journees, A0().cfg.absences, A0().cfg, Date.now())
+    .map(o => o.chantier.id + ' ' + C0.jourCle(o.d) + ' ' + o.heures);
+  verifier('ne comptent que le confirmé et le « Posé » choisi à la main',
+    ['c1 ' + C0.jourCle(j(-3)) + ' 8', 'c5 ' + C0.jourCle(j(-1)) + ' 4'], office());
+  let c = await caseDuJour(t, j(-8));
+  verifierVrai('le jour d’avant la mise à jour reste posé, pâle, sans ○ ni « ? »',
+    c && /st-confirme/.test(c.className) && /passe/.test(c.className) && !c.querySelector('.cal-o, .cal-q'));
+  c = await caseDuJour(t, j(-2));
+  verifierVrai('le jour sur devis pas signé : pointillés pâles', c && /st-prevu/.test(c.className) && /passe/.test(c.className));
+  await parBarre(t, 'aujourdhui');
+  verifierVrai('aucune relance sur Aujourd’hui', !t.$('#aj-retard') && !/non saisi|trancher/i.test(t.texte('#vue-accueil')));
+  /* « Je n'y étais pas » : le jour posé s'en va dans la Corbeille, et en revient. */
+  await parBarre(t, 'agenda');
+  await cliquerJour(t, j(-3));
+  verifierVrai('la fiche du jour propose « Je n’y étais pas »', t.$('#fj-nonla'));
+  t.clic('#fj-nonla'); await t.pause(600);
+  verifier('le jour est retiré', [], ((t.stock('chantiers') || []).filter(x => x.id === 'c1')[0].jours || []));
+  verifier('plus de journée d’office', ['c5 ' + C0.jourCle(j(-1)) + ' 4'], office());
+  t.clic('#s-recuperer'); await t.pause(450);
+  verifierVrai('il est dans la Corbeille', /Chantier c1/.test(t.texte('#s-recup')) && /Jour posé/.test(t.texte('#s-recup')));
+  t.clic('[data-repecher]'); await t.pause(600);
+  verifier('repêché, il compte de nouveau', ['c1 ' + C0.jourCle(j(-3)) + ' 8', 'c5 ' + C0.jourCle(j(-1)) + ' 4'], office());
+  verifier('aucune erreur', [], t.erreurs);
 });
 
 /* --------------------------------------------------------------------- */
@@ -6701,8 +6755,8 @@ scenario('Ma journée : un chantier posé ce jour-là est pré-choisi, un seul (
   t.clic('#modale-x'); await t.pause(150);
   await parBarre(t, 'agenda');
   await cliquerJour(t, auj);
-  t.clic('#fj-autrement'); await t.pause(400);
-  verifier('fiche du jour ▸ J’y ai travaillé, mais autrement : pré-choisi', 'c1', choix());
+  t.clic('#fj-travaille'); await t.pause(400);
+  verifier('fiche du jour ▸ Saisir ma journée : pré-choisi', 'c1', choix());
   t.clic('#modale-x'); await t.pause(150);
 
   /* En modification, rien n'est pré-choisi : la journée est à lui. */
@@ -6792,14 +6846,15 @@ scenario('Accueil : le jour qui vient dit pour qui on travaille', async () => {
       jours: [{ d: demain.getTime(), p: 1 }] }]
   }));
   await t.pause(300);
-  /* Lot 5b : la ligne sous les bulles est devenue « N jours prévus » dans
-     Aujourd'hui ▸ Bientôt. */
-  const dit = texteLignes(t, 'prevus:c1');
-  verifierVrai('le jour est annoncé', /demain/.test(dit) && /1 jour prévu/.test(dit));
+  /* Lot r1 : Bientôt est parti ; « posé demain » se dit sur la ligne du
+     chantier, dans Chantiers en cours, avec le donneur d'ordre. */
+  const ligne = t.$('#aj-encours [data-ajch="c1"]');
+  const dit = ligne ? ligne.textContent.replace(/\s+/g, ' ') : '';
+  verifierVrai('le jour est annoncé : ' + dit, /posé demain/.test(dit));
   verifierVrai('avec le chantier', /Dégagement Martin/.test(dit));
-  verifierVrai('et pour qui', /pour Cabinet Dubois/.test(dit));
-  verifierVrai('dans Bientôt', t.$('#aj-bientot [data-ajcle="prevus:c1"]'));
-  await appuyerLigne(t, 'prevus:c1');
+  verifierVrai('et pour qui', /Cabinet Dubois/.test(dit));
+  verifierVrai('plus de bloc Bientôt', !t.$('#aj-bientot') && !/Bientôt/.test(t.texte('#vue-accueil')));
+  ligne && ligne.click(); await t.pause(400);
   verifierVrai('elle ouvre la fiche du chantier', vueActive(t) === 'vue-chantier' &&
     /Dégagement Martin/.test(t.texte('#vue-chantier')));
   verifier('aucune erreur', [], t.erreurs);
@@ -6873,6 +6928,32 @@ async function cliquerJour(t, ts, attente) {
   await t.pause(attente || 450);
   return !!c;
 }
+/* Poser un chantier (lot r1) : la feuille liste les chantiers à choisir, puis
+   le statut du jour. */
+async function choisirAPoser(t, id, st) {
+  const ok = t.clic('#modale [data-pjch="' + id + '"]'); await t.pause(150);
+  if (st) { t.clic('#modale [data-pjst="' + st + '"]'); await t.pause(100); }
+  return ok;
+}
+/* L'appui long (G2) : le doigt tenu sur la case, ou le clic droit. jsdom n'a
+   pas de PointerEvent : un MouseEvent du même nom suffit aux écouteurs. */
+async function appuiLong(t, ts, maniere) {
+  const c = await caseDuJour(t, ts);
+  if (!c) return null;
+  if (maniere === 'souris') {
+    const e = new t.w.MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2 });
+    c.dispatchEvent(e);
+    await t.pause(100);
+    return e;
+  }
+  c.dispatchEvent(new t.w.MouseEvent('pointerdown', { bubbles: true, button: 0, clientX: 5, clientY: 5 }));
+  await t.pause(650);
+  c.dispatchEvent(new t.w.MouseEvent('pointerup', { bubbles: true, button: 0 }));
+  /* Le doigt levé donne un clic sur la case : il ne doit rien rouvrir. */
+  c.dispatchEvent(new t.w.MouseEvent('click', { bubbles: true, button: 0 }));
+  await t.pause(150);
+  return c;
+}
 
 scenario('Calendrier : un jour porte exactement un statut', async () => {
   /* « Une case-jour peut porter plusieurs statuts en même temps, plusieurs
@@ -6945,18 +7026,17 @@ scenario('Calendrier : cliquer un jour ouvre sa fiche, et on peut y poser un cha
   verifier('mais pas d’y avoir déjà travaillé', null, t.$('#fj-travaille'));
 
   t.clic('#fj-poser'); await t.pause(400);
-  t.choisir('#pj-ch', 'c1');
+  await choisirAPoser(t, 'c1');
   t.clic('#pj-ok'); await t.pause(500);
   const c = (t.stock('chantiers') || [])[0];
   verifier('le chantier est posé sur ce jour', 1, (c.jours || []).length);
   verifier('à la bonne date', t.w.BCC.jourCle(cible), t.w.BCC.jourCle(c.jours[0].d));
   const apres = t.$('[data-jour="' + cible + '"]');
-  verifierVrai('et la case passe en confirmé', /st-confirme/.test(apres.className));
+  verifierVrai('et la case passe en posé', /st-confirme/.test(apres.className));
   verifier('une seule bande', 1, apres.querySelectorAll('.bande').length);
 
-  /* Et une fois le chantier posé, on ne valide toujours pas d'un doigt une
-     journée qui n'a pas eu lieu. Le jour vide ne prouvait rien : il n'avait
-     rien en attente, donc une autre garde le retenait déjà. */
+  /* Et une fois le chantier posé, on ne valide pas d'un doigt une journée
+     qui n'a pas eu lieu (le geste est d'ailleurs parti au lot r1). */
   t.clic('[data-jour="' + cible + '"]'); await t.pause(450);
   verifierVrai('la fiche annonce ce qui est posé', /Dégagement Martin/.test(t.texte('#modale')));
   verifier('mais pas de validation d’un doigt', null, t.$('#fj-prevu'));
@@ -6992,118 +7072,58 @@ scenario('Calendrier : un jour non travaillé se pose, se note et se reprend', a
 });
 
 /* --------------------------------------------------------------------- */
-scenario('Calendrier : un jour passé resté au planning doit être tranché', async () => {
-  /* « Pas de jour prévu/confirmé qui reste indéfiniment dans le passé sans
-     statut final. » Trois issues, et le jour même n'en fait pas partie : il
-     n'est pas fini. */
+scenario('Calendrier : un jour passé d’avant la mise à jour se règle à la main', async () => {
+  /* Tranché le 04/11 : les jours passés avant la 4.92 restent tels quels —
+     pâles, sans relance, sans journée d'office. Il les règle à la main :
+     déplacer (« prévu jeudi mais chantier fait mercredi »), retirer, saisir. */
   const t = await ouvrir(Object.assign({}, VIDE, {
     module: 'calendrier', cfg: { heuresJour: 8 },
     chantiers: [{ id: 'c1', nom: 'Dégagement Martin', statut: 'accepte', aDevis: true,
       maj: Date.now(), lignes: [], temps: [],
-      jours: [{ d: JCAL(-4), p: 1 }, { d: JCAL(0), p: 1 }, { d: JCAL(3), p: 1 }] }]
+      jours: [{ d: JCAL(-4), p: 1 }, { d: JCAL(-3), p: 1 }, { d: JCAL(0), p: 1 }, { d: JCAL(3), p: 1 }] }]
   }));
   await t.pause(300);
   const C0 = t.w.BCC;
-  const l = C0.joursAResoudre(t.stock('chantiers'), { heuresJour: 8 }, [], Date.now());
-  verifier('un seul jour à trancher', 1, l.length);
-  verifier('celui d’il y a quatre jours', C0.jourCle(JCAL(-4)), C0.jourCle(l[0].d));
-
-  /* Le déplacer : « prévu jeudi mais chantier fait mercredi ». */
-  /* Lot 5b : la ligne « non saisi » d'Aujourd'hui ▸ En retard. */
-  t.clic('#aj-retard [data-ajcle^="trancher:"] [data-ajouvre]'); await t.pause(600);
+  const cles = () => (((t.stock('chantiers') || [])[0] || {}).jours || []).map(j => C0.jourCle(j.d));
+  verifierVrai('la date de la mise à jour est posée à la première ouverture',
+    Math.abs((t.stock('cfg') || {}).officeDepuis - Date.now()) < 60000);
+  await cliquerJour(t, JCAL(-4));
+  verifierVrai('sa fiche le dit : il ne compte pas', /ne compte pas/.test(t.texte('#modale .fj-etat')));
+  verifierVrai('on peut y saisir sa journée', t.$('#fj-travaille') && /Saisir ma journée/.test(t.texte('#fj-travaille')));
   t.clic('#fj-deplacer'); await t.pause(400);
   t.choisir('#dj-date', jourISO(JCAL(-5))); await t.pause(150);
   t.clic('#dj-ok'); await t.pause(600);
-  const c = (t.stock('chantiers') || [])[0];
-  const cles = (c.jours || []).map(j => C0.jourCle(j.d));
-  verifierVrai('le jour d’origine est libéré', cles.indexOf(C0.jourCle(JCAL(-4))) < 0);
-  verifierVrai('et le vrai jour est posé', cles.indexOf(C0.jourCle(JCAL(-5))) >= 0);
-  verifier('rien n’a été perdu', 3, cles.length);
+  verifierVrai('le jour d’origine est libéré', cles().indexOf(C0.jourCle(JCAL(-4))) < 0);
+  verifierVrai('et le vrai jour est posé', cles().indexOf(C0.jourCle(JCAL(-5))) >= 0);
+  verifier('rien n’a été perdu', 4, cles().length);
+  await cliquerJour(t, JCAL(-3));
+  t.clic('[data-fjretirer="c1"]'); await t.pause(500);
+  verifierVrai('un autre se retire', cles().indexOf(C0.jourCle(JCAL(-3))) < 0 && cles().length === 3);
+  verifier('aucun n’est devenu une journée', 0, (t.stock('journees') || []).length);
   verifier('aucune erreur', [], t.erreurs);
 });
 
 /* --------------------------------------------------------------------- */
-scenario('Calendrier : « je n’y étais pas » clôt le jour pour de bon', async () => {
-  const t = await ouvrir(Object.assign({}, VIDE, {
-    module: 'calendrier', cfg: { heuresJour: 8 },
-    chantiers: [{ id: 'c1', nom: 'Dégagement Martin', statut: 'accepte', aDevis: true,
-      maj: Date.now(), lignes: [], temps: [], jours: [{ d: JCAL(-4), p: 1 }] }]
-  }));
-  await t.pause(300);
-  /* Lot 5b : la ligne « non saisi » d'Aujourd'hui ▸ En retard. */
-  t.clic('#aj-retard [data-ajcle^="trancher:"] [data-ajouvre]'); await t.pause(600);
-  t.clic('#fj-nonla'); await t.pause(400);
-  t.saisir('#ab-note', 'arrêt');
-  t.clic('#ab-ok'); await t.pause(600);
-
-  const C0 = t.w.BCC;
-  verifier('plus rien à trancher', 0,
-    C0.joursAResoudre(t.stock('chantiers'), { heuresJour: 8 },
-      (t.stock('cfg') || {}).absences || [], Date.now()).length);
-  verifierVrai('et la ligne s’efface', !lignesAuj(t, 'trancher:').length);
-  verifier('aucune erreur', [], t.erreurs);
-});
-
-/* --------------------------------------------------------------------- */
-scenario('Calendrier : une journée prévue se valide d’un seul geste', async () => {
-  /* « Il faudrait juste un endroit où je puisse dire : valider, c'est bon
-     j'ai travaillé, ça l'enregistre. Comme ça je ne me pose pas de
-     questions. C'est rapide et c'est efficace. » Le cas courant est
-     celui-là : posé, fait, comme prévu. Ouvrir « Ma journée » pour retaper
-     ce que l'agenda sait déjà, c'est cinq gestes pour rien.
-
-     Deux portes mènent au même geste, et les deux sont éprouvées ici : la
-     fiche du jour, et l'écran qui force à trancher. */
+scenario('Calendrier : plus de validation d’un geste, la journée se saisit (lot r1)', async () => {
+  /* « C'était comme prévu », « Toutes comme prévu » et « J'y ai travaillé,
+     mais autrement » sont partis (retrait accepté le 03/11) : un jour posé et
+     confirmé compte d'office le lendemain, et « Saisir ma journée » ouvre Ma
+     journée, le chantier posé déjà choisi (P4). */
   const t = await ouvrir(Object.assign({}, VIDE, {
     module: 'calendrier', cfg: { heuresJour: 8, journeesMigrees: true },
-    chantiers: [
-      { id: 'c1', nom: 'Dégagement Martin', statut: 'accepte', aDevis: true,
-        maj: Date.now(), foret: 'Forêt de la Côte', commune: 'Clairbois', temps: [],
-        jours: [{ d: JCAL(0), p: 1 }],
-        lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 3, prix: 700, nature: 'prestation' }] },
-      /* Une demi-journée, sur un chantier qui ne dit pas ce qu'on y fait. */
-      { id: 'c2', nom: 'Vaux', statut: 'accepte', aDevis: true, maj: Date.now(),
-        temps: [], jours: [{ d: JCAL(-2), p: 0.5 }], lignes: [] }
-    ]
+    chantiers: [{ id: 'c1', nom: 'Dégagement Martin', statut: 'accepte', aDevis: true,
+      maj: Date.now(), foret: 'Forêt de la Côte', commune: 'Clairbois', temps: [],
+      jours: [{ d: JCAL(0), p: 1 }],
+      lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 3, prix: 700, nature: 'prestation' }] }]
   }));
   await t.pause(300);
-
-  /* --- par la fiche du jour, sur aujourd'hui --------------------------- */
   t.clic('[data-jour="' + t.w.BCC.minuit(Date.now()) + '"]'); await t.pause(450);
-  verifierVrai('la fiche dit ce qui était prévu', /1 j prévues/.test(t.texte('#modale')));
-  const bouton = t.$('#fj-prevu');
-  verifierVrai('le geste est proposé', !!bouton);
-  /* Valider un chiffre qu'on ne voit pas ne serait pas une validation. */
-  verifierVrai('et il annonce la durée', /1 j/.test(bouton.textContent));
-  bouton.click(); await t.pause(700);
-
-  const j1 = (t.stock('journees') || [])[0];
-  verifierVrai('une journée est née', !!j1);
-  verifier('sur le bon chantier', 'c1', j1.chantier);
-  verifier('avec les heures prévues', 8, (j1.postes || [])[0].heures);
-  verifier('et la prestation du chantier en poste', 'DEGAG', (j1.postes || [])[0].travaux);
-  verifier('le chantier porte enfin son temps', 1,
-    ((t.stock('chantiers') || []).filter(c => c.id === 'c1')[0].temps || []).length);
-  const casse = t.$('[data-jour="' + t.w.BCC.minuit(Date.now()) + '"]');
-  verifierVrai('la case passe en travaillé', /st-travaille/.test(casse.className));
-
-  /* --- par l'écran qui force à trancher, sur un jour passé ------------- */
-  verifierVrai('le jour passé reste à trancher', t.$('#cal-trancher-btn'));
-  t.clic('#cal-trancher-btn'); await t.pause(500);
-  /* Une demi-journée posée vaut une demi-journée faite : le geste reprend
-     ce qui a été posé, il n'invente pas la journée entière. */
-  verifierVrai('le même geste y est', t.$('#fj-prevu'));
-  verifierVrai('pour quatre heures', /4 h/.test(t.$('#fj-prevu').textContent));
-  t.clic('#fj-prevu'); await t.pause(700);
-
-  const j2 = (t.stock('journees') || []).filter(x => x.chantier === 'c2')[0];
-  verifierVrai('la seconde journée est née', !!j2);
-  /* Sans prestation au chantier, les heures entrent en temps non productif :
-     elles comptent dans la journée, jamais dans un rendement. */
-  verifier('quatre heures enregistrées', 4, j2.nonProd);
-  verifier('plus rien à trancher', 0,
-    t.w.BCC.joursAResoudre(t.stock('chantiers'), { heuresJour: 8 }, [], Date.now()).length);
-  verifier('et le rappel s’efface', null, t.$('#cal-trancher-btn'));
+  verifierVrai('la fiche dit ce qui est posé', /8 h prévues|1 j prévues/.test(t.texte('#modale')));
+  verifier('plus de geste « comme prévu »', [null, null, null], [t.$('#fj-prevu'), t.$('#fj-tout'), t.$('#fj-autrement')]);
+  verifier('le bouton dit « Saisir ma journée »', 'Saisir ma journée', t.texte('#fj-travaille'));
+  t.clic('#fj-travaille'); await t.pause(500);
+  verifier('il ouvre Ma journée, datée de ce jour', jourISO(Date.now()), t.$('#mj-date') && t.$('#mj-date').value);
+  verifier('le chantier posé déjà choisi', 'c1', t.$('#mj-ch') && t.$('#mj-ch').value);
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -7211,82 +7231,12 @@ scenario('Ma journée : un chantier posé ce jour-là reste sélectionnable', as
   }));
   await t.pause(300);
   await cliquerJour(t, hier.getTime());
-  /* Posé, passé, sans temps : le jour est à trancher (R8). */
-  t.clic('#fj-autrement'); await t.pause(500);
+  /* Posé, passé, sans temps (d'avant la mise à jour) : on y saisit sa journée. */
+  t.clic('#fj-travaille'); await t.pause(500);
 
   const choix = options(t, '#mj-ch').join(' · ');
   verifierVrai('le chantier posé ce jour-là est proposé', /Payé/.test(choix));
   verifierVrai('celui qui n’y est pas reste écarté', !/Ailleurs/.test(choix));
-  verifier('aucune erreur', [], t.erreurs);
-});
-
-/* --------------------------------------------------------------------- */
-scenario('Calendrier : toutes les journées passées se valident d’un seul geste', async () => {
-  /* « Toutes les journées posées au calendrier, il faudrait que ce soit compté
-     comme fait. Je considère que si j'y ai travaillé, et puis voilà. » Il en
-     avait quarante-sept ; les trancher une par une, c'est quarante-sept
-     fenêtres. Le bouton s'efface de lui-même : une fois pressé, il ne reste
-     plus rien à trancher. */
-  const t = await ouvrir(Object.assign({}, VIDE, {
-    module: 'calendrier', cfg: { heuresJour: 8, journeesMigrees: true },
-    chantiers: [{ id: 'c1', proprietaire: 'Martin', commune: 'Clairbois', statut: 'accepte',
-      aDevis: true, temps: [], maj: Date.now(),
-      jours: [{ d: JCAL(-4), p: 1 }, { d: JCAL(-3), p: 0.5 }, { d: JCAL(-2), p: 1 }],
-      lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 3, prix: 700, nature: 'prestation' }] }]
-  }));
-  await t.pause(300);
-  const C0 = t.w.BCC;
-  verifier('trois journées attendent', 3,
-    C0.joursAResoudre(t.stock('chantiers'), { heuresJour: 8 }, [], Date.now()).length);
-
-  t.clic('#cal-trancher-btn'); await t.pause(500);
-  const bouton = t.$('#fj-tout');
-  verifierVrai('le geste d’ensemble est proposé', !!bouton);
-  verifierVrai('et il dit combien', /3 journées/.test(bouton.textContent));
-
-  /* On écrit trois journées d'un coup : le geste se confirme, dans une
-     feuille (lot c2), plus par la fenêtre du téléphone. */
-  let natif = false;
-  t.w.confirm = () => { natif = true; return true; };
-  bouton.click(); await t.pause(400);
-  verifierVrai('la question est posée dans une feuille', /3 journées passées/.test(t.texte('#modale')) &&
-    t.$('#modale').classList.contains('feuille-nav') && t.$('#ft-ok'));
-  verifier('rien n’est écrit avant de confirmer', 0, (t.stock('journees') || []).length);
-  verifier('et pas de fenêtre native', false, natif);
-  t.clic('#ft-ok'); await t.pause(900);
-
-  const js = t.stock('journees') || [];
-  verifier('trois journées sont nées', 3, js.length);
-  /* Chacune reprend la part de l'agenda : la demi-journée ne devient pas
-     entière. */
-  const heures = js.map(j => (j.postes || []).reduce((s, p) => s + p.heures, 0)).sort();
-  verifier('avec les heures de l’agenda', [4, 8, 8], heures);
-  verifierVrai('et la prestation du chantier',
-    js.every(j => (j.postes || [])[0].travaux === 'DEGAG'));
-
-  verifier('plus rien à trancher', 0,
-    C0.joursAResoudre(t.stock('chantiers'), { heuresJour: 8 }, [], Date.now()).length);
-  verifierVrai('le rappel s’efface de lui-même', !t.$('#cal-trancher-btn'));
-  verifier('aucune erreur', [], t.erreurs);
-});
-
-/* --------------------------------------------------------------------- */
-scenario('Calendrier : un refus n’écrit aucune journée', async () => {
-  /* Quarante-sept écritures d'un coup ne se lancent pas par mégarde. */
-  const t = await ouvrir(Object.assign({}, VIDE, {
-    module: 'calendrier', cfg: { heuresJour: 8, journeesMigrees: true },
-    chantiers: [{ id: 'c1', proprietaire: 'Martin', statut: 'accepte', aDevis: true,
-      temps: [], maj: Date.now(), lignes: [],
-      jours: [{ d: JCAL(-4), p: 1 }, { d: JCAL(-2), p: 1 }] }]
-  }));
-  await t.pause(300);
-  t.clic('#cal-trancher-btn'); await t.pause(500);
-  t.clic('#fj-tout'); await t.pause(400);
-  t.clic('#ft-annuler'); await t.pause(450);
-  verifier('rien n’est écrit', 0, (t.stock('journees') || []).length);
-  verifierVrai('« Annuler » ramène à la fiche du jour', t.$('#modale .fj-etat.st-trancher') && t.$('#fj-tout'));
-  verifier('et les journées attendent toujours', 2,
-    t.w.BCC.joursAResoudre(t.stock('chantiers'), { heuresJour: 8 }, [], Date.now()).length);
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -8687,40 +8637,12 @@ scenario('Calendrier : un seul chemin pour dire qu’on a travaillé — la fich
     [t.$('#cal-saisir'), t.$('#cal-detail'), t.$('#cal-jour-titre')]);
   t.clic('#cal-auj'); await t.pause(450);
   verifierVrai('le bouton Aujourd’hui ouvre la fiche du jour', t.$('#fj-poser'));
-  verifier('avec le bouton de saisie', 'J’ai travaillé aujourd’hui', t.texte('#fj-travaille'));
+  verifier('avec le bouton de saisie', 'Saisir ma journée', t.texte('#fj-travaille'));
   t.clic('#fj-travaille'); await t.pause(450);
   verifier('qui ouvre Ma journée', 'Ma journée', t.texte('#modale-titre'));
   verifier('datée du jour', jourISO(Date.now()), t.$('#mj-date').value);
   /* Et l'ancien formulaire n'existe plus. */
   verifier('l’ancien formulaire a disparu', null, t.$('#sj-duree'));
-  verifier('aucune erreur', [], t.erreurs);
-});
-
-/* --------------------------------------------------------------------- */
-scenario('Calendrier : les jours restés à trancher s’annoncent dans l’agenda', async () => {
-  /* « À l'ouverture de l'app OU à l'accès au calendrier. » La ligne est en
-     tête de l'Agenda (P3), en plus d'Aujourd'hui ▸ En retard, et elle ouvre
-     la fiche du jour à l'état « à trancher » (R8). */
-  const JOUR = 86400000;
-  const j = n => { const d = new Date(Date.now() + n * JOUR); d.setHours(12, 0, 0, 0); return d.getTime(); };
-  const t = await ouvrir(Object.assign({}, VIDE, {
-    module: 'calendrier', cfg: { heuresJour: 8 },
-    chantiers: [{ id: 'c1', nom: 'Dégagement Martin', statut: 'accepte', aDevis: true,
-      maj: Date.now(), lignes: [], temps: [],
-      jours: [{ d: j(-5), p: 1 }, { d: j(-3), p: 1 }, { d: j(4), p: 1 }] }]
-  }));
-  await t.pause(400);
-  const dit = t.texte('#cal-trancher');
-  verifierVrai('l’agenda l’annonce, en tête', /2 journées à trancher/.test(dit) &&
-    t.$('#vue-calendrier #cal-trancher') && t.$('#cal-trancher').compareDocumentPosition(t.$('#cal-grille')) & 4);
-  verifierVrai('il dit les jours', dit.indexOf(' ' + new Date(j(-5)).getDate() + ' ') >= 0 &&
-    dit.indexOf(' ' + new Date(j(-3)).getDate() + ' ') >= 0);
-
-  t.clic('#cal-trancher-btn'); await t.pause(500);
-  verifierVrai('il ouvre la fiche du jour, à trancher', t.$('#modale .fj-etat.st-trancher'));
-  verifierVrai('sur le plus ancien', new RegExp(' ' + new Date(j(-5)).getDate() + ' ').test(t.texte('#modale-titre')));
-  verifierVrai('avec les issues de « Que s’est-il passé ? »',
-    t.$('#fj-autrement') && t.$('#fj-deplacer') && t.$('#fj-nonla') && t.$('#fj-prevu') && t.$('#fj-tout'));
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -8869,50 +8791,6 @@ scenario('Fiche : voir ou placer le chantier sur la carte', async () => {
   verifierVrai('sa commune a été cherchée', /q=Saint-Paul/.test(demande || ''));
   const v2 = t.w.BCUI._carte.cadre(), c2 = LB.vers(43.70, 7.12);
   verifierVrai('et la carte y est allée', Math.abs(v2.cx - c2.x) < 1 && Math.abs(v2.cy - c2.y) < 1);
-  verifier('aucune erreur', [], t.erreurs);
-});
-
-/* --------------------------------------------------------------------- */
-scenario('Calendrier : la liste de ce qui reste à planifier', async () => {
-  /* « J'ai besoin de pouvoir dire : j'ai trois chantiers à planifier, sur tel
-     chantier j'ai estimé deux jours, l'autre trois, l'autre un. » */
-  const auj = new Date(); auj.setHours(12, 0, 0, 0);
-  const ch = (id, statut, extra) => Object.assign({ id, statut, aDevis: statut === 'devis',
-    proprietaire: 'Client ' + id, lignes: [], temps: [], jours: [], maj: Date.now() }, extra);
-  const t = await ouvrir(Object.assign({}, VIDE, {
-    module: 'calendrier',
-    chantiers: [
-      ch('a', 'accepte', { joursEstimes: 2 }),
-      ch('b', 'encours', { joursEstimes: 4, jours: [{ d: auj.getTime(), p: 1 }] }),
-      ch('d', 'devis', { joursEstimes: 1 }),
-      ch('e', 'accepte'),
-      ch('f', 'facture', { joursEstimes: 4 }),
-      ch('g', 'encours', { joursEstimes: 1, jours: [{ d: auj.getTime(), p: 1 }] })
-    ]
-  }));
-  await t.pause(300);
-  const z = () => t.$('#cal-aplanifier');
-  const txt = z().textContent.replace(/\s+/g, ' ');
-  verifierVrai('le bloc s’appelle « À programmer »', /À programmer/.test(txt));
-  const lignes = t.$$('#cal-aplanifier [data-aplacer], #cal-aplanifier [data-aestimer]')
-    .map(b => (b.dataset.aplacer || b.dataset.aestimer));
-  verifier('les engagés d’abord, le devis ensuite ; ni le facturé, ni le tout placé',
-    ['b', 'a', 'e', 'd'], lignes);
-  verifierVrai('chaque chantier dit ce qui lui reste', /3 journées à placer/.test(txt) && /2 journées à placer/.test(txt) && /1 journée à placer/.test(txt));
-  verifierVrai('un chantier engagé sans estimation est signalé', /à estimer/.test(txt));
-  verifierVrai('le devis est marqué comme tel', /devis en attente/.test(txt));
-  verifierVrai('et le total se lit', /6 journées sur 4 chantiers/.test(txt));
-  /* Repliable : replié une fois, il le reste quand la grille se refait. */
-  verifier('il est déplié d’abord', true, t.$('#cal-aprog').open);
-  t.$('#cal-aprog').open = false; await t.pause(150);
-  t.clic('#cal-suiv'); await t.pause(200);
-  verifier('replié, il le reste', false, t.$('#cal-aprog').open);
-  t.$('#cal-aprog').open = true; await t.pause(150);
-
-  t.clic('[data-aplacer="a"]'); await t.pause(300);
-  verifierVrai('« Placer » ouvre le placement du chantier',
-    /Placement — Client a/.test(t.texte('#cal-planif')));
-  verifier('et la liste s’efface le temps de placer', '', z().innerHTML);
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -9160,7 +9038,7 @@ scenario('Cadre : chaque entrée du ☰ ouvre le bon écran, avec son chiffre', 
   verifier('la feuille s’appelle « Le reste de Sylve »', 'Le reste de Sylve', t.texte('#modale-titre'));
   verifier('ses deux groupes', ['Entreprise', 'Outils de terrain'], t.$$('#modale .fn-sous').map(p => p.textContent));
   verifier('dans l’ordre de la maquette',
-    ['stock', 'achats', 'vehicule', 'rendements', 'cubage', 'bois', 'reglages', 'sauvegarde', 'corbeille'],
+    ['stock', 'achats', 'vehicule', 'rendements', 'cubage', 'bois', 'notes', 'reglages', 'sauvegarde', 'corbeille'],
     t.$$('#modale [data-menu]').map(b => b.dataset.menu));
   /* Le chiffre de situation : deux bordereaux de 12,5 et 3,25 m³. */
   const cub = t.$('#modale [data-menu="cubage"]');
@@ -9171,7 +9049,7 @@ scenario('Cadre : chaque entrée du ☰ ouvre le bon écran, avec son chiffre', 
   t.clic('#modale-x'); await t.pause(150);
 
   const attendus = { stock: 'vue-stock2', achats: 'vue-achats', vehicule: 'vue-carnetv',
-    rendements: 'vue-rendements', cubage: 'vue-fichiers', bois: 'vue-stock', reglages: 'vue-reglages' };
+    rendements: 'vue-rendements', cubage: 'vue-fichiers', bois: 'vue-stock', notes: 'vue-notes', reglages: 'vue-reglages' };
   for (const m of Object.keys(attendus)) {
     await parMenu(t, m);
     verifier('☰ ▸ ' + m + ' ouvre son écran', attendus[m], vueActive(t));
@@ -9231,7 +9109,9 @@ scenario('Cadre : rien de l’inventaire des écrans ne s’est perdu', async ()
      chaque élément de l'accueil et de Mon entreprise a son nouvel endroit ». */
   await parBarre(t, 'chantiers'); await parBarre(t, 'aujourdhui');
   verifier('Accueil : l’onglet Aujourd’hui l’ouvre', 'vue-accueil', vueActive(t));
-  verifierVrai('Mes notes y sont', t.$('#vue-accueil #aj-notes'));
+  /* Mes notes ont quitté Aujourd'hui pour le ☰ au lot r1. */
+  await parMenu(t, 'notes');
+  verifierVrai('Mes notes : par le ☰', vueActive(t) === 'vue-notes' && t.$('#vue-notes #aj-notes'));
   await parMenu(t, 'reglages');
   verifier('Réglages : par le ☰', 'vue-reglages', vueActive(t));
 
@@ -9337,11 +9217,11 @@ const posteV = dernierDate => ({ infos: {}, releves: [], interventions: [], seme
    elle mène, et comment on la règle. « reglee » rend soit une action sur
    l'application ouverte, soit des données réglées à rouvrir. */
 const LIGNES_AUJ = [
-  { nom: 'jour à trancher', bloc: 'retard', cle: () => 'trancher:' + jourISO(JA(-1)),
-    graines: { chantiers: [chA('c1', { nom: 'Dégagement Martin', statut: 'accepte', aDevis: true, jours: [{ d: JA(-1), p: 1 }] })] },
-    dit: /non saisi.*Prévu : Dégagement Martin.*Trancher/,
-    mene: t => !!t.$('#fj-autrement') && /Dégagement Martin/.test(t.texte('#modale')),
-    regler: async t => { t.clic('#fj-nonla'); await t.pause(400); t.saisir('#ab-note', 'arrêt'); t.clic('#ab-ok'); await t.pause(600); } },
+  /* Lot r1 : En retard ne porte plus que trois sortes de lignes ; la
+     sauvegarde, le stock et le véhicule sont repliés dans « Autres rappels ».
+     Les jours à trancher, « À programmer », « N jours prévus » et « Devis à
+     faire » ne sont plus des lignes : la journée d'office, la ligne du
+     chantier et l'étape Devis de la fiche les ont remplacés. */
   { nom: 'facture à faire', bloc: 'retard', cle: () => 'afacturer:c1',
     graines: { chantiers: [chA('c1', { nom: 'Vaux', commune: 'Vaux', statut: 'termine', dateFin: JA(-20),
       lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 2, prix: 500, nature: 'prestation' }] })] },
@@ -9354,12 +9234,18 @@ const LIGNES_AUJ = [
     dit: /Facture impayée.*1 000 €.*échue depuis 10 j/,
     mene: t => vueActive(t) === 'vue-chantier' && /Vaux/.test(t.texte('#vue-chantier')),
     regler: async t => { t.w.BCUI._setChantier('c1', { statut: 'paye', datePaiement: Date.now() }); await t.pause(400); } },
-  { nom: 'échéance du véhicule dépassée', bloc: 'retard', cle: () => 'vehicule:p1',
+  { nom: 'relancer le devis', bloc: 'retard', cle: () => 'relancer:c1',
+    graines: { chantiers: [chA('c1', { nom: 'Vaux', commune: 'Vaux', statut: 'envoye', aDevis: true, dateEnvoi: JA(-40),
+      lignes: [{ travail: 'PLANT', unite: 'plant', quantite: 1000, prix: 1, nature: 'prestation' }] })] },
+    dit: /Relancer le devis \?.*Vaux.*1 000 €.*envoyé il y a 40 jours/,
+    mene: t => vueActive(t) === 'vue-chantier' && /Vaux/.test(t.texte('#vue-chantier')),
+    regler: async t => { t.w.BCUI._setChantier('c1', { statut: 'accepte', dateSignature: Date.now() }); await t.pause(400); } },
+  { nom: 'échéance du véhicule dépassée', bloc: 'autres', cle: () => 'vehicule:p1',
     graines: { vehicule: posteV(moisAvant(14)) },
     dit: /Contrôle technique.*Véhicule · échéance dépassée/,
     mene: t => vueActive(t) === 'vue-echeancesv',
     reglee: { vehicule: posteV(Date.now()) } },
-  { nom: 'sauvegarde à faire', bloc: 'retard', cle: () => 'sauvegarde',
+  { nom: 'sauvegarde à faire', bloc: 'autres', cle: () => 'sauvegarde',
     graines: { export: Date.now() - 45 * 86400000, chantiers: [chA('c1', { statut: 'encours' })] },
     dit: /Sauvegarde à faire.*il y a 1 mois.*1 chantier.*Sauvegarder/,
     mene: t => vueActive(t) === 'vue-reglages' && !t.$('#c-sauvegarde').hidden,
@@ -9367,41 +9253,14 @@ const LIGNES_AUJ = [
        suivre : on neutralise le clic sur le lien, pas la sauvegarde. */
     regler: async t => { t.w.HTMLAnchorElement.prototype.click = function () {};
       t.clic('#s-tout'); await t.pause(600); } },
-  { nom: 'à programmer, jours à placer', bloc: 'bientot', cle: () => 'programmer:c1',
-    graines: { chantiers: [chA('c1', { nom: 'Vaux', statut: 'accepte', aDevis: true, joursEstimes: 3 })] },
-    dit: /À programmer : 3 j à placer.*Vaux.*Placer/,
-    mene: t => vueActive(t) === 'vue-calendrier' && /Vaux/.test(t.texte('#cal-planif') || ''),
-    regler: async t => { t.w.BCUI._setChantier('c1', { jours: [{ d: JA(20), p: 1 }, { d: JA(21), p: 1 }, { d: JA(22), p: 1 }] }); await t.pause(400); } },
-  { nom: 'à programmer, temps à estimer', bloc: 'bientot', cle: () => 'programmer:c1',
-    graines: { chantiers: [chA('c1', { nom: 'Vaux', statut: 'accepte', aDevis: false })] },
-    dit: /À programmer : temps à estimer.*Vaux.*Estimer/,
-    mene: t => vueActive(t) === 'vue-chantier' && /Vaux/.test(t.texte('#vue-chantier')),
-    regler: async t => { t.w.BCUI._setChantier('c1', { joursEstimes: 1, jours: [{ d: JA(20), p: 1 }] }); await t.pause(400); } },
-  { nom: 'jours prévus', bloc: 'bientot', cle: () => 'prevus:c1',
-    graines: { chantiers: [chA('c1', { nom: 'Vaux', statut: 'encours', donneur: 'Cabinet Dubois',
-      jours: [{ d: JA(1), p: 1 }, { d: JA(2), p: 1 }] })] },
-    dit: /Vaux.*2 jours prévus.*pour Cabinet Dubois.*demain →/,
-    mene: t => vueActive(t) === 'vue-chantier' && /Vaux/.test(t.texte('#vue-chantier')),
-    regler: async t => { t.w.BCUI._setChantier('c1', { jours: [{ d: JA(20), p: 1 }] }); await t.pause(400); } },
-  { nom: 'relancer le devis', bloc: 'bientot', cle: () => 'relancer:c1',
-    graines: { chantiers: [chA('c1', { nom: 'Vaux', commune: 'Vaux', statut: 'envoye', aDevis: true, dateEnvoi: JA(-40),
-      lignes: [{ travail: 'PLANT', unite: 'plant', quantite: 1000, prix: 1, nature: 'prestation' }] })] },
-    dit: /Relancer le devis \?.*Vaux.*1 000 €.*envoyé il y a 40 jours/,
-    mene: t => vueActive(t) === 'vue-chantier' && /Vaux/.test(t.texte('#vue-chantier')),
-    regler: async t => { t.w.BCUI._setChantier('c1', { statut: 'accepte', dateSignature: Date.now() }); await t.pause(400); } },
-  { nom: 'devis à faire', bloc: 'bientot', cle: () => 'devisafaire:c1',
-    graines: { chantiers: [chA('c1', { nom: 'Vaux', statut: 'devis', aDevis: true, dateEntree: JA(-6) })] },
-    dit: /Devis à faire.*Vaux.*annoncé il y a 6 j/,
-    mene: t => vueActive(t) === 'vue-chantier' && /Vaux/.test(t.texte('#vue-chantier')),
-    regler: async t => { t.w.BCUI._setChantier('c1', { statut: 'envoye', dateEnvoi: Date.now() }); await t.pause(400); } },
-  { nom: 'à recommander', bloc: 'bientot', cle: () => 'stock',
+  { nom: 'à recommander', bloc: 'autres', cle: () => 'stock',
     graines: { articles: [{ id: 'a1', nom: 'Gaine', type: 'protection', unite: 'unite', seuil: 100, maj: Date.now(),
       mouvements: [{ sens: 'entree', qte: 50, prix: 1, date: JA(-10) }] }] },
     dit: /À recommander : 1 fourniture.*Gaine \(sous le seuil\)/,
     mene: t => vueActive(t) === 'vue-stock2',
     reglee: { articles: [{ id: 'a1', nom: 'Gaine', type: 'protection', unite: 'unite', seuil: 100, maj: Date.now(),
       mouvements: [{ sens: 'entree', qte: 500, prix: 1, date: JA(-10) }] }] } },
-  { nom: 'échéance du véhicule proche', bloc: 'bientot', cle: () => 'vehicule:p1',
+  { nom: 'échéance du véhicule proche', bloc: 'autres', cle: () => 'vehicule:p1',
     graines: { vehicule: posteV(moisAvant(11)) },
     dit: /Contrôle technique.*Véhicule · échéance proche/,
     mene: t => vueActive(t) === 'vue-echeancesv',
@@ -9412,7 +9271,7 @@ LIGNES_AUJ.forEach(c => scenario('Aujourd’hui : la ligne « ' + c.nom + ' » p
   const cle = c.cle();
   const t = await ouvrir(graines);
   const l = ligneAuj(t, cle);
-  verifierVrai('elle paraît dans « ' + (c.bloc === 'retard' ? 'En retard' : 'Bientôt') + ' »',
+  verifierVrai('elle paraît dans « ' + (c.bloc === 'retard' ? 'En retard' : 'Autres rappels') + ' »',
     l && l.closest('#aj-' + c.bloc));
   verifierVrai('elle dit ce qu’il faut : ' + texteLignes(t, cle), c.dit.test(texteLignes(t, cle)));
   /* Le × la masque jusqu'au lendemain : relancée le même jour, elle reste
@@ -9437,86 +9296,95 @@ LIGNES_AUJ.forEach(c => scenario('Aujourd’hui : la ligne « ' + c.nom + ' » p
 }));
 
 /* --------------------------------------------------------------------- */
-scenario('Aujourd’hui : les blocs dans l’ordre de la maquette, la sauvegarde en dernier', async () => {
-  /* V2 puis tour 2 (31/10) : date et ligne de saisie · En retard · Bientôt ·
-     Mes notes (N1) · Chantiers en cours · Prélèvements à venir · Derniers
-     jours. Et B1 : « Sauvegarde à faire » ferme En retard. */
+scenario('Aujourd’hui : l’ordre du lot r1, En retard en trois sortes, le reste replié', async () => {
+  /* A1 à A4, validés le 03/11 : date · Ma journée · En retard (s'il y a
+     quelque chose) · Chantiers en cours · Prélèvements à venir · Derniers
+     jours · « Autres rappels (N) », replié. En retard : les factures échues,
+     les chantiers terminés pas facturés, les devis sans réponse à 7 jours ou
+     moins de la fin de leur validité — et rien d'autre. */
+  const t0 = await ouvrir(VIDE);
+  const C0 = t0.w.BCC;
+  /* Une date de devis valable un mois dont la fin tombe dans « reste » jours,
+     cherchée avec la règle de l'application (les mois n'ont pas tous trente
+     jours). */
+  const devisFinissantDans = reste => {
+    for (let k = -45; k < 0; k++) {
+      const f = C0.finValiditeDevis({ aDevis: true, dateDevis: JA(k), validiteDevis: 1 });
+      if (Math.round((f - C0.minuit(Date.now())) / 86400000) === reste) return JA(k);
+    }
+    return null;
+  };
+  const dv = (id, reste) => {
+    const d = devisFinissantDans(reste);
+    return chA(id, { nom: 'Devis ' + id, statut: 'envoye', aDevis: true, dateDevis: d, dateEnvoi: d, validiteDevis: 1 });
+  };
   const dans = n => { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + n); return d; };
   const t = await ouvrir(Object.assign({}, VIDE, {
     export: Date.now() - 45 * 86400000,
+    vehicule: posteV(moisAvant(14)),
+    articles: [{ id: 'a1', nom: 'Gaine', type: 'protection', unite: 'unite', seuil: 100, maj: Date.now(),
+      mouvements: [{ sens: 'entree', qte: 50, prix: 1, date: JA(-10) }] }],
     chantiers: [
-      chA('c1', { nom: 'Vaux', statut: 'facture', numeroFacture: 'F-1', dateFacture: JA(-60), echeancePaiement: JA(-10) }),
-      chA('c2', { nom: 'Combe', statut: 'accepte', aDevis: true, joursEstimes: 2 })],
-    journees: [{ id: 'j1', date: JA(-2), chantier: 'c2', postes: [{ travaux: 'PLANT', heures: 8, quantite: 0 }] }],
+      dv('d8', 8), dv('d7', 7), dv('dx', -3),
+      chA('imp', { nom: 'Impayé', statut: 'facture', numeroFacture: 'F-1', dateFacture: JA(-60), echeancePaiement: JA(-10) }),
+      chA('fac', { nom: 'À facturer', statut: 'termine', dateFin: JA(-5) }),
+      chA('ret', { nom: 'Sans jour devant', statut: 'encours', dateEntree: JA(-30), jours: [{ d: JA(-5), p: 1 }] }),
+      chA('dem', { nom: 'Posé demain', statut: 'accepte', aDevis: true, dateEntree: JA(-10), jours: [{ d: JA(1), p: 1 }] }),
+      chA('info', { nom: 'Annoncé', statut: 'devis', aDevis: true, dateEntree: JA(-4) }),
+      chA('paye', { nom: 'Payé', statut: 'paye', datePaiement: JA(-2) }),
+      chA('ss', { nom: 'Sans suite', statut: 'sansuite', aDevis: true })],
+    journees: [{ id: 'j1', date: JA(-2), chantier: 'dem', postes: [{ travaux: 'PLANT', heures: 8, quantite: 0 }] }],
     charges: [{ id: 'h1', libelle: 'Assurance', ttc: 412, periodicite: 'mensuel', categorie: 'ASSUR', taux: 0,
       debut: dans(2).getTime(), jour: dans(2).getDate(), moisReference: dans(2).getMonth() }],
-    vehicule: posteV(moisAvant(14)),
     cfg: { notes: [{ id: 'n1', titre: 'Courses', couleur: '#B4231F', items: [] }] }
   }));
-  const ids = ['aj-date', 'aj-saisie', 'aj-retard', 'aj-bientot', 'aj-notes', 'aj-encours', 'aj-prelevements', 'aj-jours'];
-  verifierVrai('tous les blocs sont là', ids.every(i => t.$('#vue-accueil #' + i)));
+  verifierVrai('les dates des devis se trouvent', devisFinissantDans(7) && devisFinissantDans(8));
+  const ids = ['aj-date', 'aj-saisie', 'aj-retard', 'aj-encours', 'aj-prelevements', 'aj-jours', 'aj-autres'];
   const ordre = t.$$('#vue-accueil [id^="aj-"]').map(e => e.id).filter(i => ids.indexOf(i) >= 0);
   verifier('dans l’ordre de la maquette', ids, ordre);
-  verifier('les intitulés', ['En retard', 'Bientôt', 'Mes notes', 'Chantiers en cours', 'Prélèvements à venir', 'Derniers jours'],
+  verifier('plus de Bientôt ni de Mes notes', [null, null], [t.$('#aj-bientot'), t.$('#vue-accueil #aj-notes')]);
+  verifier('les intitulés', ['En retard', 'Chantiers en cours', 'Prélèvements à venir', 'Derniers jours'],
     t.$$('#vue-accueil .aj-sous').map(h => h.childNodes[0].textContent.trim()));
   verifier('la date du jour en tête', t.w.document.querySelector('#aj-date').textContent.split(' ')[1],
     String(new Date().getDate()));
+  /* En retard : trois sortes, dans cet ordre, et rien d'autre. */
   const retard = t.$$('#aj-retard [data-ajcle]').map(l => l.dataset.ajcle);
-  verifierVrai('En retard tient trois lignes (' + retard.join(', ') + ')', retard.length === 3);
-  verifier('la sauvegarde en dernier (B1)', 'sauvegarde', retard[retard.length - 1]);
-  verifier('aucune erreur', [], t.erreurs);
+  verifier('impayé, à facturer, puis les devis (le plus pressant d’abord)',
+    ['impaye:imp', 'afacturer:fac', 'relancer:dx', 'relancer:d7'], retard);
+  verifierVrai('rien que ces trois sortes', retard.every(k => /^(impaye|afacturer|relancer):/.test(k)));
+  verifierVrai('un devis à 8 jours de la fin n’y est pas, à 7 il y est', !ligneAuj(t, 'relancer:d8') && ligneAuj(t, 'relancer:d7'));
+  verifier('le préavis est d’une semaine', 7, C0.PREAVIS_DEVIS);
+  /* Autres rappels : repliés, avec le même lien qu'avant. */
+  const au = t.$('#aj-autres');
+  verifierVrai('« Autres rappels (3) », replié', au && !au.open && /Autres rappels \(3\)/.test(au.querySelector('summary').textContent));
+  verifier('la sauvegarde, le stock et le véhicule', ['sauvegarde', 'stock', 'vehicule:p1'],
+    t.$$('#aj-autres [data-ajcle]').map(l => l.dataset.ajcle));
+  /* Chantiers en cours : par étape, le plus ancien en haut ; ni payé ni sans suite. */
+  verifier('par étape, le plus ancien en haut', ['info', 'dx', 'd7', 'd8', 'ret', 'dem', 'fac', 'imp'],
+    t.$$('#aj-encours [data-ajch]').map(b => b.dataset.ajch));
+  verifier('un intertitre par étape', ['Infos et repérage', 'Devis', 'Travaux', 'Facture', 'Paiement'],
+    t.$$('#aj-encours .aj-etape').map(p => p.textContent));
+  verifier('le compte', '8', t.texte('#aj-encours .aj-compte'));
+  const ligne = id => (t.$('#aj-encours [data-ajch="' + id + '"]') || {}).textContent || '';
+  verifierVrai('« posé demain » sur la ligne du chantier', /posé demain/.test(ligne('dem')));
+  verifierVrai('« plus de jour posé » sur celle qui n’a plus rien devant', /plus de jour posé/.test(ligne('ret')));
+  verifierVrai('« devis à faire · pas encore repéré » à l’étape Infos', /Devis à faire · annoncé il y a 4 j · pas encore repéré/.test(ligne('info')));
+  verifierVrai('ce qui est en retard est en rouge sur sa ligne',
+    t.$('#aj-encours [data-ajch="imp"] .aj-situ.aj-alerte') && !t.$('#aj-encours [data-ajch="d8"] .aj-situ.aj-alerte'));
+  /* Un appui ouvre la fiche à l'étape en cours. */
+  t.clic('#aj-encours [data-ajch="dem"]'); await t.pause(400);
+  verifierVrai('un appui ouvre la fiche, à l’étape en cours', vueActive(t) === 'vue-chantier' &&
+    /Posé demain/.test(t.texte('#vue-chantier')) && t.$('#vue-chantier details.fi-etape[data-etape="2"][open]'));
+  verifier('aucune erreur', [], t.erreurs.concat(t0.erreurs));
 });
 
 /* --------------------------------------------------------------------- */
-scenario('Aujourd’hui : la ligne de saisie, puis les trois derniers jours', async () => {
-  /* L'ancienne ligne sous « Enregistrer ma journée » : ce qui est saisi
-     aujourd'hui, et la semaine (du lundi). Un appui ouvre Ma journée. */
-  const t = await ouvrir(Object.assign({}, VIDE, {
-    chantiers: [chA('c1', { nom: 'Vaux', statut: 'encours' })],
-    journees: [
-      { id: 'j0', date: JA(0), chantier: 'c1', postes: [{ travaux: 'PLANT', heures: 7.5, quantite: 160 }] },
-      { id: 'j8', date: JA(-8), chantier: 'c1', postes: [{ travaux: 'PLANT', heures: 8, quantite: 0 }] },
-      { id: 'j9', date: JA(-9), chantier: 'c1', postes: [{ travaux: 'PLANT', heures: 8, quantite: 0 }] },
-      { id: 'j10', date: JA(-10), chantier: 'c1', postes: [{ travaux: 'PLANT', heures: 8, quantite: 0 }] }]
-  }));
-  const s = t.texte('#aj-saisie');
-  verifierVrai('ce qui est saisi aujourd’hui : ' + s, /Déjà saisi aujourd’hui/.test(s));
-  verifierVrai('la semaine ne compte que depuis lundi', /Cette semaine : 7,5 h sur 1 jour/.test(s));
-  t.clic('#aj-jour'); await t.pause(400);
-  verifier('un appui ouvre Ma journée, la fenêtre de toujours', 'Ma journée', t.texte('#modale-titre'));
-  t.clic('#modale-x'); await t.pause(150);
-  const vide = await ouvrir(VIDE);
-  verifierVrai('rien de saisi', /Rien de saisi aujourd’hui.*Cette semaine : rien de saisi/.test(vide.texte('#aj-saisie')));
-
-  const jours = t.$$('#aj-jours [data-ajouvre^="journee:"]').map(b => b.dataset.ajouvre);
-  verifier('les trois derniers jours saisis, le plus récent d’abord', ['journee:j0', 'journee:j8', 'journee:j9'], jours);
-  verifierVrai('chacun dit le chantier, les heures et ce qui a été fait',
-    /Vaux · 7,5 h/.test(t.texte('#aj-jours')) && /160 plant/.test(t.texte('#aj-jours')));
-  t.clic('#aj-jours [data-ajouvre="journee:j8"]'); await t.pause(400);
-  verifier('un appui la rouvre pour la modifier', jourISO(JA(-8)), t.$('#mj-date') && t.$('#mj-date').value);
-  t.clic('#modale-x'); await t.pause(150);
-  t.clic('#aj-jours [data-ajouvre="agenda:"]'); await t.pause(400);
-  verifier('et tout l’historique est dans l’Agenda', 'vue-calendrier', vueActive(t));
-  verifier('aucune erreur', [], t.erreurs.concat(vide.erreurs));
-});
-
-/* --------------------------------------------------------------------- */
-scenario('Aujourd’hui : « Devis à faire » remplace « Repérage à faire » (C1)', async () => {
-  /* Un chantier qui vient d'arriver n'a qu'une ligne : « Devis à faire »,
-     avec son annonce. Le repérage n'est pas une donnée de Sylve : rien ne
-     dit « repéré », et aucune ligne ne réclame un repérage. */
-  const t = await ouvrir(Object.assign({}, VIDE, { chantiers: [
-    chA('c1', { nom: 'Vaux', statut: 'devis', aDevis: true, dateEntree: JA(-6) }),
-    chA('c2', { nom: 'Mont Rond', statut: 'devis', aDevis: true, dateEntree: JA(0) }),
-    chA('c3', { nom: 'Envoyé', statut: 'envoye', aDevis: true, dateEnvoi: JA(-1) })] }));
-  verifier('une ligne par chantier sans devis, le plus récent d’abord', ['devisafaire:c2', 'devisafaire:c1'],
-    lignesAuj(t, 'devisafaire:').map(l => l.dataset.ajcle));
-  verifierVrai('l’annonce en petit', /annoncé aujourd’hui/.test(texteLignes(t, 'devisafaire:c2')) &&
-    /annoncé il y a 6 j/.test(texteLignes(t, 'devisafaire:c1')));
-  /* Le repérage se dit en petit depuis le lot b2, jamais en ligne à lui. */
-  verifierVrai('pas de « Repérage à faire »', !/Repérage/i.test(t.texte('#vue-accueil')) &&
-    /pas encore repéré/.test(texteLignes(t, 'devisafaire:c2')));
-  verifierVrai('un devis déjà envoyé n’est plus « à faire »', !ligneAuj(t, 'devisafaire:c3'));
+scenario('Aujourd’hui : rien en retard, pas de bloc En retard', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, { export: Date.now(),
+    chantiers: [chA('c1', { nom: 'Vaux', statut: 'encours' })] }));
+  verifier('pas de bloc', null, t.$('#aj-retard'));
+  verifierVrai('une phrase le dit', /Rien en retard/.test(t.texte('#aj-calme')));
+  verifier('pas d’autres rappels non plus', null, t.$('#aj-autres'));
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -9642,7 +9510,7 @@ scenario('Cadre : chaque élément de l’accueil et de Mon entreprise a son nou
       debut: JA(2), jour: new Date(JA(2)).getDate(), moisReference: new Date(JA(2)).getMonth() }],
     articles: [{ id: 'a1', nom: 'Gaine', type: 'protection', unite: 'unite', maj: Date.now(), mouvements: [] }],
     vehicule: posteV(moisAvant(14)),
-    cfg: { nomEntreprise: 'Forêts du Levant', notes: [{ id: 'n1', titre: 'Courses', couleur: '#B4231F',
+    cfg: { nomEntreprise: 'Forêts du Levant', officeDepuis: JA(-5), notes: [{ id: 'n1', titre: 'Courses', couleur: '#B4231F',
       items: [{ id: 'i1', texte: 'gants', fait: false }] }] }
   });
   const t = await ouvrir(graines);
@@ -9656,15 +9524,18 @@ scenario('Cadre : chaque élément de l’accueil et de Mon entreprise a son nou
     'demarrage-marque': async () => !!t.$('#demarrage .dem-logo') && t.texte('.dem-nom') === 'Sylve' && !!t.texte('.dem-sous'),
     'demarrage-entreprise': async () => !t.$('#dem-ent').hidden && /Forêts du Levant/.test(t.texte('#dem-ent')),
     'menu-reglages': async () => menu('reglages', 'vue-reglages'),
-    'retard-sauvegarde': async () => {
-      const r = t.$$('#aj-retard [data-ajcle]');
-      return r[r.length - 1].dataset.ajcle === 'sauvegarde' && await appuyerLigne(t, 'sauvegarde') &&
-        vueActive(t) === 'vue-reglages' && !t.$('#c-sauvegarde').hidden;
-    },
-    'retard-trancher': async () => await appuyerLigne(t, 'trancher:' + jourISO(JA(-1))) && !!t.$('#fj-autrement'),
+    'autres-sauvegarde': async () => !!t.$('#aj-autres [data-ajcle="sauvegarde"]') &&
+      await appuyerLigne(t, 'sauvegarde') && vueActive(t) === 'vue-reglages' && !t.$('#c-sauvegarde').hidden,
+    /* Le jour posé hier compte d'office : Derniers jours le montre, sa fiche
+       propose de le préciser ou de dire qu'on n'y était pas. */
+    'office': async () => { const b = t.$('#aj-jours [data-ajouvre="jour:' + C.minuit(JA(-1)) + '"]');
+      if (!b || !/○/.test(b.textContent)) return false;
+      b.click(); await t.pause(450);
+      return !!t.$('#fj-preciser') && !!t.$('#fj-nonla') && /Comptée d’office/.test(t.texte('#fj-office')); },
     'prelevements': async () => /Assurance/.test(t.texte('#aj-prelevements')) &&
       await appuyerLigne(t, lignesAuj(t, 'prelevement:')[0].dataset.ajcle) && vueActive(t) === 'vue-charges',
-    'bientot-relancer': async () => /Relancer le devis/.test(texteLignes(t, 'relancer:c2')) &&
+    'retard-relancer': async () => /Relancer le devis/.test(texteLignes(t, 'relancer:c2')) &&
+      !!t.$('#aj-retard [data-ajcle="relancer:c2"]') &&
       await appuyerLigne(t, 'relancer:c2') && /Marchand/.test(t.texte('#vue-chantier')),
     'encours-compte': async () => t.texte('#aj-encours .aj-compte') === String(C.filtre(t.stock('chantiers'), 'ouverts').length) &&
       await parBarre(t, 'chantiers') && vueActive(t) === 'vue-carnet',
@@ -9674,8 +9545,13 @@ scenario('Cadre : chaque élément de l’accueil et de Mon entreprise a son nou
       t.clic('#modale [data-plus="journee"]'); await t.pause(300); return t.texte('#modale-titre') === 'Ma journée'; },
     'menu-outils': async () => await menu('cubage', 'vue-fichiers') && await menu('bois', 'vue-stock'),
     'barre-aujourdhui': async () => { await parBarre(t, 'chantiers'); await parBarre(t, 'aujourdhui'); return vueActive(t) === 'vue-accueil'; },
-    'bientot-programmer': async () => /À programmer : 2 j à placer/.test(texteLignes(t, 'programmer:c1')) &&
-      await appuyerLigne(t, 'programmer:c1') && vueActive(t) === 'vue-calendrier' && /Vaux/.test(t.texte('#cal-planif') || ''),
+    'fiche-placer': async () => { t.w.BCUI._ouvrirChantier('c1', 'travaux'); await t.pause(350);
+      if (!t.$('#f-planifier')) return false;
+      t.clic('#f-planifier'); await t.pause(400);
+      const ok = vueActive(t) === 'vue-calendrier' && /Vaux/.test(t.texte('#cal-planif') || '');
+      t.clic('#cal-planif-fin'); await t.pause(400);
+      return ok; },
+    'encours-signe': async () => /Signé · à programmer/.test(t.texte('#aj-encours [data-ajch="c1"]') || ''),
     'encours-bloc': async () => { t.clic('#aj-encours [data-ajouvre="fiche:c4"]'); await t.pause(400);
       return vueActive(t) === 'vue-chantier' && /Essarts/.test(t.texte('#vue-chantier')); },
     'retard-impaye': async () => /Facture impayée.*Montjoie.*Cabinet Dubois/.test(texteLignes(t, 'impaye:c3')) &&
@@ -9686,19 +9562,21 @@ scenario('Cadre : chaque élément de l’accueil et de Mon entreprise a son nou
       return !ca || sansBlancs(await bilan()).indexOf(sansBlancs(eur(ca) + 'facturé (HT)')) >= 0; },
     'argent-tva': async () => { const d = FIN.balanceTva(t.stock('chantiers'), t.stock('depenses'), anBornes(), C.tauxLigne).deductible.total;
       return d > 0 && sansBlancs(await bilan()).indexOf(sansBlancs(eur(d) + 'déductible')) >= 0; },
-    'bientot-prevus': async () => /Vaux.*1 jour prévu.*demain/.test(texteLignes(t, 'prevus:c1')),
+    'encours-pose': async () => /posé demain/.test(t.texte('#aj-encours [data-ajch="c1"]') || ''),
     'barre-modules': async () => { const vues = [];
       for (const o of ['chantiers', 'agenda', 'argent']) { await parBarre(t, o); vues.push(vueActive(t)); }
       return vues.join() === 'vue-carnet,vue-calendrier,vue-finances'; },
     'menu-entreprise': async () => await menu('stock', 'vue-stock2') && await menu('achats', 'vue-achats') &&
       await menu('vehicule', 'vue-carnetv') && await menu('rendements', 'vue-rendements'),
-    'bientot-recommander': async () => { const n = /À recommander : (\d+)/.exec(texteLignes(t, 'stock'));
+    'autres-recommander': async () => { const n = !!t.$('#aj-autres [data-ajcle="stock"]') &&
+      /À recommander : (\d+)/.exec(texteLignes(t, 'stock'));
       t.clic('#b-menu'); await t.pause(200);
       return !!n && new RegExp(n[1] + ' à recommander').test(t.texte('#modale [data-menu="stock"]')); },
-    'vehicule-echeance': async () => /échéance dépassée/.test(texteLignes(t, 'vehicule:p1')) &&
+    'autres-vehicule': async () => !!t.$('#aj-autres [data-ajcle="vehicule:p1"]') &&
+      /échéance dépassée/.test(texteLignes(t, 'vehicule:p1')) &&
       await appuyerLigne(t, 'vehicule:p1') && vueActive(t) === 'vue-echeancesv',
-    'notes-actions': async () => { const z = t.$('#aj-notes');
-      return (t.$('#aj-bientot').compareDocumentPosition(z) & 4) && !!z.querySelector('[data-note="n1"]') &&
+    'menu-notes': async () => { await parMenu(t, 'notes'); const z = t.$('#vue-notes #aj-notes');
+      return vueActive(t) === 'vue-notes' && !!z && !t.$('#vue-accueil #aj-notes') && !!z.querySelector('[data-note="n1"]') &&
         !!z.querySelector('[data-notesup="n1"]') && !!z.querySelector('[data-nt-coche="i1"]') &&
         !!z.querySelector('[data-nt-supitem="i1"]') && !!z.querySelector('[data-nt-ajout="n1"]'); },
     'plus-note': async () => { await plusNote(t); return t.texte('#modale-titre') === 'Une note à moi-même'; },
@@ -9721,6 +9599,137 @@ scenario('Cadre : chaque élément de l’accueil et de Mon entreprise a son nou
   verifier('plus d’écran Mon entreprise ni d’ancien accueil', [null, null, null],
     [t.$('#vue-entreprise'), t.$('#a-reglages'), t.$('#vue-accueil .tuile')]);
   verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+/* Le tableau « Où sont allés les éléments d'Aujourd'hui et de l'Agenda
+   (lot r1) » de l'inventaire : élément, nouvel endroit, clé de preuve. */
+function retraitsR1() {
+  const debut = INVENTAIRE.findIndex(l => /^### Où sont allés les éléments d'Aujourd'hui et de l'Agenda/.test(l));
+  const lignes = [];
+  for (let i = debut + 1; debut >= 0 && i < INVENTAIRE.length && !/^###/.test(INVENTAIRE[i]); i++) {
+    const m = /^\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*`([a-z0-9-]+)`\s*\|$/.exec(INVENTAIRE[i]);
+    if (m) lignes.push({ element: m[1], endroit: m[2], cle: m[3] });
+  }
+  return lignes;
+}
+scenario('Inventaire r1 : chaque élément d’Aujourd’hui et de l’Agenda a sa place, sauf les retraits du 03/11', async () => {
+  /* « Rien ne disparaît, sauf les retraits acceptés le 03/11. » Chaque ligne
+     du tableau a sa preuve, jouée ici ; un retrait se prouve par son absence. */
+  const t0 = await ouvrir(VIDE);
+  const C = t0.w.BCC;
+  const graines = Object.assign({}, VIDE, {
+    export: Date.now() - 45 * 86400000,
+    vehicule: posteV(moisAvant(14)),
+    articles: [{ id: 'a1', nom: 'Gaine', type: 'protection', unite: 'unite', seuil: 100, maj: Date.now(),
+      mouvements: [{ sens: 'entree', qte: 50, prix: 1, date: JA(-10) }] }],
+    chantiers: [
+      chA('imp', { nom: 'Impayé', statut: 'facture', numeroFacture: 'F-1', dateFacture: JA(-60), echeancePaiement: JA(-10) }),
+      chA('fac', { nom: 'À facturer', statut: 'termine', dateFin: JA(-5) }),
+      chA('dv', { nom: 'Devis', statut: 'envoye', aDevis: true, dateEnvoi: JA(-40) }),
+      chA('ret', { nom: 'Sans jour devant', statut: 'encours', dateEntree: JA(-30), jours: [{ d: JA(-12), p: 1 }] }),
+      chA('dem', { nom: 'Posé demain', statut: 'accepte', aDevis: true, joursEstimes: 5, dateEntree: JA(-20),
+        jours: [{ d: JA(-1), p: 1 }, { d: JA(1), p: 1 }] }),
+      chA('info', { nom: 'Annoncé', statut: 'devis', aDevis: true, dateEntree: JA(-4) })],
+    journees: [{ id: 'j1', date: JA(-3), chantier: 'dem', personnes: 1, nonProd: 7, postes: [] }],
+    charges: [{ id: 'h1', libelle: 'Assurance', ttc: 412, periodicite: 'mensuel', categorie: 'ASSUR', taux: 0,
+      debut: JA(-40), jour: new Date(JA(2)).getDate(), moisReference: new Date(JA(2)).getMonth() }],
+    cfg: { heuresJour: 8, journeesMigrees: true, officeDepuis: JA(-10),
+      notes: [{ id: 'n1', titre: 'Courses', couleur: '#B4231F', items: [{ id: 'i1', texte: 'gants', fait: false }] }] }
+  });
+  const t = await ouvrir(graines);
+  const auj = async () => { if (!t.$('#modale').hidden) { t.clic('#modale-x'); await t.pause(150); } await parBarre(t, 'aujourdhui'); };
+  const agenda = async () => { if (!t.$('#modale').hidden) { t.clic('#modale-x'); await t.pause(150); } await parBarre(t, 'agenda'); };
+  const ligneCh = id => (t.$('#aj-encours [data-ajch="' + id + '"]') || {}).textContent || '';
+  const fermer = async () => { if (!t.$('#modale').hidden) { t.clic('#modale-x'); await t.pause(150); } };
+  const PREUVES = {
+    'r1-saisie': async () => { const h = t.$('#aj-haut'); if (!h || h.firstElementChild.id !== 'aj-saisie') return false;
+      t.clic('#aj-jour'); await t.pause(300); return t.texte('#modale-titre') === 'Ma journée'; },
+    'r1-retard': async () => t.$$('#aj-retard [data-ajcle]').map(l => l.dataset.ajcle).join() === 'impaye:imp,afacturer:fac,relancer:dv',
+    'r1-office': async () => { const b = t.$('#aj-jours [data-ajouvre="jour:' + C.minuit(JA(-1)) + '"]');
+      if (!b || !/○/.test(b.textContent)) return false;
+      b.click(); await t.pause(450);
+      return /Comptée d’office/.test(t.texte('#fj-office') || '') && !!t.$('#fj-preciser') && !!t.$('#fj-nonla'); },
+    'r1-plusdejour': async () => /plus de jour posé/.test(ligneCh('ret')),
+    'r1-autres': async () => { const a = t.$('#aj-autres');
+      return !!a && !a.open && t.$$('#aj-autres [data-ajcle]').map(l => l.dataset.ajcle).join() === 'sauvegarde,stock,vehicule:p1' &&
+        await appuyerLigne(t, 'stock') && vueActive(t) === 'vue-stock2'; },
+    'r1-pose': async () => /posé demain/.test(ligneCh('dem')),
+    'r1-devisafaire': async () => /Devis à faire · annoncé il y a 4 j · pas encore repéré/.test(ligneCh('info')),
+    'r1-devis7': async () => {
+      const a = reste => { for (let k = -45; k < 0; k++) {
+        const ch = { id: 'x', statut: 'envoye', aDevis: true, dateDevis: JA(k), validiteDevis: 1 };
+        if (Math.round((C.finValiditeDevis(ch) - C.minuit(Date.now())) / 86400000) === reste) {
+          return C.alertes([ch], {}, Date.now()).filter(x => x.type === 'devis').length; } } return -1; };
+      return a(7) === 1 && a(8) === 0 && a(-2) === 1; },
+    'r1-notes': async () => { await parMenu(t, 'notes');
+      return vueActive(t) === 'vue-notes' && !!t.$('#vue-notes [data-note="n1"]'); },
+    'r1-encours': async () => { const e = t.$$('#aj-encours .aj-etape').map(p => Number(p.dataset.etape));
+      return e.length >= 4 && e.every((x, i) => !i || x > e[i - 1]); },
+    'r1-prelevements': async () => /Assurance/.test(t.texte('#aj-prelevements') || ''),
+    'r1-derniers': async () => t.$$('#aj-jours [data-ajouvre^="journee:"]').length >= 1 &&
+      t.$$('#aj-jours [data-ajouvre^="jour:"]').length >= 1 && !!t.$('#aj-jours [data-ajouvre="agenda:"]'),
+    'r1-grille': async () => { await agenda();
+      return t.$$('#cal-grille [data-jour]').length >= 28 && !!t.$('#cal-prec') && !!t.$('#cal-auj') && !!t.$('#cal-suiv') &&
+        !!t.$('#cal-grille .cal-prel'); },
+    'r1-legende': async () => { await agenda();
+      return !!t.texte('#cal-legende') && /prélèvement/.test(t.texte('#cal-leg2') || ''); },
+    'r1-compteurs': async () => { await agenda();
+      return t.$$('#cal-charge .carte2 small').map(s => s.textContent).join() === 'fait,posé (signé),non travaillé'; },
+    'r1-histo': async () => { await agenda(); return /Ce mois-ci, jour par jour/.test(t.texte('#cal-histo')); },
+    'r1-fiche': async () => { await agenda();
+      await cliquerJour(t, JA(1));
+      const pose = !!t.$('#fj-deplacer') && !!t.$('#fj-poser') && !!t.$('#fj-absent'); await fermer();
+      await cliquerJour(t, JA(-3));
+      const fait = t.texte('#fj-travaille') === 'Modifier ma journée'; await fermer();
+      await cliquerJour(t, JA(0));
+      const libre = t.texte('#fj-travaille') === 'Saisir ma journée'; await fermer();
+      await cliquerJour(t, JA(2));
+      const prel = /Prélevé ce jour-là/.test(t.texte('#modale')); await fermer();
+      return pose && fait && libre && prel; },
+    'r1-placement': async () => { t.w.BCUI._ouvrirChantier('dem', 'travaux'); await t.pause(350);
+      t.clic('#f-planifier'); await t.pause(400);
+      if (!t.$('#cal-planif-fin')) return false;
+      const avant = (t.stock('journees') || []).length;
+      await cliquerJour(t, JA(-6), 500);
+      const ok = (t.stock('journees') || []).length === avant + 1;
+      t.clic('#cal-planif-fin'); await t.pause(400);
+      return ok && vueActive(t) === 'vue-chantier'; },
+    'r1-bulle': async () => { await agenda(); await appuiLong(t, JA(3), 'souris');
+      const n = t.$$('#cal-bulle [data-bulle]').length;
+      t.clic('#cal-bulle [data-bulle="abs"]'); await t.pause(300); await fermer();
+      return n === 3; },
+    /* Les retraits du 03/11 : plus nulle part. */
+    'r1-x-aplacer': async () => !/à placer|estimez et placez|pas d’estimation|temps à estimer/.test(t.texte('#vue-accueil')),
+    'r1-x-aprogrammer': async () => { await agenda();
+      return !t.$('#cal-aplanifier') && !t.$('#cal-aprog') && !/À programmer/.test(t.texte('#vue-calendrier')); },
+    'r1-x-trancher-agenda': async () => { await agenda();
+      return !t.$('#cal-trancher') && !t.$('#cal-trancher-btn') && !t.$('#cal-grille .cal-q') && !/trancher/.test(t.texte('#vue-calendrier')); },
+    'r1-x-trancher-fiche': async () => { await agenda(); await cliquerJour(t, JA(-12));
+      const ok = !t.$('.fj-etat.st-trancher') && !t.$('#fj-prevu') && !t.$('#fj-tout') && !t.$('#fj-autrement') &&
+        !/Que s’est-il passé|à trancher/i.test(t.texte('#modale'));
+      await fermer(); return ok; },
+    'r1-x-trancher-auj': async () => !t.$('[data-ajcle^="trancher:"]') && !/non saisie/.test(t.texte('#vue-accueil')),
+    'r1-x-notes-auj': async () => !t.$('#vue-accueil #aj-notes') && !/Mes notes/.test(t.texte('#vue-accueil')),
+    /* En dernier : la ligne chassée ne sert plus aux autres. */
+    'r1-masquer': async () => { const k = 'impaye:imp';
+      t.clic('[data-ajmasque="' + k + '"]'); await t.pause(250);
+      return !ligneAuj(t, k) && (t.stock('masques') || {})[k] === C.jourCle(Date.now()); }
+  };
+  const lignes = retraitsR1();
+  verifierVrai('l’inventaire porte le tableau du lot r1 (' + lignes.length + ' lignes)', lignes.length >= 25);
+  verifier('chaque ligne a sa preuve', [], lignes.filter(l => !PREUVES[l.cle]).map(l => l.cle));
+  verifier('chaque preuve a sa ligne', [], Object.keys(PREUVES).filter(k => !lignes.some(l => l.cle === k)));
+  verifier('les retraits, et eux seuls, sont dits « retiré (03/11) »', [],
+    lignes.filter(l => /^r1-x-/.test(l.cle) !== /^retiré/.test(l.endroit)).map(l => l.cle));
+  /* Le × en dernier, quel que soit l'ordre du tableau. */
+  const ordre = lignes.filter(l => l.cle !== 'r1-masquer').concat(lignes.filter(l => l.cle === 'r1-masquer'));
+  for (const l of ordre) {
+    if (!PREUVES[l.cle]) continue;
+    await auj();
+    verifierVrai(l.element + ' → ' + l.endroit, await PREUVES[l.cle]());
+  }
+  verifier('aucune erreur', [], t.erreurs.concat(t0.erreurs));
 });
 
 /* --------------------------------------------------------------------- */
@@ -9842,14 +9851,17 @@ scenario('Messages : la corbeille se dit « ☰ ▸ Corbeille », d’un seul te
 
 /* --------------------------------------------------------------------- */
 scenario('Note : créée depuis un autre écran, on dit où elle est', async () => {
+  /* Lot r1 : les notes vivent dans ☰ ▸ Mes notes. Créée de là, le message
+     simple ; d'ailleurs, il dit où elle est. */
   const t = await ouvrir(VIDE);
+  await parMenu(t, 'notes');
   await plusNote(t);
   t.saisir('#nt-titre', 'Ici même'); t.clic('#nt-ok'); await t.pause(400);
-  verifier('depuis Aujourd’hui : le message simple', 'Note ajoutée.', t.texte('#toast'));
+  verifier('depuis Mes notes : le message simple', 'Note ajoutée.', t.texte('#toast'));
   await parBarre(t, 'agenda');
   await plusNote(t);
   t.saisir('#nt-titre', 'Depuis l’agenda'); t.clic('#nt-ok'); await t.pause(400);
-  verifierVrai('depuis l’Agenda : ' + t.texte('#toast'), /^Note ajoutée dans Aujourd.hui\.$/.test(t.texte('#toast')));
+  verifierVrai('depuis l’Agenda : ' + t.texte('#toast'), /^Note ajoutée dans ☰ ▸ Mes notes\.$/.test(t.texte('#toast')));
   verifier('les deux notes sont bien là', 2, ((t.stock('cfg') || {}).notes || []).length);
   verifier('aucune erreur', [], t.erreurs);
 });
@@ -9915,8 +9927,10 @@ scenario('Agenda : le bouton Aujourd’hui ramène au mois courant et ouvre la f
   verifierVrai('en feuille', t.$('#modale').classList.contains('feuille-nav'));
   t.clic('#modale-x'); await t.pause(150);
 
-  /* En placement, un appui sur un jour pose : le bouton ne fait que ramener. */
-  t.clic('#cal-aplanifier [data-aplacer="c1"]'); await t.pause(400);
+  /* En placement, un appui sur un jour pose : le bouton ne fait que ramener.
+     On y entre par la fiche ▸ Travaux depuis le lot r1. */
+  t.w.BCUI._ouvrirChantier('c1', 'travaux'); await t.pause(300);
+  t.clic('#f-planifier'); await t.pause(400);
   t.clic('#cal-suiv'); await t.pause(150);
   t.clic('#cal-auj'); await t.pause(400);
   verifier('en placement, il ramène au mois', moisCourant, t.texte('#cal-titre').toLowerCase());
@@ -9925,66 +9939,192 @@ scenario('Agenda : le bouton Aujourd’hui ramène au mois courant et ouvre la f
 });
 
 /* --------------------------------------------------------------------- */
-scenario('À trancher : « Journée du jeudi 29 octobre non saisie », dans Aujourd’hui et dans l’Agenda', async () => {
-  /* Retour du 01/11 : « non saisi » seul n'était pas clair. Le libellé est
-     écrit par Intl ici, par les tables de l'application là-bas : deux
-     sources qui doivent dire la même chose. */
-  const jour = JA(-3);
-  const attendu = 'Journée du ' + new Date(jour).toLocaleDateString('fr-FR',
-    { weekday: 'long', day: 'numeric', month: 'long' }) + ' non saisie';
+scenario('Agenda : un jour, une couleur — légende du mois, ○, € et trois compteurs (G1)', async () => {
+  /* G1, validé le 03/11 : fait = bleu, posé = vert, non travaillé = gris ;
+     posé sur un devis pas signé = vert en pointillés (fini le jaune). La
+     légende ne dit que ce qui figure dans le mois affiché ; « € » et « ○ »
+     en petit dessous. Trois compteurs : fait, posé (signé seulement), non
+     travaillé. */
   const t = await ouvrir(Object.assign({}, VIDE, {
-    cfg: { heuresJour: 8 },
-    chantiers: [chA('c1', { nom: 'Dégagement Martin', statut: 'accepte', aDevis: true, jours: [{ d: jour, p: 1 }] })]
-  }));
-  const l = ligneAuj(t, 'trancher:' + jourISO(jour));
-  verifierVrai('Aujourd’hui ▸ En retard le dit (' + attendu + ')', l && l.querySelector('b').textContent === attendu);
-  await parBarre(t, 'agenda');
-  verifier('la ligne de l’Agenda aussi', attendu, (t.$('#cal-trancher-btn b') || {}).textContent);
-  await parBarre(t, 'aujourdhui');
-  await appuyerLigne(t, 'trancher:' + jourISO(jour));
-  verifierVrai('« Trancher » ouvre la fiche du jour, à trancher', t.$('#modale .fj-etat.st-trancher') &&
-    /À trancher/.test(t.texte('#modale .fj-etat')));
-  verifier('aucune erreur', [], t.erreurs);
-});
-
-/* --------------------------------------------------------------------- */
-scenario('Agenda : un jour, une couleur — bande, « ? », « € » et quatre compteurs (P5)', async () => {
-  const t = await ouvrir(Object.assign({}, VIDE, {
-    module: 'calendrier', cfg: { heuresJour: 8, journeesMigrees: true,
+    module: 'calendrier', cfg: { heuresJour: 8, journeesMigrees: true, officeDepuis: JCAL(-10),
       absences: [{ d: new Date(JCAL(-4)).setHours(0, 0, 0, 0), note: 'pluie' }] },
     chantiers: [
       { id: 'c1', nom: 'Vaux', statut: 'accepte', aDevis: true, maj: Date.now(), lignes: [], temps: [],
         jours: [{ d: JCAL(-2), p: 1 }, { d: JCAL(3), p: 1 }] },
       { id: 'c2', nom: 'Marchand', statut: 'envoye', aDevis: true, maj: Date.now(), lignes: [], temps: [],
-        jours: [{ d: JCAL(4), p: 1 }] }],
+        jours: [{ d: JCAL(4), p: 1 }] },
+      { id: 'c3', nom: 'Combe', statut: 'accepte', aDevis: true, maj: Date.now(), lignes: [], temps: [],
+        jours: [{ d: JCAL(-3), p: 1, ferme: false }] },
+      { id: 'c4', nom: 'Loin', statut: 'accepte', aDevis: true, maj: Date.now(), lignes: [], temps: [],
+        jours: [{ d: JCAL(75), p: 1 }] }],
     journees: [{ id: 'j1', date: JCAL(-1), chantier: 'c1', personnes: 1, nonProd: 7, postes: [] }],
     charges: [{ id: 'h1', libelle: 'Assurance', ttc: 412, periodicite: 'mensuel', categorie: 'ASSUR', taux: 0,
       debut: JCAL(-40), jour: new Date(JCAL(5)).getDate(), moisReference: new Date(JCAL(5)).getMonth() }]
   }));
   await t.pause(300);
+  const C0 = t.w.BCC;
   const cas = async n => { const c = await caseDuJour(t, JCAL(n)); return c ? c.className : ''; };
-  verifierVrai('travaillé', /st-travaille/.test(await cas(-1)));
+  verifierVrai('fait', /st-travaille/.test(await cas(-1)));
   verifierVrai('non travaillé', /st-absent/.test(await cas(-4)));
-  verifierVrai('confirmé', /st-confirme/.test(await cas(3)) && !/trancher/.test(await cas(3)));
-  verifierVrai('prévu, devis en attente', /st-prevu/.test(await cas(4)));
-  const tr = await caseDuJour(t, JCAL(-2));
-  verifierVrai('le jour passé resté posé : bord pointillé et « ? »',
-    /trancher/.test(tr.className) && tr.querySelector('.cal-q') && tr.querySelector('.cal-q').textContent === '?');
-  verifier('chaque case porte une bande, et une seule', 1, tr.querySelectorAll('.bande').length);
-  /* Compté sur le mois du jour à trancher, qui est affiché. */
+  verifierVrai('posé', /st-confirme/.test(await cas(3)));
+  verifierVrai('posé, devis pas signé', /st-prevu/.test(await cas(4)));
+  verifierVrai('le même, passé : pâle', /st-prevu/.test(await cas(-3)) && /passe/.test(await cas(-3)));
+  const off = await caseDuJour(t, JCAL(-2));
+  verifierVrai('le jour posé passé compte d’office : fait, avec un ○, sans « ? »',
+    /st-travaille/.test(off.className) && off.querySelector('.cal-o') && !off.querySelector('.cal-q'));
+  verifier('chaque case porte une bande, et une seule', 1, off.querySelectorAll('.bande').length);
+  verifierVrai('la légende du mois dit le ○', /comptée d’office \(8 h\)/.test(t.texte('#cal-leg2')));
+  verifierVrai('et le €', /prélèvement/.test(t.texte('#cal-leg2')));
+  verifierVrai('et la couleur du fait', /fait/.test(t.texte('#cal-legende')));
   const k = t.$$('#cal-charge .carte2 small').map(s => s.textContent);
-  verifier('quatre compteurs', 4, k.length);
-  verifierVrai('fait, confirmé dont à trancher, prévu, non travaillé',
-    k[0] === 'fait' && /^confirmé · dont 1 à trancher$/.test(k[1]) && k[2] === 'prévu' && k[3] === 'non travaillé');
-  const prel = await caseDuJour(t, JCAL(5));
-  verifierVrai('« € » dans le coin du jour prélevé', prel.querySelector('.cal-prel') &&
-    prel.querySelector('.cal-prel').textContent === '€');
-  const leg = t.texte('.cal-legende');
-  verifierVrai('la légende est gardée, et dit les deux nouveaux repères', /travaillé/.test(leg) &&
-    /à trancher/.test(leg) && /prélèvement/.test(leg));
-  /* Les couleurs sont des variables du :root, pas des valeurs en dur. */
+  verifier('trois compteurs', ['fait', 'posé (signé)', 'non travaillé'], k);
+  /* Le compteur « posé » ne compte que le signé, et pas ce qui est déjà fait. */
+  const m0 = new Date(JCAL(10)), an = m0.getFullYear(), mo = m0.getMonth(), d10 = new Date(an, mo, 10, 12).getTime();
+  const cfg = { heuresJour: 8 };
+  verifier('un jour sur devis pas signé n’est pas « posé (signé) »', 0,
+    C0.chargeMois([{ id: 'x', statut: 'envoye', jours: [{ d: d10, p: 1 }] }], an, mo, cfg).fermes);
+  verifier('un jour signé l’est', 1,
+    C0.chargeMois([{ id: 'x', statut: 'accepte', jours: [{ d: d10, p: 1 }] }], an, mo, cfg).fermes);
+  const fait = C0.chargeMois([{ id: 'x', statut: 'accepte', jours: [{ d: d10, p: 1 }],
+    temps: [{ date: d10, duree: 8, unite: 'h', office: true }] }], an, mo, cfg);
+  verifier('un jour fait n’est plus « posé » : il est fait, une fois', [0, 1], [fait.fermes, fait.joursReels]);
+  /* Un mois sans jour non travaillé ne l'affiche pas. */
+  await caseDuJour(t, JCAL(75));
+  const leg = t.texte('#cal-legende');
+  verifierVrai('un mois sans jour non travaillé ne l’affiche pas : « ' + leg + ' »',
+    /posé/.test(leg) && !/non travaillé/.test(leg) && !/fait/.test(leg) && !/comptée d’office/.test(t.texte('#cal-leg2')));
+  verifierVrai('le compteur « non travaillé » reste, à zéro', /^0 j$/.test(t.texte('#cal-charge .carte2:last-child b')));
+  /* Les couleurs sont des variables du :root, et le jaune est parti. */
   verifierVrai('les teintes viennent du :root', /--st-trav:/.test(html) &&
     /\.cal button\.st-confirme\{background:var\(--st-conf-f\)\}/.test(html));
+  verifierVrai('posé sur un devis pas signé : le vert, en pointillés',
+    /\.cal button\.st-prevu\{background:var\(--carte\);border:2px dashed var\(--st-conf\)\}/.test(html) &&
+    !/var\(--st-prev\)/.test(html));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Agenda : l’appui long ouvre la bulle, l’appui simple la fiche du jour (G2)', async () => {
+  /* G2, validé le 03/11 : appui long (500 ms au doigt, clic droit à la
+     souris) → une bulle sous le jour : Saisir ma journée · Poser un chantier
+     · Jour non travaillé. L'appui simple ouvre toujours la fiche du jour. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'calendrier', cfg: { heuresJour: 8, journeesMigrees: true },
+    chantiers: [{ id: 'c1', nom: 'Vaux', statut: 'accepte', aDevis: true, maj: Date.now(), lignes: [], temps: [], jours: [] }]
+  }));
+  await t.pause(300);
+  const bulle = () => t.$('#cal-bulle');
+  const c = await appuiLong(t, JCAL(2));
+  verifierVrai('tenu 500 ms : la bulle s’ouvre', !!bulle());
+  verifier('avec ses trois gestes', ['Saisir ma journée', 'Poser un chantier', 'Jour non travaillé'],
+    t.$$('#cal-bulle [data-bulle]').map(b => b.textContent.trim()));
+  verifierVrai('elle nomme le jour', /\d/.test(t.texte('#cal-bulle .cb-t')));
+  verifier('le doigt levé n’ouvre pas la fiche par-dessus', true, t.$('#modale').hidden);
+  verifierVrai('la case est marquée', c && c.classList.contains('appui'));
+  /* Un appui hors de la bulle la ferme (après le temps de lever le doigt). */
+  await t.pause(400);
+  t.clic('#cal-bulle-fond'); await t.pause(150);
+  verifier('un appui à côté la ferme', null, bulle());
+  /* Le clic droit, à la souris : la bulle, et pas le menu du navigateur. */
+  const e = await appuiLong(t, JCAL(2), 'souris');
+  verifierVrai('le clic droit l’ouvre aussi', !!bulle());
+  verifierVrai('sans le menu du navigateur', e && e.defaultPrevented);
+  t.clic('#cal-bulle [data-bulle="poser"]'); await t.pause(400);
+  verifierVrai('« Poser un chantier » ouvre la feuille', !!t.$('#modale [data-pjch="c1"]') && !bulle());
+  t.clic('#modale-x'); await t.pause(150);
+  await appuiLong(t, JCAL(-1), 'souris');
+  t.clic('#cal-bulle [data-bulle="mj"]'); await t.pause(400);
+  verifier('« Saisir ma journée » ouvre Ma journée à ce jour', ['Ma journée', jourISO(JCAL(-1))],
+    [t.texte('#modale-titre'), t.$('#mj-date') && t.$('#mj-date').value]);
+  t.clic('#modale-x'); await t.pause(150);
+  await appuiLong(t, JCAL(-1), 'souris');
+  t.clic('#cal-bulle [data-bulle="abs"]'); await t.pause(400);
+  verifierVrai('« Jour non travaillé » ouvre sa feuille', !!t.$('#ab-note'));
+  t.clic('#modale-x'); await t.pause(150);
+  /* L'appui simple, lui, ouvre toujours la fiche du jour. */
+  await cliquerJour(t, JCAL(2));
+  verifierVrai('l’appui simple ouvre la fiche du jour', !t.$('#modale').hidden && t.$('#modale .fj-etat') && !bulle());
+  t.clic('#modale-x'); await t.pause(150);
+  /* En placement, chaque appui pose : pas de bulle. */
+  t.w.BCUI._ouvrirChantier('c1', 'travaux'); await t.pause(300);
+  t.clic('#f-planifier'); await t.pause(400);
+  await appuiLong(t, JCAL(2), 'souris');
+  verifier('en placement, pas de bulle', null, bulle());
+  /* Ni sélection de texte, ni menu du téléphone sur un appui long. */
+  verifierVrai('la case ne sélectionne rien et n’ouvre pas le menu du téléphone',
+    /\.cal button\{[^}]*user-select:none[^}]*-webkit-touch-callout:none/.test(html));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Agenda : poser un chantier — par étape, statut proposé d’après le chantier (G3)', async () => {
+  /* La feuille liste les chantiers ni payés ni sans suite, rangés par étape ;
+     on en choisit un, puis le statut du jour, proposé d'après le chantier et
+     modifiable. Un statut contraire au chantier s'écrit sur la pose ; sinon
+     le jour suit le chantier, et se confirme le jour où le devis est signé. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    module: 'calendrier', cfg: { heuresJour: 8, journeesMigrees: true },
+    chantiers: [
+      chA('sig', { nom: 'Signé', statut: 'accepte', aDevis: true }),
+      chA('att', { nom: 'En attente', statut: 'envoye', aDevis: true }),
+      chA('inf', { nom: 'Annoncé', statut: 'devis', aDevis: true }),
+      chA('fac', { nom: 'Facturé', statut: 'facture' }),
+      chA('pay', { nom: 'Payé', statut: 'paye' }),
+      chA('ss', { nom: 'Sans suite', statut: 'sansuite', aDevis: true })]
+  }));
+  await t.pause(300);
+  const C0 = t.w.BCC;
+  const poseDe = (id, ts) => (((t.stock('chantiers') || []).filter(c => c.id === id)[0] || {}).jours || [])
+    .filter(j => C0.jourCle(j.d) === C0.jourCle(ts))[0];
+  const ouvrirPoser = async ts => { await cliquerJour(t, ts); t.clic('#fj-poser'); await t.pause(400); };
+  await ouvrirPoser(JCAL(3));
+  verifier('ni payé ni sans suite, rangés par étape', ['inf', 'att', 'sig', 'fac'],
+    t.$$('#modale [data-pjch]').map(b => b.dataset.pjch));
+  verifier('un intertitre par étape', ['Infos et repérage', 'Devis', 'Travaux', 'Paiement'],
+    t.$$('#modale .pj-etape').map(p => p.textContent));
+  await choisirAPoser(t, 'att');
+  verifier('devis en attente : « Posé, devis pas signé » proposé', 'provisoire',
+    (t.$('#modale [data-pjst][aria-pressed="true"]') || {}).dataset.pjst);
+  t.clic('#pj-ok'); await t.pause(500);
+  verifier('écrit sans statut à lui : il suit le chantier', undefined, poseDe('att', JCAL(3)).ferme);
+  verifierVrai('la case est en pointillés', /st-prevu/.test((await caseDuJour(t, JCAL(3))).className));
+  /* Signé ensuite : le jour se confirme de lui-même. */
+  t.w.BCUI._setChantier('att', { statut: 'accepte', dateSignature: Date.now() }); await t.pause(400);
+  t.w.BCUI._setCal(null, null); await t.pause(200);
+  verifierVrai('le devis signé, il est posé', /st-confirme/.test((await caseDuJour(t, JCAL(3))).className));
+  /* Un choix contraire au chantier est permis. */
+  await ouvrirPoser(JCAL(4));
+  await choisirAPoser(t, 'sig');
+  verifier('signé : « Posé » proposé', 'ferme', (t.$('#modale [data-pjst][aria-pressed="true"]') || {}).dataset.pjst);
+  await choisirAPoser(t, 'sig', 'provisoire');
+  t.clic('#pj-ok'); await t.pause(500);
+  verifier('« devis pas signé » choisi à la main : écrit sur la pose', false, poseDe('sig', JCAL(4)).ferme);
+  verifierVrai('et la case en pointillés', /st-prevu/.test((await caseDuJour(t, JCAL(4))).className));
+  await ouvrirPoser(JCAL(5));
+  await choisirAPoser(t, 'inf', 'ferme');
+  t.clic('#pj-ok'); await t.pause(500);
+  verifier('« Posé » sur un devis pas encore fait : écrit sur la pose', true, poseDe('inf', JCAL(5)).ferme);
+  /* Une date passée : fait, journée ou demi-journée — une journée, pas de pose. */
+  await ouvrirPoser(JCAL(-2));
+  await choisirAPoser(t, 'sig');
+  verifier('date passée : « Fait » proposé, journée ou demi-journée',
+    ['Fait · journée (8 h)', 'Fait · demi-journée (4 h)'], t.$$('#modale [data-pjst]').map(b => b.textContent.trim()));
+  verifier('la journée entière d’abord', 'j', (t.$('#modale [data-pjst][aria-pressed="true"]') || {}).dataset.pjst);
+  await choisirAPoser(t, 'sig', 'd');
+  t.clic('#pj-ok'); await t.pause(600);
+  const js = t.stock('journees') || [];
+  verifier('une journée de 4 h est créée, sans prestation', [1, 'sig', 4, 0],
+    [js.length, js[0] && js[0].chantier, js[0] && js[0].nonProd, js[0] && (js[0].postes || []).length]);
+  verifier('à cette date', C0.jourCle(JCAL(-2)), js[0] && C0.jourCle(js[0].date));
+  verifier('et rien de posé ce jour-là', undefined, poseDe('sig', JCAL(-2)));
+  await ouvrirPoser(JCAL(-3));
+  await choisirAPoser(t, 'fac');
+  t.clic('#pj-ok'); await t.pause(600);
+  verifier('la journée entière : 8 h', 8, ((t.stock('journees') || []).filter(j => j.chantier === 'fac')[0] || {}).nonProd);
+  /* Un appui sur le jour, ensuite, ouvre de quoi la préciser. */
+  await cliquerJour(t, JCAL(-2));
+  verifierVrai('le jour est fait, et se modifie', /Ce que vous y avez fait/.test(t.texte('#modale')) &&
+    t.texte('#fj-travaille') === 'Modifier ma journée');
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -10035,7 +10175,9 @@ scenario('Fiche du jour : rien de la carte Journée, de la fiche d’un jour ni 
   /* L'inventaire de non-perte du lot c1 (R7, R8). Les boutons des trois
      écrans fondus sont lus dans la table de correspondance (section 4) ;
      chacun a ici sa preuve, jouée sur la fiche du jour, avec le même effet
-     qu'avant. Un bouton sans preuve, ou une preuve sans bouton, fait crier. */
+     qu'avant. Un bouton sans preuve, ou une preuve sans bouton, fait crier.
+     Lot r1 : les boutons retirés le 03/11 sont lus dans la section 15 de la
+     table ; chacun doit y être, et ne plus être nulle part sur la fiche. */
   const TABLE = fs.readFileSync(path.join(__dirname, '..', 'docs', 'correspondance-refonte.md'), 'utf8').split(/\r?\n/);
   const lu = {};
   [['carte', /^\| Carte Journée[^(|]*\(([^)]+)\)/], ['fiche', /^\| Appui sur un jour[^(|]*\(([^)]+)\)/],
@@ -10056,6 +10198,8 @@ scenario('Fiche du jour : rien de la carte Journée, de la fiche d’un jour ni 
     lignes: [] }, extra);
   const autre = { id: 'c2', nom: 'Marchand', statut: 'accepte', aDevis: true, maj: Date.now(), temps: [], jours: [], lignes: [] };
   const POSE = { cfg: { heuresJour: 8, journeesMigrees: true }, chantiers: [ch([JCAL(3)]), autre] };
+  /* Un jour posé passé depuis la mise à jour : il compte d'office. */
+  const OFFICE = { cfg: { heuresJour: 8, journeesMigrees: true, officeDepuis: JCAL(-10) }, chantiers: [ch([JCAL(-3)])] };
   const FAIT = { cfg: { heuresJour: 8, journeesMigrees: true }, chantiers: [ch([])],
     journees: [{ id: 'j1', date: JCAL(-1), chantier: 'c1', personnes: 1, nonProd: 0, postes: [{ travaux: 'DEGAG', heures: 7, quantite: 0 }] }] };
   const TRANCHE = { cfg: { heuresJour: 8, journeesMigrees: true }, chantiers: [ch([JCAL(-3), JCAL(-2)])] };
@@ -10077,8 +10221,6 @@ scenario('Fiche du jour : rien de la carte Journée, de la fiche d’un jour ni 
       'J\'ai travaillé': async () => prJourneeDatee(VIDE_CFG, JCAL(-1), '#fj-travaille')
     },
     fiche: {
-      'C\'était comme prévu': async () => { await fiche(AUJ, JCAL(0));
-        return await clic('#fj-prevu', 700) && journees().length === 1 && journees()[0].chantier === 'c1'; },
       'Non travaillé': async () => { await fiche(POSE, JCAL(3)); await clic('#fj-absent', 400);
         t0.saisir('#ab-note', 'pluie'); await clic('#ab-ok', 500);
         return ((t0.stock('cfg') || {}).absences || []).length === 1; },
@@ -10086,9 +10228,9 @@ scenario('Fiche du jour : rien de la carte Journée, de la fiche d’un jour ni 
       'Modifier ma journée': async () => { await fiche(FAIT, JCAL(-1));
         return t0.texte('#fj-travaille') === 'Modifier ma journée' && await clic('#fj-travaille') && titre() === 'Modifier la journée'; },
       'Autre chose': async () => await prJourneeDatee(FAIT, JCAL(-1), '#fj-autre') &&
-        await prJourneeDatee(AUJ, JCAL(0), '#fj-autrement') && t0.$('#mj-ch').value === 'c1',
+        await prJourneeDatee(AUJ, JCAL(0), '#fj-travaille') && t0.$('#mj-ch').value === 'c1',
       'Poser un chantier': async () => { await fiche(POSE, JCAL(3)); await clic('#fj-poser', 400);
-        t0.choisir('#pj-ch', 'c2'); await clic('#pj-ok', 500);
+        await choisirAPoser(t0, 'c2'); await clic('#pj-ok', 500);
         return joursDe('c2').indexOf(C0().jourCle(JCAL(3))) >= 0; },
       'Fiche': async () => { await fiche(POSE, JCAL(3)); return await clic('[data-fjouvrir="c1"]') && /Vaux/.test(t0.texte('#vue-chantier')); },
       'Prélevé ce jour-là': async () => { await fiche({ charges: [{ id: 'h1', libelle: 'Assurance', ttc: 412, periodicite: 'mensuel',
@@ -10096,16 +10238,10 @@ scenario('Fiche du jour : rien de la carte Journée, de la fiche d’un jour ni 
         return /Prélevé ce jour-là/.test(t0.texte('#modale')) && /Assurance/.test(t0.texte('#modale')); }
     },
     fenetre: {
-      'comme prévu': async () => { await fiche(TRANCHE, JCAL(-3));
-        return !!t0.$('.fj-etat.st-trancher') && await clic('#fj-prevu', 700) && journees().length === 1 &&
-          C0().jourCle(journees()[0].date) === C0().jourCle(JCAL(-3)); },
-      'toutes comme prévu': async () => { await fiche(TRANCHE, JCAL(-3)); await clic('#fj-tout', 400);
-        return await clic('#ft-ok', 900) && journees().length === 2; },
-      'je n\'étais pas là': async () => { await fiche(TRANCHE, JCAL(-3)); await clic('#fj-nonla', 400);
-        t0.saisir('#ab-note', 'arrêt'); await clic('#ab-ok', 500);
-        const a = ((t0.stock('cfg') || {}).absences || [])[0];
-        return !!a && C0().jourCle(a.d) === C0().jourCle(JCAL(-3)); },
-      'autrement': async () => await prJourneeDatee(TRANCHE, JCAL(-3), '#fj-autrement') && t0.$('#mj-ch').value === 'c1',
+      /* Devenu « Je n'y étais pas » de la journée d'office : le jour posé
+         s'en va (dans la Corbeille). */
+      'je n\'étais pas là': async () => { await fiche(OFFICE, JCAL(-3)); await clic('#fj-nonla', 600);
+        return joursDe('c1').indexOf(C0().jourCle(JCAL(-3))) < 0; },
       'un autre jour': async () => { await fiche(TRANCHE, JCAL(-3)); await clic('#fj-deplacer', 400);
         t0.choisir('#dj-date', jourISO(JCAL(-5))); await clic('#dj-ok', 600);
         const j = joursDe('c1');
@@ -10118,9 +10254,31 @@ scenario('Fiche du jour : rien de la carte Journée, de la fiche d’un jour ni 
     'Ce n’est plus un jour off': async () => { await fiche({ cfg: { heuresJour: 8, absences: [{ d: new Date(JCAL(3)).setHours(0, 0, 0, 0), note: 'congé' }] } }, JCAL(3));
       return await clic('#fj-libre', 500) && ((t0.stock('cfg') || {}).absences || []).length === 0; }
   };
+  /* Les retraits du 03/11 (lot r1), et le mot qui les nomme dans la
+     section 15 de la table. */
+  const RETIRES = { fiche: { 'C\'était comme prévu': 'C\'était comme prévu' },
+    fenetre: { 'comme prévu': 'C\'était comme prévu', 'toutes comme prévu': 'Toutes comme prévu',
+      'autrement': 'J\'y ai travaillé, mais autrement' } };
+  const s15 = TABLE.slice(TABLE.findIndex(l => /^## 15\./.test(l)));
+  const retire = mot => s15.some(l => l.indexOf('« ' + mot + ' »') >= 0 && /retrait accepté \(03\/11\)/.test(l));
+  const ABSENTS = ['#fj-prevu', '#fj-tout', '#fj-autrement'];
+  const nulle = async () => {
+    for (const [g, ts] of [[AUJ, JCAL(0)], [TRANCHE, JCAL(-3)], [OFFICE, JCAL(-3)], [POSE, JCAL(3)]]) {
+      await fiche(g, ts);
+      if (ABSENTS.some(x => t0.$(x))) return false;
+    }
+    return true;
+  };
   for (const k of ['carte', 'fiche', 'fenetre']) {
-    verifier('la table cite les boutons de « ' + k + ' », chacun avec sa preuve', Object.keys(PREUVES[k]), lu[k]);
+    const partis = RETIRES[k] || {};
+    verifier('la table cite les boutons de « ' + k + ' », chacun avec sa preuve ou son retrait',
+      Object.keys(PREUVES[k]).concat(Object.keys(partis)).sort(), lu[k].slice().sort());
     for (const b of lu[k]) {
+      if (partis[b]) {
+        verifierVrai(k + ' ▸ « ' + b + ' » : retrait accepté, écrit dans la section 15', retire(partis[b]));
+        verifierVrai(k + ' ▸ « ' + b + ' » : plus nulle part sur la fiche du jour', await nulle());
+        continue;
+      }
       const p = PREUVES[k][b];
       verifierVrai(k + ' ▸ « ' + b + ' » : même effet dans la fiche du jour', p && await p());
       if (t0) verifier(k + ' ▸ « ' + b + ' » : aucune erreur', [], t0.erreurs);
@@ -10394,17 +10552,16 @@ function preuvesB1() {
         return ok;
       };
       let tout = true;
-      /* Aujourd'hui : l'impayée ouvre l'étape Payé, « Estimer » l'étape Devis. */
+      /* Aujourd'hui : l'impayée ouvre l'étape Payé ; « À programmer ▸ Estimer »
+         est parti au lot r1 : la ligne de Chantiers en cours ouvre l'étape en
+         cours, et l'estimation est dans l'étape Devis. */
       await parBarre(t, 'aujourdhui');
       t.clic('[data-ajcle="impaye:c"] [data-ajouvre]'); await t.pause(400);
       tout = await sur('Aujourd’hui ▸ facture impayée', 'Charles', '4') && tout;
       await parBarre(t, 'aujourdhui');
-      t.clic('[data-ajcle="programmer:g"] [data-ajouvre]'); await t.pause(400);
-      tout = await sur('Aujourd’hui ▸ À programmer ▸ Estimer', 'Gaston', '1') && tout;
-      /* L'Agenda : « Estimer » d'À programmer, et « Fiche » de la fiche du jour. */
-      await parBarre(t, 'agenda');
-      t.clic('[data-aestimer="g"]'); await t.pause(400);
-      tout = await sur('Agenda ▸ À programmer ▸ Estimer', 'Gaston', '1') && tout;
+      t.clic('#aj-encours [data-ajch="g"]'); await t.pause(400);
+      tout = await sur('Aujourd’hui ▸ Chantiers en cours', 'Gaston', String(t.w.BCC.etapeChantier(chB1(t, 'g')))) && tout;
+      /* L'Agenda : « Fiche » de la fiche du jour. */
       await parBarre(t, 'agenda');
       await cliquerJour(t, JCAL(5));
       t.clic('[data-fjouvrir="a"]'); await t.pause(400);
@@ -10933,7 +11090,9 @@ scenario('Création courte : + ▸ Chantier, puis la fiche sur Infos et Devis (l
   await parBarre(t, 'chantiers');
   verifier('il est dans Chantiers ▸ Devis', [c.id], groupeB2(t, 'devis'));
   await parBarre(t, 'aujourdhui');
-  verifierVrai('et dans Aujourd’hui ▸ Devis à faire', !!ligneAuj(t, 'devisafaire:' + c.id));
+  /* Lot r1 : « Devis à faire » se dit sur la ligne du chantier. */
+  verifierVrai('et dans Aujourd’hui ▸ Chantiers en cours, « Devis à faire »',
+    /Devis à faire/.test(t.texte('#aj-encours [data-ajch="' + c.id + '"]') || ''));
 
   /* Rien de quoi le nommer : la feuille le dit et ne crée rien. */
   await plusChantier(t);
@@ -10966,10 +11125,13 @@ scenario('Création depuis une estimation : Rendements ▸ Estimer ▸ Créer le
 });
 
 /* --------------------------------------------------------------------- */
-scenario('C1 : un chantier « Devis à envoyer » fait une ligne « Devis à faire » (lot b2)', async () => {
+scenario('C1 : un chantier « Devis à envoyer » dit « Devis à faire » sur sa ligne (lots b2, r1)', async () => {
+  /* Bientôt est parti au lot r1 (A2) : « Devis à faire » se dit sur la
+     ligne du chantier, à l'étape Infos de Chantiers en cours. */
   const t = await ouvrir(Object.assign({}, VIDE, B2()));
   await parBarre(t, 'aujourdhui');
-  const l = id => ligneAuj(t, 'devisafaire:' + id);
+  const l = id => { const e = t.$('#aj-encours [data-ajch="' + id + '"]');
+    return e && /Devis à faire/.test(e.textContent) ? e : null; };
   verifierVrai('pas encore repéré', l('dv') &&
     /annoncé il y a 3 j · pas encore repéré/.test(l('dv').textContent));
   verifierVrai('repéré', l('dr') && /repéré il y a 2 j/.test(l('dr').textContent) &&

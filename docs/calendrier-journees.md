@@ -481,3 +481,57 @@ Maquette `maquettes/refonte-5b-temps.html`, écran Ma journée (validée le
 `mj-lieu` · `mj-commune` · `mj-hier` · `mj-total` · `mj-postes` ·
 `pst-plus` · `data-pstsup` · `mj-horsprod` · `mj-trajet` · `mj-km` ·
 `mj-pers` · `mj-fin` · `mj-note` · `mj-apercu` · `mj-ok` · `mj-sup`.
+
+## Le lot r1 (4.92.0) : jour passé = journée faite, journée d'office
+
+Décisions des 02 et 03/11 (G4 de la maquette `maquettes/refonte-auj-agenda.html`),
+et du 04/11 pour les jours d'avant la mise à jour. Elles remplacent la règle
+d'août « un jour posé passé doit être tranché ». Le détail ligne à ligne est
+dans `docs/correspondance-refonte.md`, section 15.
+
+**Ce qui ne vaut plus, plus haut dans ce fichier** : *La journée qui passe
+sans être notée* (le rappel et `journeesANoter`, restée dans la logique mais
+plus lue), *Le rappel entre aussi dans le calendrier* (`#cal-trancher`), *La
+fiche du jour, et l'écran qui force à trancher* (`joursAResoudre`, retiré),
+*Valider une journée d'un seul geste*, *Quarante-sept journées d'un seul
+geste* (`validerCommePrevu`, `validerTousLesJoursPrevus`, retirés), *Ce qui
+reste à planifier* (`#cal-aplanifier`, retiré), et dans *L'Agenda du lot c1*
+l'état « à trancher », le « ? » de la grille et les quatre compteurs.
+
+- **Poser sur une date passée crée une journée** (bulle, fiche du jour,
+  placement) : `creerJourneeFaite`, la part × `HEURES_JOUR` en temps non
+  productif, sans prestation, sur ce chantier ; pas de pose. Un appui sur le
+  jour ouvre ensuite de quoi la préciser.
+- **La journée d'office** (`C.joursDOffice`) : un jour posé et confirmé que
+  la date a dépassé, sans journée saisie pour ce chantier ce jour-là, compte
+  comme une journée faite — sa part × `HEURES_JOUR`, sans prestation. Elle
+  entre dans `c.temps` par `indexerJournees()` (marquée `office`) : temps
+  passé, prix par journée, compteur « fait » et statut du jour la voient
+  comme une journée ; aucun rendement, faute de prestation. Le jour même ne
+  compte que le lendemain ; un jour marqué non travaillé ne compte pas.
+- **Confirmé** se lit sur la pose (`C.fermeteJour`) : le statut choisi en
+  posant s'il contredit le chantier (champ facultatif `ferme` de la pose),
+  sinon le chantier, comme avant ; un jour posé avant la date de signature
+  du devis reste « devis pas signé » — signer ensuite n'en fait pas une
+  journée qu'il n'a pas faite.
+- **Jamais en double** : dès qu'une journée existe pour ce chantier ce
+  jour-là, la journée d'office n'existe plus. C'est structurel — elle se
+  déduit des journées — et non une garde qu'on pourrait oublier.
+- **Le ○** vit sur la pose (champ `vu`, posé par `marquerOfficeVu` à
+  l'ouverture de la fiche du jour). « Je n'y étais pas » retire la pose,
+  dans la Corbeille (type `jour`, qui sait la reposer).
+- **Les jours d'avant la mise à jour** : `A.cfg.officeDepuis`, la date de la
+  première ouverture de la 4.92, posée une fois. Un jour posé avant ce
+  jour-là reste tel quel, pâle, sans relance.
+
+**Calculée, pas écrite : ce que ça change.** La journée d'office ne s'écrit
+dans aucune liste ; elle se refait à chaque indexation, comme le statut d'un
+jour. Rien à migrer, rien à effacer quand une vraie journée la remplace.
+Pour la sauvegarde : elle ne contient que les poses (avec `ferme` et `vu`)
+et `officeDepuis`, qui vit dans la configuration ; la journée d'office se
+recalcule à l'arrivée. Une restauration ne touche pas à la configuration :
+sur un téléphone neuf, `officeDepuis` est le jour de la première ouverture,
+si bien que les poses passées d'une vieille sauvegarde ne deviennent pas des
+journées d'office. Le revers : une journée d'office n'apparaît dans un
+export que par ses poses ; un chantier qu'on change de statut (sans suite,
+devis pas signé) la fait disparaître, ce qui est voulu.

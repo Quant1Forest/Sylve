@@ -167,10 +167,10 @@ preuve sans ligne, le fait crier.
 |---|---|---|
 | Accueil ▸ marque (logo, « Sylve », sous-titre) | Écran de démarrage | `demarrage-marque` |
 | Accueil ▸ ⚙ | ☰ ▸ Réglages | `menu-reglages` |
-| Accueil ▸ rappel de sauvegarde | Aujourd'hui ▸ En retard, dernière ligne « Sauvegarde à faire » → ☰ ▸ Sauvegarde (carte Sauvegarde des Réglages) | `retard-sauvegarde` |
-| Accueil ▸ rappel « journées à trancher » | Aujourd'hui ▸ En retard, une ligne par jour « Journée du … non saisie » → fiche du jour, état « à trancher » (fenêtre « Que s'est-il passé ? » jusqu'en 4.87) | `retard-trancher` |
+| Accueil ▸ rappel de sauvegarde | Aujourd'hui ▸ Autres rappels, repliés en bas (En retard jusqu'en 4.91) : « Sauvegarde à faire » → ☰ ▸ Sauvegarde (carte Sauvegarde des Réglages) | `autres-sauvegarde` |
+| Accueil ▸ rappel « journées à trancher » | Remplacé par la journée d'office (lot r1) : le jour posé et confirmé compte le lendemain, marqué ○ dans Aujourd'hui ▸ Derniers jours ; sa fiche du jour propose Préciser ma journée et Je n'y étais pas (« à trancher » jusqu'en 4.91) | `office` |
 | Accueil ▸ rappel d'échéances des charges fixes | Aujourd'hui ▸ Prélèvements à venir (7 jours, ou le préavis s'il est plus long ; total) → Argent ▸ Charges fixes | `prelevements` |
-| Accueil ▸ rappel de devis en attente | Aujourd'hui ▸ Bientôt « Relancer le devis ? », un par devis → sa fiche (la liste filtrée reste dans Chantiers) | `bientot-relancer` |
+| Accueil ▸ rappel de devis en attente | Aujourd'hui ▸ En retard « Relancer le devis ? » à 7 jours de la fin de validité ou après (Bientôt jusqu'en 4.91), un par devis → sa fiche (la liste filtrée reste dans Chantiers) | `retard-relancer` |
 | Accueil ▸ tuile Mon entreprise (chantiers ouverts) | Barre ▸ Chantiers ; le chiffre : compte de « Chantiers en cours » | `encours-compte` |
 | Accueil ▸ bouton « Enregistrer ma journée » | Ligne de saisie d'Aujourd'hui → fenêtre Ma journée | `saisie-journee` |
 | Accueil ▸ bouton « Enregistrer ma journée » (bis) | + ▸ Ma journée | `plus-journee` |
@@ -178,25 +178,64 @@ preuve sans ligne, le fait crier.
 | Accueil ▸ tuiles Cubage et Bois de chauffage, avec m³ et stères | ☰ ▸ Outils de terrain | `menu-outils` |
 | Mon entreprise ▸ marque (logo et nom de l'entreprise) | Écran de démarrage, sous Sylve ; aperçu dans Réglages ▸ Général | `demarrage-entreprise` |
 | Mon entreprise ▸ ↩ | Barre ▸ Aujourd'hui | `barre-aujourdhui` |
-| Mon entreprise ▸ bulle « journées à planifier » | Aujourd'hui ▸ Bientôt « À programmer : N j à placer » → placement de l'Agenda | `bientot-programmer` |
-| Mon entreprise ▸ bulle « devis signés » | La même ligne « À programmer » (signé = à programmer) ; le total dans Chantiers | `bientot-programmer` |
+| Mon entreprise ▸ bulle « journées à planifier » | Fiche ▸ Travaux ▸ Placer des jours dans l'Agenda, et l'appui long sur un jour ; l'estimation dans l'étape Devis (« N j à placer » retiré le 03/11, lot r1) | `fiche-placer` |
+| Mon entreprise ▸ bulle « devis signés » | Aujourd'hui ▸ Chantiers en cours, étape Travaux : « Signé · à programmer » (ligne « À programmer » jusqu'en 4.91) ; le total dans Chantiers | `encours-signe` |
 | Mon entreprise ▸ bulle « chantiers en cours » | Aujourd'hui ▸ Chantiers en cours → fiche | `encours-bloc` |
 | Mon entreprise ▸ bulle « factures en attente » (et « N en retard ») | Aujourd'hui ▸ En retard « Facture impayée » quand l'échéance est passée → fiche | `retard-impaye` |
 | Mon entreprise ▸ bulle « factures en attente », son montant | Argent ▸ Bilan, « en attente » | `argent-attente` |
 | Mon entreprise ▸ bulle « chiffre d'affaires » | Argent ▸ Bilan, « facturé (HT) » de l'année | `argent-ca` |
 | Mon entreprise ▸ bulle « TVA déductible » | Argent ▸ Bilan, « déductible » de l'année | `argent-tva` |
-| Mon entreprise ▸ ligne « Aujourd'hui / Demain / Dans N jours — chantier, pour qui » | Aujourd'hui ▸ Bientôt « N jours prévus », sur 7 jours | `bientot-prevus` |
+| Mon entreprise ▸ ligne « Aujourd'hui / Demain / Dans N jours — chantier, pour qui » | Aujourd'hui ▸ Chantiers en cours, sur la ligne du chantier : « posé aujourd'hui », « posé demain », « posé dans N j » (trois jours ; Bientôt jusqu'en 4.91) | `encours-pose` |
 | Mon entreprise ▸ tuiles Chantiers, Calendrier, Finances | Barre : Chantiers, Agenda, Argent | `barre-modules` |
 | Mon entreprise ▸ tuiles Stock, Achats, Véhicule, Rendements, avec leur chiffre | ☰ ▸ Entreprise | `menu-entreprise` |
-| Mon entreprise ▸ tuile Stock, « N à recommander » | Aujourd'hui ▸ Bientôt « À recommander », réservé compris, même chiffre que la tuile du ☰ | `bientot-recommander` |
-| Mon entreprise ▸ tuile Véhicule, « N échéances dépassées » | Aujourd'hui ▸ En retard (dépassée) ou Bientôt (proche) → Véhicule ▸ Échéances | `vehicule-echeance` |
-| Mon entreprise ▸ Mes notes (cocher, titre, couleur, ajouter, × d'un élément, × de la note → corbeille) | Aujourd'hui ▸ Mes notes, juste après Bientôt | `notes-actions` |
+| Mon entreprise ▸ tuile Stock, « N à recommander » | Aujourd'hui ▸ Autres rappels « À recommander », réservé compris, même chiffre que la tuile du ☰ | `autres-recommander` |
+| Mon entreprise ▸ tuile Véhicule, « N échéances dépassées » | Aujourd'hui ▸ Autres rappels (dépassée ou proche) → Véhicule ▸ Échéances | `autres-vehicule` |
+| Mon entreprise ▸ Mes notes (cocher, titre, couleur, ajouter, × d'un élément, × de la note → corbeille) | ☰ ▸ Mes notes, un écran à elles (Aujourd'hui jusqu'en 4.91) | `menu-notes` |
 | Mon entreprise ▸ Mes notes, « + note » | + ▸ Note | `plus-note` |
 | Accueil ▸ × des rappels (jusqu'au lancement suivant) | × de chaque ligne d'Aujourd'hui, jusqu'au lendemain | `masquer` |
 
 Le chiffre de la tuile Calendrier (« j. ce mois ») est dans Agenda (jours
 confirmés et provisoires du mois affiché) ; celui de la tuile Finances
 (facturé de la période, TVA) dans Argent ▸ Bilan, sur la même période.
+
+### Où sont allés les éléments d'Aujourd'hui et de l'Agenda (lot r1)
+
+Lot r1 (4.92.0), maquette `maquettes/refonte-auj-agenda.html` validée le
+03/11 (A1 à A4, G1 à G4). Même principe que le tableau du lot 5b : la
+dernière colonne est la clé de la preuve, jouée par le scénario
+« Inventaire r1 : chaque élément d'Aujourd'hui et de l'Agenda a sa place ».
+Les lignes « retiré (03/11) » sont les retraits acceptés ; leur preuve
+vérifie qu'ils ne sont plus nulle part. Une ligne sans preuve, ou une preuve
+sans ligne, fait crier le scénario.
+
+| Élément (4.91) | Nouvel endroit | Preuve |
+|---|---|---|
+| Aujourd'hui ▸ ligne Ma journée | En tête, sous la date, inchangée | `r1-saisie` |
+| Aujourd'hui ▸ En retard ▸ facture impayée, chantier à facturer, devis sans réponse | En retard, dans cet ordre (seulement s'il y a quelque chose) | `r1-retard` |
+| Aujourd'hui ▸ En retard ▸ journée non saisie (à trancher) | La journée d'office ○ (Derniers jours, grille, fiche ▸ Travaux) ; « Je n'y étais pas » dans la fiche du jour | `r1-office` |
+| Aujourd'hui ▸ En retard ▸ chantier dont tous les jours posés sont passés | Chantiers en cours, sur sa ligne : « plus de jour posé » | `r1-plusdejour` |
+| Aujourd'hui ▸ En retard et Bientôt ▸ sauvegarde du mois, stock à recommander, entretien du véhicule | Autres rappels (N), replié en bas, même lien qu'avant | `r1-autres` |
+| Aujourd'hui ▸ Bientôt ▸ posé dans les trois jours | Chantiers en cours, sur la ligne : « posé aujourd'hui », « posé demain », « posé dans N j » | `r1-pose` |
+| Aujourd'hui ▸ Bientôt ▸ Devis à faire | Chantiers en cours, étape Infos : « Devis à faire · pas encore repéré » (ou « repéré il y a N j ») | `r1-devisafaire` |
+| Aujourd'hui ▸ Bientôt ▸ devis bientôt plus valable | En retard, à 7 jours de la fin de validité ou après | `r1-devis7` |
+| Aujourd'hui ▸ Mes notes | ☰ ▸ Mes notes | `r1-notes` |
+| Aujourd'hui ▸ Chantiers en cours | Gardé : par étape, le plus ancien en haut, un intertitre par étape | `r1-encours` |
+| Aujourd'hui ▸ Prélèvements à venir | Inchangé | `r1-prelevements` |
+| Aujourd'hui ▸ Derniers jours | Inchangé, plus la journée d'office | `r1-derniers` |
+| Aujourd'hui ▸ × « masquer jusqu'à demain » | Inchangé, sur chaque ligne | `r1-masquer` |
+| Agenda ▸ grille, ‹ Aujourd'hui ›, € | Gardés | `r1-grille` |
+| Agenda ▸ légende | Ce qui figure dans le mois : fait, posé, posé devis pas signé (pointillés), non travaillé ; € et ○ en petit | `r1-legende` |
+| Agenda ▸ quatre compteurs | Trois : fait, posé (signé), non travaillé | `r1-compteurs` |
+| Agenda ▸ Ce mois-ci, jour par jour | Gardé, journées d'office comprises | `r1-histo` |
+| Agenda ▸ fiche du jour | Gardée : Déplacer la journée, Jour non travaillé, Poser un chantier, Saisir / Modifier ma journée, Prélevé ce jour-là | `r1-fiche` |
+| Agenda ▸ placement (bandeau, Fini de placer, jour déjà pris) | Gardé ; un jour passé touché devient une journée faite | `r1-placement` |
+| (nouveau) Appui long sur un jour | La bulle : Saisir ma journée, Poser un chantier, Jour non travaillé | `r1-bulle` |
+| Aujourd'hui ▸ Bientôt ▸ « N jours à placer », « aucune journée prévue — estimez et placez », « N posées, pas d'estimation » | retiré (03/11) : on place depuis la fiche ▸ Travaux, on estime dans l'étape Devis | `r1-x-aplacer` |
+| Agenda ▸ bloc « À programmer » (Placer, Estimer) | retiré (03/11) : fiche ▸ Travaux ▸ Placer des jours, ou l'appui long | `r1-x-aprogrammer` |
+| Agenda ▸ ligne « N jours passés à trancher » | retiré (03/11) : la journée d'office | `r1-x-trancher-agenda` |
+| Agenda ▸ fiche du jour ▸ état « à trancher » (C'était comme prévu, Toutes comme prévu, J'y ai travaillé mais autrement, C'était un autre jour) | retiré (03/11) : journée d'office, Préciser ma journée, Déplacer la journée, Je n'y étais pas | `r1-x-trancher-fiche` |
+| Aujourd'hui ▸ En retard ▸ « Journée du … non saisie » ▸ Trancher | retiré (03/11) : la journée d'office | `r1-x-trancher-auj` |
+| Aujourd'hui ▸ Mes notes | retiré d'Aujourd'hui (03/11) : ☰ ▸ Mes notes | `r1-x-notes-auj` |
 
 ### 2.3 Chantiers
 
@@ -296,6 +335,15 @@ Ma position, − / + / Tout voir, **Poser un chantier**, fonds de carte, liste).
 Liste), intacte ; l'Agenda n'a plus qu'une vue, et donc plus de pastille.
 
 **Carnet** — le même écran que 2.3.
+
+**Depuis le lot r1 (4.92.0)**, l'Agenda n'a plus ni le rappel des jours à
+trancher ni le bloc À programmer ; sa légende ne dit que ce qui figure dans le
+mois, ses compteurs sont trois (fait, posé signé, non travaillé), un appui long
+sur un jour ouvre une bulle (Saisir ma journée, Poser un chantier, Jour non
+travaillé), et un jour posé confirmé qui passe compte d'office, marqué ○.
+Aujourd'hui (2.1, et son tableau du lot 5b) a perdu Bientôt et Mes notes, qui
+est passé dans le ☰. Détail et preuves : *Où sont allés les éléments
+d'Aujourd'hui et de l'Agenda (lot r1)*, plus haut.
 
 ### 2.5 Rendements
 

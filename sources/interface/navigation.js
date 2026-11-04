@@ -5,7 +5,7 @@ function vueDemandee(def) {
     var m = /[?&]vue=([a-z]+)/.exec(location.search || '');
     var v = m && m[1];
     if (v && ['saisie', 'bordereau', 'syntheses', 'fichiers', 'reglages',
-      'stock', 'bois', 'lieux', 'accueil', 'carnet', 'chantier', 'estimer', 'rendements', 'calendrier', 'finances', 'depenses', 'stock2', 'charges', 'carte', 'analyses', 'commandes', 'revient'].indexOf(v) >= 0) return v;
+      'stock', 'bois', 'lieux', 'accueil', 'carnet', 'chantier', 'estimer', 'rendements', 'calendrier', 'finances', 'depenses', 'stock2', 'charges', 'carte', 'analyses', 'commandes', 'revient', 'notes'].indexOf(v) >= 0) return v;
   } catch (e) { }
   return def;
 }
@@ -109,7 +109,7 @@ function init() {
           rendements: 'rendements', estimer: 'rendements', finances: 'finances', depenses: 'finances',
           charges: 'finances', stock2: 'stock', commandes: 'stock', revient: 'stock', carte: 'chantiers', analyses: 'finances',
           carnetv: 'vehicule', echeancesv: 'vehicule', coutsv: 'vehicule',
-          achats: 'achats', budget: 'achats', fichech: 'chantiers' };
+          achats: 'achats', budget: 'achats', fichech: 'chantiers', notes: 'notes' };
         var mod = MOD_DE_VUE[vd] || 'cubage';
         renderReglages();
         if (actif && A.index.some(function (x) { return x.id === actif; })) {
@@ -269,6 +269,12 @@ var MODULES = {
     nom: 'Bois de chauffage', defaut: 'stock',
     vues: [['stock', 'Stock'], ['bois', 'Piles'], ['lieux', 'Où ?'],
     ['fichiers', 'Export et analyse']]
+  },
+  /* Mes notes quittent Aujourd'hui (lot r1) pour alléger l'écran d'arrivée :
+     un écran à elles, par le ☰ ; une vue seule, donc aucune pastille. */
+  notes: {
+    nom: 'Mes notes', defaut: 'notes',
+    vues: [['notes', 'Mes notes']]
   }
 };
 
@@ -282,6 +288,9 @@ PICTOS.note = '<path d="M5 4h10l4 4v12H5z"/><path d="M14 4v5h5M8.5 13h7M8.5 16.5
 PICTOS.sauvegarde = '<path d="M7 18.5a4 4 0 0 1-.6-8A6 6 0 0 1 18 9.5a4.5 4.5 0 0 1 0 9z"/>' +
   '<path d="M12 16v-5M9.6 13.4 12 11l2.4 2.4"/>';
 PICTOS.corbeille = '<path d="M4 7h16M9.5 7V4h5v3M6 7l1 13h10l1-13"/>';
+PICTOS.notes = PICTOS.note;
+/* « Jour non travaillé », dans la bulle de l'appui long. */
+PICTOS.pause = '<circle cx="12" cy="12" r="8.5"/><path d="M10 9v6M14 9v6"/>';
 PICTOS.menu = '<path d="M4 7h16M4 12h16M4 17h16"/>';
 PICTOS.retour = '<path d="M14.5 6l-6 6 6 6"/>';
 PICTOS.plus = '<path d="M12 5v14M5 12h14"/>';
@@ -455,7 +464,7 @@ function ouvrirMenu() {
     '<div class="fn-tuiles">' + MENU_ENTREPRISE.map(tuile).join('') + '</div>' +
     '<p class="fn-sous">Outils de terrain</p>' +
     '<div class="fn-tuiles">' + MENU_OUTILS.map(tuile).join('') + '</div>' +
-    '<div class="fn-zone">' + ligne('reglages', 'reglages', 'Réglages') +
+    '<div class="fn-zone">' + ligne('notes', 'note', 'Mes notes') + ligne('reglages', 'reglages', 'Réglages') +
     ligne('sauvegarde', 'sauvegarde', 'Sauvegarde') + ligne('corbeille', 'corbeille', 'Corbeille') + '</div>');
   $('#modale').classList.add('feuille-nav');
   $('#modale-corps').addEventListener('click', function (ev) {
