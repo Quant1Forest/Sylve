@@ -7,50 +7,33 @@ function fmtJours(n) {
   var v = arr(nb(n), 2);
   return String(v).replace('.', ',') + ' journée' + (v > 1 ? 's' : '');
 }
-/* Une semaine avant la fin de validité : de quoi passer un coup de fil et
-   laisser le temps de signer. Le devis remonte désormais dans « En retard »
-   (lot r1, A3), et deux semaines l'y installaient trop tôt : il ne s'y lisait
-   plus. Plus tard, il ne sert qu'à constater. */
-var PREAVIS_DEVIS = 7;
+/* Ce qui est en retard (lot r1b, tranché le 05/11) : les trois mêmes choses
+   sur Aujourd'hui et dans la liste Chantiers — factures échues, chantiers
+   terminés pas facturés, devis arrivés à échéance sans réponse. Une seule
+   liste, pour que les deux écrans ne divergent plus. */
+var TYPES_EN_RETARD = ['impaye', 'afacturer', 'devis'];
 
 function alertes(chantiers, cfg, maintenant) {
   var now = maintenant || Date.now();
-  var relanceDevis = nb(cfg && cfg.joursRelanceDevis) || 21;
   var relanceFacture = nb(cfg && cfg.joursRelanceFacture) || 45;
   var out = [];
   (chantiers || []).forEach(function (ch) {
-    if (enRetard(ch, now)) {
-      /* ch.fin n'existe plus depuis que l'échéance de chantier a été retirée :
-         la phrase annonçait « Invalid Date ». C'est le dernier jour posé qui
-         date la chose. */
-      var dernier = dateChantier(ch);
-      out.push({ type: 'retard', chantier: ch, gravite: 2,
-        texte: dernier
-          ? 'dernière journée posée le ' + new Date(dernier).toLocaleDateString('fr-FR') +
-            ', chantier pas encore terminé'
-          : 'toutes les journées posées sont passées, chantier pas encore terminé' });
-    }
-    /* Un devis a sa propre échéance : celle qu'il porte écrite. Quand elle
-       est connue, c'est elle qui parle — approcher de la fin de validité
-       sans réponse est le vrai moment de relancer. Le délai réglable ne
-       sert plus que faute de validité saisie. */
+    /* Le chantier aux jours tous passés ne relance plus (lot r1b) : il reste
+       dans En travaux, l'alerte « retard » est partie. */
+    /* Un devis sans réponse entre dans En retard le jour même de la fin de
+       sa validité, sans préavis (corrigé le 04/11, lot r1b) : « devis
+       valable jusqu'à aujourd'hui », puis « expiré ». Avant, rien. Sans
+       validité saisie, l'échéance est la validité par défaut des réglages. */
     if (ch.statut === 'envoye') {
-      var fin = finValiditeDevis(ch);
+      var fin = echeanceDevis(ch, cfg);
       if (fin != null) {
         var reste = Math.round((minuit(fin) - minuit(now)) / JOUR);
         if (reste < 0) {
           out.push({ type: 'devis', chantier: ch, gravite: 2, jours: -reste, fin: fin,
             texte: 'devis expiré le ' + new Date(fin).toLocaleDateString('fr-FR') + ', sans réponse' });
-        } else if (reste <= PREAVIS_DEVIS) {
-          out.push({ type: 'devis', chantier: ch, gravite: 1, jours: reste, fin: fin,
-            texte: reste === 0 ? 'devis valable jusqu’à aujourd’hui, sans réponse'
-              : 'devis valable ' + reste + ' jour' + (reste > 1 ? 's' : '') + ' encore, sans réponse' });
-        }
-      } else if (ch.dateEnvoi) {
-        var j = Math.round((minuit(now) - minuit(ch.dateEnvoi)) / JOUR);
-        if (j >= relanceDevis) {
-          out.push({ type: 'devis', chantier: ch, gravite: 1, jours: j,
-            texte: 'devis envoyé il y a ' + j + ' jours, sans réponse' });
+        } else if (reste === 0) {
+          out.push({ type: 'devis', chantier: ch, gravite: 1, jours: 0, fin: fin,
+            texte: 'devis valable jusqu’à aujourd’hui, sans réponse' });
         }
       }
     }
@@ -467,20 +450,20 @@ function chercher(chantiers, q) {
   });
 }
 /* Les groupes de la liste Chantiers (lot b2, maquette V2). « À faire
-   maintenant » est l'ancien « À traiter » du carnet : journées passées, à
-   facturer, facture impayée — le chantier « en retard » ne vit que là.
-   Chaque statut a son groupe ; un facturé pas encore échu reste dans « En
-   travaux », faute d'un groupe à lui. L'ordre est fixe, le plus urgent en
-   haut ; seuls les payés plus anciens se trient au choix, à l'écran. */
+   maintenant » dit les trois mêmes choses qu'En retard d'Aujourd'hui (lot
+   r1b) : facture échue, terminé pas facturé, devis arrivé à échéance sans
+   réponse. Chaque statut a son groupe ; un facturé pas encore échu attend
+   son paiement dans le sien (tranché le 02/11). L'ordre est fixe, le plus
+   urgent en haut ; seuls les payés plus anciens se trient au choix, à
+   l'écran. */
 var JOURS_PAYE_RECENT = 30;
-var TYPES_A_FAIRE = ['impaye', 'retard', 'afacturer'];
-var RANG_TRAVAUX = { termine: 0, encours: 1, accepte: 2, facture: 3 };
+var RANG_TRAVAUX = { termine: 0, encours: 1, accepte: 2 };
 function datePaye(c) { return nb(c.datePaiement) || nb(c.dateFacture) || dateEntree(c); }
 function groupesChantiers(chantiers, cfg, maintenant) {
   var now = maintenant || Date.now();
-  var g = { faire: [], travaux: [], devis: [], payes: [], anciens: [], sansuite: [], alerte: {} };
+  var g = { faire: [], travaux: [], factures: [], devis: [], payes: [], anciens: [], sansuite: [], alerte: {} };
   alertes(chantiers, cfg, now).forEach(function (a) {
-    if (TYPES_A_FAIRE.indexOf(a.type) < 0 || g.alerte[a.chantier.id]) return;
+    if (TYPES_EN_RETARD.indexOf(a.type) < 0 || g.alerte[a.chantier.id]) return;
     g.alerte[a.chantier.id] = a;
     g.faire.push(a.chantier);
   });
@@ -491,6 +474,7 @@ function groupesChantiers(chantiers, cfg, maintenant) {
     if (st === 'devis' || st === 'envoye') g.devis.push(c);
     else if (st === 'paye') (datePaye(c) >= limite ? g.payes : g.anciens).push(c);
     else if (st === 'sansuite') g.sansuite.push(c);
+    else if (st === 'facture') g.factures.push(c);
     else g.travaux.push(c);
   });
   var prochain = function (c) {
@@ -505,6 +489,12 @@ function groupesChantiers(chantiers, cfg, maintenant) {
     var ra = RANG_TRAVAUX[a.statut], rb = RANG_TRAVAUX[b.statut];
     return (ra == null ? 9 : ra) - (rb == null ? 9 : rb) ||
       (prochain(a) - prochain(b)) || dateEntree(a) - dateEntree(b);
+  });
+  /* La plus proche de son échéance d'abord ; sans échéance écrite, la plus
+     vieille facture. */
+  g.factures.sort(function (a, b) {
+    return (nb(a.echeancePaiement) || Infinity) - (nb(b.echeancePaiement) || Infinity) ||
+      (nb(a.dateFacture) || dateEntree(a)) - (nb(b.dateFacture) || dateEntree(b));
   });
   /* Le devis à faire avant celui qui attend une réponse ; le plus vieux
      d'abord, c'est lui qui presse. */
@@ -678,7 +668,8 @@ var M = {
   appliquerTravauxPerso: appliquerTravauxPerso, travauxActifs: travauxActifs,
   nomStatut: nomStatut, statutOuvert: statutOuvert, statutEngage: statutEngage, rangStatut: rangStatut,
   aDevis: aDevis, statutsPossibles: statutsPossibles, finValiditeDevis: finValiditeDevis,
-  PREAVIS_DEVIS: PREAVIS_DEVIS,
+  echeanceDevis: echeanceDevis, joursValiditeDefaut: joursValiditeDefaut,
+  VALIDITE_DEVIS_DEFAUT: VALIDITE_DEVIS_DEFAUT, TYPES_EN_RETARD: TYPES_EN_RETARD,
   nb: nb, arr: arr,
   montantLigne: montantLigne, montant: montant, quantite: quantite, unitesPresentes: unitesPresentes,
   tauxLigne: tauxLigne, tauxPresents: tauxPresents, tauxAttendu: tauxAttendu,
@@ -687,7 +678,7 @@ var M = {
   heuresPostes: heuresPostes, heuresJournee: heuresJournee, joursJournee: joursJournee,
   prixJourVise: prixJourVise, bilanJournees: bilanJournees, HEURES_JOUR: HEURES_JOUR,
   prixJour: prixJour, chantierSolde: chantierSolde, rendement: rendement,
-  dureePrevue: dureePrevue, enRetard: enRetard, journeesANoter: journeesANoter, tri: tri, filtre: filtre, chercher: chercher,
+  dureePrevue: dureePrevue, enRetard: enRetard, tri: tri, filtre: filtre, chercher: chercher,
   totaux: totaux, groupesChantiers: groupesChantiers, JOURS_PAYE_RECENT: JOURS_PAYE_RECENT,
   dernierEvenement: dernierEvenement, rangComptable: rangComptable,
   rangFacture: rangFacture,
@@ -707,7 +698,8 @@ var M = {
   nomRisque: nomRisque, risquesCoches: risquesCoches, manquesFiche: manquesFiche,
   ficheRequise: ficheRequise, SEUIL_FICHE_HA: SEUIL_FICHE_HA,
   STATUTS_JOUR: STATUTS_JOUR, nomStatutJour: nomStatutJour, coulStatutJour: coulStatutJour,
-  statutJour: statutJour, estAbsent: estAbsent, joursDOffice: joursDOffice, fermeteJour: fermeteJour,
+  statutJour: statutJour, estAbsent: estAbsent, joursDOffice: joursDOffice,
+  joursEnPointilles: joursEnPointilles, fermeteJour: fermeteJour,
   chargeMois: chargeMois, alertes: alertes, fmtJours: fmtJours,
   MOTIFS_REFUS: MOTIFS_REFUS, nomMotifRefus: nomMotifRefus, analyseRefus: analyseRefus,
   kmChantier: kmChantier, kmTotal: kmTotal, coutCarburant: coutCarburant,

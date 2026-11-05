@@ -30,12 +30,15 @@ function ilYa(ts) {
 function masquee(cle) {
   return !!(A.masques && A.masques[cle] === C.jourCle(Date.now()));
 }
-function masquer(cle) {
+function noterMasque(cle) {
   var auj = C.jourCle(Date.now()), garde = {};
   Object.keys(A.masques || {}).forEach(function (k) { if (A.masques[k] === auj) garde[k] = auj; });
   garde[cle] = auj;
   A.masques = garde;
   ecrire('bordcub.masques', A.masques);
+}
+function masquer(cle) {
+  noterMasque(cle);
   renderAujourdhui();
 }
 
@@ -90,12 +93,13 @@ function ligneSaisie() {
 
 /* En retard (A3) : trois choses, dans cet ordre. Les factures échues d'abord
    (« le plus important »), puis les chantiers terminés pas facturés, puis
-   les devis sans réponse à une semaine de la fin de leur validité, ou au-delà
-   (sans validité, le délai de relance des réglages). Le reste est parti : les
-   jours à trancher n'existent plus (la journée d'office les remplace), le
-   chantier aux jours passés se dit sur sa ligne, et la sauvegarde, le stock
-   et le véhicule sont dans « Autres rappels ». */
-var TYPES_EN_RETARD = ['impaye', 'afacturer', 'devis'];
+   les devis sans réponse arrivés à la fin de leur validité, le jour même et
+   après (lot r1b ; sans validité saisie, celle des réglages). La liste des
+   types est partagée avec « À faire maintenant » de la liste Chantiers
+   (C.TYPES_EN_RETARD). Le reste est parti : les jours à trancher n'existent
+   plus (la journée d'office les remplace), le chantier aux jours passés se
+   dit sur sa ligne, et la sauvegarde, le stock et le véhicule sont dans
+   « Autres rappels ». */
 function lignesRetard() {
   var now = Date.now(), l = [];
   var al = C.alertes(A.chantiers, A.cfg, now);
@@ -238,7 +242,8 @@ function motCalendrier(c, now) {
   }
   return C.enRetard(c, now) ? 'plus de jour posé' : '';
 }
-var ETAPES_AUJ = ['Infos et repérage', 'Devis', 'Travaux', 'Facture', 'Paiement'];
+/* Les intertitres d'étape, ici et dans « Poser un chantier » de l'Agenda. */
+var NOMS_ETAPES = ['Infos et repérage', 'Devis', 'Travaux', 'Facture', 'Paiement'];
 function chantiersEnCours() {
   return C.filtre(A.chantiers, 'ouverts').slice().sort(function (a, b) {
     return C.etapeChantier(a) - C.etapeChantier(b) || entreeEtape(a) - entreeEtape(b);
@@ -249,12 +254,12 @@ function lignesEnCours() {
   /* Ce qui est en retard se dit en rouge sur sa ligne aussi. */
   var enRetard = {};
   C.alertes(A.chantiers, A.cfg, now).forEach(function (a) {
-    if (TYPES_EN_RETARD.indexOf(a.type) >= 0) enRetard[a.chantier.id] = 1;
+    if (C.TYPES_EN_RETARD.indexOf(a.type) >= 0) enRetard[a.chantier.id] = 1;
   });
   var h = '';
   chantiersEnCours().forEach(function (c) {
     var e = C.etapeChantier(c);
-    if (e !== et) { et = e; h += '<p class="aj-etape" data-etape="' + e + '">' + esc(ETAPES_AUJ[e] || '') + '</p>'; }
+    if (e !== et) { et = e; h += '<p class="aj-etape" data-etape="' + e + '">' + esc(NOMS_ETAPES[e] || '') + '</p>'; }
     var s = situationChantier(c, now, true), m = C.montant(c), mot = motCalendrier(c, now);
     var ton = enRetard[c.id] ? 'alerte' : s.ton;
     h += '<button type="button" class="aj-ch" data-ajouvre="fiche:' + esc(c.id) + '" data-ajch="' + esc(c.id) + '">' +
@@ -340,6 +345,116 @@ function renderAujourdhui() {
       '<summary>Autres rappels (' + au.length + ')' + picto('chevron') + '</summary>' +
       '<div class="aj-zone">' + au.map(ligneAuj).join('') + '</div></details>' : '');
   renderNotes();
+}
+
+/* ------------------------------------------------- la bulle d'information
+   Lot r1b. « Pas de bouton à presser chaque soir », mais savoir quand Sylve
+   a compté une journée pour lui, avec de quoi la corriger d'un geste. Elle
+   s'ouvre quand Aujourd'hui s'affiche et qu'il y a du neuf : une journée
+   d'office pas encore vue, ou un jour en pointillés passé pas encore réglé
+   (celui-là revient le lendemain s'il le laisse, pas avant — même masque
+   que le × des lignes). Rien de neuf, pas de bulle. */
+var BULLE_AUJ_MAX = 6;
+var CLE_BULLE_POINTILLES = 'bulle:pointilles';
+function contenuBulleAuj() {
+  var office = journeesDOffice().filter(function (o) { return !o.vu; });
+  var pointilles = masquee(CLE_BULLE_POINTILLES) ? [] : journeesEnPointilles();
+  return { office: office, pointilles: pointilles };
+}
+function montrerBulleAuj() {
+  if ($('#aj-bulle') || !$('#modale').hidden) return;
+  var x = contenuBulleAuj();
+  if (!x.office.length && !x.pointilles.length) return;
+  var fond = document.createElement('div');
+  fond.id = 'aj-bulle-fond'; fond.className = 'aj-bulle-fond';
+  var b = document.createElement('div');
+  b.id = 'aj-bulle'; b.className = 'aj-bulle';
+  b.setAttribute('role', 'dialog'); b.setAttribute('aria-modal', 'true'); b.setAttribute('aria-labelledby', 'ajb-titre');
+  document.body.appendChild(fond);
+  document.body.appendChild(b);
+  /* Sur Aujourd'hui, le retour du téléphone sortirait de Sylve : un cran
+     de plus, que la bulle consomme en se fermant. */
+  empilerCran(); A.crans = (A.crans || 0) + 1;
+  A.bulleAuj = { office: [], pointilles: false };
+  dessinerBulleAuj(x);
+  b.addEventListener('click', function (e) {
+    if (e.target.closest('#ajb-ok')) { fermerBulleAuj(); return; }
+    var v = e.target.closest('[data-ajbvoir]');
+    if (v) { var ts = Number(v.dataset.ajbvoir); fermerBulleAuj(); ouvrirFicheJour(ts); return; }
+    if (e.target.closest('#ajb-agenda')) { fermerBulleAuj(); allerModule('calendrier', 'calendrier'); return; }
+    var y = e.target.closest('[data-ajbytrav]'), n = e.target.closest('[data-ajbpasla]');
+    if (!y && !n) return;
+    var p = (y || n).dataset[y ? 'ajbytrav' : 'ajbpasla'].split('|');
+    var c = chantier(p[0]), ts2 = Number(p[1]); if (!c) return;
+    (y ? reconnaitreJour(c, ts2) : retirerJoursOffice(ts2, [{ chantier: c }])).then(function () {
+      renderCalendrier(); renderAujourdhui(); renderCarnet(); renderFiche();
+      toast(y ? 'Compté : ' + C.nomChantier(c) + ', ' + jourCourt(ts2) + '.'
+        : 'Jour retiré — il est dans la Corbeille.');
+      if (!$('#aj-bulle') || !A.bulleAuj) return;
+      var reste = contenuBulleAuj();
+      /* Ce qui a déjà été montré d'office reste dans la bulle tant qu'elle
+         est ouverte : il n'est vu qu'au OK. */
+      reste.office = journeesDOffice().filter(function (o) {
+        return !o.vu || A.bulleAuj.office.some(function (r) { return r.chantier.id === o.chantier.id && r.d === o.d; });
+      });
+      if (!reste.office.length && !reste.pointilles.length) fermerBulleAuj();
+      else dessinerBulleAuj(reste);
+    });
+  });
+}
+function dessinerBulleAuj(x) {
+  var b = $('#aj-bulle'); if (!b) return;
+  var h1 = function (h) { return E.fmt(C.arr(h, 1), h % 1 ? 1 : 0) + ' h'; };
+  var place = BULLE_AUJ_MAX;
+  var office = x.office.slice(0, place); place -= office.length;
+  var pointilles = x.pointilles.slice(0, Math.max(0, place));
+  var autres = x.office.length + x.pointilles.length - office.length - pointilles.length;
+  A.bulleAuj.office = office;
+  if (pointilles.length) A.bulleAuj.pointilles = true;
+  var h = '<h2 id="ajb-titre">Sylve a compté pour vous</h2><div class="ajb-corps">';
+  if (office.length) {
+    h += '<p class="ajb-sous">Comptées d’office</p>' +
+      '<p class="ajb-aide">Le jour était posé, rien n’a été saisi : Sylve l’a compté.</p>' +
+      office.map(function (o) {
+        return '<div class="ajb-l" data-ajboffice="' + esc(o.chantier.id + '|' + o.d) + '">' +
+          '<span>' + esc(jourCourt(o.d) + ' · ' + C.nomChantier(o.chantier) + ' · ' + h1(o.heures)) + '</span>' +
+          '<button type="button" class="btn btn-min" data-ajbvoir="' + o.d + '">Voir</button></div>';
+      }).join('');
+  }
+  if (pointilles.length) {
+    h += '<p class="ajb-sous">Posés, devis pas signé</p>' +
+      '<p class="ajb-aide">Le devis n’était pas signé : ces jours ne comptent pas tant que vous ne le dites pas.</p>' +
+      pointilles.map(function (p) {
+        var cle = esc(p.chantier.id + '|' + p.d);
+        return '<div class="ajb-l ajb-p" data-ajbpointille="' + cle + '">' +
+          '<span>' + esc(jourCourt(p.d) + ' · ' + C.nomChantier(p.chantier) + ' · ' + partEnMots(p.p)) + '</span>' +
+          '<span class="ajb-btns"><button type="button" class="btn primaire btn-min" data-ajbytrav="' + cle + '">' +
+          'J’y ai travaillé</button><button type="button" class="btn btn-min" data-ajbpasla="' + cle + '">' +
+          'Je n’y étais pas</button></span></div>';
+      }).join('');
+  }
+  if (autres > 0) {
+    h += '<button type="button" class="aj-lien" id="ajb-agenda">et ' + autres + ' autre' + (autres > 1 ? 's' : '') +
+      ' · Voir l’Agenda' + picto('chevron') + '</button>';
+  }
+  h += '</div><div class="btn-rang"><button type="button" class="btn primaire plein" id="ajb-ok">OK</button></div>';
+  b.innerHTML = h;
+}
+/* OK, le retour du téléphone, « Voir » : les journées d'office montrées
+   passent vues (leur ○ s'en va), et les jours en pointillés laissés tels
+   quels ne reviennent que demain. */
+function fermerBulleAuj() {
+  if (!$('#aj-bulle')) return;
+  var vus = (A.bulleAuj && A.bulleAuj.office) || [];
+  if (A.bulleAuj && A.bulleAuj.pointilles) noterMasque(CLE_BULLE_POINTILLES);
+  oterBulleAuj();
+  marquerPosesVues(vus.filter(function (o) { return !o.vu; }));
+}
+function oterBulleAuj() {
+  ['#aj-bulle', '#aj-bulle-fond'].forEach(function (s) {
+    var e = $(s); if (e && e.parentNode) e.parentNode.removeChild(e);
+  });
+  A.bulleAuj = null;
 }
 
 /* Où mène chaque ligne. */

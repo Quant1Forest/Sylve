@@ -25,7 +25,8 @@ function estWeekend(ts) { var j = new Date(ts).getDay(); return j === 0 || j ===
    Deux marques facultatives (lot r1) suivent la pose : « ferme », quand on a
    choisi un statut contraire à celui du chantier, et « vu », quand la fiche
    du jour d'une journée d'office a été ouverte. Les perdre ici, c'était les
-   perdre au premier jour posé à côté. */
+   perdre au premier jour posé à côté. Une troisième (lot r1b), « fait » :
+   il a dit « J'y ai travaillé » sur un jour posé sur un devis pas signé. */
 function journeesPlacees(ch) {
   var m = {};
   ((ch && ch.jours) || []).forEach(function (x) {
@@ -34,6 +35,7 @@ function journeesPlacees(ch) {
       ts = minuit(x.d); o = { d: ts, p: nb(x.p) || 1 };
       if (x.ferme != null) o.ferme = !!x.ferme;
       if (x.vu) o.vu = true;
+      if (x.fait) o.fait = true;
     } else { ts = minuit(x); o = { d: ts, p: 1 }; }
     if (!ts || isNaN(ts)) return;
     m[ts] = o;
@@ -331,34 +333,54 @@ function statutJour(occ, absences, ts) {
 }
 /* La journée d'office (lot r1, G4). « Un jour à trancher » forçait la main
    chaque matin ; la règle du 02/11 la remplace : un jour posé et confirmé
-   que la date a dépassé, sans journée saisie pour ce chantier ce jour-là,
-   compte comme une journée faite — sa part de journée, sans prestation.
+   que la date a dépassé, sans journée saisie ce jour-là, compte comme une
+   journée faite — sa part de journée, sans prestation.
    Elle ne s'écrit nulle part : elle se déduit, comme le statut d'un jour, et
    s'efface d'elle-même dès qu'une vraie journée la remplace. Jamais deux
    heures pour la même chose.
    Bornes : le jour même n'est pas fini (il compte le lendemain) ; un jour
    d'avant « depuis » — la première ouverture de la 4.92 — reste tel qu'il
    était, sans rien compter (décidé le 04/11) ; un jour marqué non travaillé
-   n'a pas été travaillé. */
-function joursDOffice(chantiers, journees, absences, cfg, maintenant) {
+   n'a pas été travaillé.
+   La règle est par jour (02/11, confirmée le 05/11) : « si Ma journée est
+   saisie pour ce jour, elle remplace la journée d'office ». N'importe quelle
+   journée saisie à cette date — tout chantier, facturée ou non, même sans
+   chantier — efface toutes celles d'office de ce jour : un jour posé sur A
+   et une journée saisie sur B ne font pas seize heures. */
+function posesPassees(chantiers, journees, absences, cfg, maintenant, retenir) {
   var depuis = nb(cfg && cfg.officeDepuis), out = [];
   if (!depuis) return out;
   var m = minuit(maintenant), d0 = minuit(depuis), hj = HEURES_JOUR(cfg);
   var saisis = {};
-  (journees || []).forEach(function (j) {
-    if (j && j.chantier) saisis[j.chantier + '|' + jourCle(nb(j.date))] = 1;
-  });
+  (journees || []).forEach(function (j) { if (j) saisis[jourCle(nb(j.date))] = 1; });
   (chantiers || []).forEach(function (ch) {
     if (ch.statut === 'sansuite') return;
     journeesPlacees(ch).forEach(function (x) {
       if (x.d >= m || x.d < d0) return;
-      if (fermeteJour(ch, x) !== 'ferme') return;
-      if (saisis[ch.id + '|' + jourCle(x.d)]) return;
+      if (saisis[jourCle(x.d)]) return;
       if (estAbsent(absences, x.d)) return;
+      if (!retenir(ch, x)) return;
       out.push({ chantier: ch, d: x.d, p: x.p, heures: arr(nb(x.p) * hj, 2), vu: !!x.vu });
     });
   });
   return out.sort(function (a, b) { return a.d - b.d; });
+}
+/* Compte d'office : le jour confirmé, et le jour en pointillés dont il a dit
+   « J'y ai travaillé » (la marque « fait » de la pose). */
+function joursDOffice(chantiers, journees, absences, cfg, maintenant) {
+  return posesPassees(chantiers, journees, absences, cfg, maintenant, function (ch, x) {
+    return !!x.fait || fermeteJour(ch, x) === 'ferme';
+  });
+}
+/* Les jours en pointillés passés (lot r1b) : posés sur un devis pas signé
+   quand ils sont passés — signé depuis ou non —, ils ne comptent jamais
+   seuls. Ils attendent qu'il dise « J'y ai travaillé » ou « Je n'y étais
+   pas ». Mêmes bornes que la journée d'office : d'avant la 4.92, un jour
+   saisi, un jour non travaillé, ils restent tels quels. */
+function joursEnPointilles(chantiers, journees, absences, cfg, maintenant) {
+  return posesPassees(chantiers, journees, absences, cfg, maintenant, function (ch, x) {
+    return !x.fait && fermeteJour(ch, x) !== 'ferme';
+  });
 }
 /* Charge d'un mois : jours ouvrés occupés, fermes et provisoires. Un jour
    posé que le chantier a fait ce jour-là n'est plus « posé » : il est fait,

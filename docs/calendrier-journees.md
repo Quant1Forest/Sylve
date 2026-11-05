@@ -535,3 +535,55 @@ si bien que les poses passées d'une vieille sauvegarde ne deviennent pas des
 journées d'office. Le revers : une journée d'office n'apparaît dans un
 export que par ses poses ; un chantier qu'on change de statut (sans suite,
 devis pas signé) la fait disparaître, ce qui est voulu.
+
+## Le lot r1b (4.93.0) : la règle par jour, les jours en pointillés, la bulle
+
+Retours des 4 et 5 novembre, tranchés par lui. Ligne à ligne :
+`docs/correspondance-refonte.md`, section 15, *Suites du lot r1*.
+
+**Ce qui ne vaut plus, plus haut** : dans *Le lot r1*, « sans journée saisie
+pour ce chantier ce jour-là » (la règle est désormais par jour), et le jour
+posé sur un devis pas signé « réglé à la main » (il a ses deux choix).
+`journeesANoter` est retirée de la logique.
+
+- **La règle est par jour** (02/11, confirmée le 05/11) : « si Ma journée est
+  saisie pour ce jour, elle remplace la journée d'office ». N'importe quelle
+  journée saisie à cette date — tout chantier, facturée ou non, même sans
+  chantier — efface toutes les journées d'office de ce jour. Un jour posé sur
+  A et une journée saisie sur B ne font plus seize heures. `C.joursDOffice`
+  et `C.joursEnPointilles` partagent le même parcours (`posesPassees`).
+- **Les jours en pointillés passés** (`C.joursEnPointilles`) : posés, passés,
+  depuis `officeDepuis`, sur un devis pas signé quand ils sont passés (signé
+  depuis ou non), sans journée saisie ce jour-là, pas marqués non
+  travaillés. Ils ne comptent jamais seuls. Deux choix :
+  - **« J'y ai travaillé »** pose la marque `fait` sur la pose (avec `vu`) :
+    le jour compte comme une journée d'office — sa part × `HEURES_JOUR`,
+    sans prestation, mêmes affichages, « Préciser ma journée », remplacé par
+    une vraie journée, jamais dans les rendements. Calculé, pas écrit, comme
+    la journée d'office : la marque seule part dans la sauvegarde.
+  - **« Je n'y étais pas »** : le jour posé part à la Corbeille (type
+    `jour`, qui rend aussi la marque `fait`).
+  Ces deux choix sont dans la fiche du jour de l'Agenda (`#fj-pointilles`)
+  et dans la bulle d'Aujourd'hui. Les jours d'avant `officeDepuis` restent
+  tels quels, pâles, « à régler à la main » (décidé le 04/11). Déplacer un
+  jour n'emporte pas sa marque `fait`.
+- **La bulle d'information** (`montrerBulleAuj`, `interface/aujourdhui.js`) :
+  à chaque fois qu'Aujourd'hui s'affiche (`aller('accueil')`, démarrage
+  compris) et qu'il y a du neuf. Deux parties : les journées d'office pas
+  encore vues (« Voir » → la fiche du jour), puis les jours en pointillés
+  avec leurs deux choix. OK, « Voir », Échap et le retour du téléphone la
+  ferment : les journées d'office montrées passent vues (`marquerPosesVues`),
+  et les pointillés laissés ne reviennent que le lendemain — un masque du
+  jour, `bulle:pointilles`, le même que le × des lignes d'Aujourd'hui. Six
+  lignes au plus, puis « et N autres · Voir l'Agenda » ; ce qui n'a pas été
+  montré n'est pas marqué vu et revient. Sur Aujourd'hui, la bulle empile un
+  cran d'historique : sans lui, le retour du téléphone sortait de Sylve.
+  Hors d'Aujourd'hui, elle s'efface sans rien marquer.
+- **La fiche du jour, une ligne par chantier** (`parChantierDuJour`) : la
+  durée du jour, × N pers., les prestations en petit. L'appui ouvre la
+  première journée de ce chantier ce jour-là (les autres restent dans « Ce
+  mois-ci »). ✕ retire, après confirmation, toutes les journées de ce
+  chantier ce jour-là, vers la Corbeille, qui les rend et les recompte. Une
+  vieille saisie sans journée ne se retire pas d'ici, comme avant. Derniers
+  jours et « Ce mois-ci » montraient déjà une ligne par journée, la fiche ▸
+  Travaux une ligne par jour : rien à y changer.

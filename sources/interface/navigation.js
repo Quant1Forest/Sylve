@@ -633,6 +633,10 @@ function synchroniserCrans() {
 function brancherRetourTelephone() {
   window.addEventListener('popstate', function () {
     A.crans = Math.max(0, (A.crans || 0) - 1);
+    /* Les deux bulles se ferment comme une fenêtre (lot r1b) : celle
+       d'Aujourd'hui comme son OK, celle de l'appui long de l'Agenda. */
+    if ($('#aj-bulle')) { fermerBulleAuj(); synchroniserCrans(); return; }
+    if (A.bulle) { fermerBulleJour(); synchroniserCrans(); return; }
     if (!$('#modale').hidden) { fermerModale(); synchroniserCrans(); return; }
     if (typeEcran(A.ecran) === 'racine') return;
     remonter();

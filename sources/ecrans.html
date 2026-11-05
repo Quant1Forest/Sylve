@@ -340,14 +340,15 @@
       <p class="eyebrow reg-titre" data-sec="ent" data-sous="alertes" style="margin:22px 0 8px">Relances et calendrier</p>
       <div class="carte" data-sec="ent" data-sous="alertes">
         <div class="grille g2">
-          <div class="champ"><label class="eyebrow" for="r-rd">Relancer un devis après (jours)</label>
+          <div class="champ"><label class="eyebrow" for="r-rd">Validité des devis par défaut (jours)</label>
             <input type="text" id="r-rd" inputmode="numeric" autocomplete="off"></div>
           <div class="champ"><label class="eyebrow" for="r-rf">Relancer une facture après (jours)</label>
             <input type="text" id="r-rf" inputmode="numeric" autocomplete="off"></div>
         </div>
         <p class="muted" style="font-size:12px;margin:9px 0 0">
-          Le délai du devis ne sert que faute de validité saisie : un devis qui porte une
-          date de fin est relancé d'après elle.
+          Proposée sur chaque nouveau devis, modifiable devis par devis ; elle sert aussi
+          d'échéance aux devis sans validité saisie. Un devis sans réponse entre dans
+          « En retard » le jour où sa validité prend fin.
         </p>
         <label class="ligne-check" style="margin-top:10px;display:flex;align-items:center;gap:8px;font-size:13.5px">
           <input type="checkbox" id="r-we"> Compter les week-ends comme jours travaillables

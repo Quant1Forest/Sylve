@@ -44,7 +44,7 @@ function dateStatut(c) {
   if (c.statut === 'envoye') {
     /* Un devis envoyé se cherche des yeux par sa date de fin, pas par celle
        de son départ : c'est elle qui dit s'il faut relancer. */
-    var fin = C.finValiditeDevis(c);
+    var fin = C.echeanceDevis(c, A.cfg);
     if (fin != null) return 'valable jusqu’au ' + dateCourte(fin);
     if (c.dateEnvoi) return 'envoyé le ' + dateCourte(c.dateEnvoi);
   }

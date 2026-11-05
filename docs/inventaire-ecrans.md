@@ -170,7 +170,7 @@ preuve sans ligne, le fait crier.
 | Accueil ▸ rappel de sauvegarde | Aujourd'hui ▸ Autres rappels, repliés en bas (En retard jusqu'en 4.91) : « Sauvegarde à faire » → ☰ ▸ Sauvegarde (carte Sauvegarde des Réglages) | `autres-sauvegarde` |
 | Accueil ▸ rappel « journées à trancher » | Remplacé par la journée d'office (lot r1) : le jour posé et confirmé compte le lendemain, marqué ○ dans Aujourd'hui ▸ Derniers jours ; sa fiche du jour propose Préciser ma journée et Je n'y étais pas (« à trancher » jusqu'en 4.91) | `office` |
 | Accueil ▸ rappel d'échéances des charges fixes | Aujourd'hui ▸ Prélèvements à venir (7 jours, ou le préavis s'il est plus long ; total) → Argent ▸ Charges fixes | `prelevements` |
-| Accueil ▸ rappel de devis en attente | Aujourd'hui ▸ En retard « Relancer le devis ? » à 7 jours de la fin de validité ou après (Bientôt jusqu'en 4.91), un par devis → sa fiche (la liste filtrée reste dans Chantiers) | `retard-relancer` |
+| Accueil ▸ rappel de devis en attente | Aujourd'hui ▸ En retard « Relancer le devis ? » le jour de la fin de validité et après (à 7 jours avant en 4.92, Bientôt jusqu'en 4.91), un par devis → sa fiche (la liste filtrée reste dans Chantiers) | `retard-relancer` |
 | Accueil ▸ tuile Mon entreprise (chantiers ouverts) | Barre ▸ Chantiers ; le chiffre : compte de « Chantiers en cours » | `encours-compte` |
 | Accueil ▸ bouton « Enregistrer ma journée » | Ligne de saisie d'Aujourd'hui → fenêtre Ma journée | `saisie-journee` |
 | Accueil ▸ bouton « Enregistrer ma journée » (bis) | + ▸ Ma journée | `plus-journee` |
@@ -210,6 +210,7 @@ sans ligne, fait crier le scénario.
 
 | Élément (4.91) | Nouvel endroit | Preuve |
 |---|---|---|
+| (nouveau, lot r1b) Ce que Sylve a compté pour lui | La bulle d'information, au centre d'Aujourd'hui quand il y a du neuf : journées comptées d'office (Voir → fiche du jour), jours posés sur un devis pas signé (J'y ai travaillé · Je n'y étais pas) ; OK ou le retour la ferment, six lignes puis « et N autres · Voir l'Agenda » | `r1b-bulle` |
 | Aujourd'hui ▸ ligne Ma journée | En tête, sous la date, inchangée | `r1-saisie` |
 | Aujourd'hui ▸ En retard ▸ facture impayée, chantier à facturer, devis sans réponse | En retard, dans cet ordre (seulement s'il y a quelque chose) | `r1-retard` |
 | Aujourd'hui ▸ En retard ▸ journée non saisie (à trancher) | La journée d'office ○ (Derniers jours, grille, fiche ▸ Travaux) ; « Je n'y étais pas » dans la fiche du jour | `r1-office` |
@@ -217,7 +218,7 @@ sans ligne, fait crier le scénario.
 | Aujourd'hui ▸ En retard et Bientôt ▸ sauvegarde du mois, stock à recommander, entretien du véhicule | Autres rappels (N), replié en bas, même lien qu'avant | `r1-autres` |
 | Aujourd'hui ▸ Bientôt ▸ posé dans les trois jours | Chantiers en cours, sur la ligne : « posé aujourd'hui », « posé demain », « posé dans N j » | `r1-pose` |
 | Aujourd'hui ▸ Bientôt ▸ Devis à faire | Chantiers en cours, étape Infos : « Devis à faire · pas encore repéré » (ou « repéré il y a N j ») | `r1-devisafaire` |
-| Aujourd'hui ▸ Bientôt ▸ devis bientôt plus valable | En retard, à 7 jours de la fin de validité ou après | `r1-devis7` |
+| Aujourd'hui ▸ Bientôt ▸ devis bientôt plus valable | En retard, le jour de la fin de validité et après, sans préavis (lot r1b ; à 7 jours avant en 4.92) | `r1-devis0` |
 | Aujourd'hui ▸ Mes notes | ☰ ▸ Mes notes | `r1-notes` |
 | Aujourd'hui ▸ Chantiers en cours | Gardé : par étape, le plus ancien en haut, un intertitre par étape | `r1-encours` |
 | Aujourd'hui ▸ Prélèvements à venir | Inchangé | `r1-prelevements` |
@@ -229,7 +230,7 @@ sans ligne, fait crier le scénario.
 | Agenda ▸ Ce mois-ci, jour par jour | Gardé, journées d'office comprises | `r1-histo` |
 | Agenda ▸ fiche du jour | Gardée : Déplacer la journée, Jour non travaillé, Poser un chantier, Saisir / Modifier ma journée, Prélevé ce jour-là | `r1-fiche` |
 | Agenda ▸ placement (bandeau, Fini de placer, jour déjà pris) | Gardé ; un jour passé touché devient une journée faite | `r1-placement` |
-| (nouveau) Appui long sur un jour | La bulle : Saisir ma journée, Poser un chantier, Jour non travaillé | `r1-bulle` |
+| (nouveau) Appui long sur un jour | La bulle : Saisir ma journée, Poser un chantier, Jour non travaillé ; le retour du téléphone la ferme (lot r1b) | `r1-bulle` |
 | Aujourd'hui ▸ Bientôt ▸ « N jours à placer », « aucune journée prévue — estimez et placez », « N posées, pas d'estimation » | retiré (03/11) : on place depuis la fiche ▸ Travaux, on estime dans l'étape Devis | `r1-x-aplacer` |
 | Agenda ▸ bloc « À programmer » (Placer, Estimer) | retiré (03/11) : fiche ▸ Travaux ▸ Placer des jours, ou l'appui long | `r1-x-aprogrammer` |
 | Agenda ▸ ligne « N jours passés à trancher » | retiré (03/11) : la journée d'office | `r1-x-trancher-agenda` |

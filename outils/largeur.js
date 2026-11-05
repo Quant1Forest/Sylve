@@ -69,6 +69,16 @@ function graine() {
       fournisseur: 'Établissements Dupont-Martin Motoculture et Équipements Forestiers ' + i,
       lignes: [{ libelle: 'Chaîne de tronçonneuse guide 40 cm équipement', categorie: i % 3 ? 'CONSO' : 'IMMO', ttc: 120 + i * 10, taux: 20 }] });
   }
+  /* Lot r1b : un devis pas signé aux sept jours posés passés, plus la journée
+     d'office de c1 : la bulle d'Aujourd'hui en a huit, six lignes et « et 2
+     autres ». */
+  const poses = [];
+  for (let k = 3; k <= 9; k++) poses.push({ d: maintenant - k * JOUR, p: k % 2 ? 1 : 0.5 });
+  chantiers.push({ id: 'c14', nom: 'Dégagement de régénération naturelle parcelle 14 lieu-dit Les Grands Communaux',
+    statut: 'envoye', aDevis: true, donneur: 'Coopérative forestière du Haut-Pays et des Vallées 14',
+    commune: 'Saint-Germain-de-la-Montagne-Haute', maj: maintenant, cree: maintenant, dateEntree: maintenant - 20 * JOUR,
+    dateDevis: maintenant - 5 * JOUR, validiteJours: 30, dateEnvoi: maintenant - 5 * JOUR,
+    lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 3, prix: 880, nature: 'prestation' }], temps: [], jours: poses });
   for (let a = 0; a < 8; a++) {
     articles.push({ id: 'a' + a, nom: 'Protection gaine ventilée tube 60 cm modèle renforcé ' + a, type: 'protection',
       unite: 'unite', prix: 0.9, seuil: 50, fournisseur: 'Pépinières et fournitures forestières réunies',
@@ -135,6 +145,19 @@ function parcours() {
         return;
       }
     }
+    /* La bulle d'information d'Aujourd'hui (lot r1b), fixe au centre : entière
+       dans l'écran, en largeur comme en hauteur, et rien qui déborde dedans. */
+    const ba = $('#aj-bulle');
+    if (ba) {
+      const ra = ba.getBoundingClientRect(), co = ba.querySelector('.ajb-corps');
+      const dedans = co ? co.scrollWidth - co.clientWidth : 0;
+      if (ra.left < -0.5 || ra.right > lg + 0.5 || ra.bottom > window.innerHeight + 0.5 || dedans > 1) {
+        relevés.push({ ecran: nom, page: Math.round(ra.right - Math.min(0, ra.left)), ecranLargeur: lg, trop: true,
+          barre: barreEntiere, fautifs: ['bulle d’Aujourd’hui de ' + Math.round(ra.left) + ' à ' + Math.round(ra.right) +
+            ' px, bas à ' + Math.round(ra.bottom) + (dedans > 1 ? ', ' + dedans + ' px de trop dedans' : '')] });
+        return;
+      }
+    }
     const m = $('#modale'), mi = $('.modale-in');
     if (/^agenda|^\+ |^fenêtre \+|^fiche ›/.test(nom) && m && !m.hidden && mi && mi.scrollWidth > mi.clientWidth + 1) {
       fautifs.push('fenêtre de ' + mi.scrollWidth + ' px dans un cadre de ' + mi.clientWidth);
@@ -158,6 +181,17 @@ function parcours() {
   return (async function () {
     await pause(1500);
     mesurer('démarrage');
+    /* La bulle d'Aujourd'hui, longue (six lignes et « et 2 autres »), puis
+       courte : on ne garde qu'un jour posé au devis pas signé. */
+    if ($('#aj-bulle')) mesurer('aujourdhui › bulle longue');
+    const etat = window.BCUI && window.BCUI._etat && window.BCUI._etat();
+    const c14 = etat && etat.chantiers.filter(function (c) { return c.id === 'c14'; })[0];
+    const jourPale = c14 && c14.jours[0] ? c14.jours[0].d : null;
+    if (c14) c14.jours = c14.jours.slice(0, 1);
+    $('#barre [data-barre="agenda"]').click(); await pause(300);
+    $('#barre [data-barre="aujourdhui"]').click(); await pause(400);
+    if ($('#aj-bulle')) mesurer('aujourdhui › bulle courte');
+    if ($('#ajb-ok')) { $('#ajb-ok').click(); await pause(300); }
     const barres = liste('#barre [data-barre]', 'barre').filter(function (k) { return k !== 'plus'; });
     for (let i = 0; i < barres.length; i++) {
       $('#barre [data-barre="' + barres[i] + '"]').click(); await pause(400);
@@ -177,6 +211,16 @@ function parcours() {
     if (cases.length) { cases[cases.length - 1].click(); await pause(400); mesurer('agenda › fiche du jour'); await fermer(); }
     const office = document.querySelector('#cal-grille .cal-o');
     if (office) { office.parentNode.click(); await pause(400); mesurer('agenda › fiche d’une journée d’office'); await fermer(); }
+    /* Lot r1b : la fiche d'un jour en pointillés, avec ses deux choix. */
+    if (jourPale) {
+      const d0 = new Date(jourPale); d0.setHours(0, 0, 0, 0);
+      const cp = $('#cal-grille [data-jour="' + d0.getTime() + '"]');
+      if (cp) { cp.click(); await pause(400); mesurer('agenda › fiche d’un jour en pointillés'); await fermer(); }
+    }
+    /* Et celle d'un jour fait : une ligne par chantier (lot r1b). */
+    const j2 = new Date(); j2.setDate(2); j2.setHours(0, 0, 0, 0);
+    const cf = $('#cal-grille [data-jour="' + j2.getTime() + '"]');
+    if (cf) { cf.click(); await pause(400); mesurer('agenda › fiche d’un jour fait'); await fermer(); }
     const auj0 = new Date(); auj0.setHours(0, 0, 0, 0);
     const poser = async function (ts, nom) {
       const c = $('#cal-grille [data-jour="' + ts + '"]'); if (!c) return;

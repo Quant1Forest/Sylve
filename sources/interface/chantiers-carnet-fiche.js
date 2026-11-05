@@ -112,9 +112,10 @@ function triChantiers() {
    s'ouvre d'un appui sur l'étape en cours. */
 function ligneChantierListe(c, alerte, now) {
   var s = situationChantier(c, now);
-  /* Ce que le statut seul ne dit pas, l'alerte le dit : des journées
-     passées, une facture restée sans réponse faute d'échéance écrite. */
-  if (alerte && alerte.type === 'retard') s = { t: majuscule(alerte.texte), ton: 'tiede' };
+  /* Ce que le statut seul ne dit pas, l'alerte le dit : un devis arrivé à
+     échéance, une facture restée sans réponse faute d'échéance écrite. Les
+     journées passées ne s'y disent plus (lot r1b). */
+  if (alerte && alerte.type === 'devis') s = { t: majuscule(alerte.texte), ton: alerte.gravite > 1 ? 'alerte' : 'tiede' };
   if (alerte && alerte.type === 'impaye' && s.ton !== 'alerte') s = { t: majuscule(alerte.texte), ton: 'alerte' };
   var m = C.montant(c);
   var lieu = [c.foret, c.commune && c.commune !== c.foret ? c.commune : ''].filter(Boolean);
@@ -173,6 +174,7 @@ function renderListeChantiers() {
   z.innerHTML =
     groupeListe('faire', 'À faire maintenant', 'alerte', g.faire, g, now) +
     groupeListe('travaux', 'En travaux', '', g.travaux, g, now) +
+    groupeListe('factures', 'Facturés · attendent le paiement', '', g.factures, g, now) +
     groupeListe('devis', 'Devis', '', g.devis, g, now) +
     groupeListe('payes', 'Payés récemment', '', g.payes, g, now) +
     pliListe('anciens', 'Voir les payés plus anciens', triChantiers() +
@@ -706,12 +708,15 @@ function corpsDevis(c) {
       '<div class="btn-rang"><button class="btn primaire" id="f-devis">Saisir le devis</button>' +
       '<button class="btn" id="f-sansdevis">Pas de devis : à programmer</button></div>';
   } else {
-    var fin = C.finValiditeDevis(c);
+    /* « Valable 30 jours, jusqu'au … » ; un ancien devis dit ses mois, un
+       devis sans durée saisie la validité par défaut des réglages. */
+    var fin = C.echeanceDevis(c, A.cfg), jv = C.nb(c.validiteJours);
+    var duree = jv > 0 ? jv + ' jour' + (jv > 1 ? 's' : '') : C.nb(c.validiteDevis) > 0 ? moisDe(c)
+      : C.joursValiditeDefaut(A.cfg) + ' jours (par défaut)';
     h += '<div class="fi-tete-etape"><p class="fi-meta">' +
       '<span>N° <b>' + esc(c.numeroDevis || '—') + '</b></span>' +
       (c.dateDevis ? '<span>Édité le <b>' + dateCourte(c.dateDevis) + '</b></span>' : '') +
-      (c.validiteDevis ? '<span>Valable <b>' + c.validiteDevis + ' mois' +
-        (fin ? ' — jusqu’au ' + dateCourte(fin) : '') + '</b></span>' : '') +
+      (fin ? '<span id="f-validite">Valable <b>' + esc(duree) + ', jusqu’au ' + dateCourte(fin) + '</b></span>' : '') +
       (c.dateEnvoi ? '<span>Envoyé le <b>' + dateCourte(c.dateEnvoi) + '</b></span>' : '') +
       (c.dateSignature ? '<span>Signé le <b>' + dateCourte(c.dateSignature) + '</b></span>'
         : c.statut === 'envoye' ? '<span><b>En attente de réponse</b></span>' : '') +

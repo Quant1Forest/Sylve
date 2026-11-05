@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML servi, recollé depuis `sources/` sans rien transformer ; aucune
 dépendance, tout fonctionne hors ligne.
 
-Version courante : **4.92.0-20261104-2100**
+Version courante : **4.93.0-20261105-2100**
 
 ---
 
@@ -76,11 +76,11 @@ npm run controle -- --dates   # en plus : les scénarios du temps au 1er et au d
 
 Doit afficher **« index.html fabriqué »**, puis **« Bon pour livraison »**,
 puis **« le service worker tient »** (33 vérifications), puis la suite au
-vert — 2724 à ce jour — puis **« largeur : … aucune page plus large que l’écran »** (mesure dans un vrai Chrome à 320 et 360 px, `outils/largeur.js` ; sans Chrome elle le dit et passe), puis **« Sylve.html est conforme »**.
+vert — 2815 à ce jour — puis **« largeur : … aucune page plus large que l’écran »** (mesure dans un vrai Chrome à 320 et 360 px, `outils/largeur.js` ; sans Chrome elle le dit et passe), puis **« Sylve.html est conforme »**.
 
 Compter **trois minutes** : 187 à 260 s aux lots 4b, 5b et c1 (selon la charge du poste ;
 17 minutes avant, en séquentiel). **Avec `--dates`, sept minutes** : les scénarios du
-temps rejoués le 1er puis le dernier jour d'un mois (697 vérifications chacun au lot r1 ;
+temps rejoués le 1er puis le dernier jour d'un mois (786 vérifications chacun au lot r1b ;
 `SYLVE_DATE` et `--motif=`, `docs/tests-et-pieges.md`). À lancer **sur demande**, et
 avant de livrer un lot qui touche à l'Agenda, aux journées ou à Aujourd'hui (décidé le
 01/11). Les scénarios se jouent en
@@ -207,7 +207,7 @@ Débordements à connaître : `prix-de-revient.js` finit par les réglages
 Chantiers, Veille et Démarrage, puis l'appel d'`init` ; `carte.js` par les
 fenêtres « numéro de facture » et « motif de refus ».
 
-**La navigation (lots 5a, 5b, 5b2, 5b3, c1, c2, b1, b2 et r1, 4.86.0 à 4.92.0)** — détail dans
+**La navigation (lots 5a, 5b, 5b2, 5b3, c1, c2, b1, b2, r1 et r1b, 4.86.0 à 4.93.0)** — détail dans
 `docs/design-navigation.md`, *Le cadre du lot 5a*, *L'écran Aujourd'hui* et *Aujourd'hui allégé* :
 
 - Démarrage → **Aujourd'hui** (vue `accueil`) : saisie · En retard · Chantiers
@@ -229,6 +229,7 @@ fenêtres « numéro de facture » et « motif de refus ».
 - **b1 (Fiche en étapes)** : `renderFiche` (`chantiers-carnet-fiche.js`) = tête · trois chiffres (`C.troisChiffres`) · cinq `details.fi-etape` (`C.etapeChantier`, `data-etape` 0 à 4) · tuiles. `ouvrirChantier(id, 'devis' | 'travaux' …)` ouvre l'étape utile ; ce qui est déplié se garde tant que l'étape ne change pas (`A.ficheVue`). Fenêtre « Les journées » retirée. Repérage : trois cases nouvelles, `dateReperage`, `vuReperage`, `surface` (accord du 01/11). Les lignes vivent dans l'étape Devis, puis Facture dès qu'il y a facture ou devis figé (`lignesDeFacture`). Où va chaque ancien bloc : `docs/correspondance-refonte.md` 3.2, que lisent les scénarios « Fiche en étapes ». Dans les tests : `ficheB1(t, id)`, `etapeB1(t, i)`.
 - **b2 (Liste Chantiers)** : pastilles Liste · Carte · Fiche · Fiche sécurité ; l'Agenda n'a plus de pastille (un module à une vue n'en montre aucune). La liste : recherche (`#c-rech`, hors de ce qui se redessine), groupes de `C.groupesChantiers` (`logique/alertes-import.js` : faire · travaux · devis · payes · anciens · sansuite, ordre fixe), plis `data-pli` gardés dans `A.chPlis` ; en bas, repliés, l'ancien filtre (`#c-filtre`, `#ch-filtre-liste`) et les cumuls (`#carnet-totaux`, jusqu'au lot d). Le bandeau « À traiter » est parti (`renderAlertes` retiré). Création : `ouvrirEnteteCh`, feuille courte, naît « Devis à envoyer » avec devis. « Facturé à » à l'écran, `proprietaire` en base. Pastilles renommées ou déplacées : table de la section 12 de `docs/correspondance-refonte.md`, que lisent les scénarios d'inventaire. Dans les tests : `listeB2(t)`, `groupeB2(t, g)`, `plusChantier(t)`.
 - **r1 (Aujourd'hui et Agenda allégés, 4.92.0)** : En retard = `impaye`, `afacturer`, `devis` (préavis 7 j) ; sauvegarde, stock, véhicule dans `#aj-autres` ; Chantiers en cours par étape (`data-ajch`), mot du calendrier sur la ligne ; Mes notes dans le module `notes` (☰). Agenda : légende du mois, trois compteurs, plus d'« À programmer » ni de « à trancher » ; appui long → bulle (`ouvrirBulleJour`) ; Poser un chantier = feuille par étape, statut proposé (`ferme` facultatif sur la pose) ; date passée → `creerJourneeFaite`. **Journée d'office** : `C.joursDOffice`, calculée et injectée dans `c.temps` par `indexerJournees` (`office: true`), jamais écrite ; ○ jusqu'à `vu` ; bornée par `A.cfg.officeDepuis`. Détail : `docs/calendrier-journees.md`, *Le lot r1* ; table : `docs/correspondance-refonte.md` section 15. Dans les tests : `choisirAPoser(t, id, st)`, `appuiLong(t, ts, 'souris')`, l'état par `t.w.BCUI._etat()`.
+- **r1b (suites de r1, 4.93.0)** : devis en jours (`validiteJours`, 30 du réglage `joursValiditeDevis` ; les mois `validiteDevis` relus ; `C.echeanceDevis`), en retard le jour de l'échéance, plus de préavis ; journée d'office **par jour** (toute journée saisie ce jour-là l'efface) ; jours en pointillés passés (`C.joursEnPointilles`) : « J'y ai travaillé » (marque `fait` sur la pose) ou « Je n'y étais pas » ; **bulle d'Aujourd'hui** (`montrerBulleAuj`, à chaque `aller('accueil')`, masque du jour `bulle:pointilles`) ; fiche du jour une ligne par chantier (`data-fjch`, ✕ `data-fjsupch`) ; Chantiers : « À faire maintenant » = `C.TYPES_EN_RETARD`, groupe `factures`. Détail : `docs/calendrier-journees.md`, *Le lot r1b*.
 
 ---
 
@@ -278,6 +279,7 @@ mention d'un autre fichier.
 - **Clients inversés** : à l'écran « Client » = `proprios` / `proprietaire` ; le magasin `clients` porte les donneurs d'ordre — `docs/chantiers.md`.
 - **On n'écrit jamais dans une liste dérivée** (`c.temps` se refait depuis `A.journees`) — `docs/calendrier-journees.md`.
 - **La journée d'office n'existe que dans `c.temps`** : qui lit `A.journees` seul ne la voit pas (Derniers jours et « Ce mois-ci » passent par `journeesDOffice()`) — `docs/calendrier-journees.md`, *Le lot r1*.
+- **Aujourd'hui peut s'ouvrir sous une bulle** (lot r1b) : un scénario semé avec une journée d'office pas vue ou un jour en pointillés passé la voit au démarrage ; elle est hors de `#vue-accueil`, et n'empêche pas les `click()`.
 - **Un champ que rien n'écrit ne se lit plus** : `outils/vocabulaire.js` est un cliquet — `docs/tests-et-pieges.md`.
 - **Deux gardes qui se couvrent ne s'éprouvent pas** : placer le cas où une seule tient.
 - **L'Agenda n'affiche qu'un mois** : un jour « il y a deux jours » n'y est pas le 1er ni le 2 ; viser par `caseDuJour`, et nommer un scénario du temps avec un mot du motif des passes datées.

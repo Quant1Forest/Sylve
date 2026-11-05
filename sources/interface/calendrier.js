@@ -165,6 +165,26 @@ function journeesDOffice() {
   if (!A.cfg.officeDepuis) { A.cfg.officeDepuis = Date.now(); sauverCfg(); }
   return C.joursDOffice(A.chantiers, A.journees, absences(), A.cfg, Date.now());
 }
+/* Les jours en pointillés passés qui attendent qu'il dise ce qu'il en fut. */
+function journeesEnPointilles() {
+  journeesDOffice();
+  return C.joursEnPointilles(A.chantiers, A.journees, absences(), A.cfg, Date.now());
+}
+/* « J'y ai travaillé » sur un jour en pointillés (lot r1b) : une marque sur
+   la pose, et le jour compte comme une journée d'office — calculée, jamais
+   écrite. Il vient de le dire : pas de ○. */
+function reconnaitreJour(c, ts) {
+  var k = C.jourCle(ts);
+  c.jours = (c.jours || []).map(function (j) {
+    if (jourDePose(j) !== k) return j;
+    var o = typeof j === 'object' ? Object.assign({}, j) : { d: C.minuit(j), p: 1 };
+    o.fait = true; o.vu = true;
+    return o;
+  });
+  c.maj = Date.now();
+  indexerJournees();
+  return sauverChantiers();
+}
 /* Le jour d'une pose, quel que soit son format (l'ancien : une date nue). */
 function tsPose(j) { return C.minuit(j && typeof j === 'object' ? j.d : j); }
 function jourDePose(j) { return C.jourCle(tsPose(j)); }
@@ -201,22 +221,26 @@ function retirerJoursOffice(ts, office) {
     return sauverChantiers();
   });
 }
-/* Le ○ s'efface quand il a ouvert la fiche du jour : il l'a vu. La marque est
-   portée par la pose elle-même. */
-function marquerOfficeVu(ts, office) {
-  var k = C.jourCle(ts), n = 0;
-  office.forEach(function (r) {
-    if (r.temps.vu) return;
-    var c = r.chantier;
+/* Le ○ s'efface quand il a ouvert la fiche du jour, ou fermé la bulle
+   d'Aujourd'hui qui la montrait : il l'a vu. La marque est portée par la
+   pose elle-même. « liste » : des { chantier, d }. */
+function marquerPosesVues(liste) {
+  var n = 0;
+  liste.forEach(function (r) {
+    var k = C.jourCle(r.d), c = r.chantier;
     c.jours = (c.jours || []).map(function (j) {
-      if (jourDePose(j) !== k) return j;
+      if (jourDePose(j) !== k || (typeof j === 'object' && j.vu)) return j;
       n++;
       return typeof j === 'object' ? Object.assign({}, j, { vu: true }) : { d: C.minuit(j), p: 1, vu: true };
     });
   });
-  if (!n) return;
+  if (!n) return Promise.resolve(false);
   indexerJournees();
-  sauverChantiers().then(function () { renderCalendrier(); renderAujourdhui(); renderFiche(); });
+  return sauverChantiers().then(function () { renderCalendrier(); renderAujourdhui(); renderFiche(); return true; });
+}
+function marquerOfficeVu(ts, office) {
+  marquerPosesVues(office.filter(function (r) { return !r.temps.vu; })
+    .map(function (r) { return { chantier: r.chantier, d: ts }; }));
 }
 
 /* « jeudi 29 octobre » : le jour tel qu'on le dit. */
@@ -246,10 +270,14 @@ function ouvrirFicheJour(ts) {
   var office = o.reels.filter(function (r) { return r.temps.office; });
   var vrais = o.reels.filter(function (r) { return !r.temps.office; });
   /* Un jour posé resté dans le passé sans rien compter : d'avant la 4.92, ou
-     posé sur un devis pas signé. Pâle, sans relance ; il se règle à la main. */
+     posé sur un devis pas signé. Pâle ; d'avant la 4.92, il se règle à la
+     main ; depuis, sur un devis pas signé, il attend qu'on dise ce qu'il en
+     fut (lot r1b). */
   var pale = ts < auj && (st === 'confirme' || st === 'prevu');
+  var pointilles = journeesEnPointilles().filter(function (x) { return x.d === ts; });
   var aide = office.length && !vrais.length ? 'journée comptée d’office'
-    : pale && st === 'confirme' ? 'posé avant la mise à jour : il ne compte pas, à régler à la main'
+    : pointilles.length ? 'devis pas signé : il ne compte pas tant que vous ne le dites pas'
+    : pale ? 'posé avant la mise à jour : il ne compte pas, à régler à la main'
     : trouveAide(st);
 
   var h = '<div class="fj-etat st-' + st + (pale ? ' passe' : '') + '"><span class="fj-pt"></span>' +
@@ -265,21 +293,34 @@ function ouvrirFicheJour(ts) {
       '<div class="btn-rang"><button class="btn primaire btn-min" id="fj-preciser">Préciser ma journée</button>' +
       '<button class="btn btn-min" id="fj-nonla">Je n’y étais pas</button></div></div>';
   }
-  if (vrais.length) {
+  if (pointilles.length) {
+    h += '<div class="fj-office fj-pointilles" id="fj-pointilles"><p><b>Posé, devis pas signé.</b> ' +
+      'Ce jour ne compte pas tant que vous ne le dites pas.</p>' +
+      pointilles.map(function (x) {
+        return '<div class="fj-pl"><span>' + esc(C.nomChantier(x.chantier) + ' · ' + partEnMots(x.p)) + '</span>' +
+          '<div class="btn-rang"><button class="btn primaire btn-min" data-fjytrav="' + esc(x.chantier.id) + '">' +
+          'J’y ai travaillé</button><button class="btn btn-min" data-fjpasla="' + esc(x.chantier.id) + '">' +
+          'Je n’y étais pas</button></div></div>';
+      }).join('') + '</div>';
+  }
+  /* Une ligne par chantier ce jour-là (lot r1b) : « une seule ligne pour me
+     dire là où j'ai été ». Une journée à deux prestations en donnait trois —
+     une par prestation, une pour le hors production. */
+  var parCh = parChantierDuJour(vrais);
+  if (parCh.length) {
     h += '<p class="fj-sous">Ce que vous y avez fait</p>' +
-      vrais.map(function (r) {
-        var txt = '<b>' + esc(C.nomChantier(r.chantier)) + '</b><small>' +
-          C.ditDuree(C.heuresSaisie(r.temps, A.cfg), A.cfg) +
-          (C.nb(r.temps.personnes) > 1 ? ' × ' + C.nb(r.temps.personnes) + ' pers.' : '') +
-          (r.temps.activite ? ' · ' + esc(C.nomTravail(r.temps.activite)) : '') + '</small>';
-        /* Un appui sur la ligne rouvre la journée qui porte ce temps. */
-        return '<div class="liste-item">' +
-          (r.temps.jrn
-            ? '<button type="button" class="li-c fj-txt" data-fjmj="' + esc(r.temps.jrn) + '">' + txt + '</button>'
+      parCh.map(function (x) {
+        var txt = '<b>' + esc(C.nomChantier(x.chantier)) + '</b><small>' +
+          C.ditDuree(x.heures, A.cfg) + (x.personnes > 1 ? ' × ' + x.personnes + ' pers.' : '') + '</small>' +
+          (x.prestations.length ? '<small class="fj-presta">' + esc(x.prestations.join(', ')) + '</small>' : '');
+        /* Un appui rouvre la journée de ce chantier ; s'il y en a plusieurs ce
+           jour-là, la première. */
+        return '<div class="liste-item" data-fjch="' + esc(x.chantier.id) + '">' +
+          (x.jrn.length
+            ? '<button type="button" class="li-c fj-txt" data-fjmj="' + esc(x.jrn[0]) + '">' + txt + '</button>'
             : '<div class="li-c">' + txt + '</div>') +
-          '<button class="btn-min" data-fjouvrir="' + r.chantier.id + '">Fiche</button>' +
-          '<button class="btn-min" data-fjsup="' + r.chantier.id + '_' +
-          (r.chantier.temps || []).indexOf(r.temps) + '" aria-label="Retirer ce temps">✕</button>' +
+          '<button class="btn-min" data-fjouvrir="' + x.chantier.id + '">Fiche</button>' +
+          '<button class="btn-min" data-fjsupch="' + x.chantier.id + '" aria-label="Retirer la journée de ce chantier">✕</button>' +
           '</div>';
       }).join('');
   }
@@ -405,20 +446,69 @@ function ouvrirFicheJour(ts) {
       sauverChantiers().then(function () { refaire('Chantier retiré de ce jour.'); });
       return;
     }
-    var sup = e.target.closest('[data-fjsup]');
-    if (sup) {
-      var p = sup.dataset.fjsup.split('_');
-      var c2 = chantier(p[0]); if (!c2) return;
-      var t2 = (c2.temps || [])[Number(p[1])];
-      if (!t2) return;
-      if (!retirerSaisie(t2)) { toast('Cette saisie ne se retire pas d’ici.'); return; }
-      indexerJournees();
-      c2.maj = Date.now();
-      Promise.all([sauverJournees(), sauverChantiers()]).then(function () {
-        refaire('Temps retiré.');
+    var yt = e.target.closest('[data-fjytrav]');
+    if (yt) {
+      var c3 = chantier(yt.dataset.fjytrav); if (!c3) return;
+      var part = (pointilles.filter(function (x) { return x.chantier.id === c3.id; })[0] || {}).heures;
+      reconnaitreJour(c3, ts).then(function () {
+        refaire('Compté : ' + E.fmt(part || 0, (part || 0) % 1 ? 1 : 0) + ' h sur ' + C.nomChantier(c3) + '.');
       });
+      return;
+    }
+    var pl = e.target.closest('[data-fjpasla]');
+    if (pl) {
+      var c4 = chantier(pl.dataset.fjpasla); if (!c4) return;
+      retirerJoursOffice(ts, [{ chantier: c4 }]).then(function () {
+        refaire('Jour retiré — il est dans la Corbeille.');
+      });
+      return;
+    }
+    var sup = e.target.closest('[data-fjsupch]');
+    if (sup) {
+      var x = parCh.filter(function (y) { return y.chantier.id === sup.dataset.fjsupch; })[0];
+      if (!x) return;
+      /* Une vieille saisie qui ne vient d'aucune journée ne se retire pas
+         d'ici, comme avant. */
+      if (!x.jrn.length) { toast('Cette saisie ne se retire pas d’ici.'); return; }
+      if (!confirm('Retirer la journée « ' + C.nomChantier(x.chantier) + ' » de ce jour ?\n\nElle restera ' +
+        'récupérable ' + B.JOURS_POUBELLE + ' jours dans ' + B.CHEMIN_CORBEILLE + '.')) return;
+      retirerJourneesDe(x.jrn).then(function () { refaire('Journée mise à la corbeille.'); });
     }
   });
+}
+/* Les saisies d'un jour, rangées par chantier : durée totale, personnes,
+   prestations en clair, et les journées qui les portent. */
+function parChantierDuJour(reels) {
+  var par = {}, ordre = [];
+  reels.forEach(function (r) {
+    var id = r.chantier.id;
+    if (!par[id]) { par[id] = { chantier: r.chantier, heures: 0, personnes: 1, prestations: [], jrn: [] }; ordre.push(id); }
+    var x = par[id];
+    x.heures = C.arr(x.heures + C.heuresSaisie(r.temps, A.cfg), 2);
+    x.personnes = Math.max(x.personnes, C.nb(r.temps.personnes) || 1);
+    var n = r.temps.activite ? C.nomTravail(r.temps.activite) : '';
+    if (n && x.prestations.indexOf(n) < 0) x.prestations.push(n);
+    if (r.temps.jrn && x.jrn.indexOf(r.temps.jrn) < 0) x.jrn.push(r.temps.jrn);
+  });
+  return ordre.map(function (id) { return par[id]; });
+}
+/* Retirer une journée entière, vers la Corbeille, d'où elle revient. */
+function retirerJourneesDe(ids) {
+  var l = (A.journees || []).filter(function (j) { return ids.indexOf(j.id) >= 0; });
+  A.journees = (A.journees || []).filter(function (j) { return ids.indexOf(j.id) < 0; });
+  return Promise.all(l.map(function (j) {
+    var c = j.chantier ? chantier(j.chantier) : null;
+    return jeterObjet('journee', j, dateCourte(j.date) + ' — ' + (c ? C.nomChantier(c) : (j.lieu || 'sans chantier')),
+      E.fmt(C.heuresJournee(j), 1) + ' h');
+  })).then(function () {
+    indexerJournees();
+    return Promise.all([sauverJournees(), sauverChantiers()]);
+  });
+}
+/* « journée », « demi-journée », sinon la durée. */
+function partEnMots(p) {
+  p = C.nb(p) || 1;
+  return p === 1 ? 'journée' : p === 0.5 ? 'demi-journée' : C.ditDuree(p * C.HEURES_JOUR(A.cfg), A.cfg);
 }
 function trouveAide(st) {
   for (var i = 0; i < C.STATUTS_JOUR.length; i++) {
@@ -510,7 +600,6 @@ function ouvrirAbsence(ts) {
    étape, comme Aujourd'hui. Puis le statut du jour, proposé d'après le
    chantier et modifiable (G3) : à venir, posé ou posé sur un devis pas
    signé ; passé, il a eu lieu — une journée faite, entière ou demie. */
-var ETAPES_EN_COURS = ['Infos et repérage', 'Devis', 'Travaux', 'Facture', 'Paiement'];
 function chantiersAPoser() {
   return (A.chantiers || []).filter(function (c) { return C.statutOuvert(c.statut); })
     .sort(function (a, b) {
@@ -527,7 +616,7 @@ function ouvrirPoserChantier(ts) {
   var et = -1, liste = '';
   l.forEach(function (c) {
     var e = C.etapeChantier(c);
-    if (e !== et) { et = e; liste += '<p class="pj-etape">' + esc(ETAPES_EN_COURS[e] || '') + '</p>'; }
+    if (e !== et) { et = e; liste += '<p class="pj-etape">' + esc(NOMS_ETAPES[e] || '') + '</p>'; }
     liste += '<button type="button" class="pj-ch" data-pjch="' + esc(c.id) + '" aria-pressed="false">' +
       '<b>' + esc(C.nomChantier(c)) + '</b>' + pointsEtape(c) +
       '<small>' + esc([c.donneur, C.nomStatut(c.statut, c)].filter(Boolean).join(' · ')) + '</small></button>';

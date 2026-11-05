@@ -38,7 +38,7 @@
   /* Un jour = un statut = une couleur (P5) : la bande sous le numéro, et le
      fond teinté de la case. Mêmes teintes que les pastilles d'avant. */
   --st-trav:#1D6FB8; --st-trav-f:#E4EEF8; --st-conf:#2E7D46; --st-conf-f:#E3EFE7;
-  --st-prev:#B98A00; --st-prev-f:#FBF2DC; --st-abs:#8E8878; --st-abs-f:#ECE7DF;
+  --st-abs:#8E8878; --st-abs-f:#ECE7DF;
   /* La couleur vive de l'application. Le bleu avait été validé le 3 août ;
      il l'a repris le 23 pour un vert, « qui respire plus l'esprit de
      l'application ». Le nom Sylve, lui, garde le vert de la marque
@@ -311,6 +311,28 @@ body:not(.m-ent) .mod-ent{display:none}
 .cal-bulle .pic{width:18px;height:18px;flex:none}
 .cal-bulle-fond{position:fixed;inset:0;z-index:59}
 .cal button.appui{outline:3px solid var(--accent);outline-offset:1px}
+/* Les jours en pointillés passés dans la fiche du jour (lot r1b). */
+.fj-pointilles{background:var(--st-conf-f);border:1px dashed var(--st-conf)}
+.fj-pointilles b{color:var(--st-conf)}
+.fj-pl{display:grid;gap:6px;min-width:0}
+.fj-pl span{font-weight:600;overflow-wrap:anywhere}
+.fj-presta{display:block;font-size:12px;color:var(--gris);overflow-wrap:anywhere}
+/* La bulle d'information d'Aujourd'hui (lot r1b) : au centre, par-dessus,
+   et elle défile quand la liste est longue. */
+.aj-bulle-fond{position:fixed;inset:0;z-index:70;background:rgba(23,37,31,.45)}
+.aj-bulle{position:fixed;z-index:71;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:min(400px,calc(100% - 24px));max-height:calc(100% - 48px);box-sizing:border-box;
+  display:flex;flex-direction:column;background:var(--papier);border-radius:16px;
+  box-shadow:var(--ombre);padding:14px 14px 12px}
+.aj-bulle h2{margin:0 0 6px;font-size:16.5px}
+.aj-bulle .ajb-corps{overflow:auto;min-height:0;flex:1 1 auto}
+.ajb-sous{margin:10px 0 2px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--gris)}
+.ajb-aide{margin:0 0 6px;font-size:12.5px;color:var(--gris)}
+.ajb-l{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 10px;
+  padding:8px 0;border-bottom:1px solid var(--trait);font-size:13.5px;min-width:0}
+.ajb-l > span:first-child{min-width:0;overflow-wrap:anywhere;flex:1 1 140px}
+.ajb-btns{display:flex;flex-wrap:wrap;gap:6px}
+.aj-bulle .btn-rang{margin:12px 0 0}
 .cal-aide{margin:0 0 8px;font-size:12.5px;color:var(--gris)}
 /* Ma journée (lot c2) : des blocs titrés, et un pied qui reste en vue. */
 .mj-copie{display:grid;gap:2px;width:100%;padding:10px 12px;border-radius:11px;text-align:left;
@@ -1691,14 +1713,15 @@ if (froid && s > 0) montrer(s);
       <p class="eyebrow reg-titre" data-sec="ent" data-sous="alertes" style="margin:22px 0 8px">Relances et calendrier</p>
       <div class="carte" data-sec="ent" data-sous="alertes">
         <div class="grille g2">
-          <div class="champ"><label class="eyebrow" for="r-rd">Relancer un devis après (jours)</label>
+          <div class="champ"><label class="eyebrow" for="r-rd">Validité des devis par défaut (jours)</label>
             <input type="text" id="r-rd" inputmode="numeric" autocomplete="off"></div>
           <div class="champ"><label class="eyebrow" for="r-rf">Relancer une facture après (jours)</label>
             <input type="text" id="r-rf" inputmode="numeric" autocomplete="off"></div>
         </div>
         <p class="muted" style="font-size:12px;margin:9px 0 0">
-          Le délai du devis ne sert que faute de validité saisie : un devis qui porte une
-          date de fin est relancé d'après elle.
+          Proposée sur chaque nouveau devis, modifiable devis par devis ; elle sert aussi
+          d'échéance aux devis sans validité saisie. Un devis sans réponse entre dans
+          « En retard » le jour où sa validité prend fin.
         </p>
         <label class="ligne-check" style="margin-top:10px;display:flex;align-items:center;gap:8px;font-size:13.5px">
           <input type="checkbox" id="r-we"> Compter les week-ends comme jours travaillables
@@ -3726,12 +3749,25 @@ function statutsPossibles(ch) {
   var avec = aDevis(ch);
   return STATUTS.filter(function (s) { return avec || !s.devisSeul; });
 }
-/* Fin de validité : la date d'édition plus la durée choisie. Le jour est
-   conservé, sauf s'il n'existe pas dans le mois d'arrivée — un devis édité
-   un 31 janvier et valable un mois court jusqu'au 28 février, pas au 3 mars.
-   Rien n'est déduit quand l'une des deux données manque. */
+/* Fin de validité (lot r1b) : la validité se dit en jours, `validiteJours`,
+   comptés depuis l'édition — à défaut l'envoi, seule date qu'un devis repris
+   porte parfois. Les devis d'avant gardent leurs mois (`validiteDevis`),
+   relus tels quels tant qu'on n'a pas tapé de jours : leur date de fin ne
+   bouge pas.
+   En mois, le jour est conservé, sauf s'il n'existe pas dans le mois
+   d'arrivée — un devis édité un 31 janvier et valable un mois court jusqu'au
+   28 février, pas au 3 mars. Rien n'est déduit quand une donnée manque. */
+var VALIDITE_DEVIS_DEFAUT = 30;
+function joursValiditeDefaut(cfg) { return nb(cfg && cfg.joursValiditeDevis) || VALIDITE_DEVIS_DEFAUT; }
+function dateDepartDevis(ch) { return nb(ch && ch.dateDevis) || nb(ch && ch.dateEnvoi) || 0; }
 function finValiditeDevis(ch) {
-  if (!aDevis(ch) || !ch || !ch.dateDevis) return null;
+  if (!aDevis(ch) || !ch) return null;
+  var jv = nb(ch.validiteJours);
+  if (jv > 0) {
+    var dep = dateDepartDevis(ch);
+    return dep ? ajouteJours(dep, jv) : null;
+  }
+  if (!ch.dateDevis) return null;
   var m = nb(ch.validiteDevis);
   if (!(m > 0)) return null;
   var d = new Date(ch.dateDevis), jour = d.getDate();
@@ -3740,6 +3776,16 @@ function finValiditeDevis(ch) {
   var dernier = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
   d.setDate(Math.min(jour, dernier));
   return minuit(d.getTime());
+}
+/* L'échéance qui fait entrer un devis sans réponse dans En retard : sa fin
+   de validité, ou, s'il n'en porte pas, la validité par défaut des réglages
+   comptée de la même date de départ. */
+function echeanceDevis(ch, cfg) {
+  var f = finValiditeDevis(ch);
+  if (f != null) return f;
+  if (!aDevis(ch)) return null;
+  var dep = dateDepartDevis(ch);
+  return dep ? ajouteJours(dep, joursValiditeDefaut(cfg)) : null;
 }
 
 function trouve(liste, code) {
@@ -4273,26 +4319,9 @@ function dureePrevue(ch) {
    le chantier n'est pas clos. Les journées placées font foi si elles existent. */
 /* En retard : l'échéance est passée, ou la dernière journée placée l'est
    sans que le chantier soit clos. */
-/* Une journée posée sur une date passée, sans qu'aucun temps n'y soit noté :
-   on y était, on ne sait pas combien de temps ça a pris. « Sinon je me dis
-   ok, je le ferai plus tard, et après je ne le fais pas et j'oublie. » Sans
-   ce rattrapage, les rendements se vident en silence et le chantier finit
-   par s'annoncer « en retard » sans qu'on sache pourquoi. */
-function journeesANoter(chantiers, maintenant) {
-  var m = minuit(maintenant), out = [];
-  (chantiers || []).forEach(function (ch) {
-    if (['sansuite', 'devis', 'envoye'].indexOf(ch.statut) >= 0) return;
-    var notes = {};
-    (ch.temps || []).forEach(function (t) { if (t.date) notes[jourCle(t.date)] = 1; });
-    journeesPlacees(ch).forEach(function (j) {
-      /* Le jour même n'est pas fini : on ne réclame rien avant demain. */
-      if (j.d >= m) return;
-      if (notes[jourCle(j.d)]) return;
-      out.push({ chantier: ch, d: j.d, p: nb(j.p) });
-    });
-  });
-  return out.sort(function (a, b) { return a.d - b.d; });
-}
+/* « En retard » ne relance plus (lot r1b) : un chantier aux jours tous
+   passés reste dans En travaux. Le fait se lit encore sur la ligne
+   d'Aujourd'hui (« plus de jour posé »), dans la fiche et dans les cumuls. */
 function enRetard(ch, maintenant) {
   if (!ch) return false;
   if (['termine', 'facture', 'paye', 'sansuite'].indexOf(ch.statut) >= 0) return false;
@@ -4429,7 +4458,8 @@ function estWeekend(ts) { var j = new Date(ts).getDay(); return j === 0 || j ===
    Deux marques facultatives (lot r1) suivent la pose : « ferme », quand on a
    choisi un statut contraire à celui du chantier, et « vu », quand la fiche
    du jour d'une journée d'office a été ouverte. Les perdre ici, c'était les
-   perdre au premier jour posé à côté. */
+   perdre au premier jour posé à côté. Une troisième (lot r1b), « fait » :
+   il a dit « J'y ai travaillé » sur un jour posé sur un devis pas signé. */
 function journeesPlacees(ch) {
   var m = {};
   ((ch && ch.jours) || []).forEach(function (x) {
@@ -4438,6 +4468,7 @@ function journeesPlacees(ch) {
       ts = minuit(x.d); o = { d: ts, p: nb(x.p) || 1 };
       if (x.ferme != null) o.ferme = !!x.ferme;
       if (x.vu) o.vu = true;
+      if (x.fait) o.fait = true;
     } else { ts = minuit(x); o = { d: ts, p: 1 }; }
     if (!ts || isNaN(ts)) return;
     m[ts] = o;
@@ -4735,34 +4766,54 @@ function statutJour(occ, absences, ts) {
 }
 /* La journée d'office (lot r1, G4). « Un jour à trancher » forçait la main
    chaque matin ; la règle du 02/11 la remplace : un jour posé et confirmé
-   que la date a dépassé, sans journée saisie pour ce chantier ce jour-là,
-   compte comme une journée faite — sa part de journée, sans prestation.
+   que la date a dépassé, sans journée saisie ce jour-là, compte comme une
+   journée faite — sa part de journée, sans prestation.
    Elle ne s'écrit nulle part : elle se déduit, comme le statut d'un jour, et
    s'efface d'elle-même dès qu'une vraie journée la remplace. Jamais deux
    heures pour la même chose.
    Bornes : le jour même n'est pas fini (il compte le lendemain) ; un jour
    d'avant « depuis » — la première ouverture de la 4.92 — reste tel qu'il
    était, sans rien compter (décidé le 04/11) ; un jour marqué non travaillé
-   n'a pas été travaillé. */
-function joursDOffice(chantiers, journees, absences, cfg, maintenant) {
+   n'a pas été travaillé.
+   La règle est par jour (02/11, confirmée le 05/11) : « si Ma journée est
+   saisie pour ce jour, elle remplace la journée d'office ». N'importe quelle
+   journée saisie à cette date — tout chantier, facturée ou non, même sans
+   chantier — efface toutes celles d'office de ce jour : un jour posé sur A
+   et une journée saisie sur B ne font pas seize heures. */
+function posesPassees(chantiers, journees, absences, cfg, maintenant, retenir) {
   var depuis = nb(cfg && cfg.officeDepuis), out = [];
   if (!depuis) return out;
   var m = minuit(maintenant), d0 = minuit(depuis), hj = HEURES_JOUR(cfg);
   var saisis = {};
-  (journees || []).forEach(function (j) {
-    if (j && j.chantier) saisis[j.chantier + '|' + jourCle(nb(j.date))] = 1;
-  });
+  (journees || []).forEach(function (j) { if (j) saisis[jourCle(nb(j.date))] = 1; });
   (chantiers || []).forEach(function (ch) {
     if (ch.statut === 'sansuite') return;
     journeesPlacees(ch).forEach(function (x) {
       if (x.d >= m || x.d < d0) return;
-      if (fermeteJour(ch, x) !== 'ferme') return;
-      if (saisis[ch.id + '|' + jourCle(x.d)]) return;
+      if (saisis[jourCle(x.d)]) return;
       if (estAbsent(absences, x.d)) return;
+      if (!retenir(ch, x)) return;
       out.push({ chantier: ch, d: x.d, p: x.p, heures: arr(nb(x.p) * hj, 2), vu: !!x.vu });
     });
   });
   return out.sort(function (a, b) { return a.d - b.d; });
+}
+/* Compte d'office : le jour confirmé, et le jour en pointillés dont il a dit
+   « J'y ai travaillé » (la marque « fait » de la pose). */
+function joursDOffice(chantiers, journees, absences, cfg, maintenant) {
+  return posesPassees(chantiers, journees, absences, cfg, maintenant, function (ch, x) {
+    return !!x.fait || fermeteJour(ch, x) === 'ferme';
+  });
+}
+/* Les jours en pointillés passés (lot r1b) : posés sur un devis pas signé
+   quand ils sont passés — signé depuis ou non —, ils ne comptent jamais
+   seuls. Ils attendent qu'il dise « J'y ai travaillé » ou « Je n'y étais
+   pas ». Mêmes bornes que la journée d'office : d'avant la 4.92, un jour
+   saisi, un jour non travaillé, ils restent tels quels. */
+function joursEnPointilles(chantiers, journees, absences, cfg, maintenant) {
+  return posesPassees(chantiers, journees, absences, cfg, maintenant, function (ch, x) {
+    return !x.fait && fermeteJour(ch, x) !== 'ferme';
+  });
 }
 /* Charge d'un mois : jours ouvrés occupés, fermes et provisoires. Un jour
    posé que le chantier a fait ce jour-là n'est plus « posé » : il est fait,
@@ -4798,50 +4849,33 @@ function fmtJours(n) {
   var v = arr(nb(n), 2);
   return String(v).replace('.', ',') + ' journée' + (v > 1 ? 's' : '');
 }
-/* Une semaine avant la fin de validité : de quoi passer un coup de fil et
-   laisser le temps de signer. Le devis remonte désormais dans « En retard »
-   (lot r1, A3), et deux semaines l'y installaient trop tôt : il ne s'y lisait
-   plus. Plus tard, il ne sert qu'à constater. */
-var PREAVIS_DEVIS = 7;
+/* Ce qui est en retard (lot r1b, tranché le 05/11) : les trois mêmes choses
+   sur Aujourd'hui et dans la liste Chantiers — factures échues, chantiers
+   terminés pas facturés, devis arrivés à échéance sans réponse. Une seule
+   liste, pour que les deux écrans ne divergent plus. */
+var TYPES_EN_RETARD = ['impaye', 'afacturer', 'devis'];
 
 function alertes(chantiers, cfg, maintenant) {
   var now = maintenant || Date.now();
-  var relanceDevis = nb(cfg && cfg.joursRelanceDevis) || 21;
   var relanceFacture = nb(cfg && cfg.joursRelanceFacture) || 45;
   var out = [];
   (chantiers || []).forEach(function (ch) {
-    if (enRetard(ch, now)) {
-      /* ch.fin n'existe plus depuis que l'échéance de chantier a été retirée :
-         la phrase annonçait « Invalid Date ». C'est le dernier jour posé qui
-         date la chose. */
-      var dernier = dateChantier(ch);
-      out.push({ type: 'retard', chantier: ch, gravite: 2,
-        texte: dernier
-          ? 'dernière journée posée le ' + new Date(dernier).toLocaleDateString('fr-FR') +
-            ', chantier pas encore terminé'
-          : 'toutes les journées posées sont passées, chantier pas encore terminé' });
-    }
-    /* Un devis a sa propre échéance : celle qu'il porte écrite. Quand elle
-       est connue, c'est elle qui parle — approcher de la fin de validité
-       sans réponse est le vrai moment de relancer. Le délai réglable ne
-       sert plus que faute de validité saisie. */
+    /* Le chantier aux jours tous passés ne relance plus (lot r1b) : il reste
+       dans En travaux, l'alerte « retard » est partie. */
+    /* Un devis sans réponse entre dans En retard le jour même de la fin de
+       sa validité, sans préavis (corrigé le 04/11, lot r1b) : « devis
+       valable jusqu'à aujourd'hui », puis « expiré ». Avant, rien. Sans
+       validité saisie, l'échéance est la validité par défaut des réglages. */
     if (ch.statut === 'envoye') {
-      var fin = finValiditeDevis(ch);
+      var fin = echeanceDevis(ch, cfg);
       if (fin != null) {
         var reste = Math.round((minuit(fin) - minuit(now)) / JOUR);
         if (reste < 0) {
           out.push({ type: 'devis', chantier: ch, gravite: 2, jours: -reste, fin: fin,
             texte: 'devis expiré le ' + new Date(fin).toLocaleDateString('fr-FR') + ', sans réponse' });
-        } else if (reste <= PREAVIS_DEVIS) {
-          out.push({ type: 'devis', chantier: ch, gravite: 1, jours: reste, fin: fin,
-            texte: reste === 0 ? 'devis valable jusqu’à aujourd’hui, sans réponse'
-              : 'devis valable ' + reste + ' jour' + (reste > 1 ? 's' : '') + ' encore, sans réponse' });
-        }
-      } else if (ch.dateEnvoi) {
-        var j = Math.round((minuit(now) - minuit(ch.dateEnvoi)) / JOUR);
-        if (j >= relanceDevis) {
-          out.push({ type: 'devis', chantier: ch, gravite: 1, jours: j,
-            texte: 'devis envoyé il y a ' + j + ' jours, sans réponse' });
+        } else if (reste === 0) {
+          out.push({ type: 'devis', chantier: ch, gravite: 1, jours: 0, fin: fin,
+            texte: 'devis valable jusqu’à aujourd’hui, sans réponse' });
         }
       }
     }
@@ -5258,20 +5292,20 @@ function chercher(chantiers, q) {
   });
 }
 /* Les groupes de la liste Chantiers (lot b2, maquette V2). « À faire
-   maintenant » est l'ancien « À traiter » du carnet : journées passées, à
-   facturer, facture impayée — le chantier « en retard » ne vit que là.
-   Chaque statut a son groupe ; un facturé pas encore échu reste dans « En
-   travaux », faute d'un groupe à lui. L'ordre est fixe, le plus urgent en
-   haut ; seuls les payés plus anciens se trient au choix, à l'écran. */
+   maintenant » dit les trois mêmes choses qu'En retard d'Aujourd'hui (lot
+   r1b) : facture échue, terminé pas facturé, devis arrivé à échéance sans
+   réponse. Chaque statut a son groupe ; un facturé pas encore échu attend
+   son paiement dans le sien (tranché le 02/11). L'ordre est fixe, le plus
+   urgent en haut ; seuls les payés plus anciens se trient au choix, à
+   l'écran. */
 var JOURS_PAYE_RECENT = 30;
-var TYPES_A_FAIRE = ['impaye', 'retard', 'afacturer'];
-var RANG_TRAVAUX = { termine: 0, encours: 1, accepte: 2, facture: 3 };
+var RANG_TRAVAUX = { termine: 0, encours: 1, accepte: 2 };
 function datePaye(c) { return nb(c.datePaiement) || nb(c.dateFacture) || dateEntree(c); }
 function groupesChantiers(chantiers, cfg, maintenant) {
   var now = maintenant || Date.now();
-  var g = { faire: [], travaux: [], devis: [], payes: [], anciens: [], sansuite: [], alerte: {} };
+  var g = { faire: [], travaux: [], factures: [], devis: [], payes: [], anciens: [], sansuite: [], alerte: {} };
   alertes(chantiers, cfg, now).forEach(function (a) {
-    if (TYPES_A_FAIRE.indexOf(a.type) < 0 || g.alerte[a.chantier.id]) return;
+    if (TYPES_EN_RETARD.indexOf(a.type) < 0 || g.alerte[a.chantier.id]) return;
     g.alerte[a.chantier.id] = a;
     g.faire.push(a.chantier);
   });
@@ -5282,6 +5316,7 @@ function groupesChantiers(chantiers, cfg, maintenant) {
     if (st === 'devis' || st === 'envoye') g.devis.push(c);
     else if (st === 'paye') (datePaye(c) >= limite ? g.payes : g.anciens).push(c);
     else if (st === 'sansuite') g.sansuite.push(c);
+    else if (st === 'facture') g.factures.push(c);
     else g.travaux.push(c);
   });
   var prochain = function (c) {
@@ -5296,6 +5331,12 @@ function groupesChantiers(chantiers, cfg, maintenant) {
     var ra = RANG_TRAVAUX[a.statut], rb = RANG_TRAVAUX[b.statut];
     return (ra == null ? 9 : ra) - (rb == null ? 9 : rb) ||
       (prochain(a) - prochain(b)) || dateEntree(a) - dateEntree(b);
+  });
+  /* La plus proche de son échéance d'abord ; sans échéance écrite, la plus
+     vieille facture. */
+  g.factures.sort(function (a, b) {
+    return (nb(a.echeancePaiement) || Infinity) - (nb(b.echeancePaiement) || Infinity) ||
+      (nb(a.dateFacture) || dateEntree(a)) - (nb(b.dateFacture) || dateEntree(b));
   });
   /* Le devis à faire avant celui qui attend une réponse ; le plus vieux
      d'abord, c'est lui qui presse. */
@@ -5469,7 +5510,8 @@ var M = {
   appliquerTravauxPerso: appliquerTravauxPerso, travauxActifs: travauxActifs,
   nomStatut: nomStatut, statutOuvert: statutOuvert, statutEngage: statutEngage, rangStatut: rangStatut,
   aDevis: aDevis, statutsPossibles: statutsPossibles, finValiditeDevis: finValiditeDevis,
-  PREAVIS_DEVIS: PREAVIS_DEVIS,
+  echeanceDevis: echeanceDevis, joursValiditeDefaut: joursValiditeDefaut,
+  VALIDITE_DEVIS_DEFAUT: VALIDITE_DEVIS_DEFAUT, TYPES_EN_RETARD: TYPES_EN_RETARD,
   nb: nb, arr: arr,
   montantLigne: montantLigne, montant: montant, quantite: quantite, unitesPresentes: unitesPresentes,
   tauxLigne: tauxLigne, tauxPresents: tauxPresents, tauxAttendu: tauxAttendu,
@@ -5478,7 +5520,7 @@ var M = {
   heuresPostes: heuresPostes, heuresJournee: heuresJournee, joursJournee: joursJournee,
   prixJourVise: prixJourVise, bilanJournees: bilanJournees, HEURES_JOUR: HEURES_JOUR,
   prixJour: prixJour, chantierSolde: chantierSolde, rendement: rendement,
-  dureePrevue: dureePrevue, enRetard: enRetard, journeesANoter: journeesANoter, tri: tri, filtre: filtre, chercher: chercher,
+  dureePrevue: dureePrevue, enRetard: enRetard, tri: tri, filtre: filtre, chercher: chercher,
   totaux: totaux, groupesChantiers: groupesChantiers, JOURS_PAYE_RECENT: JOURS_PAYE_RECENT,
   dernierEvenement: dernierEvenement, rangComptable: rangComptable,
   rangFacture: rangFacture,
@@ -5498,7 +5540,8 @@ var M = {
   nomRisque: nomRisque, risquesCoches: risquesCoches, manquesFiche: manquesFiche,
   ficheRequise: ficheRequise, SEUIL_FICHE_HA: SEUIL_FICHE_HA,
   STATUTS_JOUR: STATUTS_JOUR, nomStatutJour: nomStatutJour, coulStatutJour: coulStatutJour,
-  statutJour: statutJour, estAbsent: estAbsent, joursDOffice: joursDOffice, fermeteJour: fermeteJour,
+  statutJour: statutJour, estAbsent: estAbsent, joursDOffice: joursDOffice,
+  joursEnPointilles: joursEnPointilles, fermeteJour: fermeteJour,
   chargeMois: chargeMois, alertes: alertes, fmtJours: fmtJours,
   MOTIFS_REFUS: MOTIFS_REFUS, nomMotifRefus: nomMotifRefus, analyseRefus: analyseRefus,
   kmChantier: kmChantier, kmTotal: kmTotal, coutCarburant: coutCarburant,
@@ -7835,7 +7878,12 @@ var CORBEILLE = {
   fournisseur: { nom: 'Fournisseur', liste: 'fournisseurs', sauver: function () { return sauverFournisseurs(); } },
   commande:    { nom: 'Commande',    liste: 'commandes',    sauver: function () { return sauverCommandes(); } },
   sortie:      { nom: 'Mouvement',   liste: 'sorties',      sauver: function () { return sauverSorties(); } },
-  journee:     { nom: 'Journée',     liste: 'journees',     sauver: function () { return sauverJournees(); } },
+  /* Une journée rendue doit se recompter tout de suite : le temps des
+     chantiers n'est qu'une lecture des journées (lot r1b). */
+  journee:     { nom: 'Journée',     liste: 'journees',     sauver: function () {
+    indexerJournees();
+    return Promise.all([sauverJournees(), sauverChantiers()]).then(function () { renderCalendrier(); renderFiche(); });
+  } },
   /* Les notes vivent dans A.cfg, pas dans une liste de A : elles se reposent elles-mêmes. */
   note:        { nom: 'Note', feminin: true, reposer: function (o) {
     var l = notes();
@@ -7851,6 +7899,7 @@ var CORBEILLE = {
     if (!c || !o.pose) return Promise.resolve();
     var k = C.jourCle(o.pose.d), p = { d: C.minuit(o.pose.d), p: C.nb(o.pose.p) || 1 };
     if (o.pose.ferme != null) p.ferme = !!o.pose.ferme;
+    if (o.pose.fait) p.fait = true;
     c.jours = (c.jours || []).filter(function (j) { return jourDePose(j) !== k; }).concat([p]);
     c.jours.sort(function (a, b) { return tsPose(a) - tsPose(b); });
     c.maj = Date.now();
@@ -8470,6 +8519,11 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.93', quoi: [
+    { t: 'En ouvrant Aujourd’hui, une bulle dit les journées comptées d’office et les jours posés sur un devis pas signé : « J’y ai travaillé » ou « Je n’y étais pas »' },
+    { t: 'La validité d’un devis se choisit en jours (30 proposés) ; il passe en retard le jour où elle finit', vue: 'carnet' },
+    { t: 'Chantiers : un groupe pour les facturés qui attendent le paiement ; la fiche du jour, une ligne par chantier', vue: 'carnet' }
+  ] },
   { v: '4.92', quoi: [
     { t: 'Aujourd’hui allégé : ce qui est en retard, vos chantiers en cours rangés par étape, et les autres rappels repliés en bas ; Mes notes sont dans le ☰' },
     { t: 'Agenda : trois couleurs, un appui long sur un jour pour saisir, poser ou marquer non travaillé', vue: 'calendrier' },
@@ -8878,8 +8932,11 @@ function aller(v) {
   if (v === 'coutsv') renderCoutsV();
   if (v === 'notes') renderNotes();
   if (v !== 'calendrier') fermerBulleJour();
+  if (v !== 'accueil') oterBulleAuj();
   majCadre();
   try { if (window.scrollY || window.pageYOffset) window.scrollTo(0, 0); } catch (e) { }
+  /* Aujourd'hui qui s'affiche dit ce que Sylve a compté pour lui (lot r1b). */
+  if (v === 'accueil') montrerBulleAuj();
 }
 
 /* ============================================================ ECOUTEURS */
@@ -9151,7 +9208,7 @@ function brancher() {
        la main, avec les mêmes dates posées en passant. */
     if (e.target.closest('#f-sansdevis')) {
       majChantier(c, { aDevis: false, numeroDevis: '', dateDevis: null, dateSignature: null,
-        validiteDevis: null, statut: c.statut === 'devis' || c.statut === 'envoye' ? 'accepte' : c.statut },
+        validiteDevis: null, validiteJours: null, statut: c.statut === 'devis' || c.statut === 'envoye' ? 'accepte' : c.statut },
         'Sans devis — chantier « ' + C.nomStatut('accepte', { aDevis: false }) + ' ».');
       return;
     }
@@ -9702,7 +9759,11 @@ function brancher() {
     annulerAppui();
     ouvrirBulleJour(Number(b.dataset.jour), b);
   });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && A.bulle) fermerBulleJour(); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if ($('#aj-bulle')) fermerBulleAuj();
+    else if (A.bulle) fermerBulleJour();
+  });
   $('#cal-planif').addEventListener('click', function (e) {
     if (e.target.closest('#cal-planif-fin')) finirPlacement();
     else if (e.target.closest('#cal-pl-garder')) { A.placeAvert = null; renderBandeauPlanif(); }
@@ -10594,6 +10655,10 @@ function synchroniserCrans() {
 function brancherRetourTelephone() {
   window.addEventListener('popstate', function () {
     A.crans = Math.max(0, (A.crans || 0) - 1);
+    /* Les deux bulles se ferment comme une fenêtre (lot r1b) : celle
+       d'Aujourd'hui comme son OK, celle de l'appui long de l'Agenda. */
+    if ($('#aj-bulle')) { fermerBulleAuj(); synchroniserCrans(); return; }
+    if (A.bulle) { fermerBulleJour(); synchroniserCrans(); return; }
     if (!$('#modale').hidden) { fermerModale(); synchroniserCrans(); return; }
     if (typeEcran(A.ecran) === 'racine') return;
     remonter();
@@ -11538,7 +11603,7 @@ function dateStatut(c) {
   if (c.statut === 'envoye') {
     /* Un devis envoyé se cherche des yeux par sa date de fin, pas par celle
        de son départ : c'est elle qui dit s'il faut relancer. */
-    var fin = C.finValiditeDevis(c);
+    var fin = C.echeanceDevis(c, A.cfg);
     if (fin != null) return 'valable jusqu’au ' + dateCourte(fin);
     if (c.dateEnvoi) return 'envoyé le ' + dateCourte(c.dateEnvoi);
   }
@@ -11870,9 +11935,10 @@ function triChantiers() {
    s'ouvre d'un appui sur l'étape en cours. */
 function ligneChantierListe(c, alerte, now) {
   var s = situationChantier(c, now);
-  /* Ce que le statut seul ne dit pas, l'alerte le dit : des journées
-     passées, une facture restée sans réponse faute d'échéance écrite. */
-  if (alerte && alerte.type === 'retard') s = { t: majuscule(alerte.texte), ton: 'tiede' };
+  /* Ce que le statut seul ne dit pas, l'alerte le dit : un devis arrivé à
+     échéance, une facture restée sans réponse faute d'échéance écrite. Les
+     journées passées ne s'y disent plus (lot r1b). */
+  if (alerte && alerte.type === 'devis') s = { t: majuscule(alerte.texte), ton: alerte.gravite > 1 ? 'alerte' : 'tiede' };
   if (alerte && alerte.type === 'impaye' && s.ton !== 'alerte') s = { t: majuscule(alerte.texte), ton: 'alerte' };
   var m = C.montant(c);
   var lieu = [c.foret, c.commune && c.commune !== c.foret ? c.commune : ''].filter(Boolean);
@@ -11931,6 +11997,7 @@ function renderListeChantiers() {
   z.innerHTML =
     groupeListe('faire', 'À faire maintenant', 'alerte', g.faire, g, now) +
     groupeListe('travaux', 'En travaux', '', g.travaux, g, now) +
+    groupeListe('factures', 'Facturés · attendent le paiement', '', g.factures, g, now) +
     groupeListe('devis', 'Devis', '', g.devis, g, now) +
     groupeListe('payes', 'Payés récemment', '', g.payes, g, now) +
     pliListe('anciens', 'Voir les payés plus anciens', triChantiers() +
@@ -12464,12 +12531,15 @@ function corpsDevis(c) {
       '<div class="btn-rang"><button class="btn primaire" id="f-devis">Saisir le devis</button>' +
       '<button class="btn" id="f-sansdevis">Pas de devis : à programmer</button></div>';
   } else {
-    var fin = C.finValiditeDevis(c);
+    /* « Valable 30 jours, jusqu'au … » ; un ancien devis dit ses mois, un
+       devis sans durée saisie la validité par défaut des réglages. */
+    var fin = C.echeanceDevis(c, A.cfg), jv = C.nb(c.validiteJours);
+    var duree = jv > 0 ? jv + ' jour' + (jv > 1 ? 's' : '') : C.nb(c.validiteDevis) > 0 ? moisDe(c)
+      : C.joursValiditeDefaut(A.cfg) + ' jours (par défaut)';
     h += '<div class="fi-tete-etape"><p class="fi-meta">' +
       '<span>N° <b>' + esc(c.numeroDevis || '—') + '</b></span>' +
       (c.dateDevis ? '<span>Édité le <b>' + dateCourte(c.dateDevis) + '</b></span>' : '') +
-      (c.validiteDevis ? '<span>Valable <b>' + c.validiteDevis + ' mois' +
-        (fin ? ' — jusqu’au ' + dateCourte(fin) : '') + '</b></span>' : '') +
+      (fin ? '<span id="f-validite">Valable <b>' + esc(duree) + ', jusqu’au ' + dateCourte(fin) + '</b></span>' : '') +
       (c.dateEnvoi ? '<span>Envoyé le <b>' + dateCourte(c.dateEnvoi) + '</b></span>' : '') +
       (c.dateSignature ? '<span>Signé le <b>' + dateCourte(c.dateSignature) + '</b></span>'
         : c.statut === 'envoye' ? '<span><b>En attente de réponse</b></span>' : '') +
@@ -12874,23 +12944,32 @@ function chipsDiff5(idBase, valeur) {
     }).join('');
 }
 
-/* Durées de validité usuelles d'un devis de travaux. Trois mois est le cas
-   courant. La date qui en découle ne ferme aucune porte — un devis signé
-   plus tard se fait quand même : elle dit quand relancer. */
-var VALIDITES_DEVIS = [
-  { m: 1, n: '1 mois' }, { m: 2, n: '2 mois' }, { m: 3, n: '3 mois' },
-  { m: 6, n: '6 mois' }, { m: 12, n: '1 an' }
-];
+/* La validité se dit en jours (lot r1b) : une case, la valeur des réglages
+   proposée sur un devis neuf, modifiable devis par devis. La date qui en
+   découle ne ferme aucune porte — un devis signé plus tard se fait quand
+   même : elle dit quand il entre dans En retard. Un ancien devis en mois
+   garde ses mois, affichés dans la case vide, tant qu'on n'y tape pas de
+   jours. */
+function validiteJoursDe(c) {
+  var jv = C.nb(c.validiteJours);
+  if (jv > 0) return jv;
+  /* Un devis neuf : rien de saisi encore, ni durée ni date d'édition. */
+  if (!C.nb(c.validiteDevis) && !c.dateDevis && !c.numeroDevis) return C.joursValiditeDefaut(A.cfg);
+  return '';
+}
+function moisDe(c) {
+  var m = C.nb(c.validiteDevis);
+  return m > 0 ? (m === 12 ? '1 an' : m + ' mois') : '';
+}
 function champsDevisCh(c) {
-  var v = C.nb(c.validiteDevis);
+  var mois = C.nb(c.validiteJours) > 0 ? '' : moisDe(c);
   return '<div class="grille g2" style="margin-top:9px">' +
     '<div class="champ"><label class="eyebrow" for="ce-datedevis">Édité le</label>' +
     '<input type="date" id="ce-datedevis" value="' + versChamp(c.dateDevis) + '"></div>' +
-    '<div class="champ"><label class="eyebrow" for="ce-validite">Validité</label>' +
-    '<select id="ce-validite"><option value="">—</option>' +
-    VALIDITES_DEVIS.map(function (x) {
-      return '<option value="' + x.m + '"' + (v === x.m ? ' selected' : '') + '>' + x.n + '</option>';
-    }).join('') + '</select></div></div>' +
+    '<div class="champ"><label class="eyebrow" for="ce-validite">Validité (jours)</label>' +
+    '<input type="text" id="ce-validite" inputmode="numeric" autocomplete="off" value="' +
+    esc(String(validiteJoursDe(c))) + '"' + (mois ? ' placeholder="' + esc(mois) + '" data-mois="' +
+    C.nb(c.validiteDevis) + '"' : ' placeholder="' + C.joursValiditeDefaut(A.cfg) + '"') + '></div></div>' +
     champNumero('D', 'ce-numdevis', c.numeroDevis, 'N° du devis') +
     '<p class="muted" id="ce-validite-fin" style="font-size:12px;margin:7px 0 0"></p>' +
     /* Il l'a demandée expressément : la signature est ce qui fait basculer le
@@ -12910,12 +12989,19 @@ function optionsStatutCh(statut, avecDevis) {
       esc(C.nomStatut(s.c, vu)) + '</option>';
   }).join('');
 }
+/* La date de fin sous la case. Vide, la case laisse parler les mois d'un
+   ancien devis, sinon la validité par défaut des réglages. */
 function majFinValidite() {
   var z = $('#ce-validite-fin'); if (!z) return;
-  var fin = C.finValiditeDevis({ aDevis: true,
-    dateDevis: versDate($('#ce-datedevis').value),
-    validiteDevis: C.nb($('#ce-validite').value) });
-  z.textContent = fin ? 'Valable jusqu’au ' + dateCourte(fin) + '.' : '';
+  var champ = $('#ce-validite'), jv = C.nb(champ.value);
+  var mois = jv > 0 ? 0 : C.nb(champ.dataset.mois);
+  var vu = { aDevis: true, dateDevis: versDate($('#ce-datedevis').value),
+    validiteJours: jv > 0 ? jv : null, validiteDevis: mois || null };
+  var fin = C.echeanceDevis(vu, A.cfg);
+  if (!fin) { z.textContent = ''; return; }
+  var duree = jv > 0 ? jv + ' jour' + (jv > 1 ? 's' : '') : mois ? moisDe(vu)
+    : C.joursValiditeDefaut(A.cfg) + ' jours (réglage)';
+  z.textContent = 'Valable ' + duree + ', jusqu’au ' + dateCourte(fin) + '.';
 }
 /* Statut et champs du devis suivent la case, à chaque bascule. Un chantier
    posé à « devis envoyé » puis déclaré sans devis passe à l'étape d'après :
@@ -13366,7 +13452,7 @@ function ouvrirDevisCh(id, cocher) {
   };
   $('#dv-a').addEventListener('change', maj);
   ['#ce-datedevis', '#ce-validite'].forEach(function (x) {
-    if ($(x)) $(x).addEventListener('change', majFinValidite);
+    if ($(x)) { $(x).addEventListener('change', majFinValidite); $(x).addEventListener('input', majFinValidite); }
   });
   brancherNumero('D', 'ce-numdevis', c.id);
   maj();
@@ -13377,7 +13463,10 @@ function ouvrirDevisCh(id, cocher) {
       numeroDevis: coche ? lireNumero('D', 'ce-numdevis') : '',
       dateDevis: coche ? versDate($('#ce-datedevis').value) : null,
       dateSignature: signe,
-      validiteDevis: coche ? (C.nb($('#ce-validite').value) || null) : null };
+      validiteJours: coche ? (Math.round(C.nb($('#ce-validite').value)) || null) : null,
+      /* Les mois d'un ancien devis restent en base, lus tant qu'aucun jour
+         n'est tapé : ils ne partent qu'avec le devis lui-même. */
+      validiteDevis: coche ? (c.validiteDevis || null) : null };
     /* Sans devis, les deux premières étapes n'existent plus : on avance le
        chantier à celle où il en est réellement. */
     if (!coche && (c.statut === 'devis' || c.statut === 'envoye')) champs.statut = 'accepte';
@@ -14526,6 +14615,26 @@ function journeesDOffice() {
   if (!A.cfg.officeDepuis) { A.cfg.officeDepuis = Date.now(); sauverCfg(); }
   return C.joursDOffice(A.chantiers, A.journees, absences(), A.cfg, Date.now());
 }
+/* Les jours en pointillés passés qui attendent qu'il dise ce qu'il en fut. */
+function journeesEnPointilles() {
+  journeesDOffice();
+  return C.joursEnPointilles(A.chantiers, A.journees, absences(), A.cfg, Date.now());
+}
+/* « J'y ai travaillé » sur un jour en pointillés (lot r1b) : une marque sur
+   la pose, et le jour compte comme une journée d'office — calculée, jamais
+   écrite. Il vient de le dire : pas de ○. */
+function reconnaitreJour(c, ts) {
+  var k = C.jourCle(ts);
+  c.jours = (c.jours || []).map(function (j) {
+    if (jourDePose(j) !== k) return j;
+    var o = typeof j === 'object' ? Object.assign({}, j) : { d: C.minuit(j), p: 1 };
+    o.fait = true; o.vu = true;
+    return o;
+  });
+  c.maj = Date.now();
+  indexerJournees();
+  return sauverChantiers();
+}
 /* Le jour d'une pose, quel que soit son format (l'ancien : une date nue). */
 function tsPose(j) { return C.minuit(j && typeof j === 'object' ? j.d : j); }
 function jourDePose(j) { return C.jourCle(tsPose(j)); }
@@ -14562,22 +14671,26 @@ function retirerJoursOffice(ts, office) {
     return sauverChantiers();
   });
 }
-/* Le ○ s'efface quand il a ouvert la fiche du jour : il l'a vu. La marque est
-   portée par la pose elle-même. */
-function marquerOfficeVu(ts, office) {
-  var k = C.jourCle(ts), n = 0;
-  office.forEach(function (r) {
-    if (r.temps.vu) return;
-    var c = r.chantier;
+/* Le ○ s'efface quand il a ouvert la fiche du jour, ou fermé la bulle
+   d'Aujourd'hui qui la montrait : il l'a vu. La marque est portée par la
+   pose elle-même. « liste » : des { chantier, d }. */
+function marquerPosesVues(liste) {
+  var n = 0;
+  liste.forEach(function (r) {
+    var k = C.jourCle(r.d), c = r.chantier;
     c.jours = (c.jours || []).map(function (j) {
-      if (jourDePose(j) !== k) return j;
+      if (jourDePose(j) !== k || (typeof j === 'object' && j.vu)) return j;
       n++;
       return typeof j === 'object' ? Object.assign({}, j, { vu: true }) : { d: C.minuit(j), p: 1, vu: true };
     });
   });
-  if (!n) return;
+  if (!n) return Promise.resolve(false);
   indexerJournees();
-  sauverChantiers().then(function () { renderCalendrier(); renderAujourdhui(); renderFiche(); });
+  return sauverChantiers().then(function () { renderCalendrier(); renderAujourdhui(); renderFiche(); return true; });
+}
+function marquerOfficeVu(ts, office) {
+  marquerPosesVues(office.filter(function (r) { return !r.temps.vu; })
+    .map(function (r) { return { chantier: r.chantier, d: ts }; }));
 }
 
 /* « jeudi 29 octobre » : le jour tel qu'on le dit. */
@@ -14607,10 +14720,14 @@ function ouvrirFicheJour(ts) {
   var office = o.reels.filter(function (r) { return r.temps.office; });
   var vrais = o.reels.filter(function (r) { return !r.temps.office; });
   /* Un jour posé resté dans le passé sans rien compter : d'avant la 4.92, ou
-     posé sur un devis pas signé. Pâle, sans relance ; il se règle à la main. */
+     posé sur un devis pas signé. Pâle ; d'avant la 4.92, il se règle à la
+     main ; depuis, sur un devis pas signé, il attend qu'on dise ce qu'il en
+     fut (lot r1b). */
   var pale = ts < auj && (st === 'confirme' || st === 'prevu');
+  var pointilles = journeesEnPointilles().filter(function (x) { return x.d === ts; });
   var aide = office.length && !vrais.length ? 'journée comptée d’office'
-    : pale && st === 'confirme' ? 'posé avant la mise à jour : il ne compte pas, à régler à la main'
+    : pointilles.length ? 'devis pas signé : il ne compte pas tant que vous ne le dites pas'
+    : pale ? 'posé avant la mise à jour : il ne compte pas, à régler à la main'
     : trouveAide(st);
 
   var h = '<div class="fj-etat st-' + st + (pale ? ' passe' : '') + '"><span class="fj-pt"></span>' +
@@ -14626,21 +14743,34 @@ function ouvrirFicheJour(ts) {
       '<div class="btn-rang"><button class="btn primaire btn-min" id="fj-preciser">Préciser ma journée</button>' +
       '<button class="btn btn-min" id="fj-nonla">Je n’y étais pas</button></div></div>';
   }
-  if (vrais.length) {
+  if (pointilles.length) {
+    h += '<div class="fj-office fj-pointilles" id="fj-pointilles"><p><b>Posé, devis pas signé.</b> ' +
+      'Ce jour ne compte pas tant que vous ne le dites pas.</p>' +
+      pointilles.map(function (x) {
+        return '<div class="fj-pl"><span>' + esc(C.nomChantier(x.chantier) + ' · ' + partEnMots(x.p)) + '</span>' +
+          '<div class="btn-rang"><button class="btn primaire btn-min" data-fjytrav="' + esc(x.chantier.id) + '">' +
+          'J’y ai travaillé</button><button class="btn btn-min" data-fjpasla="' + esc(x.chantier.id) + '">' +
+          'Je n’y étais pas</button></div></div>';
+      }).join('') + '</div>';
+  }
+  /* Une ligne par chantier ce jour-là (lot r1b) : « une seule ligne pour me
+     dire là où j'ai été ». Une journée à deux prestations en donnait trois —
+     une par prestation, une pour le hors production. */
+  var parCh = parChantierDuJour(vrais);
+  if (parCh.length) {
     h += '<p class="fj-sous">Ce que vous y avez fait</p>' +
-      vrais.map(function (r) {
-        var txt = '<b>' + esc(C.nomChantier(r.chantier)) + '</b><small>' +
-          C.ditDuree(C.heuresSaisie(r.temps, A.cfg), A.cfg) +
-          (C.nb(r.temps.personnes) > 1 ? ' × ' + C.nb(r.temps.personnes) + ' pers.' : '') +
-          (r.temps.activite ? ' · ' + esc(C.nomTravail(r.temps.activite)) : '') + '</small>';
-        /* Un appui sur la ligne rouvre la journée qui porte ce temps. */
-        return '<div class="liste-item">' +
-          (r.temps.jrn
-            ? '<button type="button" class="li-c fj-txt" data-fjmj="' + esc(r.temps.jrn) + '">' + txt + '</button>'
+      parCh.map(function (x) {
+        var txt = '<b>' + esc(C.nomChantier(x.chantier)) + '</b><small>' +
+          C.ditDuree(x.heures, A.cfg) + (x.personnes > 1 ? ' × ' + x.personnes + ' pers.' : '') + '</small>' +
+          (x.prestations.length ? '<small class="fj-presta">' + esc(x.prestations.join(', ')) + '</small>' : '');
+        /* Un appui rouvre la journée de ce chantier ; s'il y en a plusieurs ce
+           jour-là, la première. */
+        return '<div class="liste-item" data-fjch="' + esc(x.chantier.id) + '">' +
+          (x.jrn.length
+            ? '<button type="button" class="li-c fj-txt" data-fjmj="' + esc(x.jrn[0]) + '">' + txt + '</button>'
             : '<div class="li-c">' + txt + '</div>') +
-          '<button class="btn-min" data-fjouvrir="' + r.chantier.id + '">Fiche</button>' +
-          '<button class="btn-min" data-fjsup="' + r.chantier.id + '_' +
-          (r.chantier.temps || []).indexOf(r.temps) + '" aria-label="Retirer ce temps">✕</button>' +
+          '<button class="btn-min" data-fjouvrir="' + x.chantier.id + '">Fiche</button>' +
+          '<button class="btn-min" data-fjsupch="' + x.chantier.id + '" aria-label="Retirer la journée de ce chantier">✕</button>' +
           '</div>';
       }).join('');
   }
@@ -14766,20 +14896,69 @@ function ouvrirFicheJour(ts) {
       sauverChantiers().then(function () { refaire('Chantier retiré de ce jour.'); });
       return;
     }
-    var sup = e.target.closest('[data-fjsup]');
-    if (sup) {
-      var p = sup.dataset.fjsup.split('_');
-      var c2 = chantier(p[0]); if (!c2) return;
-      var t2 = (c2.temps || [])[Number(p[1])];
-      if (!t2) return;
-      if (!retirerSaisie(t2)) { toast('Cette saisie ne se retire pas d’ici.'); return; }
-      indexerJournees();
-      c2.maj = Date.now();
-      Promise.all([sauverJournees(), sauverChantiers()]).then(function () {
-        refaire('Temps retiré.');
+    var yt = e.target.closest('[data-fjytrav]');
+    if (yt) {
+      var c3 = chantier(yt.dataset.fjytrav); if (!c3) return;
+      var part = (pointilles.filter(function (x) { return x.chantier.id === c3.id; })[0] || {}).heures;
+      reconnaitreJour(c3, ts).then(function () {
+        refaire('Compté : ' + E.fmt(part || 0, (part || 0) % 1 ? 1 : 0) + ' h sur ' + C.nomChantier(c3) + '.');
       });
+      return;
+    }
+    var pl = e.target.closest('[data-fjpasla]');
+    if (pl) {
+      var c4 = chantier(pl.dataset.fjpasla); if (!c4) return;
+      retirerJoursOffice(ts, [{ chantier: c4 }]).then(function () {
+        refaire('Jour retiré — il est dans la Corbeille.');
+      });
+      return;
+    }
+    var sup = e.target.closest('[data-fjsupch]');
+    if (sup) {
+      var x = parCh.filter(function (y) { return y.chantier.id === sup.dataset.fjsupch; })[0];
+      if (!x) return;
+      /* Une vieille saisie qui ne vient d'aucune journée ne se retire pas
+         d'ici, comme avant. */
+      if (!x.jrn.length) { toast('Cette saisie ne se retire pas d’ici.'); return; }
+      if (!confirm('Retirer la journée « ' + C.nomChantier(x.chantier) + ' » de ce jour ?\n\nElle restera ' +
+        'récupérable ' + B.JOURS_POUBELLE + ' jours dans ' + B.CHEMIN_CORBEILLE + '.')) return;
+      retirerJourneesDe(x.jrn).then(function () { refaire('Journée mise à la corbeille.'); });
     }
   });
+}
+/* Les saisies d'un jour, rangées par chantier : durée totale, personnes,
+   prestations en clair, et les journées qui les portent. */
+function parChantierDuJour(reels) {
+  var par = {}, ordre = [];
+  reels.forEach(function (r) {
+    var id = r.chantier.id;
+    if (!par[id]) { par[id] = { chantier: r.chantier, heures: 0, personnes: 1, prestations: [], jrn: [] }; ordre.push(id); }
+    var x = par[id];
+    x.heures = C.arr(x.heures + C.heuresSaisie(r.temps, A.cfg), 2);
+    x.personnes = Math.max(x.personnes, C.nb(r.temps.personnes) || 1);
+    var n = r.temps.activite ? C.nomTravail(r.temps.activite) : '';
+    if (n && x.prestations.indexOf(n) < 0) x.prestations.push(n);
+    if (r.temps.jrn && x.jrn.indexOf(r.temps.jrn) < 0) x.jrn.push(r.temps.jrn);
+  });
+  return ordre.map(function (id) { return par[id]; });
+}
+/* Retirer une journée entière, vers la Corbeille, d'où elle revient. */
+function retirerJourneesDe(ids) {
+  var l = (A.journees || []).filter(function (j) { return ids.indexOf(j.id) >= 0; });
+  A.journees = (A.journees || []).filter(function (j) { return ids.indexOf(j.id) < 0; });
+  return Promise.all(l.map(function (j) {
+    var c = j.chantier ? chantier(j.chantier) : null;
+    return jeterObjet('journee', j, dateCourte(j.date) + ' — ' + (c ? C.nomChantier(c) : (j.lieu || 'sans chantier')),
+      E.fmt(C.heuresJournee(j), 1) + ' h');
+  })).then(function () {
+    indexerJournees();
+    return Promise.all([sauverJournees(), sauverChantiers()]);
+  });
+}
+/* « journée », « demi-journée », sinon la durée. */
+function partEnMots(p) {
+  p = C.nb(p) || 1;
+  return p === 1 ? 'journée' : p === 0.5 ? 'demi-journée' : C.ditDuree(p * C.HEURES_JOUR(A.cfg), A.cfg);
 }
 function trouveAide(st) {
   for (var i = 0; i < C.STATUTS_JOUR.length; i++) {
@@ -14871,7 +15050,6 @@ function ouvrirAbsence(ts) {
    étape, comme Aujourd'hui. Puis le statut du jour, proposé d'après le
    chantier et modifiable (G3) : à venir, posé ou posé sur un devis pas
    signé ; passé, il a eu lieu — une journée faite, entière ou demie. */
-var ETAPES_EN_COURS = ['Infos et repérage', 'Devis', 'Travaux', 'Facture', 'Paiement'];
 function chantiersAPoser() {
   return (A.chantiers || []).filter(function (c) { return C.statutOuvert(c.statut); })
     .sort(function (a, b) {
@@ -14888,7 +15066,7 @@ function ouvrirPoserChantier(ts) {
   var et = -1, liste = '';
   l.forEach(function (c) {
     var e = C.etapeChantier(c);
-    if (e !== et) { et = e; liste += '<p class="pj-etape">' + esc(ETAPES_EN_COURS[e] || '') + '</p>'; }
+    if (e !== et) { et = e; liste += '<p class="pj-etape">' + esc(NOMS_ETAPES[e] || '') + '</p>'; }
     liste += '<button type="button" class="pj-ch" data-pjch="' + esc(c.id) + '" aria-pressed="false">' +
       '<b>' + esc(C.nomChantier(c)) + '</b>' + pointsEtape(c) +
       '<small>' + esc([c.donneur, C.nomStatut(c.statut, c)].filter(Boolean).join(' · ')) + '</small></button>';
@@ -16444,7 +16622,9 @@ function renderReglagesAlertes() {
   if ($('#r-cfeca')) $('#r-cfeca').value = (A.cfg && A.cfg.cfeCaRef) || '';
   if ($('#r-l100')) $('#r-l100').value = (A.cfg && A.cfg.litres100) || 9;
   if ($('#r-pl')) $('#r-pl').value = (A.cfg && A.cfg.prixLitre) || 1.75;
-  if ($('#r-rd')) $('#r-rd').value = (A.cfg && A.cfg.joursRelanceDevis) || 21;
+  /* La validité par défaut (lot r1b) remplace le délai de relance :
+     `joursRelanceDevis` reste dans la configuration, plus lu. */
+  if ($('#r-rd')) $('#r-rd').value = C.joursValiditeDefaut(A.cfg);
   if ($('#r-rf')) $('#r-rf').value = (A.cfg && A.cfg.joursRelanceFacture) || 45;
   if ($('#r-we')) $('#r-we').checked = !!(A.cfg && A.cfg.weekends);
 }
@@ -16474,7 +16654,7 @@ function brancherReglagesAlertes() {
   if (rd) rd.addEventListener('change', function () {
     var v = C.nb(this.value);
     if (v < 1 || v > 365) { toast('Entre 1 et 365 jours.'); renderReglagesAlertes(); return; }
-    A.cfg.joursRelanceDevis = v; sauverCfg(); renderCarnet();
+    A.cfg.joursValiditeDevis = Math.round(v); sauverCfg(); renderCarnet();
   });
   var rf = $('#r-rf');
   if (rf) rf.addEventListener('change', function () {
@@ -16530,12 +16710,15 @@ function ilYa(ts) {
 function masquee(cle) {
   return !!(A.masques && A.masques[cle] === C.jourCle(Date.now()));
 }
-function masquer(cle) {
+function noterMasque(cle) {
   var auj = C.jourCle(Date.now()), garde = {};
   Object.keys(A.masques || {}).forEach(function (k) { if (A.masques[k] === auj) garde[k] = auj; });
   garde[cle] = auj;
   A.masques = garde;
   ecrire('bordcub.masques', A.masques);
+}
+function masquer(cle) {
+  noterMasque(cle);
   renderAujourdhui();
 }
 
@@ -16590,12 +16773,13 @@ function ligneSaisie() {
 
 /* En retard (A3) : trois choses, dans cet ordre. Les factures échues d'abord
    (« le plus important »), puis les chantiers terminés pas facturés, puis
-   les devis sans réponse à une semaine de la fin de leur validité, ou au-delà
-   (sans validité, le délai de relance des réglages). Le reste est parti : les
-   jours à trancher n'existent plus (la journée d'office les remplace), le
-   chantier aux jours passés se dit sur sa ligne, et la sauvegarde, le stock
-   et le véhicule sont dans « Autres rappels ». */
-var TYPES_EN_RETARD = ['impaye', 'afacturer', 'devis'];
+   les devis sans réponse arrivés à la fin de leur validité, le jour même et
+   après (lot r1b ; sans validité saisie, celle des réglages). La liste des
+   types est partagée avec « À faire maintenant » de la liste Chantiers
+   (C.TYPES_EN_RETARD). Le reste est parti : les jours à trancher n'existent
+   plus (la journée d'office les remplace), le chantier aux jours passés se
+   dit sur sa ligne, et la sauvegarde, le stock et le véhicule sont dans
+   « Autres rappels ». */
 function lignesRetard() {
   var now = Date.now(), l = [];
   var al = C.alertes(A.chantiers, A.cfg, now);
@@ -16738,7 +16922,8 @@ function motCalendrier(c, now) {
   }
   return C.enRetard(c, now) ? 'plus de jour posé' : '';
 }
-var ETAPES_AUJ = ['Infos et repérage', 'Devis', 'Travaux', 'Facture', 'Paiement'];
+/* Les intertitres d'étape, ici et dans « Poser un chantier » de l'Agenda. */
+var NOMS_ETAPES = ['Infos et repérage', 'Devis', 'Travaux', 'Facture', 'Paiement'];
 function chantiersEnCours() {
   return C.filtre(A.chantiers, 'ouverts').slice().sort(function (a, b) {
     return C.etapeChantier(a) - C.etapeChantier(b) || entreeEtape(a) - entreeEtape(b);
@@ -16749,12 +16934,12 @@ function lignesEnCours() {
   /* Ce qui est en retard se dit en rouge sur sa ligne aussi. */
   var enRetard = {};
   C.alertes(A.chantiers, A.cfg, now).forEach(function (a) {
-    if (TYPES_EN_RETARD.indexOf(a.type) >= 0) enRetard[a.chantier.id] = 1;
+    if (C.TYPES_EN_RETARD.indexOf(a.type) >= 0) enRetard[a.chantier.id] = 1;
   });
   var h = '';
   chantiersEnCours().forEach(function (c) {
     var e = C.etapeChantier(c);
-    if (e !== et) { et = e; h += '<p class="aj-etape" data-etape="' + e + '">' + esc(ETAPES_AUJ[e] || '') + '</p>'; }
+    if (e !== et) { et = e; h += '<p class="aj-etape" data-etape="' + e + '">' + esc(NOMS_ETAPES[e] || '') + '</p>'; }
     var s = situationChantier(c, now, true), m = C.montant(c), mot = motCalendrier(c, now);
     var ton = enRetard[c.id] ? 'alerte' : s.ton;
     h += '<button type="button" class="aj-ch" data-ajouvre="fiche:' + esc(c.id) + '" data-ajch="' + esc(c.id) + '">' +
@@ -16840,6 +17025,116 @@ function renderAujourdhui() {
       '<summary>Autres rappels (' + au.length + ')' + picto('chevron') + '</summary>' +
       '<div class="aj-zone">' + au.map(ligneAuj).join('') + '</div></details>' : '');
   renderNotes();
+}
+
+/* ------------------------------------------------- la bulle d'information
+   Lot r1b. « Pas de bouton à presser chaque soir », mais savoir quand Sylve
+   a compté une journée pour lui, avec de quoi la corriger d'un geste. Elle
+   s'ouvre quand Aujourd'hui s'affiche et qu'il y a du neuf : une journée
+   d'office pas encore vue, ou un jour en pointillés passé pas encore réglé
+   (celui-là revient le lendemain s'il le laisse, pas avant — même masque
+   que le × des lignes). Rien de neuf, pas de bulle. */
+var BULLE_AUJ_MAX = 6;
+var CLE_BULLE_POINTILLES = 'bulle:pointilles';
+function contenuBulleAuj() {
+  var office = journeesDOffice().filter(function (o) { return !o.vu; });
+  var pointilles = masquee(CLE_BULLE_POINTILLES) ? [] : journeesEnPointilles();
+  return { office: office, pointilles: pointilles };
+}
+function montrerBulleAuj() {
+  if ($('#aj-bulle') || !$('#modale').hidden) return;
+  var x = contenuBulleAuj();
+  if (!x.office.length && !x.pointilles.length) return;
+  var fond = document.createElement('div');
+  fond.id = 'aj-bulle-fond'; fond.className = 'aj-bulle-fond';
+  var b = document.createElement('div');
+  b.id = 'aj-bulle'; b.className = 'aj-bulle';
+  b.setAttribute('role', 'dialog'); b.setAttribute('aria-modal', 'true'); b.setAttribute('aria-labelledby', 'ajb-titre');
+  document.body.appendChild(fond);
+  document.body.appendChild(b);
+  /* Sur Aujourd'hui, le retour du téléphone sortirait de Sylve : un cran
+     de plus, que la bulle consomme en se fermant. */
+  empilerCran(); A.crans = (A.crans || 0) + 1;
+  A.bulleAuj = { office: [], pointilles: false };
+  dessinerBulleAuj(x);
+  b.addEventListener('click', function (e) {
+    if (e.target.closest('#ajb-ok')) { fermerBulleAuj(); return; }
+    var v = e.target.closest('[data-ajbvoir]');
+    if (v) { var ts = Number(v.dataset.ajbvoir); fermerBulleAuj(); ouvrirFicheJour(ts); return; }
+    if (e.target.closest('#ajb-agenda')) { fermerBulleAuj(); allerModule('calendrier', 'calendrier'); return; }
+    var y = e.target.closest('[data-ajbytrav]'), n = e.target.closest('[data-ajbpasla]');
+    if (!y && !n) return;
+    var p = (y || n).dataset[y ? 'ajbytrav' : 'ajbpasla'].split('|');
+    var c = chantier(p[0]), ts2 = Number(p[1]); if (!c) return;
+    (y ? reconnaitreJour(c, ts2) : retirerJoursOffice(ts2, [{ chantier: c }])).then(function () {
+      renderCalendrier(); renderAujourdhui(); renderCarnet(); renderFiche();
+      toast(y ? 'Compté : ' + C.nomChantier(c) + ', ' + jourCourt(ts2) + '.'
+        : 'Jour retiré — il est dans la Corbeille.');
+      if (!$('#aj-bulle') || !A.bulleAuj) return;
+      var reste = contenuBulleAuj();
+      /* Ce qui a déjà été montré d'office reste dans la bulle tant qu'elle
+         est ouverte : il n'est vu qu'au OK. */
+      reste.office = journeesDOffice().filter(function (o) {
+        return !o.vu || A.bulleAuj.office.some(function (r) { return r.chantier.id === o.chantier.id && r.d === o.d; });
+      });
+      if (!reste.office.length && !reste.pointilles.length) fermerBulleAuj();
+      else dessinerBulleAuj(reste);
+    });
+  });
+}
+function dessinerBulleAuj(x) {
+  var b = $('#aj-bulle'); if (!b) return;
+  var h1 = function (h) { return E.fmt(C.arr(h, 1), h % 1 ? 1 : 0) + ' h'; };
+  var place = BULLE_AUJ_MAX;
+  var office = x.office.slice(0, place); place -= office.length;
+  var pointilles = x.pointilles.slice(0, Math.max(0, place));
+  var autres = x.office.length + x.pointilles.length - office.length - pointilles.length;
+  A.bulleAuj.office = office;
+  if (pointilles.length) A.bulleAuj.pointilles = true;
+  var h = '<h2 id="ajb-titre">Sylve a compté pour vous</h2><div class="ajb-corps">';
+  if (office.length) {
+    h += '<p class="ajb-sous">Comptées d’office</p>' +
+      '<p class="ajb-aide">Le jour était posé, rien n’a été saisi : Sylve l’a compté.</p>' +
+      office.map(function (o) {
+        return '<div class="ajb-l" data-ajboffice="' + esc(o.chantier.id + '|' + o.d) + '">' +
+          '<span>' + esc(jourCourt(o.d) + ' · ' + C.nomChantier(o.chantier) + ' · ' + h1(o.heures)) + '</span>' +
+          '<button type="button" class="btn btn-min" data-ajbvoir="' + o.d + '">Voir</button></div>';
+      }).join('');
+  }
+  if (pointilles.length) {
+    h += '<p class="ajb-sous">Posés, devis pas signé</p>' +
+      '<p class="ajb-aide">Le devis n’était pas signé : ces jours ne comptent pas tant que vous ne le dites pas.</p>' +
+      pointilles.map(function (p) {
+        var cle = esc(p.chantier.id + '|' + p.d);
+        return '<div class="ajb-l ajb-p" data-ajbpointille="' + cle + '">' +
+          '<span>' + esc(jourCourt(p.d) + ' · ' + C.nomChantier(p.chantier) + ' · ' + partEnMots(p.p)) + '</span>' +
+          '<span class="ajb-btns"><button type="button" class="btn primaire btn-min" data-ajbytrav="' + cle + '">' +
+          'J’y ai travaillé</button><button type="button" class="btn btn-min" data-ajbpasla="' + cle + '">' +
+          'Je n’y étais pas</button></span></div>';
+      }).join('');
+  }
+  if (autres > 0) {
+    h += '<button type="button" class="aj-lien" id="ajb-agenda">et ' + autres + ' autre' + (autres > 1 ? 's' : '') +
+      ' · Voir l’Agenda' + picto('chevron') + '</button>';
+  }
+  h += '</div><div class="btn-rang"><button type="button" class="btn primaire plein" id="ajb-ok">OK</button></div>';
+  b.innerHTML = h;
+}
+/* OK, le retour du téléphone, « Voir » : les journées d'office montrées
+   passent vues (leur ○ s'en va), et les jours en pointillés laissés tels
+   quels ne reviennent que demain. */
+function fermerBulleAuj() {
+  if (!$('#aj-bulle')) return;
+  var vus = (A.bulleAuj && A.bulleAuj.office) || [];
+  if (A.bulleAuj && A.bulleAuj.pointilles) noterMasque(CLE_BULLE_POINTILLES);
+  oterBulleAuj();
+  marquerPosesVues(vus.filter(function (o) { return !o.vu; }));
+}
+function oterBulleAuj() {
+  ['#aj-bulle', '#aj-bulle-fond'].forEach(function (s) {
+    var e = $(s); if (e && e.parentNode) e.parentNode.removeChild(e);
+  });
+  A.bulleAuj = null;
 }
 
 /* Où mène chaque ligne. */
@@ -21966,7 +22261,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.92.0-20261104-2100';
+var VERSION = '4.93.0-20261105-2100';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

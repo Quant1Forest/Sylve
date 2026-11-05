@@ -151,12 +151,25 @@ function statutsPossibles(ch) {
   var avec = aDevis(ch);
   return STATUTS.filter(function (s) { return avec || !s.devisSeul; });
 }
-/* Fin de validité : la date d'édition plus la durée choisie. Le jour est
-   conservé, sauf s'il n'existe pas dans le mois d'arrivée — un devis édité
-   un 31 janvier et valable un mois court jusqu'au 28 février, pas au 3 mars.
-   Rien n'est déduit quand l'une des deux données manque. */
+/* Fin de validité (lot r1b) : la validité se dit en jours, `validiteJours`,
+   comptés depuis l'édition — à défaut l'envoi, seule date qu'un devis repris
+   porte parfois. Les devis d'avant gardent leurs mois (`validiteDevis`),
+   relus tels quels tant qu'on n'a pas tapé de jours : leur date de fin ne
+   bouge pas.
+   En mois, le jour est conservé, sauf s'il n'existe pas dans le mois
+   d'arrivée — un devis édité un 31 janvier et valable un mois court jusqu'au
+   28 février, pas au 3 mars. Rien n'est déduit quand une donnée manque. */
+var VALIDITE_DEVIS_DEFAUT = 30;
+function joursValiditeDefaut(cfg) { return nb(cfg && cfg.joursValiditeDevis) || VALIDITE_DEVIS_DEFAUT; }
+function dateDepartDevis(ch) { return nb(ch && ch.dateDevis) || nb(ch && ch.dateEnvoi) || 0; }
 function finValiditeDevis(ch) {
-  if (!aDevis(ch) || !ch || !ch.dateDevis) return null;
+  if (!aDevis(ch) || !ch) return null;
+  var jv = nb(ch.validiteJours);
+  if (jv > 0) {
+    var dep = dateDepartDevis(ch);
+    return dep ? ajouteJours(dep, jv) : null;
+  }
+  if (!ch.dateDevis) return null;
   var m = nb(ch.validiteDevis);
   if (!(m > 0)) return null;
   var d = new Date(ch.dateDevis), jour = d.getDate();
@@ -165,6 +178,16 @@ function finValiditeDevis(ch) {
   var dernier = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
   d.setDate(Math.min(jour, dernier));
   return minuit(d.getTime());
+}
+/* L'échéance qui fait entrer un devis sans réponse dans En retard : sa fin
+   de validité, ou, s'il n'en porte pas, la validité par défaut des réglages
+   comptée de la même date de départ. */
+function echeanceDevis(ch, cfg) {
+  var f = finValiditeDevis(ch);
+  if (f != null) return f;
+  if (!aDevis(ch)) return null;
+  var dep = dateDepartDevis(ch);
+  return dep ? ajouteJours(dep, joursValiditeDefaut(cfg)) : null;
 }
 
 function trouve(liste, code) {
@@ -698,26 +721,9 @@ function dureePrevue(ch) {
    le chantier n'est pas clos. Les journées placées font foi si elles existent. */
 /* En retard : l'échéance est passée, ou la dernière journée placée l'est
    sans que le chantier soit clos. */
-/* Une journée posée sur une date passée, sans qu'aucun temps n'y soit noté :
-   on y était, on ne sait pas combien de temps ça a pris. « Sinon je me dis
-   ok, je le ferai plus tard, et après je ne le fais pas et j'oublie. » Sans
-   ce rattrapage, les rendements se vident en silence et le chantier finit
-   par s'annoncer « en retard » sans qu'on sache pourquoi. */
-function journeesANoter(chantiers, maintenant) {
-  var m = minuit(maintenant), out = [];
-  (chantiers || []).forEach(function (ch) {
-    if (['sansuite', 'devis', 'envoye'].indexOf(ch.statut) >= 0) return;
-    var notes = {};
-    (ch.temps || []).forEach(function (t) { if (t.date) notes[jourCle(t.date)] = 1; });
-    journeesPlacees(ch).forEach(function (j) {
-      /* Le jour même n'est pas fini : on ne réclame rien avant demain. */
-      if (j.d >= m) return;
-      if (notes[jourCle(j.d)]) return;
-      out.push({ chantier: ch, d: j.d, p: nb(j.p) });
-    });
-  });
-  return out.sort(function (a, b) { return a.d - b.d; });
-}
+/* « En retard » ne relance plus (lot r1b) : un chantier aux jours tous
+   passés reste dans En travaux. Le fait se lit encore sur la ligne
+   d'Aujourd'hui (« plus de jour posé »), dans la fiche et dans les cumuls. */
 function enRetard(ch, maintenant) {
   if (!ch) return false;
   if (['termine', 'facture', 'paye', 'sansuite'].indexOf(ch.statut) >= 0) return false;

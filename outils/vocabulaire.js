@@ -38,7 +38,9 @@ module.exports = {
     'numeroFacture', 'dateFacture', 'echeancePaiement', 'datePaiement',
     'moyenPaiement', 'dateFin', 'debut',
     /* Lot b1 : le repérage (C2), accordé le 01/11 — trois cases facultatives. */
-    'dateReperage', 'vuReperage', 'surface'],
+    'dateReperage', 'vuReperage', 'surface',
+    /* Lot r1b : la validité du devis en jours (ouvrirDevisCh). */
+    'validiteJours'],
 
   /* ouvrirCharge : var maj = { libelle, beneficiaire, ttc, periodicite,
      debut, jour, moisReference, taux, categorie, dansDepenses, arretee, maj }.

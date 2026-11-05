@@ -231,7 +231,9 @@ function renderReglagesAlertes() {
   if ($('#r-cfeca')) $('#r-cfeca').value = (A.cfg && A.cfg.cfeCaRef) || '';
   if ($('#r-l100')) $('#r-l100').value = (A.cfg && A.cfg.litres100) || 9;
   if ($('#r-pl')) $('#r-pl').value = (A.cfg && A.cfg.prixLitre) || 1.75;
-  if ($('#r-rd')) $('#r-rd').value = (A.cfg && A.cfg.joursRelanceDevis) || 21;
+  /* La validité par défaut (lot r1b) remplace le délai de relance :
+     `joursRelanceDevis` reste dans la configuration, plus lu. */
+  if ($('#r-rd')) $('#r-rd').value = C.joursValiditeDefaut(A.cfg);
   if ($('#r-rf')) $('#r-rf').value = (A.cfg && A.cfg.joursRelanceFacture) || 45;
   if ($('#r-we')) $('#r-we').checked = !!(A.cfg && A.cfg.weekends);
 }
@@ -261,7 +263,7 @@ function brancherReglagesAlertes() {
   if (rd) rd.addEventListener('change', function () {
     var v = C.nb(this.value);
     if (v < 1 || v > 365) { toast('Entre 1 et 365 jours.'); renderReglagesAlertes(); return; }
-    A.cfg.joursRelanceDevis = v; sauverCfg(); renderCarnet();
+    A.cfg.joursValiditeDevis = Math.round(v); sauverCfg(); renderCarnet();
   });
   var rf = $('#r-rf');
   if (rf) rf.addEventListener('change', function () {

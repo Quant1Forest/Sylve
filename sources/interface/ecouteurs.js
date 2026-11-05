@@ -82,8 +82,11 @@ function aller(v) {
   if (v === 'coutsv') renderCoutsV();
   if (v === 'notes') renderNotes();
   if (v !== 'calendrier') fermerBulleJour();
+  if (v !== 'accueil') oterBulleAuj();
   majCadre();
   try { if (window.scrollY || window.pageYOffset) window.scrollTo(0, 0); } catch (e) { }
+  /* Aujourd'hui qui s'affiche dit ce que Sylve a compté pour lui (lot r1b). */
+  if (v === 'accueil') montrerBulleAuj();
 }
 
 /* ============================================================ ECOUTEURS */
@@ -355,7 +358,7 @@ function brancher() {
        la main, avec les mêmes dates posées en passant. */
     if (e.target.closest('#f-sansdevis')) {
       majChantier(c, { aDevis: false, numeroDevis: '', dateDevis: null, dateSignature: null,
-        validiteDevis: null, statut: c.statut === 'devis' || c.statut === 'envoye' ? 'accepte' : c.statut },
+        validiteDevis: null, validiteJours: null, statut: c.statut === 'devis' || c.statut === 'envoye' ? 'accepte' : c.statut },
         'Sans devis — chantier « ' + C.nomStatut('accepte', { aDevis: false }) + ' ».');
       return;
     }
@@ -906,7 +909,11 @@ function brancher() {
     annulerAppui();
     ouvrirBulleJour(Number(b.dataset.jour), b);
   });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && A.bulle) fermerBulleJour(); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if ($('#aj-bulle')) fermerBulleAuj();
+    else if (A.bulle) fermerBulleJour();
+  });
   $('#cal-planif').addEventListener('click', function (e) {
     if (e.target.closest('#cal-planif-fin')) finirPlacement();
     else if (e.target.closest('#cal-pl-garder')) { A.placeAvert = null; renderBandeauPlanif(); }

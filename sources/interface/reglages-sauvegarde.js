@@ -154,7 +154,12 @@ var CORBEILLE = {
   fournisseur: { nom: 'Fournisseur', liste: 'fournisseurs', sauver: function () { return sauverFournisseurs(); } },
   commande:    { nom: 'Commande',    liste: 'commandes',    sauver: function () { return sauverCommandes(); } },
   sortie:      { nom: 'Mouvement',   liste: 'sorties',      sauver: function () { return sauverSorties(); } },
-  journee:     { nom: 'Journée',     liste: 'journees',     sauver: function () { return sauverJournees(); } },
+  /* Une journée rendue doit se recompter tout de suite : le temps des
+     chantiers n'est qu'une lecture des journées (lot r1b). */
+  journee:     { nom: 'Journée',     liste: 'journees',     sauver: function () {
+    indexerJournees();
+    return Promise.all([sauverJournees(), sauverChantiers()]).then(function () { renderCalendrier(); renderFiche(); });
+  } },
   /* Les notes vivent dans A.cfg, pas dans une liste de A : elles se reposent elles-mêmes. */
   note:        { nom: 'Note', feminin: true, reposer: function (o) {
     var l = notes();
@@ -170,6 +175,7 @@ var CORBEILLE = {
     if (!c || !o.pose) return Promise.resolve();
     var k = C.jourCle(o.pose.d), p = { d: C.minuit(o.pose.d), p: C.nb(o.pose.p) || 1 };
     if (o.pose.ferme != null) p.ferme = !!o.pose.ferme;
+    if (o.pose.fait) p.fait = true;
     c.jours = (c.jours || []).filter(function (j) { return jourDePose(j) !== k; }).concat([p]);
     c.jours.sort(function (a, b) { return tsPose(a) - tsPose(b); });
     c.maj = Date.now();
@@ -789,6 +795,11 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.93', quoi: [
+    { t: 'En ouvrant Aujourd’hui, une bulle dit les journées comptées d’office et les jours posés sur un devis pas signé : « J’y ai travaillé » ou « Je n’y étais pas »' },
+    { t: 'La validité d’un devis se choisit en jours (30 proposés) ; il passe en retard le jour où elle finit', vue: 'carnet' },
+    { t: 'Chantiers : un groupe pour les facturés qui attendent le paiement ; la fiche du jour, une ligne par chantier', vue: 'carnet' }
+  ] },
   { v: '4.92', quoi: [
     { t: 'Aujourd’hui allégé : ce qui est en retard, vos chantiers en cours rangés par étape, et les autres rappels repliés en bas ; Mes notes sont dans le ☰' },
     { t: 'Agenda : trois couleurs, un appui long sur un jour pour saisir, poser ou marquer non travaillé', vue: 'calendrier' },

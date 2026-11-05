@@ -25,7 +25,7 @@
   /* Un jour = un statut = une couleur (P5) : la bande sous le numéro, et le
      fond teinté de la case. Mêmes teintes que les pastilles d'avant. */
   --st-trav:#1D6FB8; --st-trav-f:#E4EEF8; --st-conf:#2E7D46; --st-conf-f:#E3EFE7;
-  --st-prev:#B98A00; --st-prev-f:#FBF2DC; --st-abs:#8E8878; --st-abs-f:#ECE7DF;
+  --st-abs:#8E8878; --st-abs-f:#ECE7DF;
   /* La couleur vive de l'application. Le bleu avait été validé le 3 août ;
      il l'a repris le 23 pour un vert, « qui respire plus l'esprit de
      l'application ». Le nom Sylve, lui, garde le vert de la marque
@@ -298,6 +298,28 @@ body:not(.m-ent) .mod-ent{display:none}
 .cal-bulle .pic{width:18px;height:18px;flex:none}
 .cal-bulle-fond{position:fixed;inset:0;z-index:59}
 .cal button.appui{outline:3px solid var(--accent);outline-offset:1px}
+/* Les jours en pointillés passés dans la fiche du jour (lot r1b). */
+.fj-pointilles{background:var(--st-conf-f);border:1px dashed var(--st-conf)}
+.fj-pointilles b{color:var(--st-conf)}
+.fj-pl{display:grid;gap:6px;min-width:0}
+.fj-pl span{font-weight:600;overflow-wrap:anywhere}
+.fj-presta{display:block;font-size:12px;color:var(--gris);overflow-wrap:anywhere}
+/* La bulle d'information d'Aujourd'hui (lot r1b) : au centre, par-dessus,
+   et elle défile quand la liste est longue. */
+.aj-bulle-fond{position:fixed;inset:0;z-index:70;background:rgba(23,37,31,.45)}
+.aj-bulle{position:fixed;z-index:71;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:min(400px,calc(100% - 24px));max-height:calc(100% - 48px);box-sizing:border-box;
+  display:flex;flex-direction:column;background:var(--papier);border-radius:16px;
+  box-shadow:var(--ombre);padding:14px 14px 12px}
+.aj-bulle h2{margin:0 0 6px;font-size:16.5px}
+.aj-bulle .ajb-corps{overflow:auto;min-height:0;flex:1 1 auto}
+.ajb-sous{margin:10px 0 2px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--gris)}
+.ajb-aide{margin:0 0 6px;font-size:12.5px;color:var(--gris)}
+.ajb-l{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 10px;
+  padding:8px 0;border-bottom:1px solid var(--trait);font-size:13.5px;min-width:0}
+.ajb-l > span:first-child{min-width:0;overflow-wrap:anywhere;flex:1 1 140px}
+.ajb-btns{display:flex;flex-wrap:wrap;gap:6px}
+.aj-bulle .btn-rang{margin:12px 0 0}
 .cal-aide{margin:0 0 8px;font-size:12.5px;color:var(--gris)}
 /* Ma journée (lot c2) : des blocs titrés, et un pied qui reste en vue. */
 .mj-copie{display:grid;gap:2px;width:100%;padding:10px 12px;border-radius:11px;text-align:left;

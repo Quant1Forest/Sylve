@@ -18,23 +18,32 @@ function chipsDiff5(idBase, valeur) {
     }).join('');
 }
 
-/* Durées de validité usuelles d'un devis de travaux. Trois mois est le cas
-   courant. La date qui en découle ne ferme aucune porte — un devis signé
-   plus tard se fait quand même : elle dit quand relancer. */
-var VALIDITES_DEVIS = [
-  { m: 1, n: '1 mois' }, { m: 2, n: '2 mois' }, { m: 3, n: '3 mois' },
-  { m: 6, n: '6 mois' }, { m: 12, n: '1 an' }
-];
+/* La validité se dit en jours (lot r1b) : une case, la valeur des réglages
+   proposée sur un devis neuf, modifiable devis par devis. La date qui en
+   découle ne ferme aucune porte — un devis signé plus tard se fait quand
+   même : elle dit quand il entre dans En retard. Un ancien devis en mois
+   garde ses mois, affichés dans la case vide, tant qu'on n'y tape pas de
+   jours. */
+function validiteJoursDe(c) {
+  var jv = C.nb(c.validiteJours);
+  if (jv > 0) return jv;
+  /* Un devis neuf : rien de saisi encore, ni durée ni date d'édition. */
+  if (!C.nb(c.validiteDevis) && !c.dateDevis && !c.numeroDevis) return C.joursValiditeDefaut(A.cfg);
+  return '';
+}
+function moisDe(c) {
+  var m = C.nb(c.validiteDevis);
+  return m > 0 ? (m === 12 ? '1 an' : m + ' mois') : '';
+}
 function champsDevisCh(c) {
-  var v = C.nb(c.validiteDevis);
+  var mois = C.nb(c.validiteJours) > 0 ? '' : moisDe(c);
   return '<div class="grille g2" style="margin-top:9px">' +
     '<div class="champ"><label class="eyebrow" for="ce-datedevis">Édité le</label>' +
     '<input type="date" id="ce-datedevis" value="' + versChamp(c.dateDevis) + '"></div>' +
-    '<div class="champ"><label class="eyebrow" for="ce-validite">Validité</label>' +
-    '<select id="ce-validite"><option value="">—</option>' +
-    VALIDITES_DEVIS.map(function (x) {
-      return '<option value="' + x.m + '"' + (v === x.m ? ' selected' : '') + '>' + x.n + '</option>';
-    }).join('') + '</select></div></div>' +
+    '<div class="champ"><label class="eyebrow" for="ce-validite">Validité (jours)</label>' +
+    '<input type="text" id="ce-validite" inputmode="numeric" autocomplete="off" value="' +
+    esc(String(validiteJoursDe(c))) + '"' + (mois ? ' placeholder="' + esc(mois) + '" data-mois="' +
+    C.nb(c.validiteDevis) + '"' : ' placeholder="' + C.joursValiditeDefaut(A.cfg) + '"') + '></div></div>' +
     champNumero('D', 'ce-numdevis', c.numeroDevis, 'N° du devis') +
     '<p class="muted" id="ce-validite-fin" style="font-size:12px;margin:7px 0 0"></p>' +
     /* Il l'a demandée expressément : la signature est ce qui fait basculer le
@@ -54,12 +63,19 @@ function optionsStatutCh(statut, avecDevis) {
       esc(C.nomStatut(s.c, vu)) + '</option>';
   }).join('');
 }
+/* La date de fin sous la case. Vide, la case laisse parler les mois d'un
+   ancien devis, sinon la validité par défaut des réglages. */
 function majFinValidite() {
   var z = $('#ce-validite-fin'); if (!z) return;
-  var fin = C.finValiditeDevis({ aDevis: true,
-    dateDevis: versDate($('#ce-datedevis').value),
-    validiteDevis: C.nb($('#ce-validite').value) });
-  z.textContent = fin ? 'Valable jusqu’au ' + dateCourte(fin) + '.' : '';
+  var champ = $('#ce-validite'), jv = C.nb(champ.value);
+  var mois = jv > 0 ? 0 : C.nb(champ.dataset.mois);
+  var vu = { aDevis: true, dateDevis: versDate($('#ce-datedevis').value),
+    validiteJours: jv > 0 ? jv : null, validiteDevis: mois || null };
+  var fin = C.echeanceDevis(vu, A.cfg);
+  if (!fin) { z.textContent = ''; return; }
+  var duree = jv > 0 ? jv + ' jour' + (jv > 1 ? 's' : '') : mois ? moisDe(vu)
+    : C.joursValiditeDefaut(A.cfg) + ' jours (réglage)';
+  z.textContent = 'Valable ' + duree + ', jusqu’au ' + dateCourte(fin) + '.';
 }
 /* Statut et champs du devis suivent la case, à chaque bascule. Un chantier
    posé à « devis envoyé » puis déclaré sans devis passe à l'étape d'après :
@@ -510,7 +526,7 @@ function ouvrirDevisCh(id, cocher) {
   };
   $('#dv-a').addEventListener('change', maj);
   ['#ce-datedevis', '#ce-validite'].forEach(function (x) {
-    if ($(x)) $(x).addEventListener('change', majFinValidite);
+    if ($(x)) { $(x).addEventListener('change', majFinValidite); $(x).addEventListener('input', majFinValidite); }
   });
   brancherNumero('D', 'ce-numdevis', c.id);
   maj();
@@ -521,7 +537,10 @@ function ouvrirDevisCh(id, cocher) {
       numeroDevis: coche ? lireNumero('D', 'ce-numdevis') : '',
       dateDevis: coche ? versDate($('#ce-datedevis').value) : null,
       dateSignature: signe,
-      validiteDevis: coche ? (C.nb($('#ce-validite').value) || null) : null };
+      validiteJours: coche ? (Math.round(C.nb($('#ce-validite').value)) || null) : null,
+      /* Les mois d'un ancien devis restent en base, lus tant qu'aucun jour
+         n'est tapé : ils ne partent qu'avec le devis lui-même. */
+      validiteDevis: coche ? (c.validiteDevis || null) : null };
     /* Sans devis, les deux premières étapes n'existent plus : on avance le
        chantier à celle où il en est réellement. */
     if (!coche && (c.statut === 'devis' || c.statut === 'envoye')) champs.statut = 'accepte';
