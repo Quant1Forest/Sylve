@@ -443,10 +443,30 @@ function mesJours(t, cfg) {
 function heuresPostes(j) {
   return arr(((j && j.postes) || []).reduce(function (s, p) { return s + nb(p.heures); }, 0), 2);
 }
-/* Le trajet compte dans la journée, comme le hors production : il n'entre
-   jamais dans un rendement, mais c'est du temps donné au chantier. */
+/* Le temps productif de la journée (lot r2). Il se tape à part depuis que
+   les heures par prestation sont facultatives : dégagement et taille se font
+   ensemble, impossible de dire combien pour l'un. Une ancienne journée ne le
+   porte pas : son productif reste la somme des heures des prestations. */
+function productifJournee(j) {
+  if (j && j.productif != null && j.productif !== '') return arr(Math.max(nb(j.productif), heuresPostes(j)), 3);
+  return heuresPostes(j);
+}
+/* Une journée dont les prestations ne se partagent pas le productif : il
+   compte pour le chantier, jamais pour le rendement de l'une d'elles. */
+function journeeNonRepartie(j) {
+  return arr(productifJournee(j) - heuresPostes(j), 2) > 0;
+}
+/* Le temps sur le chantier : le productif et le hors production. Le trajet
+   en sort (lot r2) : 8 h de travail et 1 h de route faisaient « 1 j 1 h »
+   de chantier, et le prix par journée baissait d'autant. Il se dit à côté. */
 function heuresJournee(j) {
-  return arr(heuresPostes(j) + nb(j && j.nonProd) + nb(j && j.trajet), 2);
+  return arr(productifJournee(j) + nb(j && j.nonProd), 2);
+}
+function trajetJournee(j) { return arr(nb(j && j.trajet), 3); }
+/* Le trajet d'un chantier, lu sur les saisies qui le portent : celles des
+   journées, une fois chacune. */
+function trajetChantier(ch) {
+  return arr(((ch && ch.temps) || []).reduce(function (s, t) { return s + nb(t.trajet); }, 0), 3);
 }
 function joursJournee(j, cfg) { return arr(heuresJournee(j) / HEURES_JOUR(cfg), 3); }
 
@@ -570,11 +590,15 @@ function monoTravail(ch) {
 }
 function tempsPourTravail(ch, travail, cfg) {
   var saisies = (ch && ch.temps) || [];
-  var marquees = saisies.filter(function (t) { return t.activite === travail; });
+  /* Une prestation notée sans heures (journée non répartie, lot r2) porte sa
+     quantité, pas de temps : elle ne fait pas une saisie marquée. */
+  var marquees = saisies.filter(function (t) { return t.activite === travail && !t.sansTemps; });
   if (marquees.length) {
     return arr(marquees.reduce(function (s, t) { return s + joursSaisie(t, cfg); }, 0), 3);
   }
-  if (monoTravail(ch) === travail) return tempsTotal(ch, cfg);
+  if (monoTravail(ch) === travail) {
+    return arr(saisies.reduce(function (s, t) { return s + (t.nonReparti ? 0 : joursSaisie(t, cfg)); }, 0), 2);
+  }
   return 0;
 }
 function uniteTravail(ch, travail) {

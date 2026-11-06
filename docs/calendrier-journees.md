@@ -587,3 +587,90 @@ posé sur un devis pas signé « réglé à la main » (il a ses deux choix).
   vieille saisie sans journée ne se retire pas d'ici, comme avant. Derniers
   jours et « Ce mois-ci » montraient déjà une ligne par journée, la fiche ▸
   Travaux une ligne par jour : rien à y changer.
+
+## Le trajet à part (lot r2, 4.94.0)
+
+Tranché le 03/11 : « 8 h de travail et 1 h de route » faisaient « 1 j 1 h »
+de chantier, et le prix par journée baissait d'autant. **Le temps d'un
+chantier, c'est le temps passé dessus : le productif et le hors production,
+sans le trajet.** Ligne à ligne : `docs/correspondance-refonte.md`,
+section 15, *Retours des 2, 3 et 5 novembre*.
+
+**Ce qui ne vaut plus, plus haut** : dans *Ma journée du lot c2*, « le
+productif, ce sont les heures des prestations » (il se tape à part), et
+partout où le trajet « compte dans la journée ».
+
+- **Le calcul** (`logique/chantiers.js`) : `heuresJournee` = `productifJournee`
+  + `nonProd`, sans `trajet`. `indexerJournees` ne met plus le trajet dans la
+  durée des saisies de `c.temps` : il est porté à côté, `t.trajet`, sur la
+  première saisie de la journée, comme les kilomètres. `C.trajetChantier`
+  l'additionne. Une journée qui n'a que du trajet donne une saisie de durée
+  nulle qui le porte.
+- **Où il a cessé de compter** : les trois chiffres de la fiche (journées
+  faites, prix par jour réel et au rythme actuel), le résumé de l'étape
+  Travaux, sa liste des jours et ses totaux, le bilan « Le devis paie /
+  J'y ai passé », le prix par journée des références de Rendements et la
+  moyenne que l'estimation en tire, les cumuls de Chantiers (« jours-homme
+  cumulés ») et le premier donneur d'ordre, Argent ▸ Par donneur d'ordre,
+  l'Agenda (fiche du jour, « Ce mois-ci » et ses totaux de semaine),
+  Aujourd'hui (« Cette semaine », Derniers jours), le pied de Ma journée,
+  l'étiquette d'une journée mise à la Corbeille. Les rendements par
+  prestation ne le comptaient déjà pas ; seul le cas d'un chantier à un seul
+  travail, sans aucune heure marquée, le comptait encore : plus maintenant.
+  Kilomètres et carburant : inchangés. Les exports ne lisent pas le temps.
+- **Où il se dit** : « + 3 h 20 de trajet » à côté du temps — liste des jours
+  et totaux de l'étape Travaux, bilan, pied de Ma journée, fiche du jour,
+  « Ce mois-ci », Derniers jours.
+- **Le trajet se règle sur le chantier** (05/11) : fiche ▸ Infos ▸ « Trajet
+  depuis chez moi » (`trajetKm`, `trajetHeures`, aller-retour, facultatifs).
+  Ma journée le propose au choix du chantier, case par case ; à défaut, celui
+  de la dernière journée sur ce chantier (`kmHabituels`, `trajetHabituel`).
+  Proposé, il se replie en une ligne « Trajet : 64 km · 1 h 10 · Modifier » ;
+  « Modifier » rouvre les cases pour ce jour seulement. Fiche sans trajet et
+  chantier choisi : ce qui est tapé ou proposé fait paraître « Retenir pour
+  ce chantier », coché d'office.
+
+**Le temps productif** (05/11) : « je fais dégagement et taille en même
+temps, impossible de dire combien pour l'un ». Ma journée demande le **temps
+total** et le **temps productif** (`productif`, proposé égal au total, ou à
+la somme des heures réparties tant qu'il n'y a pas touché). Les heures par
+prestation sont facultatives : une seule prestation prend tout le productif ;
+plusieurs, « Répartir le temps entre les prestations » fait paraître leurs
+heures, dont la somme doit faire le productif (sinon l'enregistrement est
+refusé et l'écran dit pourquoi).
+
+- **Une journée non répartie** : son temps compte en entier pour le chantier
+  (journées, prix par journée, bilan) ; chaque prestation entre dans `c.temps`
+  avec sa quantité et une durée nulle (`sansTemps`) — l'avancement et les
+  quantités de la fiche la comptent ; le productif non réparti entre sans
+  activité (`nonReparti`). Les rendements de ces prestations l'ignorent (on ne
+  sait pas quelle part du temps leur revient), y compris le repli « chantier
+  à un seul travail ». L'estimation, qui lit ces rendements, aussi.
+- **Une ancienne journée** n'a pas de `productif` : il reste la somme des
+  heures de ses prestations, elle se relit à l'identique.
+
+**Une seule journée par chantier et par jour** (05/11) : dans Ma journée, un
+couple date + chantier déjà pris ouvre la journée existante en modification,
+avec une ligne qui le dit (et ce qui avait été tapé et n'est pas repris). En
+modification, déplacer une journée sur un couple pris est refusé, avec
+« Ouvrir l'autre journée ». Le pré-choix P4 saute un chantier qui a déjà sa
+journée ce jour-là. Hors règle : la journée d'office, le rattrapage sans date,
+une journée sans chantier. Les doublons déjà en base ne sont ni fusionnés ni
+supprimés : l'appui (fiche du jour, fiche ▸ Travaux) propose le choix entre
+eux (`ouvrirJourneesParmi`), ✕ annonce « les N journées ».
+
+**Les durées en heures et minutes** : deux cases « h » et « min »
+(`champDuree`, `lireDuree`, `interface/journee.js`) ; gardées en heures
+décimales arrondies au millième (0 h 40 → 0,667) ; relues par
+`C.enHeuresMinutes`, affichées par `C.ditHeures` (« 1 h 40 », « 40 min ») et
+`C.ditDuree` (« 2 j 4 h 30 »). La case des heures accepte encore une
+virgule. Saisies concernées : Ma journée (total, productif, prestations,
+trajet), le rattrapage de l'étape Travaux, le trajet de la fiche. Les
+cadences de Rendements se tapent déjà en minutes par unité ; « Poser un
+chantier » choisit des heures rondes dans une liste : rien à y changer.
+
+**Fiche ▸ Travaux, un appui sur un jour** (`ouvrirJourDeFiche`) : la journée
+de ce jour en modification (doublon : le choix) ; une journée d'office, Ma
+journée pré-remplie (`modeleDOffice`, la même que « Préciser ma journée ») ;
+un jour seulement posé, la fiche du jour ; « sans date (rattrapage) », le
+rattrapage.

@@ -795,6 +795,11 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.94', quoi: [
+    { t: 'Les durées se tapent en heures et minutes ; Ma journée demande le temps productif, et les heures par prestation deviennent facultatives' },
+    { t: 'Le trajet ne compte plus dans les journées du chantier : il se dit à côté, et se règle sur la fiche du chantier', vue: 'carnet' },
+    { t: 'Fiche ▸ Travaux : un appui sur un jour l’ouvre pour le corriger ; « Pas de repérage » dans Infos ; une seule journée par chantier et par jour', vue: 'carnet' }
+  ] },
   { v: '4.93', quoi: [
     { t: 'En ouvrant Aujourd’hui, une bulle dit les journées comptées d’office et les jours posés sur un devis pas signé : « J’y ai travaillé » ou « Je n’y étais pas »' },
     { t: 'La validité d’un devis se choisit en jours (30 proposés) ; il passe en retard le jour où elle finit', vue: 'carnet' },

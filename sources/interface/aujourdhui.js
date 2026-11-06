@@ -86,7 +86,7 @@ function ligneSaisie() {
   return '<button type="button" class="aj-saisie" id="aj-jour">' +
     '<span class="aj-pic">' + picto('horloge') + '</span>' +
     '<span class="aj-txt"><b>' + (faite ? 'Déjà saisi aujourd’hui' : 'Rien de saisi aujourd’hui') + '</b>' +
-    '<small>Cette semaine : ' + (n ? E.fmt(C.arr(h, 1), h % 1 ? 1 : 0) + ' h sur ' + n + ' jour' + (n > 1 ? 's' : '')
+    '<small>Cette semaine : ' + (n ? C.ditHeures(h) + ' sur ' + n + ' jour' + (n > 1 ? 's' : '')
       : 'rien de saisi') + '</small></span>' +
     '<span class="aj-etiq vert">Ma journée</span></button>';
 }
@@ -194,7 +194,9 @@ function situationChantier(c, now, surAujourdhui) {
   if (c.statut === 'devis') {
     var q = C.dateEntree(c);
     if (surAujourdhui) {
+      /* « Pas de repérage » choisi (lot r2) : plus rien ne le réclame. */
       return { t: 'Devis à faire · ' + (c.dateReperage ? 'repéré ' + ilYa(c.dateReperage)
+        : c.sansReperage ? (q ? 'annoncé ' + ilYa(q) : 'pas de repérage')
         : (q ? 'annoncé ' + ilYa(q) + ' · ' : '') + 'pas encore repéré'), ton: '' };
     }
     if (c.dateReperage) return { t: 'Repéré le ' + dateCourte(c.dateReperage) + ' · devis à faire', ton: '' };
@@ -297,7 +299,7 @@ function faitsDeJournee(j) {
    d'office y est aussi, avec son ○ tant qu'il n'a pas ouvert sa fiche : un
    appui ouvre la fiche du jour, d'où on la précise. */
 function lignesDerniersJours() {
-  var now = Date.now(), h1 = function (h) { return E.fmt(C.arr(h, 1), h % 1 ? 1 : 0) + ' h'; };
+  var now = Date.now(), h1 = C.ditHeures;
   var l = (A.journees || []).filter(function (j) { return C.minuit(C.nb(j.date)) <= C.minuit(now); })
     .map(function (j) { return { ts: C.nb(j.date), j: j }; })
     .concat(journeesDOffice().map(function (o) { return { ts: C.minuit(o.d) + 12 * 3600000, o: o }; }));
@@ -312,6 +314,7 @@ function lignesDerniersJours() {
       }
       var j = x.j, c = j.chantier ? chantier(j.chantier) : null;
       var faits = faitsDeJournee(j);
+      if (C.nb(j.trajet)) faits.push('+ ' + C.ditHeures(j.trajet) + ' de trajet');
       return '<button type="button" class="aj-jour" data-ajouvre="journee:' + esc(j.id) + '">' +
         '<span class="aj-txt"><b>' + esc(majuscule(jourCourt(j.date, true)) + ' · ' +
           (c ? C.nomChantier(c) : (j.lieu || 'sans chantier')) + ' · ' + h1(C.heuresJournee(j))) + '</b>' +
@@ -374,7 +377,7 @@ function montrerBulleAuj() {
   document.body.appendChild(b);
   /* Sur Aujourd'hui, le retour du téléphone sortirait de Sylve : un cran
      de plus, que la bulle consomme en se fermant. */
-  empilerCran(); A.crans = (A.crans || 0) + 1;
+  empilerCran(); A.crans = (A.crans || 0) + 1; A.cranBulleAuj = true;
   A.bulleAuj = { office: [], pointilles: false };
   dessinerBulleAuj(x);
   b.addEventListener('click', function (e) {
@@ -404,7 +407,7 @@ function montrerBulleAuj() {
 }
 function dessinerBulleAuj(x) {
   var b = $('#aj-bulle'); if (!b) return;
-  var h1 = function (h) { return E.fmt(C.arr(h, 1), h % 1 ? 1 : 0) + ' h'; };
+  var h1 = C.ditHeures;
   var place = BULLE_AUJ_MAX;
   var office = x.office.slice(0, place); place -= office.length;
   var pointilles = x.pointilles.slice(0, Math.max(0, place));
@@ -451,10 +454,19 @@ function fermerBulleAuj() {
   marquerPosesVues(vus.filter(function (o) { return !o.vu; }));
 }
 function oterBulleAuj() {
+  var ouverte = !!$('#aj-bulle');
   ['#aj-bulle', '#aj-bulle-fond'].forEach(function (s) {
     var e = $(s); if (e && e.parentNode) e.parentNode.removeChild(e);
   });
   A.bulleAuj = null;
+  /* Le cran que la bulle avait pris, elle le rend en se fermant autrement
+     que par le retour (lot r2) : sinon le premier appui sur retour, après
+     OK, ne faisait rien. Le « popstate » qui suit est avalé. */
+  if (ouverte && A.cranBulleAuj) {
+    A.cranBulleAuj = false;
+    A.avalerRetour = (A.avalerRetour || 0) + 1;
+    try { history.back(); } catch (e) { A.avalerRetour--; }
+  }
 }
 
 /* Où mène chaque ligne. */

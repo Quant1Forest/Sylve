@@ -273,13 +273,18 @@ scenario('Ma journée : rendement par prestation et temps porté au chantier', a
   t.clic('#aj-jour'); await t.pause(300);
   t.choisir('#mj-ch', 'c1');
   t.choisir('[data-pstt="0"]', 'PLANT');
-  t.saisir('[data-psth="0"]', '3'); t.saisir('[data-pstq="0"]', '200');
+  t.saisir('[data-pstq="0"]', '200');
   t.clic('#pst-plus'); await t.pause(120);
   t.choisir('[data-pstt="1"]', 'PROTEC');
+  /* Lot r2 : les heures par prestation se tapent une fois la répartition
+     demandée. */
+  t.clic('#pst-rep'); await t.pause(120);
+  t.saisir('[data-psth="0"]', '3'); t.saisir('[data-pstq="0"]', '200');
   t.saisir('[data-psth="1"]', '4'); t.saisir('[data-pstq="1"]', '150');
   t.saisir('#mj-trajet', '1'); t.saisir('#mj-km', '64');
   const ap = t.texte('#mj-apercu');
-  verifierVrai('la journée fait 8 heures', /8,00 h/.test(ap));
+  /* Lot r2 : le trajet n'entre plus dans la journée, il se dit à côté. */
+  verifierVrai('la journée fait 7 heures, le trajet à côté', /^7 h/.test(ap) && /\+ 1 h de trajet/.test(ap));
   /* Lot c2 : le rendement est sous chaque prestation, plus dans le pied. */
   verifierVrai('533 plants par jour, sous la plantation', /533 plant\/jour/.test(t.texte('#pst-r-0')));
   verifierVrai('300 protections par jour, sous la protection', /300 u\/jour/.test(t.texte('#pst-r-1')));
@@ -569,8 +574,9 @@ scenario('Temps : tout se note en heures, plus de quarts de journée', async () 
 
   t.clic('#f-temps'); await t.pause(400);
   verifier('le sélecteur journées/heures a disparu', null, t.$('#ct-unite'));
-  verifierVrai('le champ demande des heures',
-    /Combien d’heures/.test(t.texte('#modale-corps')));
+  /* Lot r2 : en heures et minutes, deux cases. */
+  verifierVrai('le champ demande des heures et des minutes',
+    /Combien de temps/.test(t.texte('#modale-corps')) && !!t.$('#ct-duree') && !!t.$('#ct-duree-m'));
   const crans = t.$$('#ct-crans [data-cth]').map(b => b.dataset.cth);
   verifier('un cran par heure, de 1 à la journée', 8, crans.length);
   verifier('le premier vaut une heure', '1', crans[0]);
@@ -4791,12 +4797,15 @@ scenario('Ma journée : le temps total, le productif, le trajet — et plus de c
   /* Une journée déjà notée rouvre son total : ses six heures productives. */
   verifier('le total d’une journée notée se relit', '6', t.$('#mj-total').value);
 
+  verifier('et son productif aussi (lot r2)', '6', t.$('#mj-prod').value);
+
   /* Un total plus court que le productif ne s'enregistre pas : l'un des deux
-     est mal tapé, et deviner lequel fausserait les rendements. */
-  t.saisir('#mj-postes [data-psth="0"]', '7');
+     est mal tapé, et deviner lequel fausserait les rendements. Depuis le lot
+     r2, le productif se tape à part. */
+  t.saisir('#mj-prod', '7');
   t.saisir('#mj-total', '6');
   verifierVrai('l’écran le dit tout de suite',
-    /plus court que les heures productives/.test(t.texte('#mj-horsprod')));
+    /plus court que le temps productif/.test(t.texte('#mj-horsprod')));
   t.clic('#mj-ok'); await t.pause(400);
   /* Les heures productives sont ce qui changerait : six en base, sept tapées. */
   verifier('et rien n’est enregistré', 6,
@@ -4804,14 +4813,14 @@ scenario('Ma journée : le temps total, le productif, le trajet — et plus de c
   verifierVrai('la fenêtre reste ouverte pour corriger', !!t.$('#mj-ok'));
 
   t.saisir('#mj-total', '8');
-  t.saisir('#mj-trajet', '1,5');
+  t.saisir('#mj-trajet', '1'); t.saisir('#mj-trajet-m', '30');
   verifierVrai('le hors production se déduit, et dit ce qu’il couvre',
-    /1,00 h hors production — affûtage/.test(t.texte('#mj-horsprod')));
+    /7 h productives, 1 h hors production — affûtage/.test(t.texte('#mj-horsprod')));
   const ap = t.texte('#mj-apercu');
-  verifierVrai('la journée fait neuf heures et demie, trajet compris', /9,50 h/.test(ap));
-  verifierVrai('dont sept productives', /7,00 h productives/.test(ap));
-  verifierVrai('une hors production', /1,00 h hors production/.test(ap));
-  verifierVrai('et le trajet à part', /1,50 h de trajet/.test(ap));
+  verifierVrai('la journée fait huit heures, sans le trajet', /^8 h/.test(ap));
+  verifierVrai('dont sept productives', /7 h productives/.test(ap));
+  verifierVrai('une hors production', /1 h hors production/.test(ap));
+  verifierVrai('et le trajet à côté', /\+ 1 h 30 de trajet/.test(ap));
   /* Une journée marquée avant la 4.82 garde sa marque, et l'aperçu la dit :
      sans case pour la voir, l'effacer en silence changerait ses chiffres. */
   verifierVrai('l’aperçu signale une journée déjà marquée', /non facturée/.test(ap));
@@ -4820,14 +4829,15 @@ scenario('Ma journée : le temps total, le productif, le trajet — et plus de c
   const j = (t.stock('journees') || []).filter(x => x.id === 'j1')[0];
   verifier('le hors production est gardé, déduit', 1, j.nonProd);
   verifier('le trajet aussi, à part', 1.5, j.trajet);
-  verifier('la journée compte tout', 9.5, t.w.BCC.heuresJournee(j));
+  verifier('la journée compte le temps sur le chantier, sans le trajet (lot r2)', 8, t.w.BCC.heuresJournee(j));
   verifier('et la marque ancienne est gardée', true, j.nonFacture);
 
-  /* Le trajet entre dans le temps du chantier, sans activité : la fiche
-     compte neuf heures et demie, soit une journée et une heure et demie. */
+  /* Lot r2 : le trajet n'entre plus dans le temps du chantier. La fiche
+     compte huit heures, une journée, et dit le trajet à côté. */
   t.clic('[data-chouvrir="c1"]'); await t.pause(400);
   const rangs = t.$$('#vue-chantier .jrang').map(e => e.textContent.replace(/\s+/g, ' ').trim());
-  verifierVrai('la fiche compte le trajet dans le fait', rangs.some(r => /1 j 1,5 h/.test(r)));
+  verifierVrai('la fiche compte une journée, le trajet à côté',
+    rangs.some(r => /\+ 1 h 30 de trajet ?1 j(?! \d)/.test(r)));
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -6874,7 +6884,9 @@ scenario('Ma journée : le chantier facturé ne se propose plus, et remplit ce q
      trahit : une seule, celle du dégagement. */
   verifier('la fourniture n’ouvre aucun poste fantôme', 1,
     t.$$('#mj-postes [data-pstt]').length);
-  verifierVrai('les heures restent à lui', !t.$('[data-psth="0"]').value);
+  /* Lot r2 : une seule prestation n'a pas de case d'heures ; le temps reste
+     à lui. */
+  verifierVrai('les heures restent à lui', !t.$('[data-psth="0"]') && !t.$('#mj-total').value);
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -6926,12 +6938,14 @@ scenario('Ma journée : rien de la fenêtre ne s’est perdu (lot c2)', async ()
   t.choisir('#mj-ch', 'c1'); await t.pause(200);
   t.$('#mj-lieu').value = 'Bois du Haut';
   t.choisir('[data-pstt="0"]', 'DEGAG');
-  t.saisir('[data-psth="0"]', '6'); t.saisir('[data-pstq="0"]', '1,5');
-  t.saisir('#mj-total', '7');
-  verifierVrai('la ligne hors production', /1,00 h hors production/.test(t.texte('#mj-horsprod')));
+  /* Lot r2 : une seule prestation prend tout le temps productif, tapé à part. */
+  t.saisir('[data-pstq="0"]', '1,5');
+  t.saisir('#mj-total', '7'); t.saisir('#mj-prod', '6');
+  verifierVrai('la ligne hors production', /6 h productives, 1 h hors production/.test(t.texte('#mj-horsprod')));
   t.saisir('#mj-trajet', '1'); t.saisir('#mj-km', '50'); t.saisir('#mj-pers', '2');
   t.$('#mj-fin').checked = true; t.saisir('#mj-note', 'pluie l’après-midi');
-  verifierVrai('le pied dit le total', /8,00 h/.test(t.texte('#mj-apercu')));
+  verifierVrai('le pied dit le total, le trajet à côté', /^7 h/.test(t.texte('#mj-apercu')) &&
+    /\+ 1 h de trajet/.test(t.texte('#mj-apercu')));
   t.clic('#mj-ok'); await t.pause(600);
   const neuve = (t.stock('journees') || []).filter(x => x.id !== 'j0')[0] || {};
   verifier('enregistrée telle qu’elle est tapée',
@@ -6967,7 +6981,7 @@ scenario('Ma journée : rien de la fenêtre ne s’est perdu (lot c2)', async ()
   verifier('il copie le chantier, le lieu, les km, la prestation ; ni la date ni les heures',
     ['c1', 'Les Essarts', '42', 'DEGAG', '', jourISO(Date.now())],
     [t.$('#mj-ch').value, t.$('#mj-lieu').value, t.$('#mj-km').value, t.$('[data-pstt="0"]').value,
-      t.$('[data-psth="0"]').value, t.$('#mj-date').value]);
+      t.$('#mj-total').value, t.$('#mj-date').value]);
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -6984,8 +6998,11 @@ scenario('Ma journée : la frappe ne refait aucun champ, le clavier reste ouvert
   }));
   t.clic('#aj-jour'); await t.pause(350);
   t.choisir('#mj-ch', 'c1'); await t.pause(200);
+  /* Lot r2 : les heures par prestation paraissent une fois la répartition
+     demandée ; chaque durée a ses deux cases, h et min. */
+  t.clic('#pst-rep'); await t.pause(150);
   const SEL = ['[data-psth="0"]', '[data-pstq="0"]', '[data-psth="1"]', '[data-pstq="1"]',
-    '#mj-total', '#mj-trajet', '#mj-km', '#mj-pers'];
+    '#mj-total', '#mj-total-m', '#mj-prod', '#mj-prod-m', '#mj-trajet', '#mj-trajet-m', '#mj-km', '#mj-pers'];
   const avant = SEL.map(s => t.$(s));
   verifierVrai('deux prestations ouvertes', avant.every(Boolean));
   const taper = (n, v) => {
@@ -6996,7 +7013,7 @@ scenario('Ma journée : la frappe ne refait aucun champ, le clavier reste ouvert
   };
   const gardes = [];
   avant.forEach((n, i) => {
-    taper(n, ['4', '200', '3', '1', '8', '1', '42', '1'][i]);
+    taper(n, ['4', '200', '3', '1', '8', '', '7', '', '1', '15', '42', '1'][i]);
     gardes.push(t.$(SEL[i]) === n && t.d.activeElement === n);
   });
   verifier('chaque champ reste le même, et garde le doigt', SEL.map(() => true), gardes);
@@ -7080,18 +7097,19 @@ scenario('Ma journée : choisir le chantier ne remplit que les champs vides', as
   }));
   t.clic('#aj-jour'); await t.pause(350);
   t.saisir('#mj-km', '12');
-  t.choisir('[data-pstt="0"]', 'PLANT'); t.saisir('[data-psth="0"]', '3');
+  /* Lot r2 : une seule prestation n'a pas de case d'heures ; sa quantité. */
+  t.choisir('[data-pstt="0"]', 'PLANT'); t.saisir('[data-pstq="0"]', '3');
   t.choisir('#mj-ch', 'c1'); await t.pause(250);
   verifier('les km tapés restent', '12', t.$('#mj-km').value);
-  verifier('la prestation tapée reste', ['PLANT', '3'], [t.$('[data-pstt="0"]').value, t.$('[data-psth="0"]').value]);
+  verifier('la prestation tapée reste', ['PLANT', '3'], [t.$('[data-pstt="0"]').value, t.$('[data-pstq="0"]').value]);
   verifier('la forêt et la commune vides se remplissent', ['Forêt de la Côte', 'Clairbois'],
     [t.$('#mj-lieu').value, t.$('#mj-commune').value]);
   t.clic('#modale-x'); await t.pause(150);
   t.clic('#aj-jour'); await t.pause(350);
   t.choisir('#mj-ch', 'c1'); await t.pause(250);
   verifier('champs vides : les km de la dernière journée sur ce chantier', '64', t.$('#mj-km').value);
-  verifier('et une ligne par prestation, sans heures', ['DEGAG', ''],
-    [t.$('[data-pstt="0"]').value, t.$('[data-psth="0"]').value]);
+  verifier('et une ligne par prestation, sans heures', ['DEGAG', false, ''],
+    [t.$('[data-pstt="0"]').value, !!t.$('[data-psth="0"]'), t.$('#mj-total').value]);
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -7104,16 +7122,18 @@ scenario('Ma journée : le rendement sous chaque prestation, le total au pied', 
   }));
   t.clic('#aj-jour'); await t.pause(350);
   t.choisir('#mj-ch', 'c1'); await t.pause(200);
-  t.saisir('[data-psth="0"]', '4'); t.saisir('[data-pstq="0"]', '100');
+  /* Lot r2 : une seule prestation prend tout le temps productif, proposé
+     égal au total. */
+  t.saisir('#mj-total', '4'); t.saisir('[data-pstq="0"]', '100');
   verifierVrai('100 plants en 4 h : 200 par jour', /≈ 200 plant\/jour/.test(t.texte('#pst-r-0')));
   t.saisir('#mj-pers', '2');
   verifierVrai('à deux, 400', /≈ 400 plant\/jour/.test(t.texte('#pst-r-0')));
   const pied = () => t.texte('#mj-apercu');
   verifierVrai('une demi-journée, au prix de journée du chantier',
-    /4,00 h/.test(pied()) && /0,50 journée(?!s)/.test(pied()) && /160(,00)? €/.test(pied()) && /320 €\/j/.test(pied()));
+    /^4 h/.test(pied()) && /0,50 journée(?!s)/.test(pied()) && /160(,00)? €/.test(pied()) && /320 €\/j/.test(pied()));
   t.saisir('#mj-trajet', '4');
-  verifierVrai('une journée avec le trajet', /8,00 h/.test(pied()) && /1,00 journée(?!s)/.test(pied()) &&
-    /320(,00)? €/.test(pied()));
+  verifierVrai('le trajet n’en fait pas une journée : il se dit à côté', /^4 h/.test(pied()) &&
+    /0,50 journée(?!s)/.test(pied()) && /160(,00)? €/.test(pied()) && /\+ 4 h de trajet/.test(pied()));
   verifierVrai('le pied tient Enregistrer', t.$('.mj-pied #mj-ok') && t.$('.mj-pied #mj-apercu'));
   verifier('aucune erreur', [], t.erreurs);
 });
@@ -7499,9 +7519,9 @@ scenario('Ma journée : « comme le… » reprend le contenu, jamais la date', a
   verifier('et les kilomètres', '42', t.$('#mj-km').value);
   verifier('la prestation est reprise', 'DEGAG', t.$('#mj-postes [data-pstt="0"]').value);
   /* Les heures, non : c'est ce qu'on vient noter. */
-  verifier('les heures restent à saisir', '', t.$('#mj-postes [data-psth="0"]').value);
+  verifier('les heures restent à saisir', ['', ''], [t.$('#mj-total').value, t.$('#mj-prod').value]);
 
-  t.saisir('#mj-postes [data-psth="0"]', '6');
+  t.saisir('#mj-total', '6');
   t.clic('#mj-ok'); await t.pause(700);
   const neuve = (t.stock('journees') || []).filter(x => x.id !== 'j1')[0];
   verifierVrai('une seconde journée est née', !!neuve);
@@ -11178,7 +11198,7 @@ function preuvesB2() {
     'Ligne de comptes : ouverts, jours-homme cumulés, à facturer, jours passés': async () => { const t = await voir();
       const k = t.texte('#ch-cumuls');
       return /12 chantiers ouverts/.test(k) && /jours-homme cumulés/.test(k) && /2 à facturer/.test(k) &&
-        /1 aux jours passés/.test(k) && t.texte('[data-groupe="travaux"] .aj-compte') === '6'; },
+        /1 avec plus de jour posé/.test(k) && t.texte('[data-groupe="travaux"] .aj-compte') === '6'; },
     'Recherche (nom, donneur d\'ordre, commune, n° de facture)': async () => { const t = await voir();
       const trouve = async q => { t.saisir('#c-rech', q); await t.pause(150);
         return t.$$('#ch-trouves [data-chouvrir]').map(b => b.dataset.chouvrir).join(); };
@@ -11487,6 +11507,422 @@ scenario('« Facturé à » : le mot « Client » n’est plus à l’écran pou
   verifierVrai('et aucune pastille « Clients »', t.$$('#rl-nav [data-liste]').every(b => sansClient(b.textContent)));
   /* Les données ne changent pas de nom. */
   verifier('la donnée reste « proprietaire »', 'Martin', chB2(t, 'dv').proprietaire);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+/* Lot r2 (4.94.0) : fiche, ligne de travaux, Ma journée, durées en heures
+   et minutes, trajet. Retours des 2, 3 et 5 novembre, tous tranchés. */
+const etatR2 = t => t.w.BCUI._etat();
+const chR2 = (t, id) => (etatR2(t).chantiers || []).filter(c => c.id === id)[0];
+const jrR2 = t => t.stock('journees') || [];
+/* Taper une durée dans ses deux cases, comme au doigt. */
+const dureeR2 = (t, base, h, m) => { t.saisir(base, h); t.saisir(base + '-m', m); };
+const ouvrirMjR2 = async t => { t.clic('#aj-jour'); await t.pause(350); };
+
+scenario('Lot r2 : « Pas de repérage » se choisit et se défait', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    cfg: { heuresJour: 8, journeesMigrees: true },
+    chantiers: [chA('c1', { nom: 'Vaux', statut: 'devis', aDevis: true, dateEntree: JA(-3) })]
+  }));
+  const ligne = () => t.texte('#vue-accueil [data-ajch="c1"]') || '';
+  verifierVrai('avant : Aujourd’hui dit « pas encore repéré »', /pas encore repéré/.test(ligne()));
+  await ficheB1(t, 'c1');
+  verifierVrai('l’étape Infos propose « Pas de repérage »', !!t.$('#f-sansreperage'));
+  verifierVrai('le résumé dit « repérage facultatif »', /repérage facultatif/.test(resumeB1(t, 0)));
+  t.clic('#f-sansreperage'); await t.pause(450);
+  verifier('choisi : il est gardé', true, chB1(t, 'c1').sansReperage);
+  verifierVrai('l’étape le dit', /Repérage : pas de repérage/.test(etapeB1(t, 0)));
+  verifierVrai('et ne le réclame plus : ni le résumé, ni l’aide',
+    !/repérage facultatif/.test(resumeB1(t, 0)) && /pas de repérage/.test(resumeB1(t, 0)) &&
+    !/Facultatif : un chantier peut passer/.test(etapeB1(t, 0)) && !t.$('#f-sansreperage'));
+  await parBarre(t, 'aujourdhui');
+  verifierVrai('Aujourd’hui non plus', /Devis à faire/.test(ligne()) && !/repéré/.test(ligne()));
+  await ficheB1(t, 'c1');
+  t.clic('#f-reperage-oui'); await t.pause(450);
+  verifier('défait : le choix s’en va', false, chB1(t, 'c1').sansReperage);
+  verifier('et la fenêtre du repérage s’ouvre', 'Noter le repérage', t.texte('#modale-titre'));
+  t.clic('#modale-x'); await t.pause(200);
+  verifierVrai('« Pas de repérage » revient', !!t.$('#f-sansreperage') && /repérage facultatif/.test(resumeB1(t, 0)));
+  await parBarre(t, 'aujourdhui');
+  verifierVrai('et Aujourd’hui le redit', /pas encore repéré/.test(ligne()));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+scenario('Lot r2 : fiche ▸ Travaux, un appui sur un jour ouvre ce qu’il porte', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    cfg: { heuresJour: 8, journeesMigrees: true, officeDepuis: JA(-10) },
+    chantiers: [chA('c1', { nom: 'Vaux', statut: 'encours', aDevis: false,
+      lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 3, prix: 700, nature: 'prestation' }],
+      jours: [{ d: JA(-4), p: 1 }, { d: JA(3), p: 1 }] })],
+    journees: [{ id: 'j1', date: JA(-2), chantier: 'c1', personnes: 1, nonProd: 0, km: 30,
+      postes: [{ travaux: 'DEGAG', heures: 7, quantite: 1 }] },
+      /* Une saisie sans date : la ligne « sans date (rattrapage) ». */
+      { id: 'j2', date: null, chantier: 'c1', personnes: 1, nonProd: 3, postes: [] }]
+  }));
+  const M = t.w.BCC.minuit;
+  const jour = async cle => {
+    await ficheB1(t, 'c1');
+    const d = t.$('#f-etapes [data-etape="2"]'); if (d) d.open = true;
+    const ok = t.clic('#f-etapes [data-fjour="' + cle + '"]'); await t.pause(500);
+    return ok;
+  };
+  verifierVrai('le jour fait est un bouton', await jour(M(JA(-2))));
+  verifier('il ouvre sa journée en modification', ['Modifier la journée', 'c1', '7'],
+    [t.texte('#modale-titre'), t.$('#mj-ch') && t.$('#mj-ch').value, t.$('#mj-total') && t.$('#mj-total').value]);
+  t.clic('#modale-x'); await t.pause(150);
+  verifierVrai('le jour posé à venir aussi', await jour(M(JA(3))));
+  verifierVrai('il ouvre la fiche du jour', !!t.$('#modale .fj-etat') && !t.$('#mj-ok'));
+  t.clic('#modale-x'); await t.pause(150);
+  verifierVrai('la journée comptée d’office aussi', await jour(M(JA(-4))));
+  verifier('elle ouvre Ma journée pré-remplie', ['Ma journée', 'c1', '8'],
+    [t.texte('#modale-titre'), t.$('#mj-ch') && t.$('#mj-ch').value, t.$('#mj-total') && t.$('#mj-total').value]);
+  t.clic('#modale-x'); await t.pause(150);
+  verifierVrai('la ligne sans date aussi', await jour('sans'));
+  verifierVrai('elle ouvre le rattrapage', /Temps passé/.test(t.texte('#modale-titre')) && !!t.$('#ct-duree'));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+scenario('Lot r2 : la fenêtre d’une ligne — plus de Difficulté, Produit du stock sur une fourniture, Précision', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    cfg: { heuresJour: 8, journeesMigrees: true },
+    articles: [{ id: 'a1', nom: 'Tuteur châtaignier', type: 'tuteur', unite: 'unite', prix: 1, mouvements: [], maj: Date.now() }],
+    chantiers: [chA('c1', { nom: 'Vaux', statut: 'devis', aDevis: true, lignes: [
+      { travail: 'DEGAG', unite: 'ha', quantite: 3, prix: 700, nature: 'prestation' },
+      { travail: 'F_TUTEUR', unite: 'unite', quantite: 100, prix: 1.2, nature: 'vente' },
+      /* Une ancienne ligne : un produit et une difficulté déjà notés. */
+      { travail: 'PLANT', unite: 'plant', quantite: 500, prix: 1, nature: 'prestation', article: 'a1', difficulte: 4 }] })]
+  }));
+  await ficheB1(t, 'c1');
+  const ligne = async i => { t.clic('#f-etapes [data-lmod="' + i + '"]'); await t.pause(350); };
+  const stockVu = () => !!t.$('#cl-art-champ') && t.$('#cl-art-champ').style.display !== 'none';
+  await ligne(0);
+  verifierVrai('plus de Difficulté dans la fenêtre', !t.$('#cl-diff') && !/Difficulté/.test(t.texte('#modale-corps')));
+  verifierVrai('« Précision (facultatif) »', t.texte('label[for="cl-note"]') === 'Précision (facultatif)' &&
+    !/Libellé sur la facture/.test(t.texte('#modale-corps')));
+  verifierVrai('avec son aide d’une ligne', /Ce qui précise la ligne, tel que sur votre facture/.test(t.texte('#modale-corps')) &&
+    !/La note sert à situer vos rendements/.test(t.texte('#modale-corps')));
+  verifierVrai('une prestation : pas de Produit du stock', !stockVu());
+  t.choisir('#cl-trav', 'F_PROTEC'); await t.pause(100);
+  verifierVrai('devenue fourniture, il paraît', stockVu());
+  t.clic('#modale-x'); await t.pause(150);
+  await ligne(1);
+  verifierVrai('une fourniture : Produit du stock', stockVu());
+  t.clic('#modale-x'); await t.pause(150);
+  await ligne(2);
+  verifierVrai('une ancienne prestation qui en a un : il reste', stockVu() && t.$('#cl-art').value === 'a1');
+  t.saisir('#cl-note', 'plants en racines nues');
+  t.clic('#cl-ok'); await t.pause(500);
+  const l2 = chB1(t, 'c1').lignes[2];
+  verifier('la difficulté déjà notée reste en base, la précision va dans note', [4, 'a1', 'plants en racines nues'],
+    [l2.difficulte, l2.article, l2.note]);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+scenario('Lot r2 : heures et minutes — 0 h 40 de trajet, 7 h 20 sur une prestation, le clavier reste ouvert', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    cfg: { heuresJour: 8, journeesMigrees: true },
+    chantiers: [chA('c1', { nom: 'Vaux', statut: 'encours', lignes: [
+      { travail: 'PLANT', unite: 'plant', quantite: 1200, prix: 1.1, nature: 'prestation' },
+      { travail: 'DEGAG', unite: 'ha', quantite: 2, prix: 600, nature: 'prestation' }] })]
+  }));
+  await ouvrirMjR2(t);
+  t.choisir('#mj-ch', 'c1'); await t.pause(200);
+  verifierVrai('deux prestations, sans heures', t.$$('#mj-postes [data-pstt]').length === 2 && !t.$('[data-psth="0"]'));
+  t.clic('#pst-rep'); await t.pause(150);
+  const SEL = ['[data-psth="0"]', '[data-pstm="0"]', '[data-pstq="0"]', '[data-psth="1"]', '[data-pstm="1"]',
+    '[data-pstq="1"]', '#mj-total', '#mj-total-m', '#mj-prod', '#mj-prod-m', '#mj-trajet', '#mj-trajet-m', '#mj-km', '#mj-pers'];
+  const VAL = ['7', '20', '300', '0', '40', '0,5', '8', '', '8', '', '0', '40', '42', '1'];
+  const avant = SEL.map(s => t.$(s));
+  verifierVrai('répartir fait paraître les cases h et min', avant.every(Boolean));
+  const gardes = avant.map((n, i) => {
+    n.focus(); n.value = VAL[i];
+    n.dispatchEvent(new t.w.Event('input', { bubbles: true }));
+    n.dispatchEvent(new t.w.Event('change', { bubbles: true }));
+    return t.$(SEL[i]) === n && t.d.activeElement === n;
+  });
+  verifier('chaque case reste la même et garde le doigt', SEL.map(() => true), gardes);
+  verifierVrai('le pied dit 8 h et le trajet à côté', /8 h/.test(t.texte('#mj-apercu')) &&
+    /\+ 40 min de trajet/.test(t.texte('#mj-apercu')));
+  t.clic('#mj-ok'); await t.pause(600);
+  const j = jrR2(t)[0] || {};
+  verifier('enregistré en heures décimales', [7.333, 0.667, 0.667, 8],
+    [(j.postes || [])[0] && j.postes[0].heures, (j.postes || [])[1] && j.postes[1].heures, j.trajet, j.productif]);
+  await parBarre(t, 'aujourdhui');
+  t.clic('[data-ajouvre="journee:' + j.id + '"]'); await t.pause(450);
+  verifier('relu en heures et minutes', ['7', '20', '0', '40', '0', '40'],
+    ['[data-psth="0"]', '[data-pstm="0"]', '[data-psth="1"]', '[data-pstm="1"]', '#mj-trajet', '#mj-trajet-m']
+      .map(s => t.$(s) ? t.$(s).value : null));
+  t.clic('#modale-x'); await t.pause(150);
+  /* Une ancienne valeur décimale se relit juste. */
+  verifier('1,67 h se relit 1 h 40', ['1 h 40', '40 min', '2 j 4 h 30'],
+    [t.w.BCC.ditHeures(1.67), t.w.BCC.ditHeures(0.667), t.w.BCC.ditDuree(20.5, { heuresJour: 8 })]);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+scenario('Lot r2 : le trajet sort des journées — 8 h + 1 h de route, trois jours', async () => {
+  const jour = (id, n, ch, trajet) => ({ id, date: JA(n), chantier: ch, personnes: 1, nonProd: 0, km: 50,
+    trajet, postes: [{ travaux: 'DEGAG', heures: 8, quantite: 1 }] });
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    cfg: { heuresJour: 8, journeesMigrees: true },
+    chantiers: [
+      chA('c1', { nom: 'Vaux', statut: 'termine', aDevis: true, prixJour: 300,
+        lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 3, prix: 300, nature: 'prestation' }] }),
+      chA('c2', { nom: 'Marchand', statut: 'termine', aDevis: true, prixJour: 300,
+        lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 2, prix: 500, nature: 'prestation' }] })],
+    journees: [jour('a', -6, 'c1', 1), jour('b', -5, 'c1', 1), jour('c', -4, 'c1', 1),
+      jour('d', -6, 'c2', 0), jour('e', -5, 'c2', 0)]
+  }));
+  const C0 = t.w.BCC, cfg = { heuresJour: 8 };
+  verifier('« J’y ai passé » : 3 j, plus 3 j 3 h', 3, C0.tempsMoi(chR2(t, 'c1'), cfg));
+  verifier('le prix par journée réel monte d’autant : 900 € sur 3 j', 300, C0.troisChiffres(chR2(t, 'c1'), cfg).parJour);
+  verifier('le trajet se lit à part', 3, C0.trajetChantier(chR2(t, 'c1')));
+  verifier('un chantier sans trajet, inchangé au centime près', [2, 500],
+    [C0.tempsMoi(chR2(t, 'c2'), cfg), C0.troisChiffres(chR2(t, 'c2'), cfg).parJour]);
+  verifier('les rendements ne changent pas', [1, 1],
+    [C0.rendementTravail(chR2(t, 'c1'), 'DEGAG', cfg).rendement, C0.rendementTravail(chR2(t, 'c2'), 'DEGAG', cfg).rendement]);
+  await ficheB1(t, 'c1');
+  verifierVrai('trois chiffres : 3 journées, 300 € par jour', /3journéesfaites/.test(sansBlancs(t.texte('.fi-kpis'))) &&
+    /300€parjour,réel/.test(sansBlancs(t.texte('.fi-kpis'))));
+  const tr = etapeB1(t, 2);
+  verifierVrai('étape Travaux : « J’y ai passé 3 j », le trajet à côté', /J’y ai passé ?3 j(?! \d)/.test(tr) &&
+    /\+ 3 h de trajet/.test(tr) && /\+ 1 h de trajet/.test(tr));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+scenario('Lot r2 : le temps productif — non réparti, réparti, une seule prestation, ancienne journée', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    cfg: { heuresJour: 8, journeesMigrees: true },
+    chantiers: [
+      chA('c1', { nom: 'Vaux', statut: 'encours', lignes: [
+        { travail: 'DEGAG', unite: 'ha', quantite: 3, prix: 700, nature: 'prestation' },
+        { travail: 'TAILLE', unite: 'ha', quantite: 2, prix: 500, nature: 'prestation' }] }),
+      chA('c2', { nom: 'Marchand', statut: 'encours', lignes: [
+        { travail: 'PLANT', unite: 'plant', quantite: 1000, prix: 1, nature: 'prestation' }] }),
+      chA('c3', { nom: 'Ancien', statut: 'encours', lignes: [
+        { travail: 'DEGAG', unite: 'ha', quantite: 1, prix: 700, nature: 'prestation' }] })],
+    journees: [
+      /* Une journée répartie d'avant : 4 h de dégagement, le seul repère. */
+      { id: 'j0', date: JA(-3), chantier: 'c1', personnes: 1, nonProd: 0, postes: [{ travaux: 'DEGAG', heures: 4, quantite: 0.5 }] },
+      /* Une ancienne journée, sans productif : 6 h + 1 h hors production + 1 h de route. */
+      { id: 'jv', date: JA(-2), chantier: 'c3', personnes: 1, nonProd: 1, trajet: 1, km: 20,
+        postes: [{ travaux: 'DEGAG', heures: 6, quantite: 0.4 }] }]
+  }));
+  const C0 = t.w.BCC, cfg = { heuresJour: 8 };
+  const rdt = (id, tv) => { const r = C0.rendementTravail(chR2(t, id), tv, cfg); return r ? C0.arr(r.rendement, 3) : null; };
+  const avant = [rdt('c1', 'DEGAG'), rdt('c1', 'TAILLE')];
+  verifier('les rendements avant : 3 ha / 0,5 j, rien pour la taille', [6, null], avant);
+
+  /* Dégagement et taille en même temps : 8 h sur place dont 7 productives. */
+  await ouvrirMjR2(t);
+  t.choisir('#mj-ch', 'c1'); await t.pause(200);
+  dureeR2(t, '#mj-total', '8', '');
+  verifier('le productif est proposé égal au total', '8', t.$('#mj-prod').value);
+  dureeR2(t, '#mj-prod', '7', '');
+  t.saisir('[data-pstq="0"]', '1,5'); t.saisir('[data-pstq="1"]', '1');
+  verifierVrai('l’écran dit 1 h hors production', /7 h productives, 1 h hors production/.test(t.texte('#mj-horsprod')));
+  verifierVrai('et que les rendements ne la comptent pas', /il ne compte dans le rendement d’aucune/.test(t.texte('#pst-repaide')));
+  t.clic('#mj-ok'); await t.pause(600);
+  const nr = jrR2(t).filter(x => x.chantier === 'c1' && x.id !== 'j0')[0] || {};
+  verifier('gardée : productif 7, hors production 1, quantités, pas d’heures', [7, 1, [0, 0], [1.5, 1]],
+    [nr.productif, nr.nonProd, (nr.postes || []).map(p => p.heures), (nr.postes || []).map(p => p.quantite)]);
+  verifier('8 h au chantier', 8 + 4, C0.arr(C0.tempsMoi(chR2(t, 'c1'), cfg) * 8, 2));
+  verifier('les rendements de ces prestations, inchangés', avant, [rdt('c1', 'DEGAG'), rdt('c1', 'TAILLE')]);
+  verifier('les quantités comptent pour l’avancement', [2, 1],
+    C0.avancement(chR2(t, 'c1')).lignes.map(l => l.fait));
+
+  /* La même, répartie 4 h / 3 h : les rendements sont nourris. */
+  await parBarre(t, 'aujourdhui');
+  t.clic('[data-ajouvre="journee:' + nr.id + '"]'); await t.pause(450);
+  t.clic('#pst-rep'); await t.pause(150);
+  dureeR2(t, '#pst-h-0', '4', ''); dureeR2(t, '#pst-h-1', '2', '');
+  verifierVrai('réparties, leur somme doit faire le productif', /Les prestations font 6 h, le temps productif 7 h/.test(t.texte('#mj-horsprod')));
+  t.clic('#mj-ok'); await t.pause(400);
+  verifier('et rien ne s’enregistre tant qu’elle ne le fait pas', [0, 0],
+    (jrR2(t).filter(x => x.id === nr.id)[0].postes || []).map(p => p.heures));
+  dureeR2(t, '#pst-h-1', '3', '');
+  t.clic('#mj-ok'); await t.pause(600);
+  verifier('réparties 4 h / 3 h : les rendements sont nourris', [3, 5.333], [rdt('c1', 'DEGAG'), rdt('c1', 'TAILLE')]);
+
+  /* Une seule prestation : elle prend tout le productif, sans case d'heures. */
+  await ouvrirMjR2(t);
+  t.choisir('#mj-ch', 'c2'); await t.pause(200);
+  verifierVrai('une seule prestation : pas de case d’heures', !t.$('[data-psth="0"]') && !t.$('#pst-rep'));
+  dureeR2(t, '#mj-total', '8', ''); dureeR2(t, '#mj-prod', '7', ''); t.saisir('[data-pstq="0"]', '700');
+  verifierVrai('son rendement se lit sur le productif', /≈ 800 plant\/jour/.test(t.texte('#pst-r-0')));
+  t.clic('#mj-ok'); await t.pause(600);
+  const un = jrR2(t).filter(x => x.chantier === 'c2')[0] || {};
+  verifier('7 h pour elle', [7, 1], [(un.postes || [])[0] && un.postes[0].heures, un.nonProd]);
+
+  /* Une ancienne journée se relit et se réenregistre à l'identique. */
+  await parBarre(t, 'aujourdhui');
+  t.clic('[data-ajouvre="journee:jv"]'); await t.pause(450);
+  verifier('relue : 7 h sur place dont 6 productives, 1 h de route', ['7', '6', '1'],
+    [t.$('#mj-total').value, t.$('#mj-prod').value, t.$('#mj-trajet').value]);
+  t.clic('#mj-ok'); await t.pause(600);
+  const v = jrR2(t).filter(x => x.id === 'jv')[0] || {};
+  verifier('réenregistrée : rien ne bouge', [6, 1, 1, 0.4, 7],
+    [v.postes[0].heures, v.nonProd, v.trajet, v.postes[0].quantite, C0.heuresJournee(v)]);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+scenario('Lot r2 : le trajet du chantier — proposé, modifié pour un jour, retenu', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    cfg: { heuresJour: 8, journeesMigrees: true },
+    chantiers: [
+      chA('c1', { nom: 'Vaux', statut: 'encours', trajetKm: 64, trajetHeures: 7 / 6 }),
+      chA('c2', { nom: 'Marchand', statut: 'encours' })],
+    journees: [{ id: 'j0', date: JA(-1), chantier: 'c2', personnes: 1, nonProd: 6, km: 42, trajet: 0.5, postes: [] }]
+  }));
+  await ouvrirMjR2(t);
+  t.choisir('#mj-ch', 'c1'); await t.pause(200);
+  verifierVrai('celui de la fiche est proposé, replié en une ligne',
+    !t.$('#mj-traj-ligne').hidden && /Trajet : 64 km · 1 h 10/.test(t.texte('#mj-traj-ligne')) && t.$('#mj-traj-cases').hidden);
+  verifier('ses cases sont remplies', ['64', '1', '10'], [t.$('#mj-km').value, t.$('#mj-trajet').value, t.$('#mj-trajet-m').value]);
+  verifierVrai('la fiche en a un : pas de « Retenir »', t.$('#mj-retenir-l').hidden);
+  t.clic('#mj-traj-mod'); await t.pause(100);
+  verifierVrai('« Modifier » ouvre les cases', !t.$('#mj-traj-cases').hidden);
+  t.saisir('#mj-km', '70'); dureeR2(t, '#mj-total', '8', '');
+  t.clic('#mj-ok'); await t.pause(600);
+  verifier('la journée garde 70 km', 70, (jrR2(t).filter(x => x.chantier === 'c1')[0] || {}).km);
+  verifier('la fiche ne change pas', [64, 7 / 6], [chB1(t, 'c1').trajetKm, chB1(t, 'c1').trajetHeures]);
+
+  await ouvrirMjR2(t);
+  t.choisir('#mj-ch', 'c2'); await t.pause(200);
+  verifier('fiche vide : celui de la dernière journée', ['42', '0', '30'],
+    [t.$('#mj-km').value, t.$('#mj-trajet').value, t.$('#mj-trajet-m').value]);
+  verifierVrai('et « Retenir pour ce chantier », coché', !t.$('#mj-retenir-l').hidden && t.$('#mj-retenir').checked);
+  dureeR2(t, '#mj-total', '6', '');
+  t.clic('#mj-ok'); await t.pause(600);
+  verifier('retenu sur la fiche', [42, 0.5], [chB1(t, 'c2').trajetKm, chB1(t, 'c2').trajetHeures]);
+  await ficheB1(t, 'c2');
+  verifierVrai('la fiche ▸ Infos le dit', /Trajet depuis chez moi ✎ ?42 km · 30 min aller-retour/.test(etapeB1(t, 0)));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+scenario('Lot r2 : la pastille Fiche sans chantier ouvert propose de choisir', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    cfg: { heuresJour: 8, journeesMigrees: true },
+    chantiers: [chA('c1', { nom: 'Vaux', statut: 'encours', dateEntree: JA(-9) }),
+      chA('c2', { nom: 'Marchand', statut: 'devis', aDevis: true, dateEntree: JA(-4) }),
+      chA('c3', { nom: 'Vieux', statut: 'paye', datePaiement: JA(-200) })]
+  }));
+  await parBarre(t, 'chantiers');
+  t.clic('#onglets [data-vue="chantier"]'); await t.pause(350);
+  verifierVrai('pas d’écran vide : une recherche et la liste', !!t.$('#fc-rech') &&
+    !/Chantier introuvable/.test(t.texte('#fiche-chantier')));
+  verifier('les chantiers en cours, rangés comme dans Aujourd’hui', ['c2', 'c1'],
+    t.$$('#fc-liste [data-fcouvre]').map(b => b.dataset.fcouvre));
+  verifierVrai('par étape', t.$$('#fc-liste .aj-etape').length === 2);
+  const champ = t.$('#fc-rech');
+  t.saisir('#fc-rech', 'vieux'); await t.pause(150);
+  verifier('la recherche porte sur tous', ['c3'], t.$$('#fc-liste [data-fcouvre]').map(b => b.dataset.fcouvre));
+  verifierVrai('sans refaire la case', t.$('#fc-rech') === champ);
+  t.clic('#fc-liste [data-fcouvre="c3"]'); await t.pause(450);
+  verifierVrai('le choix ouvre sa fiche', !!t.$('#f-etapes') && /Vieux/.test(t.texte('.fi-tete h2')));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+scenario('Lot r2 : une seule journée par chantier et par jour', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    cfg: { heuresJour: 8, journeesMigrees: true },
+    chantiers: [chA('c1', { nom: 'Savigny', statut: 'encours' }), chA('c2', { nom: 'Marchand', statut: 'encours' })],
+    journees: [
+      { id: 'ja', date: JA(-1), chantier: 'c1', personnes: 1, nonProd: 5, postes: [] },
+      /* Un ancien doublon : deux journées de Marchand le même jour. */
+      { id: 'd1', date: JA(-3), chantier: 'c2', personnes: 1, nonProd: 4, postes: [] },
+      { id: 'd2', date: JA(-3), chantier: 'c2', personnes: 1, nonProd: 3, postes: [] }]
+  }));
+  const n = () => jrR2(t).length;
+  await ouvrirMjR2(t);
+  t.choisir('#mj-ch', 'c1'); await t.pause(200);
+  dureeR2(t, '#mj-total', '4', '');
+  t.clic('#mj-ok'); await t.pause(600);
+  verifier('Savigny 4 h aujourd’hui', 4, n());
+  const neuve = jrR2(t).filter(x => x.chantier === 'c1' && x.id !== 'ja')[0];
+
+  /* Le soir, par oubli : Ma journée sur Savigny à la même date. */
+  await ouvrirMjR2(t);
+  dureeR2(t, '#mj-total', '3', '');
+  t.choisir('#mj-ch', 'c1'); await t.pause(350);
+  verifier('la journée de 4 h s’ouvre en modification', ['Modifier la journée', '4'],
+    [t.texte('#modale-titre'), t.$('#mj-total') && t.$('#mj-total').value]);
+  verifierVrai('une ligne le dit, et ce qui était tapé', /Savigny a déjà une journée le .* : 4 h/.test(t.texte('#mj-avis')) &&
+    /n’y est pas reporté : 3 h/.test(t.texte('#mj-avis')));
+  t.clic('#mj-ok'); await t.pause(600);
+  verifier('une seule journée en base', 4, n());
+
+  /* En modification : déplacer la journée d'hier sur aujourd'hui est refusé. */
+  await parBarre(t, 'aujourdhui');
+  t.clic('[data-ajouvre="journee:ja"]'); await t.pause(450);
+  t.choisir('#mj-date', jourISO(Date.now())); await t.pause(200);
+  verifierVrai('l’écran le dit, et propose l’autre', /Savigny a déjà une journée/.test(t.texte('#mj-doublon')) && !!t.$('#mj-autre'));
+  t.clic('#mj-ok'); await t.pause(500);
+  verifier('rien n’est enregistré en double', [4, jourISO(JA(-1))],
+    [n(), jourISO(jrR2(t).filter(x => x.id === 'ja')[0].date)]);
+  t.clic('#mj-autre'); await t.pause(450);
+  verifier('« Ouvrir l’autre journée » l’ouvre', '4', t.$('#mj-total').value);
+  t.clic('#modale-x'); await t.pause(150);
+
+  /* L'ancien doublon : le choix à l'appui, et ✕ dit combien. */
+  await parBarre(t, 'agenda');
+  await cliquerJour(t, JA(-3));
+  t.clic('#modale [data-fjmj]'); await t.pause(400);
+  verifier('l’appui propose le choix', ['2 journées ce jour-là', 2],
+    [t.texte('#modale-titre'), t.$$('#modale [data-mjchoix]').length]);
+  t.clic('#modale [data-mjchoix="d2"]'); await t.pause(400);
+  verifier('le choix ouvre la bonne', ['Modifier la journée', '3'], [t.texte('#modale-titre'), t.$('#mj-total').value]);
+  t.clic('#modale-x'); await t.pause(150);
+  await cliquerJour(t, JA(-3));
+  let question = '';
+  t.w.confirm = q => { question = q; return false; };
+  t.clic('#modale [data-fjsupch="c2"]'); await t.pause(200);
+  verifierVrai('✕ annonce « les 2 journées »', /Retirer les 2 journées de Marchand ce jour-là/.test(question));
+  t.clic('#modale-x'); await t.pause(150);
+  await ficheB1(t, 'c2');
+  const d = t.$('#f-etapes [data-etape="2"]'); if (d) d.open = true;
+  t.clic('#f-etapes [data-fjour="' + t.w.BCC.minuit(JA(-3)) + '"]'); await t.pause(400);
+  verifier('fiche ▸ Travaux : le même choix', 2, t.$$('#modale [data-mjchoix]').length);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+scenario('Lot r2 : « plus de jour posé », en gris, dans la fiche et les cumuls', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    cfg: { heuresJour: 8, journeesMigrees: true },
+    chantiers: [chA('c1', { nom: 'Vaux', statut: 'encours', aDevis: false, jours: [{ d: JA(-6), p: 1 }, { d: JA(-5), p: 1 }] })]
+  }));
+  await ficheB1(t, 'c1');
+  verifierVrai('la fiche dit « plus de jour posé »', /plus de jour posé/.test(t.texte('.fi-tete .fi-etat')));
+  verifierVrai('en gris, plus en rouge', !t.$('.fi-tete .fi-etat .retard') && !/jours passés/.test(t.texte('.fi-tete')));
+  await parBarre(t, 'chantiers');
+  verifierVrai('les cumuls disent le même mot, sans rouge', /1 avec plus de jour posé/.test(t.texte('#carnet-totaux')) &&
+    !t.$('#carnet-totaux .retard') && !/aux jours passés/.test(t.texte('#carnet-totaux')));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+scenario('Lot r2 : la bulle fermée par OK rend son cran d’historique', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    cfg: { heuresJour: 8, journeesMigrees: true, officeDepuis: JA(-10) },
+    chantiers: [chA('c1', { nom: 'Vaux', statut: 'encours', aDevis: false, jours: [{ d: JA(-2), p: 1 }] })]
+  }));
+  const A0 = etatR2(t);
+  verifierVrai('la bulle est ouverte, avec son cran', !!t.$('#aj-bulle') && A0.crans === 1);
+  t.clic('#ajb-ok'); await t.pause(400);
+  verifier('OK : la bulle se ferme et rend son cran', [false, 0, 0], [!!t.$('#aj-bulle'), A0.crans, A0.avalerRetour || 0]);
+  /* Le retour fait ce qu'il faisait sans la bulle, dès le premier appui. */
+  await parBarre(t, 'agenda');
+  t.w.dispatchEvent(new t.w.PopStateEvent('popstate')); await t.pause(350);
+  verifier('un seul retour ramène à Aujourd’hui', 'vue-accueil', vueActive(t));
+  /* La bulle de l'appui long de l'Agenda ne prend pas de cran. */
+  await parBarre(t, 'agenda');
+  const crans = A0.crans;
+  await appuiLong(t, JA(1), 'souris');
+  verifierVrai('la bulle de l’Agenda s’ouvre', !!t.$('#cal-bulle'));
+  t.clic('#cal-bulle-fond'); await t.pause(200);
+  t.w.document.dispatchEvent(new t.w.KeyboardEvent('keydown', { key: 'Escape' })); await t.pause(100);
+  verifier('fermée, elle laisse les crans tels quels', crans, A0.crans);
+  t.w.dispatchEvent(new t.w.PopStateEvent('popstate')); await t.pause(350);
+  verifier('et un seul retour ramène à Aujourd’hui', 'vue-accueil', vueActive(t));
   verifier('aucune erreur', [], t.erreurs);
 });
 

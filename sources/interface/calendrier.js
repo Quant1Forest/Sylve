@@ -286,8 +286,7 @@ function ouvrirFicheJour(ts) {
   if (office.length) {
     h += '<div class="fj-office" id="fj-office"><p><b>○ Comptée d’office : ' +
       esc(office.map(function (r) {
-        var hh = C.heuresSaisie(r.temps, A.cfg);
-        return E.fmt(hh, hh % 1 ? 1 : 0) + ' h sur ' + C.nomChantier(r.chantier);
+        return C.ditHeures(C.heuresSaisie(r.temps, A.cfg)) + ' sur ' + C.nomChantier(r.chantier);
       }).join(', ')) + '.</b> Le jour était posé et confirmé, rien n’a été saisi. ' +
       'Si vous remplissez Ma journée, elle remplace celle-ci.</p>' +
       '<div class="btn-rang"><button class="btn primaire btn-min" id="fj-preciser">Préciser ma journée</button>' +
@@ -310,11 +309,14 @@ function ouvrirFicheJour(ts) {
   if (parCh.length) {
     h += '<p class="fj-sous">Ce que vous y avez fait</p>' +
       parCh.map(function (x) {
+        /* Le trajet se dit à côté de la durée (lot r2) : il n'y entre plus. */
         var txt = '<b>' + esc(C.nomChantier(x.chantier)) + '</b><small>' +
-          C.ditDuree(x.heures, A.cfg) + (x.personnes > 1 ? ' × ' + x.personnes + ' pers.' : '') + '</small>' +
+          C.ditDuree(x.heures, A.cfg) + (x.personnes > 1 ? ' × ' + x.personnes + ' pers.' : '') +
+          (x.trajet ? ' · + ' + C.ditHeures(x.trajet) + ' de trajet' : '') +
+          (x.jrn.length > 1 ? ' · ' + x.jrn.length + ' journées' : '') + '</small>' +
           (x.prestations.length ? '<small class="fj-presta">' + esc(x.prestations.join(', ')) + '</small>' : '');
         /* Un appui rouvre la journée de ce chantier ; s'il y en a plusieurs ce
-           jour-là, la première. */
+           jour-là (un ancien doublon), un petit choix entre elles (lot r2). */
         return '<div class="liste-item" data-fjch="' + esc(x.chantier.id) + '">' +
           (x.jrn.length
             ? '<button type="button" class="li-c fj-txt" data-fjmj="' + esc(x.jrn[0]) + '">' + txt + '</button>'
@@ -416,10 +418,8 @@ function ouvrirFicheJour(ts) {
   sur('fj-preciser', function () {
     fermerModale();
     if (office.length !== 1) { ouvrirJournee(null, { date: ts }); return; }
-    var c = office[0].chantier;
-    ouvrirJournee(null, { date: ts, chantier: c.id, lieu: c.foret || '', commune: c.commune || '',
-      km: kmHabituels(c.id) || 0, total: C.heuresSaisie(office[0].temps, A.cfg),
-      postes: prestationsDe(c).map(function (tv) { return { travaux: tv }; }) });
+    /* Les kilomètres et le trajet, Ma journée les propose d'elle-même. */
+    ouvrirJournee(null, modeleDOffice(office[0].chantier, ts, C.heuresSaisie(office[0].temps, A.cfg)));
   });
   sur('fj-nonla', function () {
     retirerJoursOffice(ts, office).then(function () {
@@ -434,7 +434,11 @@ function ouvrirFicheJour(ts) {
   });
   $('#modale-corps').addEventListener('click', function (e) {
     var mj = e.target.closest('[data-fjmj]');
-    if (mj) { fermerModale(); ouvrirJournee(mj.dataset.fjmj); return; }
+    if (mj) {
+      var xm = parCh.filter(function (y) { return y.jrn.indexOf(mj.dataset.fjmj) >= 0; })[0];
+      fermerModale(); ouvrirJourneesParmi(xm ? xm.jrn : [mj.dataset.fjmj]);
+      return;
+    }
     var ouv = e.target.closest('[data-fjouvrir]');
     if (ouv) { fermerModale(); ouvrirChantier(ouv.dataset.fjouvrir, 'travaux'); return; }
     var ret = e.target.closest('[data-fjretirer]');
@@ -470,8 +474,11 @@ function ouvrirFicheJour(ts) {
       /* Une vieille saisie qui ne vient d'aucune journée ne se retire pas
          d'ici, comme avant. */
       if (!x.jrn.length) { toast('Cette saisie ne se retire pas d’ici.'); return; }
-      if (!confirm('Retirer la journée « ' + C.nomChantier(x.chantier) + ' » de ce jour ?\n\nElle restera ' +
-        'récupérable ' + B.JOURS_POUBELLE + ' jours dans ' + B.CHEMIN_CORBEILLE + '.')) return;
+      /* Un ancien doublon : on dit combien de journées partent (lot r2). */
+      if (!confirm((x.jrn.length > 1
+        ? 'Retirer les ' + x.jrn.length + ' journées de ' + C.nomChantier(x.chantier) + ' ce jour-là ?\n\nElles resteront '
+        : 'Retirer la journée « ' + C.nomChantier(x.chantier) + ' » de ce jour ?\n\nElle restera ') +
+        'récupérable' + (x.jrn.length > 1 ? 's ' : ' ') + B.JOURS_POUBELLE + ' jours dans ' + B.CHEMIN_CORBEILLE + '.')) return;
       retirerJourneesDe(x.jrn).then(function () { refaire('Journée mise à la corbeille.'); });
     }
   });
@@ -482,9 +489,10 @@ function parChantierDuJour(reels) {
   var par = {}, ordre = [];
   reels.forEach(function (r) {
     var id = r.chantier.id;
-    if (!par[id]) { par[id] = { chantier: r.chantier, heures: 0, personnes: 1, prestations: [], jrn: [] }; ordre.push(id); }
+    if (!par[id]) { par[id] = { chantier: r.chantier, heures: 0, trajet: 0, personnes: 1, prestations: [], jrn: [] }; ordre.push(id); }
     var x = par[id];
     x.heures = C.arr(x.heures + C.heuresSaisie(r.temps, A.cfg), 2);
+    x.trajet = C.arr(x.trajet + C.nb(r.temps.trajet), 3);
     x.personnes = Math.max(x.personnes, C.nb(r.temps.personnes) || 1);
     var n = r.temps.activite ? C.nomTravail(r.temps.activite) : '';
     if (n && x.prestations.indexOf(n) < 0) x.prestations.push(n);
@@ -499,7 +507,7 @@ function retirerJourneesDe(ids) {
   return Promise.all(l.map(function (j) {
     var c = j.chantier ? chantier(j.chantier) : null;
     return jeterObjet('journee', j, dateCourte(j.date) + ' — ' + (c ? C.nomChantier(c) : (j.lieu || 'sans chantier')),
-      E.fmt(C.heuresJournee(j), 1) + ' h');
+      C.ditHeures(C.heuresJournee(j)));
   })).then(function () {
     indexerJournees();
     return Promise.all([sauverJournees(), sauverChantiers()]);
@@ -1366,7 +1374,7 @@ function renderHistorique() {
     totH += heuresDu(x);
     x.jrn.forEach(function (j) { totKm += C.nb(j.km); });
   });
-  var h1 = function (h) { return E.fmt(C.arr(h, 1), h % 1 ? 1 : 0) + ' h'; };
+  var h1 = C.ditHeures;
   var lundis = Object.keys(semaines).map(Number).sort(function (a, b) { return b - a; });
   A.semOuvertes = A.semOuvertes || {};
   z.innerHTML = '<div class="carte"><div class="carte-titre"><h2>Ce mois-ci, jour par jour</h2>' +
@@ -1384,6 +1392,7 @@ function renderHistorique() {
             var c = j.chantier ? chantier(j.chantier) : null;
             var dit = faitsDeJournee(j);
             if (C.nb(j.km)) dit.push(E.fmt(C.nb(j.km), 0) + ' km');
+            if (C.nb(j.trajet)) dit.push('+ ' + C.ditHeures(j.trajet) + ' de trajet');
             if (j.fin) dit.push('chantier terminé');
             return '<button type="button" class="histo-l" data-histomj="' + esc(j.id) + '">' +
               '<span class="txt"><b>' + esc(jourCourt(x.ts, true) + ' · ' +

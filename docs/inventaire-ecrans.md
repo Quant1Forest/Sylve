@@ -299,6 +299,28 @@ main » et « Supprimer ce chantier ». La fenêtre « Les journées » est reti
 l'ancienne fiche ne s'est perdu » lisent cette table et jouent la preuve de
 chaque ligne.
 
+**Depuis le lot r2 (4.94.0)** : étape Infos — « Noter le repérage » et **Pas
+de repérage** (choisi : « Finalement, noter un repérage »), puis le bloc
+**Trajet depuis chez moi ✎** (fenêtre : kilomètres, temps en h + min,
+Enregistrer, Effacer). Étape Travaux — chaque jour de la liste est un bouton :
+sa journée (ou le choix entre deux), Ma journée pré-remplie pour une journée
+d'office, la fiche du jour pour un jour seulement posé, le rattrapage pour
+« sans date » ; « + N h de trajet » sur le jour, dans les totaux et sous
+« J'y ai passé ». Ligne d'état : « plus de jour posé » en gris (plus de badge
+rouge « jours passés »). Pastille **Fiche** sans chantier ouvert : « Quel
+chantier ouvrir ? », une recherche, puis les chantiers en cours rangés par
+étape ; un appui ouvre la fiche. Fenêtre d'une ligne : plus de Difficulté ;
+Produit du stock seulement sur une fourniture (ou une ligne qui en a un) ;
+« Précision (facultatif) » au lieu de « Libellé sur la facture ». Rattrapage :
+« Combien de temps ? » en h + min, les crans d'une heure les remplissent.
+**Ma journée** : Mon temps = temps total (h + min, « trajet non compris »),
+temps productif (h + min), personnes, puis les prestations (quantité ; heures
+seulement après « Répartir le temps entre les prestations ») ; Trajet = une
+ligne repliée « Trajet : … · Modifier » ou les cases temps aller-retour (h +
+min) et kilomètres, et « Retenir pour ce chantier » ; en tête, une ligne quand
+elle s'ouvre sur une journée qui existait déjà, et sous le chantier, celle d'un
+couple chantier + jour déjà pris.
+
 **Fiche de chantier** (le document obligatoire imprimé) — fiche ▸ « Fiche de
 chantier », ou onglet. Blocs : choix du filtre et du chantier · alerte « fiche
 obligatoire » (> 4 ha) · « Il manque » + bouton **Compléter le chantier** ·

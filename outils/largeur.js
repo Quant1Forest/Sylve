@@ -260,6 +260,9 @@ function parcours() {
       mesurer('chantiers › recherche');
       rech.value = ''; rech.dispatchEvent(new Event('input', { bubbles: true })); await pause(200);
     }
+    /* Lot r2 : la pastille Fiche sans chantier ouvert propose de choisir. */
+    const pf = $('#onglets [data-vue="chantier"]');
+    if (pf) { pf.click(); await pause(400); mesurer('chantiers › fiche sans chantier, le choix'); }
     const fs2 = $('#onglets [data-vue="fichech"]');
     if (fs2) {
       fs2.click(); await pause(350);
@@ -286,6 +289,14 @@ function parcours() {
       const b = $(portes[p]); if (!b) continue;
       b.click(); await pause(400); mesurer('fiche › ' + portes[p]); await fermer();
     }
+    /* Lot r2 : la fenêtre d'une ligne, le trajet de la fiche, et ce qu'ouvre
+       un jour de l'étape Travaux. */
+    const r2 = ['#f-etapes [data-lmod]', '#f-trajet', '#f-etapes [data-fjour]'];
+    for (let p = 0; p < r2.length; p++) {
+      [].forEach.call(document.querySelectorAll('#f-etapes details'), function (d) { d.open = true; });
+      const b = $(r2[p]); if (!b) continue;
+      b.click(); await pause(450); mesurer('fiche › ' + r2[p]); await fermer();
+    }
     $('#b-menu').click(); await pause(200);
     const menus = liste('#modale [data-menu]', 'menu');
     await fermer();
@@ -303,6 +314,19 @@ function parcours() {
       $('#barre [data-barre="plus"]').click(); await pause(250);
       const pb = $('#modale [data-plus="' + plus[p] + '"]'); if (!pb) continue;
       pb.click(); await pause(500); mesurer('+ ' + plus[p]);
+      await fermer();
+    }
+    /* Lot r2 : Ma journée et ses cases h / min — deux prestations réparties,
+       le trajet en cases. */
+    $('#barre [data-barre="plus"]').click(); await pause(250);
+    const pj = $('#modale [data-plus="journee"]');
+    if (pj) {
+      pj.click(); await pause(500);
+      const s = $('#mj-ch');
+      if (s) { s.value = 'c2'; s.dispatchEvent(new Event('change', { bubbles: true })); await pause(350); }
+      const rep = $('#pst-rep'); if (rep) { rep.click(); await pause(200); }
+      const mod = $('#mj-traj-mod'); if (mod && !$('#mj-traj-ligne').hidden) { mod.click(); await pause(150); }
+      mesurer('+ journee › répartie, cases h et min');
       await fermer();
     }
     parent.postMessage({ releves: relevés, erreurs: erreurs }, '*');

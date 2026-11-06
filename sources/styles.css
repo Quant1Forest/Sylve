@@ -34,8 +34,9 @@
   /* La couleur des plaquettes du bordereau ouvert. Elle repeignait toute
      l'application par --accent, si bien que l'écran changeait de couleur
      sans raison visible — selon le bordereau de cubage ouvert. Elle ne peint
-     plus que ce qui la désigne vraiment : la pastille du bordereau et les
-     plaquettes du ruban de saisie. */
+     plus que ce qui la désigne vraiment : les plaquettes du ruban de
+     saisie. (La pastille du bandeau du bordereau, toujours du même vert et
+     que rien ne remplissait, est partie au lot r2.) */
   --plaq:#2E4A3C;
   --r:10px; --r-s:7px;
   --mono:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Menlo,Consolas,monospace;
@@ -102,6 +103,16 @@ button{cursor:pointer;background:none;border:none}
 .jrang .jv{font-family:var(--mono);font-size:14px;font-weight:600}
 .jrang .jv.vide{color:var(--gris-clair);font-weight:400}
 .jrang.avenir .jd{color:var(--gris)}
+/* Un jour de la liste s'ouvre d'un appui (lot r2) : le bouton garde l'allure
+   de la ligne. */
+button.jrang{width:100%;font:inherit;color:inherit;text-align:left;background:none;border:0;
+  border-bottom:1px solid var(--trait);border-radius:0;cursor:pointer}
+button.jrang:active{background:var(--carte2)}
+/* Le choix d'un chantier, quand la pastille Fiche n'en a aucun (lot r2). */
+.fc-choix{display:grid;gap:10px;min-width:0}
+.fc-titre{margin:4px 0 0;font-size:15px;font-weight:700}
+.fc-choix input[type=search]{width:100%;min-width:0}
+.fc-choix .aj-etape{margin:0;padding:10px 14px 4px}
 /* Un achat à prévoir : la case à gauche, ce que c'est au milieu, le prix à
    droite. Coché, il pâlit et se barre — il reste lisible, il ne se mélange
    plus à ce qui attend. */
@@ -349,6 +360,21 @@ body:not(.m-ent) .mod-ent{display:none}
 .mj-tot .mj-montant{margin-left:auto;font-size:16px}
 #mj-apercu small{display:block;font-size:12.5px;margin-top:2px}
 .mj-pied .btn.plein{flex:1}
+/* Une durée en deux cases, « h » et « min » (lot r2) : elles se partagent la
+   largeur, et tiennent dans une demi-colonne à 320 px. */
+.duree{display:flex;align-items:center;gap:5px;min-width:0;max-width:100%}
+.duree input{width:0;flex:1 1 0;min-width:0;text-align:right}
+.duree.gros input{font-size:18px;font-weight:600;font-family:var(--mono)}
+.duree-u{flex:none;font-size:12.5px;color:var(--gris)}
+.mj-pers input{max-width:5em}
+.mj-postes-bas{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.mj-traj-ligne{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 12px;min-width:0}
+.mj-traj-ligne > span{display:grid;min-width:0;overflow-wrap:anywhere}
+.mj-traj-ligne small{font-size:12px;color:var(--gris)}
+.mj-avis{margin:0 0 10px;padding:9px 11px;border-radius:10px;background:var(--tiede-fond);
+  border:1px solid var(--tiede-trait);color:var(--tiede);font-size:13px;overflow-wrap:anywhere}
+.mj-doublon{margin:6px 0 0;font-size:12.5px;color:var(--alerte);overflow-wrap:anywhere}
+.mj-doublon:empty{display:none}
 .fj-etat small{display:block;font-size:11.5px;color:var(--gris)}
 /* La fiche de chantier. Le même dessin sert à l'aperçu et à l'impression :
    deux feuilles de style auraient fini par diverger, et c'est justement

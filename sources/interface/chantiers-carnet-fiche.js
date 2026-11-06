@@ -37,7 +37,8 @@ function renderCarnet() {
       (t.ouverts > 1 ? 's' : '') + ' ouvert' + (t.ouverts > 1 ? 's' : '') +
       ' · ' + E.fmt(t.jours, 1) + ' jours-homme cumulés' +
       (t.nAFacturer ? ' · <b>' + t.nAFacturer + ' à facturer</b>' : '') +
-      (t.retard ? ' · <span class="retard">' + t.retard + ' aux jours passés</span>' : '') + '</p>';
+      /* Un fait, pas une relance (lot r2) : le mot de la ligne d'Aujourd'hui. */
+      (t.retard ? ' · ' + t.retard + ' avec plus de jour posé' : '') + '</p>';
   }
   renderFiltreChantiers();
   renderListeChantiers();
@@ -678,11 +679,23 @@ function corpsInfos(c) {
         '<button class="btn-min" data-fcarte="moi">Je suis dessus</button>' +
         '<button class="btn-min" data-fcarte="placer">Placer sur la carte</button>') + '</div>' +
     '<p class="fi-meta"><span>Annoncé le <b>' + (C.dateEntree(c) ? dateCourte(C.dateEntree(c)) : '—') +
-    '</b></span><span>Repérage : <b>' + (c.dateReperage ? dateCourte(c.dateReperage) : 'pas encore') +
-    '</b></span></p>' +
-    '<button class="btn" id="f-reperage">' + (c.dateReperage ? 'Modifier le repérage' : 'Noter le repérage') +
-    '</button>' +
-    (c.dateReperage ? '' : '<p class="fi-aide">Facultatif : un chantier peut passer au devis sans repérage.</p>') +
+    '</b></span><span>Repérage : <b>' + (c.dateReperage ? dateCourte(c.dateReperage)
+      : c.sansReperage ? 'pas de repérage' : 'pas encore') + '</b></span></p>' +
+    /* « Pas de repérage » (lot r2), sur le principe de « Pas de devis » : un
+       choix qui se défait. Choisi, plus rien ne réclame le repérage. */
+    (c.dateReperage
+      ? '<button class="btn" id="f-reperage">Modifier le repérage</button>'
+      : c.sansReperage
+        ? '<button class="lien" id="f-reperage-oui">Finalement, noter un repérage</button>'
+        : '<div class="btn-rang"><button class="btn" id="f-reperage">Noter le repérage</button>' +
+          '<button class="btn" id="f-sansreperage">Pas de repérage</button></div>' +
+          '<p class="fi-aide">Facultatif : un chantier peut passer au devis sans repérage.</p>') +
+    /* Le trajet depuis chez lui (lot r2) : Ma journée le propose. */
+    '<button class="fi-note fi-btn" id="f-trajet"><small>Trajet depuis chez moi ✎</small>' +
+    (trajetDeFiche(c)
+      ? esc([C.nb(c.trajetKm) ? E.fmt(C.nb(c.trajetKm), C.nb(c.trajetKm) % 1 ? 1 : 0) + ' km' : '',
+        C.nb(c.trajetHeures) ? C.ditHeures(c.trajetHeures) : ''].filter(Boolean).join(' · ') + ' aller-retour')
+      : '<span class="muted">pas encore noté — Ma journée le proposera</span>') + '</button>' +
     /* La fiche sécurité est obligatoire au-delà de quatre hectares. C'est
        ici qu'il chiffre et repère, donc ici qu'il faut le dire. */
     (C.ficheRequise(c) ? '<p class="acompleter-bloc">Plus de ' + C.SEUIL_FICHE_HA + ' ha : une ' +
@@ -770,10 +783,10 @@ function corpsDevis(c) {
    posées sur l'agenda, « temps » est ce qu'on y a passé — et ne se branchent
    jamais l'une sur l'autre. */
 function lignesTemps(c) {
-  var par = {}, sansDate = { fait: 0, prevu: 0, actes: [], qtes: {}, km: 0 };
+  var par = {}, sansDate = { fait: 0, prevu: 0, actes: [], qtes: {}, km: 0, trajet: 0, jrn: [] };
   var rang = function (ts) {
     var k = C.jourCle(ts);
-    par[k] = par[k] || { d: C.minuit(ts), fait: 0, prevu: 0, actes: [], qtes: {}, km: 0 };
+    par[k] = par[k] || { d: C.minuit(ts), fait: 0, prevu: 0, actes: [], qtes: {}, km: 0, trajet: 0, jrn: [] };
     return par[k];
   };
   C.journeesPlacees(c).forEach(function (x) {
@@ -785,6 +798,9 @@ function lignesTemps(c) {
     var cible = t.date ? rang(t.date) : sansDate;
     cible.fait += C.heuresSaisie(t, A.cfg);
     cible.km += C.nb(t.km);
+    cible.trajet += C.nb(t.trajet);
+    /* Les journées qui portent ce jour : un appui les rouvre (lot r2). */
+    if (t.jrn && cible.jrn.indexOf(t.jrn) < 0) cible.jrn.push(t.jrn);
     /* La journée d'office (lot r1) se dit, avec son ○ tant que la fiche de
        ce jour n'a pas été ouverte. */
     if (t.office) { cible.office = true; if (!t.vu) cible.rond = true; }
@@ -801,7 +817,10 @@ function lignesTemps(c) {
 function corpsTravaux(c, k) {
   var hj = C.HEURES_JOUR(A.cfg) || 8;
   var rangs = lignesTemps(c), auj = C.minuit(Date.now());
-  var faitH = 0, resteH = 0, km = C.kmChantier(c);
+  var faitH = 0, resteH = 0, km = C.kmChantier(c), trajet = C.trajetChantier(c);
+  /* Le trajet ne compte plus dans le temps du chantier (lot r2) : il se dit
+     à côté, partout où ce temps se lit. */
+  var plusTrajet = function (h) { return h ? '+ ' + C.ditHeures(h) + ' de trajet' : ''; };
   rangs.forEach(function (r) {
     faitH += r.fait;
     /* Une journée passée sort du « reste à faire » : elle n'est plus à faire,
@@ -825,7 +844,7 @@ function corpsTravaux(c, k) {
   h += rangs.length
     ? '<p class="fi-aide">Le <b>prévu</b> retient la date sur l’agenda. Le <b>fait</b> est ce que ' +
       'vous y avez réellement passé — c’est lui qui donne vos rendements. Une journée fait ' +
-      hj + ' h, réglable.</p>' +
+      hj + ' h, réglable. Un appui sur un jour l’ouvre pour le corriger.</p>' +
       '<div class="jtete"><span>Date</span><span>Fait</span><span>Prévu</span></div>' +
       rangs.map(function (r) {
         var avenir = !r.sans && r.d > auj;
@@ -834,15 +853,20 @@ function corpsTravaux(c, k) {
           return C.nomTravail(a) + (q ? ' ' + E.fmt(q, q % 1 ? 2 : 0) + (u ? ' ' + C.courtUnite(u) : '') : '');
         });
         if (r.km) detail.push(E.fmt(r.km, 0) + ' km');
+        if (r.trajet) detail.push(plusTrajet(r.trajet));
         if (r.office) detail.push((r.rond ? '○ ' : '') + 'comptée d’office');
-        return '<div class="jrang' + (avenir ? ' avenir' : '') + (r.office ? ' office' : '') + '">' +
+        if (r.jrn.length > 1) detail.push(r.jrn.length + ' journées ce jour-là');
+        /* Corriger une journée sans passer par l'Agenda (lot r2) : l'appui
+           ouvre ce que le jour porte. */
+        return '<button type="button" class="jrang' + (avenir ? ' avenir' : '') + (r.office ? ' office' : '') + '" ' +
+          'data-fjour="' + (r.sans ? 'sans' : r.d) + '">' +
           '<span class="jd">' + esc(r.sans ? 'sans date' : dateCourte(r.d)) +
           (r.sans ? ' <span class="muted" style="font-size:11.5px">(rattrapage)</span>'
             : avenir ? ' <span class="muted" style="font-size:11.5px">à venir</span>' : '') +
           (detail.length ? '<small>' + esc(detail.join(' · ')) + '</small>' : '') + '</span>' +
           '<span class="jv num' + (r.fait ? '' : ' vide') + '">' + (r.fait ? dur(r.fait) : '—') + '</span>' +
           '<span class="jv num' + (r.prevu ? '' : ' vide') + '">' + (r.prevu ? dur(r.prevu) : '—') + '</span>' +
-          '</div>';
+          '</button>';
       }).join('')
     : '<p class="fi-aide">Aucune date posée, aucun temps noté.</p>';
   h += '<div class="kpi">' +
@@ -851,8 +875,9 @@ function corpsTravaux(c, k) {
     (prevus ? '<div class="carte2"><b class="num">' + dur(prevus * hj) + '</b><small>estimé au devis</small></div>' : '') +
     '</div>';
   var real = delaiRealisation(c);
-  h += '<p class="fi-meta"><span><b>' + E.fmt(C.arr(faitH, 2), faitH % 1 ? 1 : 0) + ' h</b></span>' +
+  h += '<p class="fi-meta"><span><b>' + C.ditHeures(faitH) + '</b></span>' +
     '<span><b>' + dur(faitH) + '</b></span>' +
+    (trajet ? '<span id="f-trajet-total">' + plusTrajet(trajet) + '</span>' : '') +
     '<span><b>' + E.fmt(km, 0) + ' km</b>' + (km ? ' · carburant estimé ' + eur(C.coutCarburant(km, A.cfg)) : '') + '</span>' +
     (c.dateFin && C.rangStatut(c.statut) >= C.rangStatut('termine') && c.statut !== 'sansuite'
       ? '<span>terminé le <b>' + dateCourte(c.dateFin) + '</b></span>' : '') +
@@ -863,6 +888,8 @@ function corpsTravaux(c, k) {
     h += '<div class="carte2 fi-bilan' + (bil.ecart > 0.25 ? ' perte' : bil.ecart < -0.25 ? ' gain' : '') + '">' +
       '<div><span>Le devis paie</span><b class="num">' + dur(bil.prevues * hj) + ' à ' + eur(vise) + ' la journée</b></div>' +
       '<div><span>J’y ai passé</span><b class="num">' + dur(bil.faites * hj) + '</b></div>' +
+      (trajet ? '<div class="muted" id="f-bilan-trajet"><span>sans le trajet</span><span>' +
+        plusTrajet(trajet) + '</span></div>' : '') +
       '<div><span class="muted">soit</span><b class="num">' + eur(bil.obtenu) + ' la journée</b></div>' +
       '<p class="fi-aide">' + (Math.abs(bil.ecart) <= 0.25 ? 'Estimation juste.'
         : bil.ecart > 0 ? dur(bil.ecart * hj) + ' de plus que prévu : ' + eur(vise - bil.obtenu) + ' perdus par jour.'
@@ -877,7 +904,8 @@ function corpsTravaux(c, k) {
   }
   var travaux = [];
   (c.lignes || []).forEach(function (l) { if (travaux.indexOf(l.travail) < 0) travaux.push(l.travail); });
-  if (travaux.length > 1 && (c.temps || []).length && !(c.temps || []).some(function (t) { return t.activite; })) {
+  if (travaux.length > 1 && (c.temps || []).length &&
+    !(c.temps || []).some(function (t) { return t.activite && !t.sansTemps; })) {
     h += '<p class="fi-aide">Plusieurs travaux sur ce chantier : précisez la prestation dans ' +
       'chaque journée pour obtenir les rendements.</p>';
   }
@@ -963,7 +991,8 @@ function resumeEtape(c, i, k) {
   var e = C.etapeChantier(c);
   if (i === 0) {
     return c.dateReperage ? 'repéré le ' + dateCourte(c.dateReperage)
-      : 'annoncé le ' + dateCourte(C.dateEntree(c)) + (e === 0 ? ' · repérage facultatif' : '');
+      : 'annoncé le ' + dateCourte(C.dateEntree(c)) +
+        (c.sansReperage ? ' · pas de repérage' : e === 0 ? ' · repérage facultatif' : '');
   }
   if (i === 1) {
     if (c.statut === 'sansuite') return 'refusé' + (c.motifRefus ? ' · ' + C.nomMotifRefus(c.motifRefus) : '');
@@ -1045,10 +1074,37 @@ function tuilesFiche(c) {
     '</div>';
 }
 
+/* La pastille Fiche sans chantier ouvert (lot r2) : au lieu d'un écran vide,
+   on en choisit un. Les chantiers en cours, rangés comme dans Aujourd'hui ;
+   la recherche porte sur tous. La case de recherche ne se refait pas pendant
+   la frappe : seule la liste dessous se redessine. */
+function renderChoixChantier(z) {
+  if (!$('#fc-rech')) {
+    z.innerHTML = '<div class="fc-choix"><p class="fc-titre">Quel chantier ouvrir ?</p>' +
+      '<input type="search" id="fc-rech" autocomplete="off" aria-label="Chercher un chantier" ' +
+      'placeholder="Chercher : nom, donneur d’ordre, commune, n° de facture">' +
+      '<div class="aj-zone" id="fc-liste"></div></div>';
+  }
+  var q = $('#fc-rech').value.trim(), now = Date.now(), et = -1, h = '';
+  var l = q ? C.chercher(A.chantiers, q) : chantiersEnCours();
+  l.forEach(function (c) {
+    var e = C.etapeChantier(c);
+    if (!q && e !== et) { et = e; h += '<p class="aj-etape" data-etape="' + e + '">' + esc(NOMS_ETAPES[e] || '') + '</p>'; }
+    var s = situationChantier(c, now, true);
+    h += '<button type="button" class="aj-ch" data-fcouvre="' + esc(c.id) + '">' +
+      '<span class="aj-txt"><b>' + esc(C.nomChantier(c)) + '</b>' +
+      (c.donneur || c.commune ? '<small>' + esc([c.donneur, c.commune].filter(Boolean).join(' · ')) + '</small>' : '') +
+      '<span class="aj-situ' + (s.ton ? ' aj-' + s.ton : '') + '">' + esc(s.t) + '</span></span>' +
+      '<span class="aj-droite">' + pointsEtape(c) + '</span></button>';
+  });
+  $('#fc-liste').innerHTML = h || '<p class="fi-aide" style="padding:12px 14px;margin:0">' +
+    (q ? 'Aucun chantier ne répond à cette recherche.' : 'Aucun chantier en cours : cherchez-en un plus ancien.') + '</p>';
+}
+
 function renderFiche() {
   var z = $('#fiche-chantier'); if (!z) return;
   var c = chantier(A.chOuvert);
-  if (!c) { z.innerHTML = '<div class="carte"><div class="vide"><p>Chantier introuvable.</p></div></div>'; return; }
+  if (!c) { renderChoixChantier(z); return; }
   var k = C.troisChiffres(c, A.cfg), e = C.etapeChantier(c);
   /* Ce qu'il a déplié se garde sur le même chantier, tant que l'étape ne
      change pas : un geste qui fait avancer le chantier ouvre la suivante. */
@@ -1084,7 +1140,9 @@ function renderFiche() {
     }).join('') + '</div>' +
     '<p class="fi-etat">' + badgeStatut(c) +
     (dateStatut(c) ? ' <span class="muted">' + esc(dateStatut(c)) + '</span>' : '') +
-    (C.enRetard(c, Date.now()) ? ' <span class="retard">jours passés</span>' : '') + '</p>' +
+    /* Un fait, pas une relance (lot r2) : le même mot, en gris, que la ligne
+       d'Aujourd'hui. */
+    (C.enRetard(c, Date.now()) ? ' <span class="muted fi-plusjour">plus de jour posé</span>' : '') + '</p>' +
     '</div>' +
     troisChiffresFiche(c, k) +
     '<div class="fi-etapes" id="f-etapes">' +

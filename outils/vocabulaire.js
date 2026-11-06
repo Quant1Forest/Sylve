@@ -40,7 +40,10 @@ module.exports = {
     /* Lot b1 : le repérage (C2), accordé le 01/11 — trois cases facultatives. */
     'dateReperage', 'vuReperage', 'surface',
     /* Lot r1b : la validité du devis en jours (ouvrirDevisCh). */
-    'validiteJours'],
+    'validiteJours',
+    /* Lot r2 : « Pas de repérage » (fiche, étape Infos) et le trajet du
+       chantier (ouvrirTrajetCh, « Retenir pour ce chantier » de Ma journée). */
+    'sansReperage', 'trajetKm', 'trajetHeures'],
 
   /* ouvrirCharge : var maj = { libelle, beneficiaire, ttc, periodicite,
      debut, jour, moisReference, taux, categorie, dansDepenses, arretee, maj }.
@@ -52,7 +55,9 @@ module.exports = {
   /* ouvrirJournee, validerCommePrevu, migrerJournees. Le chantier porte
      `foret` : une journée, elle, a bien un `lieu`. */
   journees: ['id', 'date', 'chantier', 'lieu', 'commune', 'km', 'nonProd',
-    'personnes', 'sansMoi', 'fin', 'nonFacture', 'postes', 'trajet'],
+    'personnes', 'sansMoi', 'fin', 'nonFacture', 'postes', 'trajet',
+    /* Lot r2 : le temps productif, tapé à part (ouvrirJournee). */
+    'productif'],
 
   articles: ['id', 'maj', 'nom', 'type', 'unite', 'dosage', 'prix', 'seuil',
     'fournisseur', 'note', 'mouvements'],

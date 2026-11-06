@@ -1,6 +1,8 @@
 /* ------------------------------------------------------------ formulaires */
 /* Difficulté d'une ligne de travaux, de 1 à 5. Les deux extrêmes sont
-   nommés : entre les deux, c'est son jugement, pas une grille. */
+   nommés : entre les deux, c'est son jugement, pas une grille. Elle ne se
+   note plus depuis le lot r2 ; les notes déjà prises se lisent encore dans
+   les rendements. */
 var DIFF5 = [
   { v: 1, n: '1', t: 'très facile' }, { v: 2, n: '2', t: 'facile' },
   { v: 3, n: '3', t: 'moyen' }, { v: 4, n: '4', t: 'difficile' },
@@ -9,13 +11,6 @@ var DIFF5 = [
 function nomDiff5(v) {
   for (var i = 0; i < DIFF5.length; i++) if (DIFF5[i].v === Number(v)) return DIFF5[i].t;
   return '';
-}
-function chipsDiff5(idBase, valeur) {
-  return '<button type="button" class="chip" data-' + idBase + '="" aria-pressed="' +
-    (!valeur) + '">—</button>' + DIFF5.map(function (n) {
-      return '<button type="button" class="chip" data-' + idBase + '="' + n.v + '" title="' + n.t +
-        '" aria-pressed="' + (Number(valeur) === n.v) + '">' + n.n + '</button>';
-    }).join('');
 }
 
 /* La validité se dit en jours (lot r1b) : une case, la valeur des réglages
@@ -774,14 +769,15 @@ function ouvrirLigne(id, idx) {
         '>forcer à ' + String(t).replace('.', ',') + ' %</option>';
     }).join('') + '</select></div>' +
     '<div class="carte2" id="cl-apercu" style="margin:11px 0"></div>' +
-    '<label class="eyebrow" style="display:block">Difficulté <span class="muted" ' +
-    'style="font-weight:400;text-transform:none;letter-spacing:0">(1 très facile → 5 très difficile)</span></label>' +
-    '<div class="chips" id="cl-diff" style="margin-top:5px">' + chipsDiff5('cldiff', l.difficulte) + '</div>' +
+    /* La difficulté ne se note plus ici (lot r2) : les notes déjà prises
+       restent sur la ligne et se lisent toujours dans les rendements. */
     /* Ce qui relie la facture au stock. Laissé vide, rien ne sort : toutes
        les fournitures ne sont pas stockées. Sur un produit dosé — un
        répulsif à 6 ml par plant — la quantité de la ligne reste le nombre
-       de plants, c'est ce que lit le client ; c'est la sortie qui convertit. */
-    '<div class="champ" style="margin-top:9px"><label class="eyebrow" for="cl-art">Produit du stock</label>' +
+       de plants, c'est ce que lit le client ; c'est la sortie qui convertit.
+       Il ne s'affiche que sur une fourniture (lot r2), et sur une ancienne
+       ligne qui en désigne déjà un. */
+    '<div class="champ" id="cl-art-champ" style="margin-top:9px"><label class="eyebrow" for="cl-art">Produit du stock</label>' +
     '<select id="cl-art"><option value="">— aucun, rien ne sort du stock —</option>' +
     (A.articles || []).slice().sort(function (x, y) {
       return (x.nom || '').localeCompare(y.nom || '', 'fr');
@@ -794,17 +790,18 @@ function ouvrirLigne(id, idx) {
     }).join('') + '</select>' +
     '<p class="muted" style="font-size:11.5px;margin:5px 0 0" id="cl-art-aide"></p></div>' +
     /* La liste des travaux sert au taux de TVA et aux rendements : elle doit
-       rester courte et stable. Ce champ porte ce qui figure vraiment sur la
-       facture — « tuteur châtaignier 9/11×150 » là où la liste ne connaît
-       que « Fourniture de tuteurs » — et c'est lui qui s'affiche en tête. */
-    '<div class="champ" style="margin-top:9px"><label class="eyebrow" for="cl-note">Libellé sur la facture</label>' +
+       rester courte et stable. Ce champ porte ce qui précise la ligne —
+       « tuteur châtaignier 9/11×150 » là où la liste ne connaît que
+       « Fourniture de tuteurs » — et c'est lui qui s'affiche en tête.
+       « Libellé sur la facture » l'induisait en erreur : Sylve ne fait pas
+       ses factures (lot r2). Le champ reste `note`. */
+    '<div class="champ" style="margin-top:9px"><label class="eyebrow" for="cl-note">Précision (facultatif)</label>' +
     '<input type="text" id="cl-note" autocomplete="off" placeholder="tuteur châtaignier 9/11×150, et agrafes…" value="' + esc(l.note || '') + '">' +
-    '<p class="muted" style="font-size:11.5px;margin:5px 0 0">Laissé vide, c’est l’intitulé des travaux qui s’affiche.</p></div>' +
-    '<p class="muted" style="font-size:12px;margin:7px 0 0">La note sert à situer vos rendements ' +
-    'quand vous estimerez un chantier semblable. La précision, elle, ne sert qu’à vous : ' +
-    'c’est ce que vous relirez dans deux ans.</p>' +
+    '<p class="muted" style="font-size:11.5px;margin:5px 0 0">Ce qui précise la ligne, tel que sur votre ' +
+    'facture : tuteur châtaignier 9/11×150… Laissé vide, c’est le nom des travaux qui s’affiche.</p></div>' +
     '<div class="btn-rang"><button class="btn primaire" id="cl-ok">Valider</button></div>');
 
+  /* Une difficulté déjà notée se garde telle quelle : elle ne se change plus. */
   var clDiff = l.difficulte || '';
   /* Les travaux en plus du premier : ils désignent ce que le forfait couvre.
      Dès qu'il y en a un, la ligne devient un forfait — un seul prix, pas de
@@ -819,6 +816,9 @@ function ouvrirLigne(id, idx) {
   var majNature = function () {
     var z = $('#cl-nat-champ'); if (!z) return;
     z.style.display = C.estFourniture($('#cl-trav').value) ? '' : 'none';
+    /* Le produit du stock : sur une fourniture, ou une ligne qui en a un. */
+    var a = $('#cl-art-champ');
+    if (a) a.style.display = C.estFourniture($('#cl-trav').value) || l.article ? '' : 'none';
   };
   var majForfait = function () {
     var groupe = clPlus.length > 0;
@@ -921,13 +921,6 @@ function ouvrirLigne(id, idx) {
   });
   $('#cl-nature').addEventListener('change', apercu);
   majNature();
-  $('#cl-diff').addEventListener('click', function (e) {
-    var b = e.target.closest('[data-cldiff]'); if (!b) return;
-    clDiff = b.dataset.cldiff ? Number(b.dataset.cldiff) : '';
-    $$('#cl-diff .chip').forEach(function (x) {
-      x.setAttribute('aria-pressed', String(x.dataset.cldiff === String(clDiff)));
-    });
-  });
   $('#cl-ajout').addEventListener('click', function () {
     var pris = C.travauxDeLigne({ travail: $('#cl-trav').value, travauxPlus: clPlus });
     var libre = C.TRAVAUX.filter(function (t) {
@@ -997,8 +990,9 @@ function ouvrirTemps(id, quand) {
        un quart de journée là, et les deux ne se comparaient plus. Tout se
        note en heures, et le nombre d'heures d'une journée se règle une fois
        pour toutes dans les Réglages. */
-    '<div class="champ"><label class="eyebrow" for="ct-duree">Combien d’heures ?</label>' +
-    '<input type="text" id="ct-duree" class="gros" inputmode="decimal" autocomplete="off"></div>' +
+    /* En heures et minutes (lot r2), comme Ma journée. */
+    '<div class="champ"><label class="eyebrow" for="ct-duree">Combien de temps ?</label>' +
+    champDuree('ct-duree', 0, { gros: true, nom: 'Temps passé' }) + '</div>' +
     '<div class="champ"><label class="eyebrow" for="ct-pers">Personnes sur place</label>' +
     '<input type="text" id="ct-pers" inputmode="numeric" value="1"></div>' +
     '<div class="champ"><label class="eyebrow" for="ct-km">Kilomètres</label>' +
@@ -1021,7 +1015,7 @@ function ouvrirTemps(id, quand) {
     '<div class="carte2" id="ct-apercu" style="margin:11px 0"></div>' +
     '<div class="btn-rang"><button class="btn primaire" id="ct-ok">Enregistrer</button></div>');
   var apercu = function () {
-    var t = { duree: C.nb($('#ct-duree').value), unite: 'h',
+    var t = { duree: lireDuree('ct-duree'), unite: 'h',
       personnes: C.nb($('#ct-pers').value), sansMoi: $('#ct-sansmoi').checked };
     var jh = C.joursSaisie(t, A.cfg), mj = C.mesJours(t, A.cfg);
     $('#ct-apercu').innerHTML = jh
@@ -1031,11 +1025,11 @@ function ouvrirTemps(id, quand) {
         (jh > mj ? ' — les autres facturent les leurs' : '') + '</div>'
       : '<span class="muted">Indiquez une durée.</span>';
   };
-  ['#ct-duree', '#ct-pers'].forEach(function (s) { $(s).addEventListener('input', apercu); });
+  ['#ct-duree', '#ct-duree-m', '#ct-pers'].forEach(function (s) { $(s).addEventListener('input', apercu); });
   $('#ct-sansmoi').addEventListener('change', apercu);
   $('#ct-crans').addEventListener('click', function (e) {
     var b = e.target.closest('[data-cth]'); if (!b) return;
-    $('#ct-duree').value = b.dataset.cth;
+    poserDuree('ct-duree', Number(b.dataset.cth));
     $$('#ct-crans [data-cth]').forEach(function (x) {
       x.setAttribute('aria-pressed', String(x === b));
     });
@@ -1043,7 +1037,7 @@ function ouvrirTemps(id, quand) {
   });
   apercu();
   $('#ct-ok').addEventListener('click', function () {
-    var d = C.nb($('#ct-duree').value);
+    var d = lireDuree('ct-duree');
     if (d <= 0) { toast('Durée attendue.'); return; }
     /* Une saisie de temps est une journée : la pousser dans c.temps la
        faisait disparaître à la prochaine indexation. */
@@ -1095,6 +1089,45 @@ function ouvrirStatut(id) {
 }
 
 
+/* --- le trajet depuis chez lui (lot r2) ---
+   Aller-retour, en kilomètres et en temps. Ma journée le propose au choix du
+   chantier ; le changer un jour donné ne touche pas la fiche. */
+function ouvrirTrajetCh(id) {
+  var c = chantier(id); if (!c) return;
+  modale('Trajet depuis chez moi',
+    '<p class="fi-aide">Aller-retour. Ma journée le propose pour ce chantier ; vous pouvez le ' +
+    'changer un jour donné sans toucher à cette fiche.</p>' +
+    '<div class="grille g2">' +
+    '<div class="champ"><label class="eyebrow" for="tr-km">Kilomètres</label>' +
+    '<input type="text" id="tr-km" inputmode="decimal" autocomplete="off" value="' +
+    (C.nb(c.trajetKm) ? esc(String(c.trajetKm).replace('.', ',')) : '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="tr-h">Temps</label>' +
+    champDuree('tr-h', c.trajetHeures, { nom: 'Temps de trajet' }) + '</div></div>' +
+    '<div class="btn-rang">' + (trajetDeFiche(c) ? '<button class="btn" id="tr-effacer">Effacer</button>' : '') +
+    '<button class="btn primaire" id="tr-ok">Enregistrer</button></div>');
+  $('#tr-ok').addEventListener('click', function () {
+    majChantier(c, { trajetKm: C.nb($('#tr-km').value) || null, trajetHeures: lireDuree('tr-h') || null },
+      'Trajet noté.');
+  });
+  if ($('#tr-effacer')) $('#tr-effacer').addEventListener('click', function () {
+    majChantier(c, { trajetKm: null, trajetHeures: null }, 'Trajet effacé.');
+  });
+}
+
+/* Un jour de l'étape Travaux, d'un appui (lot r2) : « je dépendais de
+   l'Agenda pour corriger une journée ». La journée de ce jour s'ouvre (un
+   ancien doublon : le choix entre les deux) ; une journée comptée d'office,
+   Ma journée pré-remplie ; un jour seulement posé, la fiche du jour ; la
+   ligne « sans date », le rattrapage. */
+function ouvrirJourDeFiche(c, cle) {
+  if (cle === 'sans') { ouvrirTemps(c.id); return; }
+  var ts = C.minuit(Number(cle));
+  var r = lignesTemps(c).filter(function (x) { return !x.sans && x.d === ts; })[0];
+  if (r && r.jrn.length) { ouvrirJourneesParmi(r.jrn); return; }
+  if (r && r.office) { ouvrirJournee(null, modeleDOffice(c, ts, r.fait)); return; }
+  ouvrirFicheJour(ts);
+}
+
 /* --- le repérage, noté en une fois (C2) ---
    Date, position, peuplement et ce qu'on a vu : tout ce que le passage sur
    place apprend, dans une feuille. Facultatif — un chantier passe au devis
@@ -1131,6 +1164,7 @@ function ouvrirReperageCh(id) {
     var essv = $('#rp-ess').value;
     if (essv === '__ajouter') essv = '';
     return { dateReperage: versDate($('#rp-date').value) || C.minuit(Date.now()) + 12 * 3600000,
+      sansReperage: false,
       vuReperage: $('#rp-vu').value.trim(), gps: gps,
       surface: C.nb($('#rp-surf').value) || c.surface || null,
       criteres: Object.assign({}, c.criteres || {}, {

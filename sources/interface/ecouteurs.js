@@ -306,6 +306,10 @@ function brancher() {
   $('#fiche-chantier').addEventListener('change', function (e) {
     if (e.target && e.target.id === 'f-choix' && e.target.value) ouvrirChantier(e.target.value);
   });
+  /* La recherche du choix d'un chantier (lot r2) : seule la liste se refait. */
+  $('#fiche-chantier').addEventListener('input', function (e) {
+    if (e.target && e.target.id === 'fc-rech') renderChoixChantier($('#fiche-chantier'));
+  });
   /* Ce qu'il déplie ou replie se garde tant qu'il reste sur ce chantier :
      enregistrer une ligne redessine la fiche, pas ses étapes. « toggle » ne
      remonte pas : on l'écoute à la descente. */
@@ -319,7 +323,19 @@ function brancher() {
     var voisin = e.target.closest('[data-voisin]');
     if (voisin) { ouvrirChantier(voisin.dataset.voisin); return; }
     if (e.target.closest('[data-chretour]')) { aller('carnet'); return; }
+    var fco = e.target.closest('[data-fcouvre]');
+    if (fco) { ouvrirChantier(fco.dataset.fcouvre); return; }
     if (!c) return;
+    /* Un jour de l'étape Travaux (lot r2) : la journée à corriger, la fiche
+       du jour d'un jour seulement posé, le rattrapage pour « sans date ». */
+    var fj = e.target.closest('[data-fjour]');
+    if (fj) { ouvrirJourDeFiche(c, fj.dataset.fjour); return; }
+    if (e.target.closest('#f-sansreperage')) { majChantier(c, { sansReperage: true }, 'Pas de repérage : noté.'); return; }
+    if (e.target.closest('#f-reperage-oui')) {
+      majChantier(c, { sansReperage: false }, '').then(function () { ouvrirReperageCh(id); });
+      return;
+    }
+    if (e.target.closest('#f-trajet')) { ouvrirTrajetCh(id); return; }
     var aujourdhui = C.minuit(Date.now()) + 12 * 3600000;
     /* Chaque étape ouvre son propre formulaire : on ne cherche plus le
        numéro de devis au milieu des essences. */

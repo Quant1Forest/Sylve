@@ -47,8 +47,9 @@
   /* La couleur des plaquettes du bordereau ouvert. Elle repeignait toute
      l'application par --accent, si bien que l'écran changeait de couleur
      sans raison visible — selon le bordereau de cubage ouvert. Elle ne peint
-     plus que ce qui la désigne vraiment : la pastille du bordereau et les
-     plaquettes du ruban de saisie. */
+     plus que ce qui la désigne vraiment : les plaquettes du ruban de
+     saisie. (La pastille du bandeau du bordereau, toujours du même vert et
+     que rien ne remplissait, est partie au lot r2.) */
   --plaq:#2E4A3C;
   --r:10px; --r-s:7px;
   --mono:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Menlo,Consolas,monospace;
@@ -115,6 +116,16 @@ button{cursor:pointer;background:none;border:none}
 .jrang .jv{font-family:var(--mono);font-size:14px;font-weight:600}
 .jrang .jv.vide{color:var(--gris-clair);font-weight:400}
 .jrang.avenir .jd{color:var(--gris)}
+/* Un jour de la liste s'ouvre d'un appui (lot r2) : le bouton garde l'allure
+   de la ligne. */
+button.jrang{width:100%;font:inherit;color:inherit;text-align:left;background:none;border:0;
+  border-bottom:1px solid var(--trait);border-radius:0;cursor:pointer}
+button.jrang:active{background:var(--carte2)}
+/* Le choix d'un chantier, quand la pastille Fiche n'en a aucun (lot r2). */
+.fc-choix{display:grid;gap:10px;min-width:0}
+.fc-titre{margin:4px 0 0;font-size:15px;font-weight:700}
+.fc-choix input[type=search]{width:100%;min-width:0}
+.fc-choix .aj-etape{margin:0;padding:10px 14px 4px}
 /* Un achat à prévoir : la case à gauche, ce que c'est au milieu, le prix à
    droite. Coché, il pâlit et se barre — il reste lisible, il ne se mélange
    plus à ce qui attend. */
@@ -362,6 +373,21 @@ body:not(.m-ent) .mod-ent{display:none}
 .mj-tot .mj-montant{margin-left:auto;font-size:16px}
 #mj-apercu small{display:block;font-size:12.5px;margin-top:2px}
 .mj-pied .btn.plein{flex:1}
+/* Une durée en deux cases, « h » et « min » (lot r2) : elles se partagent la
+   largeur, et tiennent dans une demi-colonne à 320 px. */
+.duree{display:flex;align-items:center;gap:5px;min-width:0;max-width:100%}
+.duree input{width:0;flex:1 1 0;min-width:0;text-align:right}
+.duree.gros input{font-size:18px;font-weight:600;font-family:var(--mono)}
+.duree-u{flex:none;font-size:12.5px;color:var(--gris)}
+.mj-pers input{max-width:5em}
+.mj-postes-bas{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.mj-traj-ligne{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 12px;min-width:0}
+.mj-traj-ligne > span{display:grid;min-width:0;overflow-wrap:anywhere}
+.mj-traj-ligne small{font-size:12px;color:var(--gris)}
+.mj-avis{margin:0 0 10px;padding:9px 11px;border-radius:10px;background:var(--tiede-fond);
+  border:1px solid var(--tiede-trait);color:var(--tiede);font-size:13px;overflow-wrap:anywhere}
+.mj-doublon{margin:6px 0 0;font-size:12.5px;color:var(--alerte);overflow-wrap:anywhere}
+.mj-doublon:empty{display:none}
 .fj-etat small{display:block;font-size:11.5px;color:var(--gris)}
 /* La fiche de chantier. Le même dessin sert à l'aperçu et à l'impression :
    deux feuilles de style auraient fini par diverger, et c'est justement
@@ -1386,7 +1412,6 @@ if (froid && s > 0) montrer(s);
       <button class="bandeau-menu" id="b-menu" title="Le reste de Sylve" aria-label="Le reste de Sylve"></button>
     </div>
     <div class="bandeau-sous mod-cubage" id="b-bordereau">
-      <span class="pastille" id="b-pastille"></span>
       <div class="bandeau-id">
         <div class="bandeau-t" id="b-titre">Aucun bordereau</div>
         <div class="bandeau-s" id="b-sous">Créez ou ouvrez un bordereau pour commencer</div>
@@ -4041,10 +4066,30 @@ function mesJours(t, cfg) {
 function heuresPostes(j) {
   return arr(((j && j.postes) || []).reduce(function (s, p) { return s + nb(p.heures); }, 0), 2);
 }
-/* Le trajet compte dans la journée, comme le hors production : il n'entre
-   jamais dans un rendement, mais c'est du temps donné au chantier. */
+/* Le temps productif de la journée (lot r2). Il se tape à part depuis que
+   les heures par prestation sont facultatives : dégagement et taille se font
+   ensemble, impossible de dire combien pour l'un. Une ancienne journée ne le
+   porte pas : son productif reste la somme des heures des prestations. */
+function productifJournee(j) {
+  if (j && j.productif != null && j.productif !== '') return arr(Math.max(nb(j.productif), heuresPostes(j)), 3);
+  return heuresPostes(j);
+}
+/* Une journée dont les prestations ne se partagent pas le productif : il
+   compte pour le chantier, jamais pour le rendement de l'une d'elles. */
+function journeeNonRepartie(j) {
+  return arr(productifJournee(j) - heuresPostes(j), 2) > 0;
+}
+/* Le temps sur le chantier : le productif et le hors production. Le trajet
+   en sort (lot r2) : 8 h de travail et 1 h de route faisaient « 1 j 1 h »
+   de chantier, et le prix par journée baissait d'autant. Il se dit à côté. */
 function heuresJournee(j) {
-  return arr(heuresPostes(j) + nb(j && j.nonProd) + nb(j && j.trajet), 2);
+  return arr(productifJournee(j) + nb(j && j.nonProd), 2);
+}
+function trajetJournee(j) { return arr(nb(j && j.trajet), 3); }
+/* Le trajet d'un chantier, lu sur les saisies qui le portent : celles des
+   journées, une fois chacune. */
+function trajetChantier(ch) {
+  return arr(((ch && ch.temps) || []).reduce(function (s, t) { return s + nb(t.trajet); }, 0), 3);
 }
 function joursJournee(j, cfg) { return arr(heuresJournee(j) / HEURES_JOUR(cfg), 3); }
 
@@ -4168,11 +4213,15 @@ function monoTravail(ch) {
 }
 function tempsPourTravail(ch, travail, cfg) {
   var saisies = (ch && ch.temps) || [];
-  var marquees = saisies.filter(function (t) { return t.activite === travail; });
+  /* Une prestation notée sans heures (journée non répartie, lot r2) porte sa
+     quantité, pas de temps : elle ne fait pas une saisie marquée. */
+  var marquees = saisies.filter(function (t) { return t.activite === travail && !t.sansTemps; });
   if (marquees.length) {
     return arr(marquees.reduce(function (s, t) { return s + joursSaisie(t, cfg); }, 0), 3);
   }
-  if (monoTravail(ch) === travail) return tempsTotal(ch, cfg);
+  if (monoTravail(ch) === travail) {
+    return arr(saisies.reduce(function (s, t) { return s + (t.nonReparti ? 0 : joursSaisie(t, cfg)); }, 0), 2);
+  }
   return 0;
 }
 function uniteTravail(ch, travail) {
@@ -4536,13 +4585,27 @@ function heuresSaisie(t, cfg) {
    j'ai trois virgule quelque chose ». Un jour est une journée entière, le
    reste se dit en heures. */
 function ditDuree(heures, cfg) {
-  var hj = HEURES_JOUR(cfg) || 8, tot = arr(heures, 2);
-  if (!tot) return '—';
-  var j = Math.floor(tot / hj), h = arr(tot - j * hj, 2);
+  var hj = HEURES_JOUR(cfg) || 8, mn = Math.round(nb(heures) * 60);
+  if (!mn) return '—';
+  /* Compté en minutes : 1,67 h se relit « 1 h 40 », jamais « 1,7 h » (lot r2). */
+  var j = Math.floor(mn / (hj * 60)), reste = mn - j * hj * 60;
   var p = [];
   if (j) p.push(j + ' j');
-  if (h) p.push(String(arr(h, 1)).replace('.', ',') + ' h');
+  if (reste) p.push(ditHeures(reste / 60));
   return p.join(' ');
+}
+/* Une durée tapée en heures et minutes, puis gardée en heures décimales :
+   les deux cases se relisent d'ici. 1,67 h → { h: 1, m: 40 }. */
+function enHeuresMinutes(heures) {
+  var mn = Math.round(nb(heures) * 60);
+  return { h: Math.floor(mn / 60), m: mn % 60 };
+}
+/* « 1 h 40 », « 8 h », « 40 min » : comme on le lit sur une montre. */
+function ditHeures(heures) {
+  var x = enHeuresMinutes(heures);
+  if (!x.h && !x.m) return '0 h';
+  if (!x.h) return x.m + ' min';
+  return x.h + ' h' + (x.m ? ' ' + (x.m < 10 ? '0' : '') + x.m : '');
 }
 function joursDevis(ch) {
   var j = 0;
@@ -5518,6 +5581,8 @@ var M = {
   estFourniture: estFourniture, tauxFixe: tauxFixe, tauxDiscute: tauxDiscute, parDonneur: parDonneur,
   joursSaisie: joursSaisie, mesJours: mesJours, tempsTotal: tempsTotal, tempsMoi: tempsMoi,
   heuresPostes: heuresPostes, heuresJournee: heuresJournee, joursJournee: joursJournee,
+  productifJournee: productifJournee, journeeNonRepartie: journeeNonRepartie,
+  trajetJournee: trajetJournee, trajetChantier: trajetChantier,
   prixJourVise: prixJourVise, bilanJournees: bilanJournees, HEURES_JOUR: HEURES_JOUR,
   prixJour: prixJour, chantierSolde: chantierSolde, rendement: rendement,
   dureePrevue: dureePrevue, enRetard: enRetard, tri: tri, filtre: filtre, chercher: chercher,
@@ -5526,7 +5591,7 @@ var M = {
   rangFacture: rangFacture,
   jourCle: jourCle, minuit: minuit, ajouteJours: ajouteJours, estWeekend: estWeekend,
   journeesPlacees: journeesPlacees, placerJour: placerJour, resteAPlacer: resteAPlacer, joursPrevus: joursPrevus, joursDevis: joursDevis,
-  heuresSaisie: heuresSaisie, ditDuree: ditDuree,
+  heuresSaisie: heuresSaisie, ditDuree: ditDuree, ditHeures: ditHeures, enHeuresMinutes: enHeuresMinutes,
   travauxHorsJournees: travauxHorsJournees,
   totalPlace: totalPlace, partDuJour: partDuJour,
   journeesFaites: journeesFaites, journeesAVenir: journeesAVenir,
@@ -8519,6 +8584,11 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.94', quoi: [
+    { t: 'Les durées se tapent en heures et minutes ; Ma journée demande le temps productif, et les heures par prestation deviennent facultatives' },
+    { t: 'Le trajet ne compte plus dans les journées du chantier : il se dit à côté, et se règle sur la fiche du chantier', vue: 'carnet' },
+    { t: 'Fiche ▸ Travaux : un appui sur un jour l’ouvre pour le corriger ; « Pas de repérage » dans Infos ; une seule journée par chantier et par jour', vue: 'carnet' }
+  ] },
   { v: '4.93', quoi: [
     { t: 'En ouvrant Aujourd’hui, une bulle dit les journées comptées d’office et les jours posés sur un devis pas signé : « J’y ai travaillé » ou « Je n’y étais pas »' },
     { t: 'La validité d’un devis se choisit en jours (30 proposés) ; il passe en retard le jour où elle finit', vue: 'carnet' },
@@ -9156,6 +9226,10 @@ function brancher() {
   $('#fiche-chantier').addEventListener('change', function (e) {
     if (e.target && e.target.id === 'f-choix' && e.target.value) ouvrirChantier(e.target.value);
   });
+  /* La recherche du choix d'un chantier (lot r2) : seule la liste se refait. */
+  $('#fiche-chantier').addEventListener('input', function (e) {
+    if (e.target && e.target.id === 'fc-rech') renderChoixChantier($('#fiche-chantier'));
+  });
   /* Ce qu'il déplie ou replie se garde tant qu'il reste sur ce chantier :
      enregistrer une ligne redessine la fiche, pas ses étapes. « toggle » ne
      remonte pas : on l'écoute à la descente. */
@@ -9169,7 +9243,19 @@ function brancher() {
     var voisin = e.target.closest('[data-voisin]');
     if (voisin) { ouvrirChantier(voisin.dataset.voisin); return; }
     if (e.target.closest('[data-chretour]')) { aller('carnet'); return; }
+    var fco = e.target.closest('[data-fcouvre]');
+    if (fco) { ouvrirChantier(fco.dataset.fcouvre); return; }
     if (!c) return;
+    /* Un jour de l'étape Travaux (lot r2) : la journée à corriger, la fiche
+       du jour d'un jour seulement posé, le rattrapage pour « sans date ». */
+    var fj = e.target.closest('[data-fjour]');
+    if (fj) { ouvrirJourDeFiche(c, fj.dataset.fjour); return; }
+    if (e.target.closest('#f-sansreperage')) { majChantier(c, { sansReperage: true }, 'Pas de repérage : noté.'); return; }
+    if (e.target.closest('#f-reperage-oui')) {
+      majChantier(c, { sansReperage: false }, '').then(function () { ouvrirReperageCh(id); });
+      return;
+    }
+    if (e.target.closest('#f-trajet')) { ouvrirTrajetCh(id); return; }
     var aujourdhui = C.minuit(Date.now()) + 12 * 3600000;
     /* Chaque étape ouvre son propre formulaire : on ne cherche plus le
        numéro de devis au milieu des essences. */
@@ -10655,9 +10741,12 @@ function synchroniserCrans() {
 function brancherRetourTelephone() {
   window.addEventListener('popstate', function () {
     A.crans = Math.max(0, (A.crans || 0) - 1);
+    /* Le cran que la bulle d'Aujourd'hui rend en se fermant par OK (lot
+       r2) : ce retour-là n'est pas un appui, il ne remonte rien. */
+    if (A.avalerRetour) { A.avalerRetour--; synchroniserCrans(); return; }
     /* Les deux bulles se ferment comme une fenêtre (lot r1b) : celle
        d'Aujourd'hui comme son OK, celle de l'appui long de l'Agenda. */
-    if ($('#aj-bulle')) { fermerBulleAuj(); synchroniserCrans(); return; }
+    if ($('#aj-bulle')) { A.cranBulleAuj = false; fermerBulleAuj(); synchroniserCrans(); return; }
     if (A.bulle) { fermerBulleJour(); synchroniserCrans(); return; }
     if (!$('#modale').hidden) { fermerModale(); synchroniserCrans(); return; }
     if (typeEcran(A.ecran) === 'racine') return;
@@ -11860,7 +11949,8 @@ function renderCarnet() {
       (t.ouverts > 1 ? 's' : '') + ' ouvert' + (t.ouverts > 1 ? 's' : '') +
       ' · ' + E.fmt(t.jours, 1) + ' jours-homme cumulés' +
       (t.nAFacturer ? ' · <b>' + t.nAFacturer + ' à facturer</b>' : '') +
-      (t.retard ? ' · <span class="retard">' + t.retard + ' aux jours passés</span>' : '') + '</p>';
+      /* Un fait, pas une relance (lot r2) : le mot de la ligne d'Aujourd'hui. */
+      (t.retard ? ' · ' + t.retard + ' avec plus de jour posé' : '') + '</p>';
   }
   renderFiltreChantiers();
   renderListeChantiers();
@@ -12501,11 +12591,23 @@ function corpsInfos(c) {
         '<button class="btn-min" data-fcarte="moi">Je suis dessus</button>' +
         '<button class="btn-min" data-fcarte="placer">Placer sur la carte</button>') + '</div>' +
     '<p class="fi-meta"><span>Annoncé le <b>' + (C.dateEntree(c) ? dateCourte(C.dateEntree(c)) : '—') +
-    '</b></span><span>Repérage : <b>' + (c.dateReperage ? dateCourte(c.dateReperage) : 'pas encore') +
-    '</b></span></p>' +
-    '<button class="btn" id="f-reperage">' + (c.dateReperage ? 'Modifier le repérage' : 'Noter le repérage') +
-    '</button>' +
-    (c.dateReperage ? '' : '<p class="fi-aide">Facultatif : un chantier peut passer au devis sans repérage.</p>') +
+    '</b></span><span>Repérage : <b>' + (c.dateReperage ? dateCourte(c.dateReperage)
+      : c.sansReperage ? 'pas de repérage' : 'pas encore') + '</b></span></p>' +
+    /* « Pas de repérage » (lot r2), sur le principe de « Pas de devis » : un
+       choix qui se défait. Choisi, plus rien ne réclame le repérage. */
+    (c.dateReperage
+      ? '<button class="btn" id="f-reperage">Modifier le repérage</button>'
+      : c.sansReperage
+        ? '<button class="lien" id="f-reperage-oui">Finalement, noter un repérage</button>'
+        : '<div class="btn-rang"><button class="btn" id="f-reperage">Noter le repérage</button>' +
+          '<button class="btn" id="f-sansreperage">Pas de repérage</button></div>' +
+          '<p class="fi-aide">Facultatif : un chantier peut passer au devis sans repérage.</p>') +
+    /* Le trajet depuis chez lui (lot r2) : Ma journée le propose. */
+    '<button class="fi-note fi-btn" id="f-trajet"><small>Trajet depuis chez moi ✎</small>' +
+    (trajetDeFiche(c)
+      ? esc([C.nb(c.trajetKm) ? E.fmt(C.nb(c.trajetKm), C.nb(c.trajetKm) % 1 ? 1 : 0) + ' km' : '',
+        C.nb(c.trajetHeures) ? C.ditHeures(c.trajetHeures) : ''].filter(Boolean).join(' · ') + ' aller-retour')
+      : '<span class="muted">pas encore noté — Ma journée le proposera</span>') + '</button>' +
     /* La fiche sécurité est obligatoire au-delà de quatre hectares. C'est
        ici qu'il chiffre et repère, donc ici qu'il faut le dire. */
     (C.ficheRequise(c) ? '<p class="acompleter-bloc">Plus de ' + C.SEUIL_FICHE_HA + ' ha : une ' +
@@ -12593,10 +12695,10 @@ function corpsDevis(c) {
    posées sur l'agenda, « temps » est ce qu'on y a passé — et ne se branchent
    jamais l'une sur l'autre. */
 function lignesTemps(c) {
-  var par = {}, sansDate = { fait: 0, prevu: 0, actes: [], qtes: {}, km: 0 };
+  var par = {}, sansDate = { fait: 0, prevu: 0, actes: [], qtes: {}, km: 0, trajet: 0, jrn: [] };
   var rang = function (ts) {
     var k = C.jourCle(ts);
-    par[k] = par[k] || { d: C.minuit(ts), fait: 0, prevu: 0, actes: [], qtes: {}, km: 0 };
+    par[k] = par[k] || { d: C.minuit(ts), fait: 0, prevu: 0, actes: [], qtes: {}, km: 0, trajet: 0, jrn: [] };
     return par[k];
   };
   C.journeesPlacees(c).forEach(function (x) {
@@ -12608,6 +12710,9 @@ function lignesTemps(c) {
     var cible = t.date ? rang(t.date) : sansDate;
     cible.fait += C.heuresSaisie(t, A.cfg);
     cible.km += C.nb(t.km);
+    cible.trajet += C.nb(t.trajet);
+    /* Les journées qui portent ce jour : un appui les rouvre (lot r2). */
+    if (t.jrn && cible.jrn.indexOf(t.jrn) < 0) cible.jrn.push(t.jrn);
     /* La journée d'office (lot r1) se dit, avec son ○ tant que la fiche de
        ce jour n'a pas été ouverte. */
     if (t.office) { cible.office = true; if (!t.vu) cible.rond = true; }
@@ -12624,7 +12729,10 @@ function lignesTemps(c) {
 function corpsTravaux(c, k) {
   var hj = C.HEURES_JOUR(A.cfg) || 8;
   var rangs = lignesTemps(c), auj = C.minuit(Date.now());
-  var faitH = 0, resteH = 0, km = C.kmChantier(c);
+  var faitH = 0, resteH = 0, km = C.kmChantier(c), trajet = C.trajetChantier(c);
+  /* Le trajet ne compte plus dans le temps du chantier (lot r2) : il se dit
+     à côté, partout où ce temps se lit. */
+  var plusTrajet = function (h) { return h ? '+ ' + C.ditHeures(h) + ' de trajet' : ''; };
   rangs.forEach(function (r) {
     faitH += r.fait;
     /* Une journée passée sort du « reste à faire » : elle n'est plus à faire,
@@ -12648,7 +12756,7 @@ function corpsTravaux(c, k) {
   h += rangs.length
     ? '<p class="fi-aide">Le <b>prévu</b> retient la date sur l’agenda. Le <b>fait</b> est ce que ' +
       'vous y avez réellement passé — c’est lui qui donne vos rendements. Une journée fait ' +
-      hj + ' h, réglable.</p>' +
+      hj + ' h, réglable. Un appui sur un jour l’ouvre pour le corriger.</p>' +
       '<div class="jtete"><span>Date</span><span>Fait</span><span>Prévu</span></div>' +
       rangs.map(function (r) {
         var avenir = !r.sans && r.d > auj;
@@ -12657,15 +12765,20 @@ function corpsTravaux(c, k) {
           return C.nomTravail(a) + (q ? ' ' + E.fmt(q, q % 1 ? 2 : 0) + (u ? ' ' + C.courtUnite(u) : '') : '');
         });
         if (r.km) detail.push(E.fmt(r.km, 0) + ' km');
+        if (r.trajet) detail.push(plusTrajet(r.trajet));
         if (r.office) detail.push((r.rond ? '○ ' : '') + 'comptée d’office');
-        return '<div class="jrang' + (avenir ? ' avenir' : '') + (r.office ? ' office' : '') + '">' +
+        if (r.jrn.length > 1) detail.push(r.jrn.length + ' journées ce jour-là');
+        /* Corriger une journée sans passer par l'Agenda (lot r2) : l'appui
+           ouvre ce que le jour porte. */
+        return '<button type="button" class="jrang' + (avenir ? ' avenir' : '') + (r.office ? ' office' : '') + '" ' +
+          'data-fjour="' + (r.sans ? 'sans' : r.d) + '">' +
           '<span class="jd">' + esc(r.sans ? 'sans date' : dateCourte(r.d)) +
           (r.sans ? ' <span class="muted" style="font-size:11.5px">(rattrapage)</span>'
             : avenir ? ' <span class="muted" style="font-size:11.5px">à venir</span>' : '') +
           (detail.length ? '<small>' + esc(detail.join(' · ')) + '</small>' : '') + '</span>' +
           '<span class="jv num' + (r.fait ? '' : ' vide') + '">' + (r.fait ? dur(r.fait) : '—') + '</span>' +
           '<span class="jv num' + (r.prevu ? '' : ' vide') + '">' + (r.prevu ? dur(r.prevu) : '—') + '</span>' +
-          '</div>';
+          '</button>';
       }).join('')
     : '<p class="fi-aide">Aucune date posée, aucun temps noté.</p>';
   h += '<div class="kpi">' +
@@ -12674,8 +12787,9 @@ function corpsTravaux(c, k) {
     (prevus ? '<div class="carte2"><b class="num">' + dur(prevus * hj) + '</b><small>estimé au devis</small></div>' : '') +
     '</div>';
   var real = delaiRealisation(c);
-  h += '<p class="fi-meta"><span><b>' + E.fmt(C.arr(faitH, 2), faitH % 1 ? 1 : 0) + ' h</b></span>' +
+  h += '<p class="fi-meta"><span><b>' + C.ditHeures(faitH) + '</b></span>' +
     '<span><b>' + dur(faitH) + '</b></span>' +
+    (trajet ? '<span id="f-trajet-total">' + plusTrajet(trajet) + '</span>' : '') +
     '<span><b>' + E.fmt(km, 0) + ' km</b>' + (km ? ' · carburant estimé ' + eur(C.coutCarburant(km, A.cfg)) : '') + '</span>' +
     (c.dateFin && C.rangStatut(c.statut) >= C.rangStatut('termine') && c.statut !== 'sansuite'
       ? '<span>terminé le <b>' + dateCourte(c.dateFin) + '</b></span>' : '') +
@@ -12686,6 +12800,8 @@ function corpsTravaux(c, k) {
     h += '<div class="carte2 fi-bilan' + (bil.ecart > 0.25 ? ' perte' : bil.ecart < -0.25 ? ' gain' : '') + '">' +
       '<div><span>Le devis paie</span><b class="num">' + dur(bil.prevues * hj) + ' à ' + eur(vise) + ' la journée</b></div>' +
       '<div><span>J’y ai passé</span><b class="num">' + dur(bil.faites * hj) + '</b></div>' +
+      (trajet ? '<div class="muted" id="f-bilan-trajet"><span>sans le trajet</span><span>' +
+        plusTrajet(trajet) + '</span></div>' : '') +
       '<div><span class="muted">soit</span><b class="num">' + eur(bil.obtenu) + ' la journée</b></div>' +
       '<p class="fi-aide">' + (Math.abs(bil.ecart) <= 0.25 ? 'Estimation juste.'
         : bil.ecart > 0 ? dur(bil.ecart * hj) + ' de plus que prévu : ' + eur(vise - bil.obtenu) + ' perdus par jour.'
@@ -12700,7 +12816,8 @@ function corpsTravaux(c, k) {
   }
   var travaux = [];
   (c.lignes || []).forEach(function (l) { if (travaux.indexOf(l.travail) < 0) travaux.push(l.travail); });
-  if (travaux.length > 1 && (c.temps || []).length && !(c.temps || []).some(function (t) { return t.activite; })) {
+  if (travaux.length > 1 && (c.temps || []).length &&
+    !(c.temps || []).some(function (t) { return t.activite && !t.sansTemps; })) {
     h += '<p class="fi-aide">Plusieurs travaux sur ce chantier : précisez la prestation dans ' +
       'chaque journée pour obtenir les rendements.</p>';
   }
@@ -12786,7 +12903,8 @@ function resumeEtape(c, i, k) {
   var e = C.etapeChantier(c);
   if (i === 0) {
     return c.dateReperage ? 'repéré le ' + dateCourte(c.dateReperage)
-      : 'annoncé le ' + dateCourte(C.dateEntree(c)) + (e === 0 ? ' · repérage facultatif' : '');
+      : 'annoncé le ' + dateCourte(C.dateEntree(c)) +
+        (c.sansReperage ? ' · pas de repérage' : e === 0 ? ' · repérage facultatif' : '');
   }
   if (i === 1) {
     if (c.statut === 'sansuite') return 'refusé' + (c.motifRefus ? ' · ' + C.nomMotifRefus(c.motifRefus) : '');
@@ -12868,10 +12986,37 @@ function tuilesFiche(c) {
     '</div>';
 }
 
+/* La pastille Fiche sans chantier ouvert (lot r2) : au lieu d'un écran vide,
+   on en choisit un. Les chantiers en cours, rangés comme dans Aujourd'hui ;
+   la recherche porte sur tous. La case de recherche ne se refait pas pendant
+   la frappe : seule la liste dessous se redessine. */
+function renderChoixChantier(z) {
+  if (!$('#fc-rech')) {
+    z.innerHTML = '<div class="fc-choix"><p class="fc-titre">Quel chantier ouvrir ?</p>' +
+      '<input type="search" id="fc-rech" autocomplete="off" aria-label="Chercher un chantier" ' +
+      'placeholder="Chercher : nom, donneur d’ordre, commune, n° de facture">' +
+      '<div class="aj-zone" id="fc-liste"></div></div>';
+  }
+  var q = $('#fc-rech').value.trim(), now = Date.now(), et = -1, h = '';
+  var l = q ? C.chercher(A.chantiers, q) : chantiersEnCours();
+  l.forEach(function (c) {
+    var e = C.etapeChantier(c);
+    if (!q && e !== et) { et = e; h += '<p class="aj-etape" data-etape="' + e + '">' + esc(NOMS_ETAPES[e] || '') + '</p>'; }
+    var s = situationChantier(c, now, true);
+    h += '<button type="button" class="aj-ch" data-fcouvre="' + esc(c.id) + '">' +
+      '<span class="aj-txt"><b>' + esc(C.nomChantier(c)) + '</b>' +
+      (c.donneur || c.commune ? '<small>' + esc([c.donneur, c.commune].filter(Boolean).join(' · ')) + '</small>' : '') +
+      '<span class="aj-situ' + (s.ton ? ' aj-' + s.ton : '') + '">' + esc(s.t) + '</span></span>' +
+      '<span class="aj-droite">' + pointsEtape(c) + '</span></button>';
+  });
+  $('#fc-liste').innerHTML = h || '<p class="fi-aide" style="padding:12px 14px;margin:0">' +
+    (q ? 'Aucun chantier ne répond à cette recherche.' : 'Aucun chantier en cours : cherchez-en un plus ancien.') + '</p>';
+}
+
 function renderFiche() {
   var z = $('#fiche-chantier'); if (!z) return;
   var c = chantier(A.chOuvert);
-  if (!c) { z.innerHTML = '<div class="carte"><div class="vide"><p>Chantier introuvable.</p></div></div>'; return; }
+  if (!c) { renderChoixChantier(z); return; }
   var k = C.troisChiffres(c, A.cfg), e = C.etapeChantier(c);
   /* Ce qu'il a déplié se garde sur le même chantier, tant que l'étape ne
      change pas : un geste qui fait avancer le chantier ouvre la suivante. */
@@ -12907,7 +13052,9 @@ function renderFiche() {
     }).join('') + '</div>' +
     '<p class="fi-etat">' + badgeStatut(c) +
     (dateStatut(c) ? ' <span class="muted">' + esc(dateStatut(c)) + '</span>' : '') +
-    (C.enRetard(c, Date.now()) ? ' <span class="retard">jours passés</span>' : '') + '</p>' +
+    /* Un fait, pas une relance (lot r2) : le même mot, en gris, que la ligne
+       d'Aujourd'hui. */
+    (C.enRetard(c, Date.now()) ? ' <span class="muted fi-plusjour">plus de jour posé</span>' : '') + '</p>' +
     '</div>' +
     troisChiffresFiche(c, k) +
     '<div class="fi-etapes" id="f-etapes">' +
@@ -12926,7 +13073,9 @@ function renderFiche() {
 }
 /* ------------------------------------------------------------ formulaires */
 /* Difficulté d'une ligne de travaux, de 1 à 5. Les deux extrêmes sont
-   nommés : entre les deux, c'est son jugement, pas une grille. */
+   nommés : entre les deux, c'est son jugement, pas une grille. Elle ne se
+   note plus depuis le lot r2 ; les notes déjà prises se lisent encore dans
+   les rendements. */
 var DIFF5 = [
   { v: 1, n: '1', t: 'très facile' }, { v: 2, n: '2', t: 'facile' },
   { v: 3, n: '3', t: 'moyen' }, { v: 4, n: '4', t: 'difficile' },
@@ -12935,13 +13084,6 @@ var DIFF5 = [
 function nomDiff5(v) {
   for (var i = 0; i < DIFF5.length; i++) if (DIFF5[i].v === Number(v)) return DIFF5[i].t;
   return '';
-}
-function chipsDiff5(idBase, valeur) {
-  return '<button type="button" class="chip" data-' + idBase + '="" aria-pressed="' +
-    (!valeur) + '">—</button>' + DIFF5.map(function (n) {
-      return '<button type="button" class="chip" data-' + idBase + '="' + n.v + '" title="' + n.t +
-        '" aria-pressed="' + (Number(valeur) === n.v) + '">' + n.n + '</button>';
-    }).join('');
 }
 
 /* La validité se dit en jours (lot r1b) : une case, la valeur des réglages
@@ -13700,14 +13842,15 @@ function ouvrirLigne(id, idx) {
         '>forcer à ' + String(t).replace('.', ',') + ' %</option>';
     }).join('') + '</select></div>' +
     '<div class="carte2" id="cl-apercu" style="margin:11px 0"></div>' +
-    '<label class="eyebrow" style="display:block">Difficulté <span class="muted" ' +
-    'style="font-weight:400;text-transform:none;letter-spacing:0">(1 très facile → 5 très difficile)</span></label>' +
-    '<div class="chips" id="cl-diff" style="margin-top:5px">' + chipsDiff5('cldiff', l.difficulte) + '</div>' +
+    /* La difficulté ne se note plus ici (lot r2) : les notes déjà prises
+       restent sur la ligne et se lisent toujours dans les rendements. */
     /* Ce qui relie la facture au stock. Laissé vide, rien ne sort : toutes
        les fournitures ne sont pas stockées. Sur un produit dosé — un
        répulsif à 6 ml par plant — la quantité de la ligne reste le nombre
-       de plants, c'est ce que lit le client ; c'est la sortie qui convertit. */
-    '<div class="champ" style="margin-top:9px"><label class="eyebrow" for="cl-art">Produit du stock</label>' +
+       de plants, c'est ce que lit le client ; c'est la sortie qui convertit.
+       Il ne s'affiche que sur une fourniture (lot r2), et sur une ancienne
+       ligne qui en désigne déjà un. */
+    '<div class="champ" id="cl-art-champ" style="margin-top:9px"><label class="eyebrow" for="cl-art">Produit du stock</label>' +
     '<select id="cl-art"><option value="">— aucun, rien ne sort du stock —</option>' +
     (A.articles || []).slice().sort(function (x, y) {
       return (x.nom || '').localeCompare(y.nom || '', 'fr');
@@ -13720,17 +13863,18 @@ function ouvrirLigne(id, idx) {
     }).join('') + '</select>' +
     '<p class="muted" style="font-size:11.5px;margin:5px 0 0" id="cl-art-aide"></p></div>' +
     /* La liste des travaux sert au taux de TVA et aux rendements : elle doit
-       rester courte et stable. Ce champ porte ce qui figure vraiment sur la
-       facture — « tuteur châtaignier 9/11×150 » là où la liste ne connaît
-       que « Fourniture de tuteurs » — et c'est lui qui s'affiche en tête. */
-    '<div class="champ" style="margin-top:9px"><label class="eyebrow" for="cl-note">Libellé sur la facture</label>' +
+       rester courte et stable. Ce champ porte ce qui précise la ligne —
+       « tuteur châtaignier 9/11×150 » là où la liste ne connaît que
+       « Fourniture de tuteurs » — et c'est lui qui s'affiche en tête.
+       « Libellé sur la facture » l'induisait en erreur : Sylve ne fait pas
+       ses factures (lot r2). Le champ reste `note`. */
+    '<div class="champ" style="margin-top:9px"><label class="eyebrow" for="cl-note">Précision (facultatif)</label>' +
     '<input type="text" id="cl-note" autocomplete="off" placeholder="tuteur châtaignier 9/11×150, et agrafes…" value="' + esc(l.note || '') + '">' +
-    '<p class="muted" style="font-size:11.5px;margin:5px 0 0">Laissé vide, c’est l’intitulé des travaux qui s’affiche.</p></div>' +
-    '<p class="muted" style="font-size:12px;margin:7px 0 0">La note sert à situer vos rendements ' +
-    'quand vous estimerez un chantier semblable. La précision, elle, ne sert qu’à vous : ' +
-    'c’est ce que vous relirez dans deux ans.</p>' +
+    '<p class="muted" style="font-size:11.5px;margin:5px 0 0">Ce qui précise la ligne, tel que sur votre ' +
+    'facture : tuteur châtaignier 9/11×150… Laissé vide, c’est le nom des travaux qui s’affiche.</p></div>' +
     '<div class="btn-rang"><button class="btn primaire" id="cl-ok">Valider</button></div>');
 
+  /* Une difficulté déjà notée se garde telle quelle : elle ne se change plus. */
   var clDiff = l.difficulte || '';
   /* Les travaux en plus du premier : ils désignent ce que le forfait couvre.
      Dès qu'il y en a un, la ligne devient un forfait — un seul prix, pas de
@@ -13745,6 +13889,9 @@ function ouvrirLigne(id, idx) {
   var majNature = function () {
     var z = $('#cl-nat-champ'); if (!z) return;
     z.style.display = C.estFourniture($('#cl-trav').value) ? '' : 'none';
+    /* Le produit du stock : sur une fourniture, ou une ligne qui en a un. */
+    var a = $('#cl-art-champ');
+    if (a) a.style.display = C.estFourniture($('#cl-trav').value) || l.article ? '' : 'none';
   };
   var majForfait = function () {
     var groupe = clPlus.length > 0;
@@ -13847,13 +13994,6 @@ function ouvrirLigne(id, idx) {
   });
   $('#cl-nature').addEventListener('change', apercu);
   majNature();
-  $('#cl-diff').addEventListener('click', function (e) {
-    var b = e.target.closest('[data-cldiff]'); if (!b) return;
-    clDiff = b.dataset.cldiff ? Number(b.dataset.cldiff) : '';
-    $$('#cl-diff .chip').forEach(function (x) {
-      x.setAttribute('aria-pressed', String(x.dataset.cldiff === String(clDiff)));
-    });
-  });
   $('#cl-ajout').addEventListener('click', function () {
     var pris = C.travauxDeLigne({ travail: $('#cl-trav').value, travauxPlus: clPlus });
     var libre = C.TRAVAUX.filter(function (t) {
@@ -13923,8 +14063,9 @@ function ouvrirTemps(id, quand) {
        un quart de journée là, et les deux ne se comparaient plus. Tout se
        note en heures, et le nombre d'heures d'une journée se règle une fois
        pour toutes dans les Réglages. */
-    '<div class="champ"><label class="eyebrow" for="ct-duree">Combien d’heures ?</label>' +
-    '<input type="text" id="ct-duree" class="gros" inputmode="decimal" autocomplete="off"></div>' +
+    /* En heures et minutes (lot r2), comme Ma journée. */
+    '<div class="champ"><label class="eyebrow" for="ct-duree">Combien de temps ?</label>' +
+    champDuree('ct-duree', 0, { gros: true, nom: 'Temps passé' }) + '</div>' +
     '<div class="champ"><label class="eyebrow" for="ct-pers">Personnes sur place</label>' +
     '<input type="text" id="ct-pers" inputmode="numeric" value="1"></div>' +
     '<div class="champ"><label class="eyebrow" for="ct-km">Kilomètres</label>' +
@@ -13947,7 +14088,7 @@ function ouvrirTemps(id, quand) {
     '<div class="carte2" id="ct-apercu" style="margin:11px 0"></div>' +
     '<div class="btn-rang"><button class="btn primaire" id="ct-ok">Enregistrer</button></div>');
   var apercu = function () {
-    var t = { duree: C.nb($('#ct-duree').value), unite: 'h',
+    var t = { duree: lireDuree('ct-duree'), unite: 'h',
       personnes: C.nb($('#ct-pers').value), sansMoi: $('#ct-sansmoi').checked };
     var jh = C.joursSaisie(t, A.cfg), mj = C.mesJours(t, A.cfg);
     $('#ct-apercu').innerHTML = jh
@@ -13957,11 +14098,11 @@ function ouvrirTemps(id, quand) {
         (jh > mj ? ' — les autres facturent les leurs' : '') + '</div>'
       : '<span class="muted">Indiquez une durée.</span>';
   };
-  ['#ct-duree', '#ct-pers'].forEach(function (s) { $(s).addEventListener('input', apercu); });
+  ['#ct-duree', '#ct-duree-m', '#ct-pers'].forEach(function (s) { $(s).addEventListener('input', apercu); });
   $('#ct-sansmoi').addEventListener('change', apercu);
   $('#ct-crans').addEventListener('click', function (e) {
     var b = e.target.closest('[data-cth]'); if (!b) return;
-    $('#ct-duree').value = b.dataset.cth;
+    poserDuree('ct-duree', Number(b.dataset.cth));
     $$('#ct-crans [data-cth]').forEach(function (x) {
       x.setAttribute('aria-pressed', String(x === b));
     });
@@ -13969,7 +14110,7 @@ function ouvrirTemps(id, quand) {
   });
   apercu();
   $('#ct-ok').addEventListener('click', function () {
-    var d = C.nb($('#ct-duree').value);
+    var d = lireDuree('ct-duree');
     if (d <= 0) { toast('Durée attendue.'); return; }
     /* Une saisie de temps est une journée : la pousser dans c.temps la
        faisait disparaître à la prochaine indexation. */
@@ -14021,6 +14162,45 @@ function ouvrirStatut(id) {
 }
 
 
+/* --- le trajet depuis chez lui (lot r2) ---
+   Aller-retour, en kilomètres et en temps. Ma journée le propose au choix du
+   chantier ; le changer un jour donné ne touche pas la fiche. */
+function ouvrirTrajetCh(id) {
+  var c = chantier(id); if (!c) return;
+  modale('Trajet depuis chez moi',
+    '<p class="fi-aide">Aller-retour. Ma journée le propose pour ce chantier ; vous pouvez le ' +
+    'changer un jour donné sans toucher à cette fiche.</p>' +
+    '<div class="grille g2">' +
+    '<div class="champ"><label class="eyebrow" for="tr-km">Kilomètres</label>' +
+    '<input type="text" id="tr-km" inputmode="decimal" autocomplete="off" value="' +
+    (C.nb(c.trajetKm) ? esc(String(c.trajetKm).replace('.', ',')) : '') + '"></div>' +
+    '<div class="champ"><label class="eyebrow" for="tr-h">Temps</label>' +
+    champDuree('tr-h', c.trajetHeures, { nom: 'Temps de trajet' }) + '</div></div>' +
+    '<div class="btn-rang">' + (trajetDeFiche(c) ? '<button class="btn" id="tr-effacer">Effacer</button>' : '') +
+    '<button class="btn primaire" id="tr-ok">Enregistrer</button></div>');
+  $('#tr-ok').addEventListener('click', function () {
+    majChantier(c, { trajetKm: C.nb($('#tr-km').value) || null, trajetHeures: lireDuree('tr-h') || null },
+      'Trajet noté.');
+  });
+  if ($('#tr-effacer')) $('#tr-effacer').addEventListener('click', function () {
+    majChantier(c, { trajetKm: null, trajetHeures: null }, 'Trajet effacé.');
+  });
+}
+
+/* Un jour de l'étape Travaux, d'un appui (lot r2) : « je dépendais de
+   l'Agenda pour corriger une journée ». La journée de ce jour s'ouvre (un
+   ancien doublon : le choix entre les deux) ; une journée comptée d'office,
+   Ma journée pré-remplie ; un jour seulement posé, la fiche du jour ; la
+   ligne « sans date », le rattrapage. */
+function ouvrirJourDeFiche(c, cle) {
+  if (cle === 'sans') { ouvrirTemps(c.id); return; }
+  var ts = C.minuit(Number(cle));
+  var r = lignesTemps(c).filter(function (x) { return !x.sans && x.d === ts; })[0];
+  if (r && r.jrn.length) { ouvrirJourneesParmi(r.jrn); return; }
+  if (r && r.office) { ouvrirJournee(null, modeleDOffice(c, ts, r.fait)); return; }
+  ouvrirFicheJour(ts);
+}
+
 /* --- le repérage, noté en une fois (C2) ---
    Date, position, peuplement et ce qu'on a vu : tout ce que le passage sur
    place apprend, dans une feuille. Facultatif — un chantier passe au devis
@@ -14057,6 +14237,7 @@ function ouvrirReperageCh(id) {
     var essv = $('#rp-ess').value;
     if (essv === '__ajouter') essv = '';
     return { dateReperage: versDate($('#rp-date').value) || C.minuit(Date.now()) + 12 * 3600000,
+      sansReperage: false,
       vuReperage: $('#rp-vu').value.trim(), gps: gps,
       surface: C.nb($('#rp-surf').value) || c.surface || null,
       criteres: Object.assign({}, c.criteres || {}, {
@@ -14736,8 +14917,7 @@ function ouvrirFicheJour(ts) {
   if (office.length) {
     h += '<div class="fj-office" id="fj-office"><p><b>○ Comptée d’office : ' +
       esc(office.map(function (r) {
-        var hh = C.heuresSaisie(r.temps, A.cfg);
-        return E.fmt(hh, hh % 1 ? 1 : 0) + ' h sur ' + C.nomChantier(r.chantier);
+        return C.ditHeures(C.heuresSaisie(r.temps, A.cfg)) + ' sur ' + C.nomChantier(r.chantier);
       }).join(', ')) + '.</b> Le jour était posé et confirmé, rien n’a été saisi. ' +
       'Si vous remplissez Ma journée, elle remplace celle-ci.</p>' +
       '<div class="btn-rang"><button class="btn primaire btn-min" id="fj-preciser">Préciser ma journée</button>' +
@@ -14760,11 +14940,14 @@ function ouvrirFicheJour(ts) {
   if (parCh.length) {
     h += '<p class="fj-sous">Ce que vous y avez fait</p>' +
       parCh.map(function (x) {
+        /* Le trajet se dit à côté de la durée (lot r2) : il n'y entre plus. */
         var txt = '<b>' + esc(C.nomChantier(x.chantier)) + '</b><small>' +
-          C.ditDuree(x.heures, A.cfg) + (x.personnes > 1 ? ' × ' + x.personnes + ' pers.' : '') + '</small>' +
+          C.ditDuree(x.heures, A.cfg) + (x.personnes > 1 ? ' × ' + x.personnes + ' pers.' : '') +
+          (x.trajet ? ' · + ' + C.ditHeures(x.trajet) + ' de trajet' : '') +
+          (x.jrn.length > 1 ? ' · ' + x.jrn.length + ' journées' : '') + '</small>' +
           (x.prestations.length ? '<small class="fj-presta">' + esc(x.prestations.join(', ')) + '</small>' : '');
         /* Un appui rouvre la journée de ce chantier ; s'il y en a plusieurs ce
-           jour-là, la première. */
+           jour-là (un ancien doublon), un petit choix entre elles (lot r2). */
         return '<div class="liste-item" data-fjch="' + esc(x.chantier.id) + '">' +
           (x.jrn.length
             ? '<button type="button" class="li-c fj-txt" data-fjmj="' + esc(x.jrn[0]) + '">' + txt + '</button>'
@@ -14866,10 +15049,8 @@ function ouvrirFicheJour(ts) {
   sur('fj-preciser', function () {
     fermerModale();
     if (office.length !== 1) { ouvrirJournee(null, { date: ts }); return; }
-    var c = office[0].chantier;
-    ouvrirJournee(null, { date: ts, chantier: c.id, lieu: c.foret || '', commune: c.commune || '',
-      km: kmHabituels(c.id) || 0, total: C.heuresSaisie(office[0].temps, A.cfg),
-      postes: prestationsDe(c).map(function (tv) { return { travaux: tv }; }) });
+    /* Les kilomètres et le trajet, Ma journée les propose d'elle-même. */
+    ouvrirJournee(null, modeleDOffice(office[0].chantier, ts, C.heuresSaisie(office[0].temps, A.cfg)));
   });
   sur('fj-nonla', function () {
     retirerJoursOffice(ts, office).then(function () {
@@ -14884,7 +15065,11 @@ function ouvrirFicheJour(ts) {
   });
   $('#modale-corps').addEventListener('click', function (e) {
     var mj = e.target.closest('[data-fjmj]');
-    if (mj) { fermerModale(); ouvrirJournee(mj.dataset.fjmj); return; }
+    if (mj) {
+      var xm = parCh.filter(function (y) { return y.jrn.indexOf(mj.dataset.fjmj) >= 0; })[0];
+      fermerModale(); ouvrirJourneesParmi(xm ? xm.jrn : [mj.dataset.fjmj]);
+      return;
+    }
     var ouv = e.target.closest('[data-fjouvrir]');
     if (ouv) { fermerModale(); ouvrirChantier(ouv.dataset.fjouvrir, 'travaux'); return; }
     var ret = e.target.closest('[data-fjretirer]');
@@ -14920,8 +15105,11 @@ function ouvrirFicheJour(ts) {
       /* Une vieille saisie qui ne vient d'aucune journée ne se retire pas
          d'ici, comme avant. */
       if (!x.jrn.length) { toast('Cette saisie ne se retire pas d’ici.'); return; }
-      if (!confirm('Retirer la journée « ' + C.nomChantier(x.chantier) + ' » de ce jour ?\n\nElle restera ' +
-        'récupérable ' + B.JOURS_POUBELLE + ' jours dans ' + B.CHEMIN_CORBEILLE + '.')) return;
+      /* Un ancien doublon : on dit combien de journées partent (lot r2). */
+      if (!confirm((x.jrn.length > 1
+        ? 'Retirer les ' + x.jrn.length + ' journées de ' + C.nomChantier(x.chantier) + ' ce jour-là ?\n\nElles resteront '
+        : 'Retirer la journée « ' + C.nomChantier(x.chantier) + ' » de ce jour ?\n\nElle restera ') +
+        'récupérable' + (x.jrn.length > 1 ? 's ' : ' ') + B.JOURS_POUBELLE + ' jours dans ' + B.CHEMIN_CORBEILLE + '.')) return;
       retirerJourneesDe(x.jrn).then(function () { refaire('Journée mise à la corbeille.'); });
     }
   });
@@ -14932,9 +15120,10 @@ function parChantierDuJour(reels) {
   var par = {}, ordre = [];
   reels.forEach(function (r) {
     var id = r.chantier.id;
-    if (!par[id]) { par[id] = { chantier: r.chantier, heures: 0, personnes: 1, prestations: [], jrn: [] }; ordre.push(id); }
+    if (!par[id]) { par[id] = { chantier: r.chantier, heures: 0, trajet: 0, personnes: 1, prestations: [], jrn: [] }; ordre.push(id); }
     var x = par[id];
     x.heures = C.arr(x.heures + C.heuresSaisie(r.temps, A.cfg), 2);
+    x.trajet = C.arr(x.trajet + C.nb(r.temps.trajet), 3);
     x.personnes = Math.max(x.personnes, C.nb(r.temps.personnes) || 1);
     var n = r.temps.activite ? C.nomTravail(r.temps.activite) : '';
     if (n && x.prestations.indexOf(n) < 0) x.prestations.push(n);
@@ -14949,7 +15138,7 @@ function retirerJourneesDe(ids) {
   return Promise.all(l.map(function (j) {
     var c = j.chantier ? chantier(j.chantier) : null;
     return jeterObjet('journee', j, dateCourte(j.date) + ' — ' + (c ? C.nomChantier(c) : (j.lieu || 'sans chantier')),
-      E.fmt(C.heuresJournee(j), 1) + ' h');
+      C.ditHeures(C.heuresJournee(j)));
   })).then(function () {
     indexerJournees();
     return Promise.all([sauverJournees(), sauverChantiers()]);
@@ -15816,7 +16005,7 @@ function renderHistorique() {
     totH += heuresDu(x);
     x.jrn.forEach(function (j) { totKm += C.nb(j.km); });
   });
-  var h1 = function (h) { return E.fmt(C.arr(h, 1), h % 1 ? 1 : 0) + ' h'; };
+  var h1 = C.ditHeures;
   var lundis = Object.keys(semaines).map(Number).sort(function (a, b) { return b - a; });
   A.semOuvertes = A.semOuvertes || {};
   z.innerHTML = '<div class="carte"><div class="carte-titre"><h2>Ce mois-ci, jour par jour</h2>' +
@@ -15834,6 +16023,7 @@ function renderHistorique() {
             var c = j.chantier ? chantier(j.chantier) : null;
             var dit = faitsDeJournee(j);
             if (C.nb(j.km)) dit.push(E.fmt(C.nb(j.km), 0) + ' km');
+            if (C.nb(j.trajet)) dit.push('+ ' + C.ditHeures(j.trajet) + ' de trajet');
             if (j.fin) dit.push('chantier terminé');
             return '<button type="button" class="histo-l" data-histomj="' + esc(j.id) + '">' +
               '<span class="txt"><b>' + esc(jourCourt(x.ts, true) + ' · ' +
@@ -16766,7 +16956,7 @@ function ligneSaisie() {
   return '<button type="button" class="aj-saisie" id="aj-jour">' +
     '<span class="aj-pic">' + picto('horloge') + '</span>' +
     '<span class="aj-txt"><b>' + (faite ? 'Déjà saisi aujourd’hui' : 'Rien de saisi aujourd’hui') + '</b>' +
-    '<small>Cette semaine : ' + (n ? E.fmt(C.arr(h, 1), h % 1 ? 1 : 0) + ' h sur ' + n + ' jour' + (n > 1 ? 's' : '')
+    '<small>Cette semaine : ' + (n ? C.ditHeures(h) + ' sur ' + n + ' jour' + (n > 1 ? 's' : '')
       : 'rien de saisi') + '</small></span>' +
     '<span class="aj-etiq vert">Ma journée</span></button>';
 }
@@ -16874,7 +17064,9 @@ function situationChantier(c, now, surAujourdhui) {
   if (c.statut === 'devis') {
     var q = C.dateEntree(c);
     if (surAujourdhui) {
+      /* « Pas de repérage » choisi (lot r2) : plus rien ne le réclame. */
       return { t: 'Devis à faire · ' + (c.dateReperage ? 'repéré ' + ilYa(c.dateReperage)
+        : c.sansReperage ? (q ? 'annoncé ' + ilYa(q) : 'pas de repérage')
         : (q ? 'annoncé ' + ilYa(q) + ' · ' : '') + 'pas encore repéré'), ton: '' };
     }
     if (c.dateReperage) return { t: 'Repéré le ' + dateCourte(c.dateReperage) + ' · devis à faire', ton: '' };
@@ -16977,7 +17169,7 @@ function faitsDeJournee(j) {
    d'office y est aussi, avec son ○ tant qu'il n'a pas ouvert sa fiche : un
    appui ouvre la fiche du jour, d'où on la précise. */
 function lignesDerniersJours() {
-  var now = Date.now(), h1 = function (h) { return E.fmt(C.arr(h, 1), h % 1 ? 1 : 0) + ' h'; };
+  var now = Date.now(), h1 = C.ditHeures;
   var l = (A.journees || []).filter(function (j) { return C.minuit(C.nb(j.date)) <= C.minuit(now); })
     .map(function (j) { return { ts: C.nb(j.date), j: j }; })
     .concat(journeesDOffice().map(function (o) { return { ts: C.minuit(o.d) + 12 * 3600000, o: o }; }));
@@ -16992,6 +17184,7 @@ function lignesDerniersJours() {
       }
       var j = x.j, c = j.chantier ? chantier(j.chantier) : null;
       var faits = faitsDeJournee(j);
+      if (C.nb(j.trajet)) faits.push('+ ' + C.ditHeures(j.trajet) + ' de trajet');
       return '<button type="button" class="aj-jour" data-ajouvre="journee:' + esc(j.id) + '">' +
         '<span class="aj-txt"><b>' + esc(majuscule(jourCourt(j.date, true)) + ' · ' +
           (c ? C.nomChantier(c) : (j.lieu || 'sans chantier')) + ' · ' + h1(C.heuresJournee(j))) + '</b>' +
@@ -17054,7 +17247,7 @@ function montrerBulleAuj() {
   document.body.appendChild(b);
   /* Sur Aujourd'hui, le retour du téléphone sortirait de Sylve : un cran
      de plus, que la bulle consomme en se fermant. */
-  empilerCran(); A.crans = (A.crans || 0) + 1;
+  empilerCran(); A.crans = (A.crans || 0) + 1; A.cranBulleAuj = true;
   A.bulleAuj = { office: [], pointilles: false };
   dessinerBulleAuj(x);
   b.addEventListener('click', function (e) {
@@ -17084,7 +17277,7 @@ function montrerBulleAuj() {
 }
 function dessinerBulleAuj(x) {
   var b = $('#aj-bulle'); if (!b) return;
-  var h1 = function (h) { return E.fmt(C.arr(h, 1), h % 1 ? 1 : 0) + ' h'; };
+  var h1 = C.ditHeures;
   var place = BULLE_AUJ_MAX;
   var office = x.office.slice(0, place); place -= office.length;
   var pointilles = x.pointilles.slice(0, Math.max(0, place));
@@ -17131,10 +17324,19 @@ function fermerBulleAuj() {
   marquerPosesVues(vus.filter(function (o) { return !o.vu; }));
 }
 function oterBulleAuj() {
+  var ouverte = !!$('#aj-bulle');
   ['#aj-bulle', '#aj-bulle-fond'].forEach(function (s) {
     var e = $(s); if (e && e.parentNode) e.parentNode.removeChild(e);
   });
   A.bulleAuj = null;
+  /* Le cran que la bulle avait pris, elle le rend en se fermant autrement
+     que par le retour (lot r2) : sinon le premier appui sur retour, après
+     OK, ne faisait rien. Le « popstate » qui suit est avalé. */
+  if (ouverte && A.cranBulleAuj) {
+    A.cranBulleAuj = false;
+    A.avalerRetour = (A.avalerRetour || 0) + 1;
+    try { history.back(); } catch (e) { A.avalerRetour--; }
+  }
 }
 
 /* Où mène chaque ligne. */
@@ -18257,14 +18459,15 @@ function retirerSaisie(t) {
       ote = true; return false;
     });
     if (!ote) return false;
+  } else if (t.nonReparti) {
+    /* Le productif que rien ne se partageait : il s'en va seul. */
+    j.productif = C.heuresPostes(j);
   } else {
-    /* Le hors production et le trajet entrent ensemble dans le chantier,
-       en une seule saisie sans activité : la retirer retire les deux. */
     j.nonProd = 0;
     j.trajet = 0;
   }
   /* Une journée sans poste ni temps mort ne dit plus rien : elle s'en va. */
-  if (!(j.postes || []).length && !C.nb(j.nonProd) && !C.nb(j.trajet)) {
+  if (!(j.postes || []).length && !C.nb(j.nonProd) && !C.nb(j.trajet) && !C.productifJournee(j)) {
     A.journees = (A.journees || []).filter(function (x) { return x.id !== j.id; });
   }
   return true;
@@ -18278,24 +18481,40 @@ function indexerJournees() {
     /* Une journée non facturée nourrit le rendement mais jamais le prix de
        journée : elle entre comme si quelqu'un d'autre l'avait faite. */
     var hors = !!j.nonFacture;
-    var premier = true;
+    var saisies = [];
+    var saisie = function (x) {
+      x.date = j.date; x.unite = 'h'; x.personnes = pers;
+      x.sansMoi = (j.sansMoi || hors) || undefined; x.nonFacture = hors || undefined; x.jrn = j.id;
+      saisies.push(x);
+    };
+    var reparti = 0;
     (j.postes || []).forEach(function (p) {
-      if (C.nb(p.heures) <= 0) return;
-      c.temps.push({ date: j.date, duree: C.nb(p.heures), unite: 'h', personnes: pers,
-        sansMoi: (j.sansMoi || hors) || undefined, nonFacture: hors || undefined,
-        km: premier ? (C.nb(j.km) || undefined) : undefined,
-        activite: p.travaux || null, quantite: C.nb(p.quantite) || undefined, jrn: j.id });
-      premier = false;
+      var h = C.nb(p.heures);
+      if (h > 0) {
+        reparti += h;
+        saisie({ duree: h, activite: p.travaux || null, quantite: C.nb(p.quantite) || undefined });
+      } else if (p.travaux) {
+        /* Une prestation sans heures (lot r2) garde sa quantité — elle fait
+           l'avancement — et ne porte aucun temps : on ne sait pas quelle part
+           du productif lui revient. Avant, elle était jetée avec sa quantité. */
+        saisie({ duree: 0, activite: p.travaux, quantite: C.nb(p.quantite) || undefined, sansTemps: true });
+      }
     });
-    /* Le trajet et le hors production comptent dans la journée facturée mais
-       jamais dans le rendement : ils entrent sans activité. */
-    var sansActivite = C.arr(C.nb(j.nonProd) + C.nb(j.trajet), 2);
-    if (sansActivite > 0) {
-      c.temps.push({ date: j.date, duree: sansActivite, unite: 'h', personnes: pers,
-        sansMoi: (j.sansMoi || hors) || undefined, nonFacture: hors || undefined,
-        km: premier ? (C.nb(j.km) || undefined) : undefined,
-        activite: null, jrn: j.id });
+    /* Le productif qui n'est réparti entre aucune prestation : il compte
+       pour le chantier, jamais pour un rendement. */
+    var libre = C.arr(C.productifJournee(j) - reparti, 2);
+    if (libre > 0) saisie({ duree: libre, activite: null, nonReparti: true });
+    /* Le hors production compte dans la journée facturée, jamais dans le
+       rendement : il entre sans activité. */
+    if (C.nb(j.nonProd) > 0) saisie({ duree: C.arr(C.nb(j.nonProd), 3), activite: null });
+    /* Le trajet ne compte plus dans le temps du chantier (lot r2) : il est
+       porté à côté, sur la première saisie, comme les kilomètres. */
+    if (!saisies.length && (C.nb(j.km) || C.nb(j.trajet))) saisie({ duree: 0, activite: null });
+    if (saisies.length) {
+      if (C.nb(j.km)) saisies[0].km = C.nb(j.km);
+      if (C.nb(j.trajet)) saisies[0].trajet = C.trajetJournee(j);
     }
+    saisies.forEach(function (x) { c.temps.push(x); });
   });
   /* Les journées d'office (lot r1) entrent ici, sans activité : elles
      comptent dans le temps passé et le prix par journée, jamais dans un
@@ -18339,32 +18558,124 @@ function derniereJournee() {
   })[0] || null;
 }
 
+/* ------------------------------------------- heures et minutes (lot r2)
+   Une durée se tape dans deux cases côte à côte, « h » et « min » : « 1,67 »
+   ne se tape pas, « 1 h 40 » si. Elle reste gardée en heures décimales, et
+   une ancienne valeur se relit juste (1,67 h → 1 h 40). La case des heures
+   accepte encore une virgule : « 1,5 » vaut 1 h 30. */
+function champDuree(id, heures, o) {
+  o = o || {};
+  var v = C.nb(heures) > 0 ? C.enHeuresMinutes(heures) : null;
+  return '<span class="duree' + (o.gros ? ' gros' : '') + '">' +
+    '<input type="text" id="' + id + '"' + (o.attrH || '') + ' inputmode="decimal" autocomplete="off" value="' +
+    (v ? v.h : '') + '"' + (o.nom ? ' aria-label="' + esc(o.nom) + ', heures"' : '') + '>' +
+    '<span class="duree-u">h</span>' +
+    '<input type="text" id="' + id + '-m"' + (o.attrM || '') + ' inputmode="numeric" autocomplete="off" value="' +
+    (v && v.m ? v.m : '') + '" aria-label="' + esc(o.nom || 'Durée') + ', minutes">' +
+    '<span class="duree-u">min</span></span>';
+}
+function dureeDe(h, m) { return C.arr(C.nb(h) + C.nb(m) / 60, 3); }
+function lireDuree(id) {
+  var h = $('#' + id), m = $('#' + id + '-m');
+  return dureeDe(h ? h.value : '', m ? m.value : '');
+}
+function dureeTapee(id) {
+  var h = $('#' + id), m = $('#' + id + '-m');
+  return !!((h && h.value.trim()) || (m && m.value.trim()));
+}
+function poserDuree(id, heures) {
+  var h = $('#' + id), m = $('#' + id + '-m'); if (!h || !m) return;
+  var v = C.nb(heures) > 0 ? C.enHeuresMinutes(heures) : null;
+  h.value = v ? String(v.h) : '';
+  m.value = v && v.m ? String(v.m) : '';
+}
+
+/* ---------------------------------- une journée par chantier et par jour
+   (lot r2) Deux Ma journée sur le même chantier le même jour — la seconde
+   par oubli — faisaient une ligne « 7 h » dont l'appui n'ouvrait que la
+   première. Les doublons déjà en base restent : on choisit entre eux. */
+function journeesDe(idChantier, ts, sauf) {
+  var k = C.jourCle(ts);
+  return (A.journees || []).filter(function (x) {
+    return idChantier && x.chantier === idChantier && x.id !== sauf && C.jourCle(C.nb(x.date)) === k;
+  });
+}
+function ditJourneeExistante(c, x) {
+  return C.nomChantier(c) + ' a déjà une journée le ' + jourCourt(x.date) + ' : ' +
+    C.ditHeures(C.heuresJournee(x));
+}
+/* Ouvrir « la » journée d'un jour : une seule, Ma journée ; plusieurs (un
+   ancien doublon), un petit choix entre elles. */
+function ouvrirJourneesParmi(ids) {
+  var l = ids.map(journee).filter(Boolean);
+  if (!l.length) return;
+  if (l.length === 1) { ouvrirJournee(l[0].id); return; }
+  var c = l[0].chantier ? chantier(l[0].chantier) : null;
+  modale(l.length + ' journées ce jour-là',
+    '<p class="fi-aide">' + esc((c ? C.nomChantier(c) : 'Ce chantier') + ' a ' + l.length +
+      ' journées le ' + jourCourt(l[0].date) + '. Laquelle ouvrir ?') + '</p>' +
+    l.map(function (j) {
+      var faits = faitsDeJournee(j);
+      return '<button type="button" class="mj-copie" data-mjchoix="' + esc(j.id) + '"><b>' +
+        esc(C.ditHeures(C.heuresJournee(j)) + (C.nb(j.trajet) ? ' · + ' + C.ditHeures(j.trajet) + ' de trajet' : '')) +
+        '</b><small>' + esc(faits.length ? faits.join(', ') : 'sans prestation') + '</small></button>';
+    }).join(''));
+  $('#modale-corps').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-mjchoix]'); if (!b) return;
+    fermerModale(); ouvrirJournee(b.dataset.mjchoix);
+  });
+}
+
+/* Le trajet du chantier (lot r2) : celui de sa fiche, à défaut celui de la
+   dernière journée qui y est allée — c'est la même route. */
+function trajetDeFiche(c) { return !!(c && (C.nb(c.trajetKm) > 0 || C.nb(c.trajetHeures) > 0)); }
+function trajetHabituel(idChantier) {
+  var vu = 0, quand = 0;
+  (A.journees || []).forEach(function (j) {
+    if (j.chantier !== idChantier || !C.nb(j.trajet)) return;
+    if (C.nb(j.date) >= quand) { quand = C.nb(j.date); vu = C.nb(j.trajet); }
+  });
+  return vu;
+}
+
 /* ------------------------------------------------------------- l'écran */
 var pst = [];
+/* Les heures par prestation sont facultatives (lot r2) : elles ne
+   s'affichent qu'une fois « Répartir le temps » demandé, et à deux
+   prestations au moins. */
+var pstRepartir = false;
 
 /* Le sélecteur des postes d'une journée passe par la même fonction que celui
    d'une ligne de chantier : il en existait deux du même nom, et la seconde
    écrasait la première en silence.
-   Ce HTML ne se refait QUE quand une ligne s'ajoute ou s'en va : refait
-   pendant la frappe, il remplaçait le champ sous le doigt et le clavier se
-   refermait (forme retenue du tour 1). */
+   Ce HTML ne se refait QUE quand une ligne s'ajoute ou s'en va, ou que la
+   répartition s'ouvre : refait pendant la frappe, il remplaçait le champ
+   sous le doigt et le clavier se refermait (forme retenue du tour 1). */
 function renderPostes() {
   var z = $('#mj-postes'); if (!z) return;
+  var rep = pstRepartir && pst.length > 1;
   z.innerHTML = pst.map(function (p, i) {
+    var qte = '<div class="champ" style="margin:0"><label class="eyebrow" for="pst-q-' + i + '" id="pst-ql-' + i + '">' +
+      libelleFait(p.travaux) + '</label>' +
+      '<input type="text" id="pst-q-' + i + '" data-pstq="' + i + '" class="gros" inputmode="decimal" autocomplete="off" value="' + esc(p.quantite) + '"></div>';
     return '<div class="mj-poste">' +
       '<div class="mj-poste-haut">' +
       '<select data-pstt="' + i + '" aria-label="Prestation ' + (i + 1) + '">' +
       optionsTravaux(p.travaux, { vide: true, sansFournitures: true }) + '</select>' +
       (pst.length > 1 ? '<button type="button" class="btn-min" data-pstsup="' + i + '" ' +
         'aria-label="Retirer cette prestation">✕</button>' : '') +
-      '</div><div class="grille g2">' +
-      '<div class="champ" style="margin:0"><label class="eyebrow" for="pst-h-' + i + '">Heures productives</label>' +
-      '<input type="text" id="pst-h-' + i + '" data-psth="' + i + '" class="gros" inputmode="decimal" autocomplete="off" value="' + esc(p.heures) + '"></div>' +
-      '<div class="champ" style="margin:0"><label class="eyebrow" for="pst-q-' + i + '" id="pst-ql-' + i + '">' +
-      libelleFait(p.travaux) + '</label>' +
-      '<input type="text" id="pst-q-' + i + '" data-pstq="' + i + '" class="gros" inputmode="decimal" autocomplete="off" value="' + esc(p.quantite) + '"></div>' +
-      '</div><small class="mj-rdt" id="pst-r-' + i + '"></small></div>';
-  }).join('') + '<button type="button" class="btn-min" id="pst-plus">+ une prestation</button>';
+      '</div>' +
+      (rep
+        ? '<div class="champ" style="margin:0"><label class="eyebrow" for="pst-h-' + i + '">Temps passé</label>' +
+          champDuree('pst-h-' + i, dureeDe(p.h, p.m), { attrH: ' data-psth="' + i + '"', attrM: ' data-pstm="' + i + '"',
+            nom: 'Temps passé, prestation ' + (i + 1) }) + '</div>' + qte
+        : qte) +
+      '<small class="mj-rdt" id="pst-r-' + i + '"></small></div>';
+  }).join('') + '<div class="mj-postes-bas"><button type="button" class="btn-min" id="pst-plus">+ une prestation</button>' +
+    (pst.length > 1 ? '<button type="button" class="lien" id="pst-rep">' +
+      (rep ? 'Ne pas répartir le temps' : 'Répartir le temps entre les prestations') + '</button>' : '') + '</div>' +
+    (pst.length > 1 && !rep ? '<small class="mj-aide" id="pst-repaide">Sans répartition, le temps compte pour le ' +
+      'chantier ; il ne compte dans le rendement d’aucune de ces prestations.</small>' : '');
 }
 function libelleFait(travaux) {
   var u = travaux ? C.courtUnite(C.uniteDe(travaux)) : '';
@@ -18372,11 +18683,13 @@ function libelleFait(travaux) {
 }
 function lirePostes() {
   $$('#mj-postes [data-pstt]').forEach(function (i) { pst[+i.dataset.pstt].travaux = i.value; });
-  $$('#mj-postes [data-psth]').forEach(function (i) { pst[+i.dataset.psth].heures = i.value; });
+  $$('#mj-postes [data-psth]').forEach(function (i) { pst[+i.dataset.psth].h = i.value; });
+  $$('#mj-postes [data-pstm]').forEach(function (i) { pst[+i.dataset.pstm].m = i.value; });
   $$('#mj-postes [data-pstq]').forEach(function (i) { pst[+i.dataset.pstq].quantite = i.value; });
 }
+function posteVide() { return { travaux: '', h: '', m: '', quantite: '' }; }
 function postesVides() {
-  return pst.every(function (p) { return !p.travaux && !C.nb(p.heures) && !C.nb(p.quantite); });
+  return pst.every(function (p) { return !p.travaux && !C.nb(p.h) && !C.nb(p.m) && !C.nb(p.quantite); });
 }
 /* Les prestations d'un chantier, une fois chacune, sans les fournitures :
    elles ouvrent les postes, sans heures. */
@@ -18407,25 +18720,43 @@ function chantiersPourJournee(ts, vise) {
     return (poses[b.id] ? 1 : 0) - (poses[a.id] ? 1 : 0) || C.dateChantier(b) - C.dateChantier(a);
   });
 }
+/* Ma journée pré-remplie d'une journée comptée d'office : le chantier, et la
+   durée comptée. Enregistrée, elle remplace la journée d'office. */
+function modeleDOffice(c, ts, heures) {
+  return { date: ts, chantier: c.id, lieu: c.foret || '', commune: c.commune || '',
+    total: heures, postes: prestationsDe(c).map(function (tv) { return { travaux: tv }; }) };
+}
 
-function ouvrirJournee(id, modele) {
+/* « avis » : une ligne en tête, quand Ma journée s'ouvre sur une journée qui
+   existait déjà (lot r2). */
+function ouvrirJournee(id, modele, avis) {
   var j = id ? journee(id) : null;
   if (id && !j) return;
   var src = j || modele || null;
   pst = (src && src.postes && src.postes.length)
     ? src.postes.map(function (p) {
-        return { travaux: p.travaux, heures: j ? String(p.heures) : '', quantite: j ? String(p.quantite || '') : '' };
+        var hm = j && C.nb(p.heures) > 0 ? C.enHeuresMinutes(p.heures) : null;
+        return { travaux: p.travaux, h: hm ? String(hm.h) : '', m: hm && hm.m ? String(hm.m) : '',
+          quantite: j ? String(p.quantite || '') : '' };
       })
-    : [{ travaux: '', heures: '', quantite: '' }];
+    : [posteVide()];
+  /* Une journée déjà répartie se rouvre répartie. */
+  pstRepartir = !!(j && pst.length > 1 && (j.postes || []).some(function (p) { return C.nb(p.heures) > 0; }));
   var leJour = C.minuit((src && src.date) || Date.now());
+  var totalInit = j ? C.heuresJournee(j) : modele && C.nb(modele.total) > 0 ? C.nb(modele.total) : 0;
+  var prodInit = j ? C.productifJournee(j) : totalInit;
   /* Ce que le formulaire a rempli de lui-même : on peut le reprendre quand le
      jour change, jamais ce qu'il a tapé. Un chantier venu de la porte (« Comme
      le… ») compte comme choisi : la date ne le change plus. */
-  var etat = { manuel: !!(j || (modele && modele.chantier)), auto: {}, autoPostes: false, aide: '' };
+  var etat = { manuel: !!(j || (modele && modele.chantier)), auto: {}, autoPostes: false, aide: '',
+    /* Le productif suit le total tant qu'il n'y a pas touché. */
+    prodManuel: !!j && Math.round(prodInit * 60) !== Math.round(totalInit * 60),
+    trajReplie: !!((src && C.nb(src.km)) || (j && C.nb(j.trajet))), trajSource: '' };
   var dj = derniereJournee();
   var cDj = dj && dj.chantier ? chantier(dj.chantier) : null;
 
   modale(id ? 'Modifier la journée' : 'Ma journée',
+    (avis ? '<p class="mj-avis" id="mj-avis">' + esc(avis) + '</p>' : '') +
     (!id && dj ? '<button type="button" class="mj-copie" id="mj-hier">' +
       '<b>Comme le ' + esc(jourCourt(dj.date)) +
       (dj.lieu || cDj ? ' — ' + esc(dj.lieu || C.nomChantier(cDj)) : '') + '</b>' +
@@ -18434,7 +18765,8 @@ function ouvrirJournee(id, modele) {
     '<div class="champ"><label class="eyebrow" for="mj-date">Date</label>' +
     '<input type="date" id="mj-date" value="' + jourIso(leJour) + '"></div>' +
     '<div class="champ"><label class="eyebrow" for="mj-ch">Chantier</label>' +
-    '<select id="mj-ch"></select><small class="mj-aide" id="mj-chaide"></small></div>' +
+    '<select id="mj-ch"></select><small class="mj-aide" id="mj-chaide"></small>' +
+    '<p class="mj-doublon" id="mj-doublon"></p></div>' +
     '<div class="grille g2">' +
     '<div class="champ" style="margin:0"><label class="eyebrow" for="mj-lieu">Forêt</label>' +
     '<input type="text" id="mj-lieu" list="lieux-connus" autocomplete="off" value="' +
@@ -18444,33 +18776,37 @@ function ouvrirJournee(id, modele) {
     esc((src && src.commune) || '') + '"></div>' +
     '</div></div>' +
     /* « Il faudrait juste le temps total, et le temps productif. Et après, si
-       je peux rajouter le temps de trajet. » Le productif, ce sont les heures
-       des prestations — elles font les rendements. Le hors production s'en
-       déduit (affûtage, réglage, panne) et ne se tape plus. Le trajet reste
-       à part : il ne se passe pas sur le chantier. */
+       je peux rajouter le temps de trajet. » Le productif se tape à part
+       depuis le lot r2 : les heures par prestation sont facultatives. Le
+       hors production s'en déduit (affûtage, réglage, panne). Le trajet
+       reste à part : il ne se passe pas sur le chantier. */
     '<p class="fj-sous">Mon temps</p><div class="mj-zone">' +
     '<div class="champ"><label class="eyebrow" for="mj-total">Temps total sur le chantier</label>' +
-    '<input type="text" id="mj-total" class="gros" inputmode="decimal" autocomplete="off" ' +
-    'placeholder="heures, trajet non compris" value="' +
-    (j && C.arr(C.heuresPostes(j) + C.nb(j.nonProd), 2) > 0
-      ? C.arr(C.heuresPostes(j) + C.nb(j.nonProd), 2)
-      /* « Préciser ma journée » (lot r1) : la durée comptée d'office. */
-      : !j && modele && C.nb(modele.total) > 0 ? C.nb(modele.total) : '') + '"></div>' +
+    champDuree('mj-total', totalInit, { gros: true, nom: 'Temps total sur le chantier' }) +
+    '<small class="mj-aide">trajet non compris</small></div>' +
+    '<div class="champ"><label class="eyebrow" for="mj-prod">Temps productif</label>' +
+    champDuree('mj-prod', prodInit, { gros: true, nom: 'Temps productif' }) +
+    '<small class="mj-aide" id="mj-prodaide">ce qui a avancé le chantier ; proposé égal au total</small></div>' +
+    '<div class="champ mj-pers"><label class="eyebrow" for="mj-pers">Personnes</label>' +
+    '<input type="text" id="mj-pers" inputmode="numeric" autocomplete="off" value="' +
+    ((src && C.nb(src.personnes)) || 1) + '"></div>' +
     '<p class="eyebrow" style="margin:0 0 6px">Ce que j’ai fait</p>' +
     '<div id="mj-postes"></div>' +
     '<p class="muted" id="mj-horsprod" style="font-size:12px;margin:6px 0 0"></p></div>' +
+    /* Le trajet se règle sur le chantier (lot r2) : proposé, il se replie
+       en une ligne ; « Modifier » le change pour ce jour seulement. */
     '<p class="fj-sous">Trajet</p><div class="mj-zone">' +
-    '<div class="grille g3">' +
-    '<div class="champ" style="margin:0"><label class="eyebrow" for="mj-trajet">Trajet (h)</label>' +
-    '<input type="text" id="mj-trajet" inputmode="decimal" autocomplete="off" value="' +
-    (j && C.nb(j.trajet) ? j.trajet : '') + '"></div>' +
+    '<div class="mj-traj-ligne" id="mj-traj-ligne" hidden><span id="mj-traj-txt"></span>' +
+    '<button type="button" class="lien" id="mj-traj-mod">Modifier</button></div>' +
+    '<div id="mj-traj-cases"><div class="grille g2">' +
+    '<div class="champ" style="margin:0"><label class="eyebrow" for="mj-trajet">Temps aller-retour</label>' +
+    champDuree('mj-trajet', j ? C.nb(j.trajet) : 0, { nom: 'Temps de trajet' }) + '</div>' +
     '<div class="champ" style="margin:0"><label class="eyebrow" for="mj-km">Kilomètres</label>' +
     '<input type="text" id="mj-km" inputmode="decimal" autocomplete="off" value="' +
     (src && C.nb(src.km) ? src.km : '') + '"></div>' +
-    '<div class="champ" style="margin:0"><label class="eyebrow" for="mj-pers">Personnes</label>' +
-    '<input type="text" id="mj-pers" inputmode="numeric" autocomplete="off" value="' +
-    ((src && C.nb(src.personnes)) || 1) + '"></div>' +
     '</div><small class="mj-aide" id="mj-kmaide"></small></div>' +
+    '<label class="mj-case" for="mj-retenir" id="mj-retenir-l" hidden><input type="checkbox" id="mj-retenir" checked>' +
+    '<span><b>Retenir pour ce chantier</b><small>il sera proposé à chaque journée</small></span></label></div>' +
     '<label class="mj-case" for="mj-fin"><input type="checkbox" id="mj-fin"' + (j && j.fin ? ' checked' : '') + '>' +
     '<span><b>Ce chantier est terminé</b><small>il passe à « à facturer »</small></span></label>' +
     '<div class="champ" style="margin-top:11px"><label class="eyebrow" for="mj-note">Note</label>' +
@@ -18482,6 +18818,7 @@ function ouvrirJournee(id, modele) {
     '<button class="btn primaire plein" id="mj-ok">Enregistrer</button></div></div>');
 
   var dateDe = function () { return versDate($('#mj-date').value) || leJour; };
+  var chDe = function () { return $('#mj-ch').value ? chantier($('#mj-ch').value) : null; };
   var listerChantiers = function () {
     var ts = dateDe(), sel = $('#mj-ch').value || (src && src.chantier) || '';
     var chs = chantiersPourJournee(ts, sel);
@@ -18493,8 +18830,23 @@ function ouvrirJournee(id, modele) {
   };
   var aides = function () {
     $('#mj-chaide').textContent = etat.aide;
-    $('#mj-kmaide').textContent = etat.auto.km != null && $('#mj-km').value === etat.auto.km
-      ? 'Les kilomètres de la dernière fois sur ce chantier : c’est la même route.' : '';
+    $('#mj-kmaide').textContent = etat.auto.km != null && $('#mj-km').value === etat.auto.km &&
+      !trajetDeFiche(chDe()) ? 'Les kilomètres de la dernière fois sur ce chantier : c’est la même route.' : '';
+  };
+  /* La ligne repliée du trajet, et « Retenir pour ce chantier » quand sa
+     fiche n'en a pas. Aucun champ n'est refait. */
+  var majTrajet = function () {
+    var km = C.nb($('#mj-km').value), h = lireDuree('mj-trajet');
+    var replie = !!(etat.trajReplie && (km || h));
+    $('#mj-traj-ligne').hidden = !replie;
+    $('#mj-traj-cases').hidden = replie;
+    if (replie) {
+      $('#mj-traj-txt').innerHTML = '<b>Trajet : ' + esc([km ? E.fmt(km, km % 1 ? 1 : 0) + ' km' : '',
+        h ? C.ditHeures(h) : ''].filter(Boolean).join(' · ')) + '</b>' +
+        (etat.trajSource ? '<small>' + esc(etat.trajSource) + '</small>' : '');
+    }
+    var c = chDe();
+    $('#mj-retenir-l').hidden = !(c && !trajetDeFiche(c) && (km || h));
   };
   /* Choisir un chantier remplit ce qu'il sait — seulement les champs vides,
      jamais par-dessus ce qui est tapé. « auto » retient ce qui a été rempli
@@ -18509,19 +18861,27 @@ function ouvrirJournee(id, modele) {
        reprise ne marchait donc jamais. */
     poser('#mj-lieu', 'lieu', c.foret);
     poser('#mj-commune', 'commune', c.commune);
-    /* Les kilomètres du dernier trajet vers ce chantier : c'est la même
-       route. Estimer une distance entre deux communes demanderait un calcul
-       d'itinéraire, que l'application ne fait pas — mais elle a sa propre
-       mémoire. */
-    var km = kmHabituels(c.id);
-    if (km && !$('#mj-km').value) { $('#mj-km').value = km; etat.auto.km = String(km); }
+    /* Le trajet de la fiche du chantier ; à défaut, celui de la dernière
+       journée sur ce chantier : c'est la même route. Estimer une distance
+       entre deux communes demanderait un calcul d'itinéraire, que
+       l'application ne fait pas — mais elle a sa propre mémoire. */
+    var fiche = trajetDeFiche(c);
+    var km = C.nb(c.trajetKm) || kmHabituels(c.id), th = C.nb(c.trajetHeures) || trajetHabituel(c.id);
+    var pris = false;
+    if (km && !$('#mj-km').value) { $('#mj-km').value = km; etat.auto.km = String(km); pris = true; }
+    if (th && !dureeTapee('mj-trajet')) { poserDuree('mj-trajet', th); etat.auto.trajet = th; pris = true; }
+    if (pris) {
+      etat.trajReplie = true;
+      etat.trajSource = fiche ? 'celui de la fiche du chantier' : 'comme la dernière fois sur ce chantier';
+    }
     lirePostes();
     var vus = prestationsDe(c);
     if (vus.length && postesVides()) {
-      pst = vus.map(function (tv) { return { travaux: tv, heures: '', quantite: '' }; });
+      pst = vus.map(function (tv) { var p = posteVide(); p.travaux = tv; return p; });
       etat.autoPostes = !!auto;
       renderPostes();
     }
+    majTrajet();
   };
   /* Reprendre ce que le formulaire avait rempli de lui-même, s'il n'y a pas
      touché depuis. */
@@ -18529,21 +18889,26 @@ function ouvrirJournee(id, modele) {
     [['#mj-lieu', 'lieu'], ['#mj-commune', 'commune'], ['#mj-km', 'km']].forEach(function (x) {
       if (etat.auto[x[1]] != null && $(x[0]).value === etat.auto[x[1]]) $(x[0]).value = '';
     });
+    if (etat.auto.trajet != null && lireDuree('mj-trajet') === C.arr(etat.auto.trajet, 3)) poserDuree('mj-trajet', 0);
     etat.auto = {};
+    etat.trajReplie = false; etat.trajSource = '';
     lirePostes();
-    if (etat.autoPostes && pst.every(function (p) { return !C.nb(p.heures) && !C.nb(p.quantite); })) {
-      pst = [{ travaux: '', heures: '', quantite: '' }];
+    if (etat.autoPostes && pst.every(function (p) { return !C.nb(p.h) && !C.nb(p.m) && !C.nb(p.quantite); })) {
+      pst = [posteVide()];
       renderPostes();
     }
     etat.autoPostes = false;
+    majTrajet();
   };
   /* P4 : un chantier posé ce jour-là est pré-choisi — un seul ; à plusieurs,
      aucun, et ils passent en tête de la liste. Revu à chaque changement de
-     date tant qu'il n'a pas choisi lui-même. Jamais en modification. */
+     date tant qu'il n'a pas choisi lui-même. Jamais en modification. Un
+     chantier qui a déjà sa journée ce jour-là n'est plus pré-choisi : « Autre
+     chose ce jour-là » ne doit pas y ramener. */
   var preChoisir = function () {
     listerChantiers();
     if (etat.manuel) { etat.aide = ''; aides(); return; }
-    var poses = posesLe(dateDe());
+    var poses = posesLe(dateDe()).filter(function (c) { return !journeesDe(c.id, dateDe()).length; });
     if ($('#mj-ch').value) oublierAuto();
     if (poses.length === 1) {
       $('#mj-ch').value = poses[0].id;
@@ -18555,52 +18920,121 @@ function ouvrirJournee(id, modele) {
     }
     aides();
   };
+  /* Ce qu'il a tapé et qui ne sera pas repris, dit en clair. */
+  var ceQuiEstTape = function () {
+    lirePostes();
+    var l = [];
+    if (dureeTapee('mj-total') && lireDuree('mj-total')) l.push(C.ditHeures(lireDuree('mj-total')));
+    pst.forEach(function (p) {
+      if (p.travaux && C.nb(p.quantite)) {
+        l.push(C.nomTravail(p.travaux) + ' ' + E.fmt(C.nb(p.quantite), C.nb(p.quantite) % 1 ? 2 : 0));
+      }
+    });
+    if ($('#mj-note').value.trim()) l.push('la note');
+    return l.join(', ');
+  };
+  /* Une journée par chantier et par jour : en saisie, on ouvre celle qui
+     existe ; en modification, on le dit et on propose l'autre. */
+  var verifierDoublon = function () {
+    var c = chDe(), z = $('#mj-doublon');
+    var x = c ? journeesDe(c.id, dateDe(), j ? j.id : null)[0] : null;
+    if (!x) { z.innerHTML = ''; return false; }
+    var msg = ditJourneeExistante(c, x);
+    if (!j) {
+      var tape = ceQuiEstTape();
+      fermerModale();
+      ouvrirJournee(x.id, null, msg + '. Elle est ouverte pour la compléter.' +
+        (tape ? ' Ce que vous aviez tapé n’y est pas reporté : ' + tape + '.' : ''));
+      return true;
+    }
+    z.innerHTML = esc(msg) + '. Une seule journée par chantier et par jour. ' +
+      '<button type="button" class="lien" id="mj-autre" data-mjautre="' + esc(x.id) + '">Ouvrir l’autre journée</button>';
+    return true;
+  };
+
+  /* Le temps de la journée, tel qu'il est tapé. Sans total, le total est le
+     productif ; sans productif, le productif est le total — ou la somme des
+     heures réparties. */
+  var calcul = function () {
+    var avec = pst.filter(function (p) { return p.travaux; }).length;
+    var rep = pstRepartir && pst.length > 1;
+    var somme = rep ? C.arr(pst.reduce(function (s, p) { return s + dureeDe(p.h, p.m); }, 0), 3) : 0;
+    var total = lireDuree('mj-total');
+    var prod = dureeTapee('mj-prod') ? lireDuree('mj-prod') : (total || somme);
+    if (!dureeTapee('mj-total')) total = prod;
+    var mn = function (h) { return Math.round(h * 60); };
+    var err = '';
+    /* Un total plus court que le productif ne peut pas être juste : l'un des
+       deux est mal tapé, et deviner lequel fausserait les rendements. */
+    if (mn(total) < mn(prod)) err = 'Le temps total est plus court que le temps productif : corrigez l’un des deux.';
+    else if (rep && somme > 0 && mn(somme) !== mn(prod)) {
+      err = 'Les prestations font ' + C.ditHeures(somme) + ', le temps productif ' + C.ditHeures(prod) +
+        ' : corrigez l’un des deux.';
+    }
+    return { avec: avec, rep: rep && somme > 0, somme: somme, total: total, prod: prod,
+      np: Math.max(0, C.arr(total - prod, 3)), err: err, trajet: lireDuree('mj-trajet') };
+  };
+  /* Le productif proposé : le total, ou la somme des heures réparties. */
+  var proposerProd = function () {
+    if (etat.prodManuel) return;
+    var rep = pstRepartir && pst.length > 1;
+    var somme = rep ? pst.reduce(function (s, p) { return s + dureeDe(p.h, p.m); }, 0) : 0;
+    poserDuree('mj-prod', somme > 0 ? somme : lireDuree('mj-total'));
+  };
+  /* Ce que chaque prestation reçoit du productif : les heures réparties ;
+     une seule prestation, tout ; plusieurs sans répartition, rien. */
+  var heuresDuPoste = function (t, p) {
+    if (!p.travaux) return 0;
+    if (t.rep) return dureeDe(p.h, p.m);
+    return t.avec === 1 ? t.prod : 0;
+  };
 
   /* Ce qui se recalcule pendant la frappe : l'aperçu du pied, la ligne hors
      production, le rendement sous chaque prestation. Aucun champ n'est
      refait. */
   var apercu = function () {
     var z = $('#mj-apercu'); if (!z) return;
-    var hj = C.HEURES_JOUR(A.cfg) || 8;
-    var prod = C.arr(pst.reduce(function (s, p) { return s + C.nb(p.heures); }, 0), 2);
-    var total = C.nb($('#mj-total').value), trajet = C.nb($('#mj-trajet').value);
-    var np = total > prod ? C.arr(total - prod, 2) : 0;
+    var hj = C.HEURES_JOUR(A.cfg) || 8, t = calcul();
     var pers = C.nb($('#mj-pers').value) || 1;
     var hp = $('#mj-horsprod');
     if (hp) {
-      hp.textContent = total && total < prod
-        ? 'Le temps total est plus court que les heures productives.'
-        : np ? E.fmt(prod, 2) + ' h productives, ' + E.fmt(np, 2) +
-          ' h hors production — affûtage, réglage, panne.' : '';
-      hp.classList.toggle('mj-erreur', !!(total && total < prod));
+      hp.textContent = t.err || (t.np ? C.ditHeures(t.prod) + ' productives, ' + C.ditHeures(t.np) +
+        ' hors production — affûtage, réglage, panne.' : '');
+      hp.classList.toggle('mj-erreur', !!t.err);
     }
     pst.forEach(function (p, i) {
       var r = $('#pst-r-' + i); if (!r) return;
-      var ok = p.travaux && C.nb(p.quantite) > 0 && C.nb(p.heures) > 0;
-      if (!ok) { r.textContent = ''; return; }
-      var parJ = C.nb(p.quantite) / (C.nb(p.heures) / hj) * pers;
+      var h = heuresDuPoste(t, p);
+      if (!(p.travaux && C.nb(p.quantite) > 0 && h > 0)) { r.textContent = ''; return; }
+      var parJ = C.nb(p.quantite) / (h / hj) * pers;
       r.textContent = '≈ ' + E.fmt(parJ, parJ >= 100 ? 0 : 1) + ' ' +
         C.courtUnite(C.uniteDe(p.travaux)) + '/jour';
     });
-    var tot = Math.max(total, prod) + trajet;
-    if (tot <= 0) { z.innerHTML = '<span class="muted">Indiquez vos heures.</span>'; return; }
+    /* Le trajet ne compte plus dans la journée (lot r2) : il se dit à côté. */
+    var tot = t.total;
+    if (tot <= 0 && t.trajet <= 0) { z.innerHTML = '<span class="muted">Indiquez vos heures.</span>'; return; }
     var jrs = tot / hj;
-    var ch = $('#mj-ch').value ? chantier($('#mj-ch').value) : null;
+    var ch = chDe();
     var nf = !!(j && j.nonFacture);
     var pj = ch ? C.prixJourVise(ch, A.cfg) : C.nb(A.cfg && A.cfg.prixJourVise);
-    z.innerHTML = '<div class="mj-tot"><b class="num">' + E.fmt(tot, 2) + ' h</b>' +
+    z.innerHTML = '<div class="mj-tot"><b class="num">' + C.ditHeures(tot) + '</b>' +
       '<span>' + E.fmt(jrs, 2) + ' journée' + (jrs > 1 ? 's' : '') + '</span>' +
       (nf ? '<span class="retard">non facturée</span>'
         : pj ? '<b class="num mj-montant">' + eur(C.arr(jrs * pj, 2)) + '</b>' : '') + '</div>' +
       '<small class="muted">' +
-      E.fmt(prod, 2) + ' h productives' + (np ? ' · ' + E.fmt(np, 2) + ' h hors production' : '') +
-      (trajet ? ' · ' + E.fmt(trajet, 2) + ' h de trajet' : '') +
+      C.ditHeures(t.prod) + ' productives' + (t.np ? ' · ' + C.ditHeures(t.np) + ' hors production' : '') +
+      (t.trajet ? ' · + ' + C.ditHeures(t.trajet) + ' de trajet' : '') +
       (pers > 1 ? ' · ' + pers + ' personnes' : '') +
       (nf ? ' · compte pour le rendement seulement' : pj ? ' · à ' + eur(pj) + '/j' : '') + '</small>';
   };
-  renderPostes(); preChoisir(); apercu();
+  renderPostes(); preChoisir();
+  /* Venu d'une porte qui connaît le chantier (« Comme le… », Préciser) : ce
+     qu'il sait remplit les champs vides, son trajet compris. */
+  if (!j && modele && modele.chantier && chDe()) remplir(chDe(), false);
+  majTrajet(); apercu();
+  if (verifierDoublon() && !j) return;
 
-  $('#mj-postes').addEventListener('input', function () { lirePostes(); apercu(); });
+  $('#mj-postes').addEventListener('input', function () { lirePostes(); proposerProd(); apercu(); });
   /* Changer de prestation change l'unité de la quantité : seule l'étiquette
      bouge. Le « change » d'un champ texte, à sa sortie, ne refait plus rien. */
   $('#mj-postes').addEventListener('change', function (e) {
@@ -18610,23 +19044,47 @@ function ouvrirJournee(id, modele) {
     apercu();
   });
   $('#mj-postes').addEventListener('click', function (e) {
-    var plus = e.target.closest('#pst-plus'), sup = e.target.closest('[data-pstsup]');
-    if (plus) { lirePostes(); pst.push({ travaux: '', heures: '', quantite: '' }); }
+    var plus = e.target.closest('#pst-plus'), sup = e.target.closest('[data-pstsup]'), rep = e.target.closest('#pst-rep');
+    if (plus) { lirePostes(); pst.push(posteVide()); }
     else if (sup) { lirePostes(); pst.splice(+sup.dataset.pstsup, 1); }
+    else if (rep) { lirePostes(); pstRepartir = !pstRepartir; }
     else return;
-    renderPostes(); apercu();
+    renderPostes(); proposerProd(); apercu();
+    if (rep && pstRepartir && $('[data-psth="0"]')) $('[data-psth="0"]').focus();
   });
-  ['#mj-total', '#mj-trajet', '#mj-pers'].forEach(function (x) { $(x).addEventListener('input', apercu); });
-  $('#mj-km').addEventListener('input', aides);
-  $('#mj-date').addEventListener('change', function () { preChoisir(); apercu(); });
+  ['#mj-total', '#mj-total-m'].forEach(function (x) {
+    $(x).addEventListener('input', function () { proposerProd(); apercu(); });
+  });
+  ['#mj-prod', '#mj-prod-m'].forEach(function (x) {
+    $(x).addEventListener('input', function () { etat.prodManuel = dureeTapee('mj-prod'); apercu(); });
+  });
+  ['#mj-trajet', '#mj-trajet-m', '#mj-km'].forEach(function (x) {
+    $(x).addEventListener('input', function () { majTrajet(); aides(); apercu(); });
+  });
+  $('#mj-pers').addEventListener('input', apercu);
+  $('#mj-traj-mod').addEventListener('click', function () {
+    etat.trajReplie = false; majTrajet();
+    $('#mj-trajet').focus();
+  });
+  $('#mj-date').addEventListener('change', function () {
+    preChoisir();
+    if (verifierDoublon() && !j) return;
+    apercu();
+  });
   $('#mj-ch').addEventListener('change', function () {
     /* Choisi à la main : la date ne le change plus. Ce que le pré-choix avait
        rempli et qu'il n'a pas touché laisse la place au chantier choisi. */
     if (!etat.manuel) oublierAuto();
     etat.manuel = true; etat.aide = ''; etat.auto = {};
-    var c = $('#mj-ch').value ? chantier($('#mj-ch').value) : null;
+    var c = chDe();
     if (c) remplir(c, false);
-    aides(); apercu();
+    majTrajet(); aides();
+    if (verifierDoublon() && !j) return;
+    apercu();
+  });
+  $('#mj-doublon').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-mjautre]'); if (!b) return;
+    fermerModale(); ouvrirJournee(b.dataset.mjautre);
   });
   if ($('#mj-hier')) $('#mj-hier').addEventListener('click', function () {
     /* Le jour reste celui qu'on a choisi : reprendre sert à ne pas retaper
@@ -18638,19 +19096,12 @@ function ouvrirJournee(id, modele) {
 
   $('#mj-ok').addEventListener('click', function () {
     lirePostes();
-    var postes = pst.filter(function (p) { return p.travaux && C.nb(p.heures) > 0; })
-      .map(function (p) {
-        return { travaux: p.travaux, heures: C.nb(p.heures), quantite: C.nb(p.quantite) || 0 };
-      });
-    var prod = C.arr(postes.reduce(function (s, p) { return s + p.heures; }, 0), 2);
-    var total = C.nb($('#mj-total').value), trajet = C.nb($('#mj-trajet').value);
-    /* Un total plus court que le productif ne peut pas être juste : l'un des
-       deux est mal tapé, et deviner lequel fausserait les rendements. */
-    if (total && total < prod) {
-      toast('Le temps total est plus court que les heures productives : corrigez l’un des deux.'); return;
-    }
-    var np = total > prod ? C.arr(total - prod, 2) : 0;
-    if (!postes.length && np <= 0 && trajet <= 0) {
+    var t = calcul();
+    if (t.err) { toast(t.err); return; }
+    var postes = pst.filter(function (p) { return p.travaux; }).map(function (p) {
+      return { travaux: p.travaux, heures: C.arr(heuresDuPoste(t, p), 3), quantite: C.nb(p.quantite) || 0 };
+    });
+    if (!postes.length && t.total <= 0 && t.trajet <= 0) {
       toast('Indiquez au moins une prestation ou un temps.'); return;
     }
     var maj = {
@@ -18658,11 +19109,19 @@ function ouvrirJournee(id, modele) {
       chantier: $('#mj-ch').value || null, lieu: $('#mj-lieu').value.trim(),
       commune: $('#mj-commune').value.trim(),
       nonFacture: !!(j && j.nonFacture),
-      km: C.nb($('#mj-km').value) || 0, nonProd: np, trajet: trajet || 0,
+      km: C.nb($('#mj-km').value) || 0, nonProd: C.arr(t.np, 3), productif: C.arr(t.prod, 3),
+      trajet: t.trajet || 0,
       personnes: C.nb($('#mj-pers').value) || 1,
       fin: !!$('#mj-fin').checked, note: $('#mj-note').value.trim(),
       postes: postes, maj: Date.now()
     };
+    /* Jamais deux journées pour un même chantier un même jour. */
+    var deja = maj.chantier ? journeesDe(maj.chantier, maj.date, j ? j.id : null)[0] : null;
+    if (deja) {
+      verifierDoublon();
+      toast(ditJourneeExistante(chantier(maj.chantier), deja) + ' : une seule journée par chantier et par jour.');
+      return;
+    }
     A.journees = A.journees || [];
     if (j) Object.keys(maj).forEach(function (k) { j[k] = maj[k]; });
     else { maj.id = uid(); A.journees.push(maj); }
@@ -18671,6 +19130,10 @@ function ouvrirJournee(id, modele) {
        où on le sait vraiment, le soir même. */
     if (ch && maj.fin && ch.statut !== 'facture' && ch.statut !== 'paye') {
       ch.statut = 'termine'; ch.maj = Date.now();
+    }
+    /* « Retenir pour ce chantier » : sa fiche n'avait pas de trajet. */
+    if (ch && !$('#mj-retenir-l').hidden && $('#mj-retenir').checked && (maj.km || maj.trajet)) {
+      ch.trajetKm = maj.km || null; ch.trajetHeures = maj.trajet || null; ch.maj = Date.now();
     }
     indexerJournees();
     sauverJournees().then(function () { return ch ? sauverChantiers() : null; }).then(function () {
@@ -18683,7 +19146,7 @@ function ouvrirJournee(id, modele) {
       B.JOURS_POUBELLE + ' jours dans ' + B.CHEMIN_CORBEILLE + '.')) return;
     A.journees = A.journees.filter(function (x) { return x.id !== id; });
     jeterObjet('journee', j, dateCourte(j.date) + (j.lieu ? ' — ' + j.lieu : ''),
-      E.fmt(C.heuresJournee(j), 1) + ' h')
+      C.ditHeures(C.heuresJournee(j)))
       .then(sauverJournees).then(function () {
         fermerModale(); majJournees(); toast('Journée mise à la corbeille.');
       });
@@ -18712,7 +19175,6 @@ function kmHabituels(idChantier) {
   });
   return vu;
 }
-
 /* ================================================ STOCK DE FOURNITURES
    Trois tables tenues à la main — les commandes, les sorties, les pertes —
    et un inventaire qui n'est que leur résultat. C'est l'organisation du
@@ -22261,7 +22723,7 @@ else init();
 (function () {
 'use strict';
 
-var VERSION = '4.93.0-20261105-2100';
+var VERSION = '4.94.0-20261106-1800';
 var $ = function (s) { return document.querySelector(s); };
 function toast(m) { if (window.BCUI && window.BCUI.toast) window.BCUI.toast(m); }
 

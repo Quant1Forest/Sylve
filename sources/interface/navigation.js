@@ -633,9 +633,12 @@ function synchroniserCrans() {
 function brancherRetourTelephone() {
   window.addEventListener('popstate', function () {
     A.crans = Math.max(0, (A.crans || 0) - 1);
+    /* Le cran que la bulle d'Aujourd'hui rend en se fermant par OK (lot
+       r2) : ce retour-là n'est pas un appui, il ne remonte rien. */
+    if (A.avalerRetour) { A.avalerRetour--; synchroniserCrans(); return; }
     /* Les deux bulles se ferment comme une fenêtre (lot r1b) : celle
        d'Aujourd'hui comme son OK, celle de l'appui long de l'Agenda. */
-    if ($('#aj-bulle')) { fermerBulleAuj(); synchroniserCrans(); return; }
+    if ($('#aj-bulle')) { A.cranBulleAuj = false; fermerBulleAuj(); synchroniserCrans(); return; }
     if (A.bulle) { fermerBulleJour(); synchroniserCrans(); return; }
     if (!$('#modale').hidden) { fermerModale(); synchroniserCrans(); return; }
     if (typeEcran(A.ecran) === 'racine') return;

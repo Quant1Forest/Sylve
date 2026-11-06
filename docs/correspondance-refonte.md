@@ -579,3 +579,25 @@ Le détail des règles : `docs/calendrier-journees.md`, *Le lot r1b*.
 | Remontée r1 : « Posé » choisi à la main sur un devis pas signé | Compte d'office comme un jour confirmé | confirmé (05/11) |
 | Remontée r1 : jour posé avant la signature du devis | Ne compte pas seul, même signé ensuite ; se règle par « J'y ai travaillé » | confirmé (05/11), réglé au lot r1b |
 | Remontée r1 : ajouts de Mes notes (N faits repliés, appui qui corrige, N lignes en N éléments) | Lot f | renvoyé au lot f (05/11) |
+
+### Retours des 2, 3 et 5 novembre (lot r2, 4.94.0)
+
+Tous tranchés par lui ; appliqués tels quels. Le détail du temps et du
+trajet : `docs/calendrier-journees.md`, *Le trajet à part (lot r2)*.
+
+| Ancien | Nouvel endroit | Statut |
+|---|---|---|
+| Fiche ▸ Infos : « Noter le repérage », facultatif, sans moyen de dire qu'il n'y en aura pas | « Pas de repérage » à côté de « Noter le repérage » ; choisi : « Repérage : pas de repérage », « Finalement, noter un repérage » le défait ; le résumé de l'étape et la ligne d'Aujourd'hui ne disent plus « pas encore repéré » | fait (lot r2) : nouveau champ `sansReperage` ; « Il manque… » ne réclamait déjà pas le repérage — tranché (02/11) |
+| Fiche ▸ Travaux : la liste des jours, en lecture seule (corriger passait par l'Agenda) | Un appui sur un jour : sa journée en modification (un ancien doublon : le choix entre elles) ; journée d'office : Ma journée pré-remplie ; jour seulement posé : la fiche du jour ; « sans date (rattrapage) » : le rattrapage | fait (lot r2) — tranché (03/11) |
+| Fenêtre d'une ligne ▸ Difficulté (1 à 5) | Retirée de la fenêtre ; les valeurs déjà notées restent sur la ligne et se lisent dans Rendements (détail d'une référence, liste des chantiers) | fait (lot r2) — tranché (03/11) |
+| Fenêtre d'une ligne ▸ Produit du stock, sur toute ligne | Seulement sur une fourniture, et sur une ancienne ligne qui en désigne déjà un | fait (lot r2) — tranché (03/11) |
+| Fenêtre d'une ligne ▸ « Libellé sur la facture » et le paragraphe « La note sert à situer vos rendements… » | « Précision (facultatif) », une aide d'une ligne ; le paragraphe parlait du même champ (`note`), il est remplacé | fait (lot r2) : le champ `note` ne change pas — tranché (03/11) |
+| Durées tapées en heures décimales (Ma journée, rattrapage) | Deux cases « h » et « min » ; gardées en heures décimales, une ancienne valeur se relit (1,67 h → 1 h 40) ; affichées « 1 h 40 », « 2 j 4 h 30 » | fait (lot r2) : Ma journée (total, productif, prestations, trajet), rattrapage, trajet de la fiche — tranché (03/11) |
+| Ma journée ▸ le productif = la somme des heures des prestations | « Temps productif » tapé à part (h + min), proposé égal au total ; heures par prestation facultatives : une seule prend tout, plusieurs se répartissent sur demande (« Répartir le temps entre les prestations »), leur somme doit faire le productif | fait (lot r2) : nouveau champ `productif` ; absent, le productif reste la somme des heures — tranché (05/11) |
+| Ma journée : deux journées possibles sur le même chantier le même jour | Le couple déjà pris ouvre la journée existante en modification, et le dit ; en modification, un couple pris est refusé, avec « Ouvrir l'autre journée » ; les doublons en base : un choix à l'appui, ✕ dit « les N journées » | fait (lot r2) : rien n'est fusionné ni supprimé d'office — tranché (05/11) |
+| Le trajet compté dans le temps du chantier (« 1 j 1 h ») | Hors des journées, des trois chiffres, du bilan et du prix par journée ; dit à côté : « + 3 h 20 de trajet » | fait (lot r2) — tranché (03/11) |
+| Ma journée ▸ trajet : km de la dernière fois, temps à retaper | Fiche ▸ Infos : « Trajet depuis chez moi » (km et temps aller-retour, facultatifs) ; Ma journée le propose, à défaut la dernière journée, replié en une ligne « Trajet : 64 km · 1 h 10 · Modifier » ; fiche vide : « Retenir pour ce chantier », coché | fait (lot r2) : nouveaux champs `trajetKm`, `trajetHeures` — tranché (05/11) |
+| Pastille Fiche sans chantier ouvert : « Chantier introuvable » | Le choix d'un chantier : recherche, et les chantiers en cours rangés comme dans Aujourd'hui | fait (lot r2) — tranché (03/11) |
+| Bandeau du bordereau ▸ `#b-pastille` | Retirée : un rond toujours du même vert, que rien ne remplissait | fait (lot r2) — tranché (03/11) |
+| Fiche ▸ badge rouge « jours passés » ; cumuls ▸ « N aux jours passés » en rouge | « plus de jour posé », en gris, comme la ligne d'Aujourd'hui ; cumuls : « N avec plus de jour posé » | fait (lot r2) — tranché (05/11) |
+| Bulle d'Aujourd'hui fermée par OK : le premier retour ne faisait rien | OK, Voir, Voir l'Agenda la ferment en rendant leur cran ; la bulle de l'appui long de l'Agenda n'en prend pas | fait (lot r2) — tranché (05/11) |

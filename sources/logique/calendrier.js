@@ -103,13 +103,27 @@ function heuresSaisie(t, cfg) {
    j'ai trois virgule quelque chose ». Un jour est une journée entière, le
    reste se dit en heures. */
 function ditDuree(heures, cfg) {
-  var hj = HEURES_JOUR(cfg) || 8, tot = arr(heures, 2);
-  if (!tot) return '—';
-  var j = Math.floor(tot / hj), h = arr(tot - j * hj, 2);
+  var hj = HEURES_JOUR(cfg) || 8, mn = Math.round(nb(heures) * 60);
+  if (!mn) return '—';
+  /* Compté en minutes : 1,67 h se relit « 1 h 40 », jamais « 1,7 h » (lot r2). */
+  var j = Math.floor(mn / (hj * 60)), reste = mn - j * hj * 60;
   var p = [];
   if (j) p.push(j + ' j');
-  if (h) p.push(String(arr(h, 1)).replace('.', ',') + ' h');
+  if (reste) p.push(ditHeures(reste / 60));
   return p.join(' ');
+}
+/* Une durée tapée en heures et minutes, puis gardée en heures décimales :
+   les deux cases se relisent d'ici. 1,67 h → { h: 1, m: 40 }. */
+function enHeuresMinutes(heures) {
+  var mn = Math.round(nb(heures) * 60);
+  return { h: Math.floor(mn / 60), m: mn % 60 };
+}
+/* « 1 h 40 », « 8 h », « 40 min » : comme on le lit sur une montre. */
+function ditHeures(heures) {
+  var x = enHeuresMinutes(heures);
+  if (!x.h && !x.m) return '0 h';
+  if (!x.h) return x.m + ' min';
+  return x.h + ' h' + (x.m ? ' ' + (x.m < 10 ? '0' : '') + x.m : '');
 }
 function joursDevis(ch) {
   var j = 0;
