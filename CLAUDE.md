@@ -76,7 +76,7 @@ npm run controle -- --dates   # en plus : les scénarios du temps au 1er et au d
 
 Doit afficher **« index.html fabriqué »**, puis **« Bon pour livraison »**,
 puis **« le service worker tient »** (33 vérifications), puis la suite au
-vert — 2815 à ce jour — puis **« largeur : … aucune page plus large que l’écran »** (mesure dans un vrai Chrome à 320 et 360 px, `outils/largeur.js` ; sans Chrome elle le dit et passe), puis **« Sylve.html est conforme »**.
+vert — 2920 à ce jour — puis **« largeur : … aucune page plus large que l’écran »** (mesure dans un vrai Chrome à 320 et 360 px, `outils/largeur.js` ; sans Chrome elle le dit et passe), puis **« Sylve.html est conforme »**.
 
 Compter **trois minutes** : 187 à 260 s aux lots 4b, 5b et c1 (selon la charge du poste ;
 17 minutes avant, en séquentiel). **Avec `--dates`, sept minutes** : les scénarios du
