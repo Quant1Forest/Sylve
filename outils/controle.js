@@ -28,7 +28,10 @@ const OPTIONS = process.argv.slice(2).filter(a => a !== '--dates');
    portaient le contrôle de 3 à 7 minutes : elles se jouent sur demande
    (« --dates », décidé le 01/11), avant un lot qui touche à l'Agenda. */
 const SENSIBLES_A_LA_DATE = '--motif=calendrier|agenda|journée|journees|journées|aujourd|trancher|placer|' +
-  'placement|fiche du jour|bientôt|retard|prélèvement|échéance';
+  'placement|fiche du jour|bientôt|retard|prélèvement|échéance|' +
+  /* Lot d1 : Argent ▸ Mois borne tout au mois affiché, et sa ligne MSA dit
+     « à venir » selon le jour du mois. */
+  'argent ▸ mois';
 const ETAPES = [
   ['fabrication', 'construire.js', []],
   ['vérificateur', 'verifier.js', []],

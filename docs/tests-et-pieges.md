@@ -415,7 +415,15 @@ contrôle ajoute deux étapes : le 1er du mois (`2026-12-01`) et le dernier
 de l'Agenda) ; pour ne pas tripler la durée, ces deux passes ne jouent que les
 scénarios dont le nom touche au temps (`--motif=calendrier|agenda|journée|…`,
 la liste est dans `outils/controle.js`). Un nouveau scénario sensible à la
-date doit porter un de ces mots dans son nom.
+date doit porter un de ces mots dans son nom. Lot d1 : « argent ▸ mois » y
+est entré — Argent ▸ Mois borne tout au mois affiché, et sa ligne MSA dit
+« à venir » selon le jour.
+
+**JSDOM ne défile pas** (lot d1). `scrollIntoView` y note l'élément amené en
+vue, par son identifiant ou son groupe de Chantiers ; `defile(t)` rend le
+dernier. C'est ainsi qu'on vérifie qu'un ancien lien « charges » arrive bien
+sur le bloc Charges fixes des Dépenses, ou qu'« À ce jour » ouvre le bon
+groupe.
 
 ```bash
 SYLVE_DATE=2026-12-01 node outils/tests.js index.html "calendrier"

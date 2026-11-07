@@ -5,7 +5,7 @@ function vueDemandee(def) {
     var m = /[?&]vue=([a-z]+)/.exec(location.search || '');
     var v = m && m[1];
     if (v && ['saisie', 'bordereau', 'syntheses', 'fichiers', 'reglages',
-      'stock', 'bois', 'lieux', 'accueil', 'carnet', 'chantier', 'estimer', 'rendements', 'calendrier', 'finances', 'depenses', 'stock2', 'charges', 'carte', 'analyses', 'commandes', 'revient', 'notes'].indexOf(v) >= 0) return v;
+      'stock', 'bois', 'lieux', 'accueil', 'carnet', 'chantier', 'estimer', 'rendements', 'calendrier', 'finances', 'tva', 'depenses', 'stock2', 'charges', 'carte', 'analyses', 'commandes', 'revient', 'notes'].indexOf(v) >= 0) return v;
   } catch (e) { }
   return def;
 }
@@ -106,7 +106,7 @@ function init() {
       if (vd) {
         var MOD_DE_VUE = { stock: 'bois', bois: 'bois', lieux: 'bois',
           carnet: 'chantiers', chantier: 'chantiers', calendrier: 'calendrier',
-          rendements: 'rendements', estimer: 'rendements', finances: 'finances', depenses: 'finances',
+          rendements: 'rendements', estimer: 'rendements', finances: 'finances', tva: 'finances', depenses: 'finances',
           charges: 'finances', stock2: 'stock', commandes: 'stock', revient: 'stock', carte: 'chantiers', analyses: 'finances',
           carnetv: 'vehicule', echeancesv: 'vehicule', coutsv: 'vehicule',
           achats: 'achats', budget: 'achats', fichech: 'chantiers', notes: 'notes' };
@@ -179,6 +179,8 @@ var PICTOS = {
             + '<path d="M9.2 8.4h5.6M9.2 12h5.6"/>',
   charges:    '<path d="M19.2 12a7.2 7.2 0 1 1-2.2-5.1"/><path d="M19.6 4.4v4.3h-4.3"/>',
   analyses:   '<circle cx="12" cy="12" r="7.9"/><path d="M12 4.1v7.9h7.9"/>',
+  /* La pastille TVA d'Argent (lot d1) : un signe pour cent, rien de plus. */
+  tva:        '<path d="M18 6 6 18"/><circle cx="7.6" cy="7.6" r="2.3"/><circle cx="16.4" cy="16.4" r="2.3"/>',
   stock2:     '<path d="M4.7 8.5 12 4.8l7.3 3.7v7L12 19.2l-7.3-3.7Z"/><path d="M4.7 8.5 12 12.2l7.3-3.7M12 12.2v7"/>',
   commandes:  '<path d="M4.6 8.6h11"/><path d="M12.4 5.4 15.6 8.6l-3.2 3.2"/>'
             + '<path d="M19.4 15.4h-11"/><path d="M11.6 12.2 8.4 15.4l3.2 3.2"/>',
@@ -238,11 +240,13 @@ var MODULES = {
      Chantiers. C'était une entrée de menu déguisée en module — et depuis que
      le devis vit sur la fiche du chantier, elle n'avait plus d'objet.
      « Analyses » lisait les mêmes données que Finances, sur la même période,
-     avec un second jeu de sélecteurs : elle y est devenue un onglet. */
+     avec un second jeu de sélecteurs : elle y est devenue un onglet.
+     Lot d1 : l'écran s'appelle Argent, comme l'onglet de la barre. Les vues
+     gardent leurs identifiants — « finances » est Mois, « analyses » est
+     Année — et les charges fixes vivent sous la liste des dépenses. */
   finances: {
-    nom: 'Finances', defaut: 'finances', groupe: 'entreprise',
-    vues: [['finances', 'Bilan'], ['depenses', 'Dépenses'],
-    ['charges', 'Charges fixes'], ['analyses', 'Analyses']]
+    nom: 'Argent', defaut: 'finances', groupe: 'entreprise',
+    vues: [['finances', 'Mois'], ['tva', 'TVA'], ['depenses', 'Dépenses'], ['analyses', 'Année']]
   },
   stock: {
     nom: 'Stock et fournitures', defaut: 'stock2', groupe: 'entreprise',
@@ -304,7 +308,7 @@ function picto(nom) {
 
 /* ============================================================ LE CADRE */
 /* Quatre onglets en bas, le + au milieu. Chacun ouvre l'écran d'arrivée de
-   son module : Chantiers le carnet, Agenda le calendrier, Argent le bilan. */
+   son module : Chantiers la liste, Agenda le calendrier, Argent le mois. */
 var BARRE = {
   aujourdhui: { nom: 'Aujourd’hui', picto: 'jour' },
   chantiers: { nom: 'Chantiers', picto: 'carnet', module: 'chantiers' },
@@ -533,6 +537,10 @@ function ouvrirPlus() {
    et « analyses » est devenue un onglet de Finances. Sans cette
    redirection, l'application se rouvrait dans le cubage. */
 var MODULES_RETIRES = { devis: 'rendements', analyses: 'finances' };
+/* Une vue devenue un bloc d'une autre (lot d1) : les liens, les notes de mise
+   à jour et Aujourd'hui ▸ Prélèvements disent encore « charges ». On arrive
+   sur la vue qui la porte, défilée jusqu'au bloc. */
+var VUES_DEPLACEES = { charges: { vue: 'depenses', bloc: 'dep-charges' } };
 function moduleValide(m) {
   if (MODULES[m]) return m;
   if (MODULES_RETIRES[m]) return MODULES_RETIRES[m];
@@ -589,6 +597,7 @@ function amenerPastilleEnVue() {
    plus diverger. Une vue partagée revient au premier module qui la déclare :
    « fichiers » au cubage, « carnet » aux chantiers. */
 function moduleDeVue(v) {
+  if (VUES_DEPLACEES[v]) v = VUES_DEPLACEES[v].vue;
   return Object.keys(MODULES).filter(function (m) {
     return MODULES[m].vues.some(function (x) { return x[0] === v; });
   })[0] || 'chantiers';

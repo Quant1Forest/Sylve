@@ -169,7 +169,7 @@ preuve sans ligne, le fait crier.
 | Accueil ▸ ⚙ | ☰ ▸ Réglages | `menu-reglages` |
 | Accueil ▸ rappel de sauvegarde | Aujourd'hui ▸ Autres rappels, repliés en bas (En retard jusqu'en 4.91) : « Sauvegarde à faire » → ☰ ▸ Sauvegarde (carte Sauvegarde des Réglages) | `autres-sauvegarde` |
 | Accueil ▸ rappel « journées à trancher » | Remplacé par la journée d'office (lot r1) : le jour posé et confirmé compte le lendemain, marqué ○ dans Aujourd'hui ▸ Derniers jours ; sa fiche du jour propose Préciser ma journée et Je n'y étais pas (« à trancher » jusqu'en 4.91) | `office` |
-| Accueil ▸ rappel d'échéances des charges fixes | Aujourd'hui ▸ Prélèvements à venir (7 jours, ou le préavis s'il est plus long ; total) → Argent ▸ Charges fixes | `prelevements` |
+| Accueil ▸ rappel d'échéances des charges fixes | Aujourd'hui ▸ Prélèvements à venir (7 jours, ou le préavis s'il est plus long ; total) → Argent ▸ Dépenses, bloc Charges fixes (Argent ▸ Charges fixes jusqu'en 4.94) | `prelevements` |
 | Accueil ▸ rappel de devis en attente | Aujourd'hui ▸ En retard « Relancer le devis ? » le jour de la fin de validité et après (à 7 jours avant en 4.92, Bientôt jusqu'en 4.91), un par devis → sa fiche (la liste filtrée reste dans Chantiers) | `retard-relancer` |
 | Accueil ▸ tuile Mon entreprise (chantiers ouverts) | Barre ▸ Chantiers ; le chiffre : compte de « Chantiers en cours » | `encours-compte` |
 | Accueil ▸ bouton « Enregistrer ma journée » | Ligne de saisie d'Aujourd'hui → fenêtre Ma journée | `saisie-journee` |
@@ -182,9 +182,9 @@ preuve sans ligne, le fait crier.
 | Mon entreprise ▸ bulle « devis signés » | Aujourd'hui ▸ Chantiers en cours, étape Travaux : « Signé · à programmer » (ligne « À programmer » jusqu'en 4.91) ; le total dans Chantiers | `encours-signe` |
 | Mon entreprise ▸ bulle « chantiers en cours » | Aujourd'hui ▸ Chantiers en cours → fiche | `encours-bloc` |
 | Mon entreprise ▸ bulle « factures en attente » (et « N en retard ») | Aujourd'hui ▸ En retard « Facture impayée » quand l'échéance est passée → fiche | `retard-impaye` |
-| Mon entreprise ▸ bulle « factures en attente », son montant | Argent ▸ Bilan, « en attente » | `argent-attente` |
-| Mon entreprise ▸ bulle « chiffre d'affaires » | Argent ▸ Bilan, « facturé (HT) » de l'année | `argent-ca` |
-| Mon entreprise ▸ bulle « TVA déductible » | Argent ▸ Bilan, « déductible » de l'année | `argent-tva` |
+| Mon entreprise ▸ bulle « factures en attente », son montant | Argent ▸ Mois ▸ À ce jour, « Facturé, pas encore payé », toutes périodes (Argent ▸ Bilan, « en attente », jusqu'en 4.94) | `argent-attente` |
+| Mon entreprise ▸ bulle « chiffre d'affaires » | Argent ▸ Année ▸ Vue d'ensemble, « facturé HT » de l'année ; celui du mois en grand dans Argent ▸ Mois (Argent ▸ Bilan jusqu'en 4.94) | `argent-ca` |
+| Mon entreprise ▸ bulle « TVA déductible » | Argent ▸ TVA, « TVA déductible » de la période, l'année au départ (Argent ▸ Bilan jusqu'en 4.94) | `argent-tva` |
 | Mon entreprise ▸ ligne « Aujourd'hui / Demain / Dans N jours — chantier, pour qui » | Aujourd'hui ▸ Chantiers en cours, sur la ligne du chantier : « posé aujourd'hui », « posé demain », « posé dans N j » (trois jours ; Bientôt jusqu'en 4.91) | `encours-pose` |
 | Mon entreprise ▸ tuiles Chantiers, Calendrier, Finances | Barre : Chantiers, Agenda, Argent | `barre-modules` |
 | Mon entreprise ▸ tuiles Stock, Achats, Véhicule, Rendements, avec leur chiffre | ☰ ▸ Entreprise | `menu-entreprise` |
@@ -196,7 +196,8 @@ preuve sans ligne, le fait crier.
 
 Le chiffre de la tuile Calendrier (« j. ce mois ») est dans Agenda (jours
 confirmés et provisoires du mois affiché) ; celui de la tuile Finances
-(facturé de la période, TVA) dans Argent ▸ Bilan, sur la même période.
+(facturé de la période, TVA) dans Argent ▸ Année et Argent ▸ TVA, sur la même période
+(Argent ▸ Bilan jusqu'en 4.94).
 
 ### Où sont allés les éléments d'Aujourd'hui et de l'Agenda (lot r1)
 
@@ -237,6 +238,37 @@ sans ligne, fait crier le scénario.
 | Agenda ▸ fiche du jour ▸ état « à trancher » (C'était comme prévu, Toutes comme prévu, J'y ai travaillé mais autrement, C'était un autre jour) | retiré (03/11) : journée d'office, Préciser ma journée, Déplacer la journée, Je n'y étais pas | `r1-x-trancher-fiche` |
 | Aujourd'hui ▸ En retard ▸ « Journée du … non saisie » ▸ Trancher | retiré (03/11) : la journée d'office | `r1-x-trancher-auj` |
 | Aujourd'hui ▸ Mes notes | retiré d'Aujourd'hui (03/11) : ☰ ▸ Mes notes | `r1-x-notes-auj` |
+
+### Où sont allés les blocs de Finances (lot d1)
+
+Lot d1 (4.95.0), maquettes `refonte-v2.html` (Argent ▸ Mois) et
+`refonte-5b-tour2.html` (Argent ▸ Dépenses), validées le 31/10 ; table de
+correspondance, section 5. Les pastilles Bilan · Dépenses · Charges fixes ·
+Analyses deviennent **Mois · TVA · Dépenses · Année**. Même principe que les
+deux tableaux précédents : le scénario « Inventaire d1 : chaque bloc de
+Finances a sa place, au centime » lit ce tableau et joue la preuve de chaque
+ligne, en comparant le chiffre affiché au calcul qui le donnait avant. Rien
+n'est retiré.
+
+| Élément (4.94) | Nouvel endroit | Preuve |
+|---|---|---|
+| Finances ▸ Bilan ▸ Période (Mois / Trimestre / Année) | Mois : son propre mois, ‹ ›, qui ne touche pas la période ; TVA, Dépenses et Année : les trois sélecteurs, une seule période pour les trois | `d1-periode` |
+| Finances ▸ Bilan ▸ Chiffre d'affaires, facturé HT | Mois : en grand, prestation et vente dessous, hors débours ; l'année mois par mois et la ligne du trimestre (MSA) | `d1-ca` |
+| Finances ▸ Bilan ▸ Chiffre d'affaires, encaissé et en attente | Mois : « Facturé en <mois> », dont payé · pas encore payé | `d1-paye` |
+| Finances ▸ Bilan ▸ « à facturer » | Mois ▸ À ce jour : « À facturer » (dont sans montant) → Chantiers, À faire maintenant ; « Facturé, pas encore payé » → Facturés · attendent le paiement | `d1-ajour` |
+| Finances ▸ Bilan ▸ abattements (vente 71 %, prestation 50 %) | Année ▸ Vue d'ensemble ▸ Abattements, sur la période ; et Année ▸ Déclarations | `d1-abattements` |
+| Finances ▸ Bilan ▸ Balance de TVA | Mois : TVA du mois, en lignes ; TVA : la même, sur la période | `d1-tva` |
+| Finances ▸ Bilan ▸ Dépenses et marge | Mois : Dépenses du mois, en barres (HT) ; Pour aller plus loin ▸ Recettes moins dépenses | `d1-depenses-marge` |
+| Finances ▸ Bilan ▸ Déplacements et devis perdus | Mois ▸ Pour aller plus loin ▸ Déplacements ; Année ▸ Vue d'ensemble ▸ Devis | `d1-deplacements` |
+| Finances ▸ Bilan ▸ Par donneur d'ordre | Mois ▸ Pour aller plus loin ▸ Par donneur d'ordre (et tous chantiers confondus) ; Année ▸ Recettes | `d1-donneurs` |
+| Finances ▸ Bilan ▸ Devis (taux d'acceptation, en attente) | Année ▸ Vue d'ensemble ▸ Devis | `d1-devis` |
+| (V2) Ce qui rapporte, marge sur fournitures, charges fixes prélevées | Mois ▸ Pour aller plus loin, repliés | `d1-plusloin` |
+| Finances ▸ Dépenses ▸ + Dépense, indicateurs, filtre par catégorie | Dépenses, intacts ; la période en haut de l'écran | `d1-dep-ind` |
+| Finances ▸ Dépenses ▸ liste (Modifier, Supprimer) | Dépenses : un appui ouvre la dépense, Supprimer est dans sa fenêtre ; née d'une charge fixe, elle ouvre la charge | `d1-dep-liste` |
+| Finances ▸ Charges fixes ▸ + Charge, résumé, liste (Modifier, Supprimer) | Dépenses, bloc Charges fixes : un appui ouvre la charge, Supprimer est dans sa fenêtre ; « prochain prélèvement » sur chaque ligne | `d1-charges` |
+| Finances ▸ Charges fixes ▸ Échéances (quand l'argent part, où il part) | Dépenses ▸ Prélèvements à venir | `d1-prelevements` |
+| Finances ▸ Analyses (sélecteurs ; Vue d'ensemble · Recettes · Dépenses · Déclarations) | Année : mêmes sélecteurs, mêmes quatre pastilles en seconde rangée, contenu intact | `d1-annee` |
+| Chantiers ▸ « Cumuls du carnet, depuis le début » | Année ▸ Vue d'ensemble ▸ Depuis le début (« encaissé » y dit « dont payé ») | `d1-cumuls` |
 
 ### 2.3 Chantiers
 

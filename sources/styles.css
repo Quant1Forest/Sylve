@@ -12,6 +12,9 @@
      textes secondaires sortaient donc en pleine encre au lieu du gris. */
   --doux:#6F6A5C;
   --vert-marque:#32461E; --brun-marque:#6A4A22; --brun-doux:#EEE2D0;
+  /* Argent ▸ Mois (maquette V2) : la part vente du chiffre d'affaires, et
+     les mois de l'histogramme qui ne sont pas celui affiché. */
+  --vente:#B98A4E; --vert-pale:#BFCBAE;
   /* Le crème de l'icône : la pastille du logo dans le bandeau. */
   --creme-logo:#F7F1E6;
   /* Le logo est stocke une seule fois ici : le demarrage et le logo du
@@ -730,7 +733,78 @@ input.mini{padding:6px 7px;border:1px solid var(--trait);border-radius:7px;font-
 .charge-p{display:block;font-size:11.5px;color:var(--gris-clair);margin-top:1px}
 .charge-m{display:block;font-size:15px;white-space:nowrap}
 .charge-a{display:block;font-size:11px;color:var(--doux);white-space:nowrap}
-.charge-act{grid-column:2/4;display:flex;gap:6px;margin-top:8px}
+/* Lot d1 : la charge entière est le bouton qui l'ouvre, comme une dépense. */
+button.charge-l{width:100%;text-align:left;font:inherit;color:inherit;cursor:pointer}
+.charge-mt{text-align:right}
+
+/* ------------------------------------------------- Argent (lot d1, V2) */
+.ag-mois{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px}
+.ag-mois b{font-size:18px;font-weight:700}
+.ag-petit{display:block;font-size:12.5px;color:var(--gris);margin:8px 0 0}
+small.ag-petit{margin:0}
+.ag-avant{margin:2px 0 10px}
+.ag-big{display:block;font-size:32px;font-weight:800;line-height:1.1;margin:2px 0 10px;overflow-wrap:anywhere}
+.ag-empile{display:flex;height:12px;border-radius:99px;overflow:hidden;background:var(--carte2)}
+.ag-empile i{display:block;height:100%}
+.ag-presta{background:var(--vert-marque)}
+.ag-vente{background:var(--vente)}
+.ag-leg{display:flex;gap:6px 14px;flex-wrap:wrap;font-size:13px;margin-top:8px}
+.ag-leg span{display:inline-flex;align-items:center;gap:6px}
+.ag-leg i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.ag-entete{display:flex;justify-content:space-between;gap:4px 10px;align-items:baseline;flex-wrap:wrap;margin:0 0 8px}
+.ag-entete h2{margin:0;font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--gris)}
+.ag-dit{font-weight:400;letter-spacing:0;text-transform:none}
+svg.ag-graph{display:block;margin-top:4px}
+svg.ag-graph text{fill:var(--gris);font-size:9px;font-family:var(--sans)}
+svg.ag-graph .ag-g{stroke:var(--trait);stroke-width:1}
+svg.ag-graph .ag-bm{fill:var(--vert-pale)}
+svg.ag-graph .ag-bm.cur{fill:var(--vert-marque)}
+svg.ag-graph .ag-val{fill:var(--encre);font-weight:700}
+/* La TVA en lignes alignées : taux, base, montant ; les totaux sous un filet. */
+.ag-tva{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px 10px;align-items:center;font-size:14px}
+.ag-tva .s{color:var(--gris);min-width:0}
+.ag-tva .l{grid-column:1/3}
+.ag-tva .tot{font-weight:700;border-top:1px solid var(--trait);padding-top:8px}
+.ag-tva .num{white-space:nowrap;text-align:right}
+.ag-tva .ag-dont{font-size:12.5px}
+.ag-taux{font-size:11.5px;font-weight:700;padding:1px 7px;border-radius:99px;background:var(--carte2);white-space:nowrap}
+.ag-taux.t20{background:var(--brun-doux);color:var(--brun-marque)}
+.ag-taux.t10{background:var(--accent-doux);color:var(--accent)}
+.ag-taux.t5{background:var(--tiede-fond);color:var(--tiede)}
+/* Les barres horizontales : nom, barre, montant, chacun dans sa colonne. */
+.ag-hbar{display:grid;gap:4px}
+.ag-hl{display:grid;grid-template-columns:minmax(0,8.5em) minmax(0,1fr) auto;gap:10px;align-items:center;
+  width:100%;padding:4px 0;font:inherit;font-size:13.5px;color:inherit;text-align:left;background:none;border:0}
+button.ag-hl{cursor:pointer}
+.ag-hn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ag-hn small{color:var(--gris);font-size:11.5px}
+.ag-barre{height:10px;border-radius:99px;background:var(--carte2);overflow:hidden}
+.ag-barre i{display:block;height:100%;background:var(--brun-marque);border-radius:99px}
+.ag-hbar.vert .ag-barre i{background:var(--vert-marque)}
+.ag-hl .num{white-space:nowrap}
+.ag-kv{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 0;margin:0;font-size:14px}
+.ag-kv dt{color:var(--gris);min-width:0}
+.ag-kv dd{margin:0;text-align:right;padding-left:12px;white-space:nowrap}
+.ag-kv .total{font-weight:700;color:var(--encre);border-top:1px solid var(--trait);padding-top:6px}
+#mo-ajour .aj-zone{margin-top:2px}
+.ag-sous{margin:18px 2px 8px;font-size:13px;font-weight:700;color:var(--gris);letter-spacing:.02em}
+.ag-loin{display:grid;gap:8px;margin-bottom:12px}
+.ag-pli{background:var(--carte);border:1px solid var(--trait);border-radius:12px;min-width:0}
+.ag-pli>summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;
+  gap:10px;padding:12px 14px;font-weight:600}
+.ag-pli>summary::-webkit-details-marker{display:none}
+.ag-pli>summary .pic{width:16px;height:16px;flex:none;color:var(--gris);transition:transform .15s}
+.ag-pli[open]>summary .pic{transform:rotate(90deg)}
+.ag-pli-corps{padding:0 14px 14px;min-width:0}
+.ag-pli-corps>.ag-petit:first-child{margin-top:0}
+/* La seconde rangée d'Année : des onglets soulignés, plus discrets que les
+   pastilles d'Argent au-dessus ; elle passe à la ligne plutôt qu'élargir. */
+.chips.ana-onglets{gap:2px 4px;border-bottom:1px solid var(--trait)}
+.chips.ana-onglets .chip{background:none;border:0;border-bottom:2px solid transparent;border-radius:0;
+  padding:6px 8px;font-size:13px;font-weight:600;color:var(--gris)}
+.chips.ana-onglets .chip[aria-pressed=true]{background:none;color:var(--accent);border-bottom-color:var(--accent)}
+.dep-l .aj-etiq{margin-top:2px}
+@media (prefers-reduced-motion:reduce){.ag-pli>summary .pic{transition:none}}
 
 /* Le carnet suit la même grille que les charges : pastille, texte, montant,
    chacun dans sa colonne. Les montants tombent donc les uns sous les autres

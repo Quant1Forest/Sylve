@@ -48,6 +48,8 @@ function fermerModale() {
 
 /* ============================================================ NAVIGATION */
 function aller(v) {
+  var bloc = null;
+  if (VUES_DEPLACEES[v]) { bloc = VUES_DEPLACEES[v].bloc; v = VUES_DEPLACEES[v].vue; }
   /* Le chemin d'un écran libre se note avant de changer d'écran : il faut
      savoir d'où l'on vient pour savoir où revenir. */
   noterParcours(v);
@@ -69,8 +71,8 @@ function aller(v) {
   if (v === 'carnet') renderCarnet();
   if (v === 'chantier') renderFiche();
   if (v === 'finances') renderFinances();
-  if (v === 'depenses') renderDepenses();
-  if (v === 'charges') renderCharges();
+  if (v === 'tva') renderTva();
+  if (v === 'depenses') { renderDepenses(); renderCharges(); }
   if (v === 'stock2') renderStockFournitures();
   if (v === 'analyses') renderAnalyses();
   if (v === 'commandes') renderCommandes();
@@ -85,6 +87,8 @@ function aller(v) {
   if (v !== 'accueil') oterBulleAuj();
   majCadre();
   try { if (window.scrollY || window.pageYOffset) window.scrollTo(0, 0); } catch (e) { }
+  /* Après la remise en haut, jamais avant : elle l'annulerait. */
+  if (bloc && $('#' + bloc)) $('#' + bloc).scrollIntoView();
   /* Aujourd'hui qui s'affiche dit ce que Sylve a compté pour lui (lot r1b). */
   if (v === 'accueil') montrerBulleAuj();
 }
@@ -274,14 +278,26 @@ function brancher() {
   $('#e-xlsx').addEventListener('click', exportXlsx);
   $('#e-csv').addEventListener('click', exportCsv);
   $('#e-json').addEventListener('click', exportJson);
+  /* --- Argent ▸ Mois (lot d1) --- */
+  $('#mo-prec').addEventListener('click', function () { changerMoisArgent(-1); });
+  $('#mo-suiv').addEventListener('click', function () { changerMoisArgent(1); });
   $('#fi-corps').addEventListener('click', function (e) {
-    if (!e.target.closest('#fi-afacturer')) return;
-    /* Le filtre exact, « Terminé, à facturer » : un chantier fini ce matin
-       n'est pas encore dans « À faire maintenant ». */
-    A.filtreCh = 'termine'; A.rechCh = ''; $('#c-rech').value = '';
-    allerModule('chantiers', 'carnet');
-    $('#ch-filtre-bloc').open = true;
-    $('#ch-filtre-bloc').scrollIntoView();
+    /* « À ce jour » mène au groupe de Chantiers qui porte ces chantiers ;
+       l'ancien détour par le filtre replié n'est plus nécessaire. */
+    if (e.target.closest('#mo-afacturer')) { ouvrirGroupeChantiers(['faire']); return; }
+    if (e.target.closest('#mo-attente')) { ouvrirGroupeChantiers(['factures', 'faire']); return; }
+    var b = e.target.closest('[data-modep]');
+    if (b) depensesDuMois(b.dataset.modep);
+  });
+  /* Un pli ouvert le reste quand l'écran se redessine, comme ceux de la
+     liste Chantiers. */
+  ['#fi-corps', '#ana-corps'].forEach(function (sel) {
+    $(sel).addEventListener('toggle', function (e) {
+      var d = e.target;
+      if (!d || !d.dataset || !d.dataset.loin) return;
+      A.agPlis = A.agPlis || {};
+      A.agPlis[d.dataset.loin] = d.open;
+    }, true);
   });
   /* --- chantiers --- */
   /* La liste se redessine en entier (le tri des payés anciens en fait
@@ -519,11 +535,16 @@ function brancher() {
     var b = e.target.closest('[data-ana]');
     if (b) { A.vueAna = b.dataset.ana; renderAnalyses(); }
   });
-  ['#an-type', '#an-indice', '#an-annee'].forEach(function (s) {
-    $(s).addEventListener('change', function () {
-      A.periode = { type: $('#an-type').value, annee: Number($('#an-annee').value),
-        indice: Number($('#an-indice').value) || 0 };
-      renderAnalyses(); renderFinances(); renderDepenses(); renderAccueil();
+  /* TVA, Dépenses et Année portent chacune les mêmes trois sélecteurs, qui
+     écrivent la même période : celle qu'on choisit dans l'une se retrouve
+     dans les deux autres. Mois a la sienne. */
+  ['an', 'fi', 'dep'].forEach(function (p) {
+    ['-type', '-indice', '-annee'].forEach(function (s) {
+      $('#' + p + s).addEventListener('change', function () {
+        A.periode = { type: $('#' + p + '-type').value, annee: Number($('#' + p + '-annee').value),
+          indice: Number($('#' + p + '-indice').value) || 0 };
+        renderAnalyses(); renderTva(); renderDepenses(); renderCharges(); renderAccueil();
+      });
     });
   });
   $('#ana-corps').addEventListener('click', function (e) {
@@ -781,27 +802,20 @@ function brancher() {
 
   /* --- charges fixes --- */
   $('#chg-nouvelle').addEventListener('click', function () { ouvrirCharge(null); });
+  /* Un appui sur la charge l'ouvre ; Supprimer est dans sa fenêtre (lot d1),
+     comme pour une dépense. */
   $('#charges-resume').addEventListener('click', function (e) {
-    var m = e.target.closest('[data-chgmod]'), s = e.target.closest('[data-chgsup]');
-    var mois = e.target.closest('[data-chgmois]');
+    var m = e.target.closest('[data-chgmod]');
     if (m) ouvrirCharge(m.dataset.chgmod);
-    else if (mois) {
-      /* On réécrit la seule phrase du détail : refaire tout l'écran ferait
-         sauter le graphique sous le doigt. */
-      var z = $('#chg-mois-detail');
-      if (z) z.innerHTML = detailMoisCharges(
-        chargesParMois(A.charges, new Date().getFullYear()), Number(mois.dataset.chgmois));
-    }
-    else if (s) {
-      var c = charge(s.dataset.chgsup);
-      if (!c || !confirm('Supprimer « ' + (c.libelle || '') + ' » ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans ' + B.CHEMIN_CORBEILLE + '.')) return;
-      A.charges = A.charges.filter(function (x) { return x.id !== c.id; });
-      jeterObjet('charge', c, c.libelle || 'Charge', eur(FIN.nb(c.montant)))
-        .then(sauverCharges).then(synchroniserDepensesCharges).then(function () {
-          renderCharges(); renderDepenses(); renderFinances(); renderAccueil();
-          toast('Charge mise à la corbeille.');
-        });
-    }
+  });
+  $('#charges-echeances').addEventListener('click', function (e) {
+    var mois = e.target.closest('[data-chgmois]');
+    if (!mois) return;
+    /* On réécrit la seule phrase du détail : refaire tout l'écran ferait
+       sauter le graphique sous le doigt. */
+    var z = $('#chg-mois-detail');
+    if (z) z.innerHTML = detailMoisCharges(
+      chargesParMois(A.charges, new Date().getFullYear()), Number(mois.dataset.chgmois));
   });
 
   /* --- carte des chantiers --- */
@@ -960,40 +974,23 @@ function brancher() {
     allerModule(moduleDeVue(v), v);
   });
 
-  /* --- finances --- */
-  ['#fi-type', '#fi-indice', '#fi-annee'].forEach(function (s) {
-    $(s).addEventListener('change', function () {
-      A.periode = { type: $('#fi-type').value, annee: Number($('#fi-annee').value),
-        indice: Number($('#fi-indice').value) || 0 };
-      renderFinances(); renderDepenses();
-    });
-  });
-
   /* --- dépenses --- */
   $('#dep-nouvelle').addEventListener('click', function () { ouvrirDepense(null); });
   $('#dep-filtre').addEventListener('change', function () { A.filtreDep = this.value; renderDepenses(); });
+  /* Un appui sur la ligne ouvre la dépense ; Supprimer est dans sa fenêtre
+     (lot d1, D5). */
   $('#liste-depenses').addEventListener('click', function (e) {
-    var m = e.target.closest('[data-depmod]'), s = e.target.closest('[data-depsup]');
-    if (m) {
-      /* Elle découle d'une charge fixe : c'est la charge qu'on ouvre, sinon la
-         correction serait effacée à la prochaine synchronisation. */
-      var d0 = depense(m.dataset.depmod);
-      if (d0 && d0.auto && d0.charge) {
-        allerModule('finances', 'charges');
-        ouvrirCharge(d0.charge);
-        return;
-      }
-      ouvrirDepense(m.dataset.depmod); return;
+    var m = e.target.closest('[data-depmod]');
+    if (!m) return;
+    /* Elle découle d'une charge fixe : c'est la charge qu'on ouvre, sinon la
+       correction serait effacée à la prochaine synchronisation. */
+    var d0 = depense(m.dataset.depmod);
+    if (d0 && d0.auto && d0.charge) {
+      allerModule('finances', 'charges');
+      ouvrirCharge(d0.charge);
+      return;
     }
-    if (s) {
-      var d = depense(s.dataset.depsup);
-      if (!d || !confirm('Supprimer cette dépense de ' + eur(FIN.nb(d.ttc)) + ' ?\n\nIl restera récupérable ' + B.JOURS_POUBELLE + ' jours dans ' + B.CHEMIN_CORBEILLE + '.')) return;
-      A.depenses = A.depenses.filter(function (x) { return x.id !== d.id; });
-      jeterObjet('depense', d, (d.fournisseur || 'Dépense'), eur(FIN.nb(d.ttc)))
-        .then(sauverDepenses).then(function () {
-          renderDepenses(); renderFinances(); renderAccueil(); toast('Dépense mise à la corbeille.');
-        });
-    }
+    ouvrirDepense(m.dataset.depmod);
   });
 
   brancherReglagesCh();

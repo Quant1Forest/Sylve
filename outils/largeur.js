@@ -203,6 +203,22 @@ function parcours() {
     /* Aujourd'hui du lot r1 : les autres rappels dépliés. */
     $('#barre [data-barre="aujourdhui"]').click(); await pause(400);
     if ($('#aj-autres')) { $('#aj-autres').open = true; await pause(150); mesurer('aujourdhui › autres rappels dépliés'); }
+    /* Argent du lot d1 : Mois avec ses plis ouverts (histogramme, lignes de
+       TVA, barres), puis chaque pastille d'Année, plis ouverts aussi —
+       Déclarations comprise. */
+    $('#barre [data-barre="argent"]').click(); await pause(400);
+    [].forEach.call(document.querySelectorAll('#fi-corps details'), function (d) { d.open = true; });
+    await pause(150); mesurer('argent › mois, plis ouverts');
+    const annee = $('#onglets [data-vue="analyses"]');
+    if (annee) {
+      annee.click(); await pause(350);
+      const anas = liste('#ana-onglets [data-ana]', 'ana');
+      for (let i = 0; i < anas.length; i++) {
+        $('#ana-onglets [data-ana="' + anas[i] + '"]').click(); await pause(300);
+        [].forEach.call(document.querySelectorAll('#ana-corps details'), function (d) { d.open = true; });
+        await pause(100); mesurer('argent › année › ' + anas[i]);
+      }
+    }
     /* L'Agenda : la fiche du jour, celle d'une journée d'office, la bulle de
        l'appui long, la feuille Poser un chantier (à venir, puis passé), et
        le placement avec son alerte. */

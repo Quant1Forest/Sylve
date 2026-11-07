@@ -2,45 +2,51 @@
 function charge(id) { return A.charges.filter(function (c) { return c.id === id; })[0] || null; }
 function sauverCharges() { return ecrire('bordcub.charges', A.charges); }
 
+/* Argent ▸ Dépenses, sous la liste (lot d1) : le bloc Charges fixes — le
+   résumé, puis les charges ; un appui en ouvre une, Supprimer est dans sa
+   fenêtre. Puis « Prélèvements à venir », l'ancienne carte « Échéances » :
+   quand l'argent part, où il part, et ce qui tombe sur la période. */
 function renderCharges() {
   var z = $('#charges-resume'); if (!z) return;
   var actives = A.charges.filter(function (c) { return !c.arretee; });
   if (!A.charges.length) {
     z.innerHTML = '<div class="vide"><p>Aucune charge fixe. Prêt bancaire, assurances, ' +
-      'logiciels : décrivez-les une fois, leurs échéances apparaîtront toutes seules.</p></div>';
-    $('#charges-echeances').innerHTML = '';
+      'logiciels : décrivez-les une fois, leurs prélèvements apparaîtront tout seuls.</p></div>';
+    $('#charges-echeances').innerHTML = '<p class="muted" style="font-size:12.5px">Aucun prélèvement : ' +
+      'aucune charge fixe.</p>';
     return;
   }
   var annuel = FIN.totalChargesAnnuel(A.charges);
+  var auj = C.minuit(Date.now());
   z.innerHTML = '<div class="kpi">' +
     '<div class="carte2"><b class="num">' + eur(annuel) + '</b><small>par an</small></div>' +
     '<div class="carte2"><b class="num">' + eur(FIN.arr(annuel / 12, 2)) + '</b><small>par mois en moyenne</small></div>' +
     '<div class="carte2"><b class="num">' + actives.length + '</b><small>charge' + (actives.length > 1 ? 's' : '') + '</small></div>' +
     '</div>' +
-    grapheChargesMois(A.charges) +
-    grapheChargesCategories(A.charges) +
     '<div style="margin-top:12px">' + A.charges.slice().sort(function (a, b) {
       return FIN.coutAnnuel(b) - FIN.coutAnnuel(a);
     }).map(function (c) {
+      /* Le prochain prélèvement, d'ici à un peu plus d'un an : c'est la date
+         qu'on cherche des yeux (maquette tour 2). */
+      var proch = c.arretee ? null : FIN.echeances(c, { debut: auj, fin: auj + 400 * C.JOUR })[0];
       /* Une grille plutôt qu'une rangée souple : la pastille, le texte et les
          montants tombent chacun sur leur colonne, donc les montants
          s'alignent au chiffre près d'une ligne à l'autre. */
-      return '<div class="charge-l' + (c.arretee ? ' epuise' : '') + '">' +
+      return '<button type="button" class="charge-l' + (c.arretee ? ' epuise' : '') +
+        '" data-chgmod="' + esc(c.id) + '">' +
         '<span class="pastille" style="background:' + coulCategorie(c.categorie) +
         '" title="' + esc(FIN.nomCategorie(c.categorie)) + '"></span>' +
-        '<div><span class="charge-n">' + esc(c.libelle || 'Charge') + '</span>' +
-        '<span class="charge-q">' + esc(quandCharge(c)) + '</span>' +
+        '<span><span class="charge-n">' + esc(c.libelle || 'Charge') + '</span>' +
+        '<span class="charge-q">' + esc(quandCharge(c)) +
+        (proch ? ' · prochain prélèvement ' + esc(jourCourt(proch)) : '') + '</span>' +
         '<span class="charge-p">' + esc(FIN.nomCategorie(c.categorie)) +
         (c.beneficiaire ? ' · payé à ' + esc(c.beneficiaire) : '') +
         (FIN.sansTvaDe(c.categorie) ? ' · sans TVA'
           : ' · TVA ' + String(C.nb(c.taux)).replace('.', ',') + ' %') +
         (chargeDansDepenses(c) ? ' · portée en dépense' : '') +
-        (c.arretee ? ' · arrêtée' : '') + '</span></div>' +
-        '<div style="text-align:right"><span class="charge-m num">' + eur(C.nb(c.ttc)) + '</span>' +
-        '<span class="charge-a num">' + eur(FIN.coutAnnuel(c)) + '/an</span></div>' +
-        '<div class="charge-act">' +
-        '<button class="btn-min" data-chgmod="' + c.id + '">Modifier</button>' +
-        '<button class="btn-min" data-chgsup="' + c.id + '">Supprimer</button></div></div>';
+        (c.arretee ? ' · arrêtée' : '') + '</span></span>' +
+        '<span class="charge-mt"><span class="charge-m num">' + eur(C.nb(c.ttc)) + '</span>' +
+        '<span class="charge-a num">' + eur(FIN.coutAnnuel(c)) + '/an</span></span></button>';
     }).join('') + '</div>';
 
   var b = periodeCourante();
@@ -55,7 +61,8 @@ function renderCharges() {
   var tvaTotal = avecTva.reduce(function (s, d) {
     return s + FIN.nb(d.ttc) - FIN.nb(d.ttc) / (1 + C.nb(d.charge.taux) / 100);
   }, 0);
-  $('#charges-echeances').innerHTML = dues.length
+  $('#charges-echeances').innerHTML = grapheChargesMois(A.charges) + grapheChargesCategories(A.charges) +
+    '<div style="margin-top:12px" id="charges-periode">' + (dues.length
     ? '<p class="muted" style="font-size:12.5px;margin:0 0 9px">' + esc(libellePeriode()) + ' — ' +
       dues.length + ' prélèvement' + (dues.length > 1 ? 's' : '') +
       (avecTva.length ? ', dont ' + avecTva.length + ' en dépense avec ' +
@@ -73,7 +80,7 @@ function renderCharges() {
       }).join('') +
       '<p class="muted" style="font-size:12px;margin:9px 0 0">Rien à pointer : ce qui doit ' +
       'entrer dans les dépenses se décide sur la charge elle-même, une fois pour toutes.</p>'
-    : '<p class="muted" style="font-size:12.5px">Aucune échéance sur cette période.</p>';
+    : '<p class="muted" style="font-size:12.5px">Aucun prélèvement sur cette période.</p>') + '</div>';
 }
 
 /* Une couleur par catégorie de charge. La liste et les deux graphiques y
@@ -263,11 +270,15 @@ function ouvrirCharge(id) {
        remboursement de prêt n'a rien à y faire. */
     '<label class="ligne-check" style="display:flex;align-items:flex-start;gap:8px;font-size:13.5px;margin-top:11px">' +
     '<input type="checkbox" id="cg-dep"' + (chargeDansDepenses(c) ? ' checked' : '') + ' style="margin-top:2px">' +
-    '<span>Enregistrer les échéances dans les dépenses' +
+    '<span>Enregistrer les prélèvements dans les dépenses' +
     '<span class="muted" style="display:block;font-size:11.5px" id="cg-dep-aide"></span></span></label>' +
     '<label class="ligne-check" style="display:flex;align-items:center;gap:8px;font-size:13.5px;margin-top:11px">' +
     '<input type="checkbox" id="cg-arret"' + (c.arretee ? ' checked' : '') + '> Charge arrêtée</label>' +
-    '<div class="btn-rang" style="margin-top:11px"><button class="btn primaire" id="cg-ok">Enregistrer</button></div>');
+    '<div class="btn-rang" style="margin-top:11px"><button class="btn primaire" id="cg-ok">Enregistrer</button>' +
+    /* Même geste que pour une dépense (lot d1) : Supprimer a quitté la ligne
+       de la liste pour la fenêtre. */
+    (id ? '<button class="btn danger btn-min" id="cg-sup">Supprimer</button>' : '') + '</div>');
+  if ($('#cg-sup')) $('#cg-sup').addEventListener('click', function () { supprimerCharge(c); });
 
   var apercu = function () {
     var t = C.nb($('#cg-ttc').value), p = $('#cg-per').value;
@@ -311,8 +322,8 @@ function ouvrirCharge(id) {
       ? 'Sans TVA : rien à récupérer, donc rien à porter en dépense.'
       : manque ? 'Choisissez le taux de TVA : c’est lui qu’on récupère.'
         : $('#cg-dep').checked
-          ? 'Chaque échéance passée devient une dépense, depuis le premier paiement.'
-          : 'Les échéances resteront hors des dépenses.';
+          ? 'Chaque prélèvement passé devient une dépense, depuis le premier paiement.'
+          : 'Les prélèvements resteront hors des dépenses.';
   };
   $('#cg-cat').addEventListener('change', majTva);
   $('#cg-dep').addEventListener('change', majObligation);
@@ -354,6 +365,21 @@ function ouvrirCharge(id) {
         if (n > 0) toast(n + ' échéance' + (n > 1 ? 's portées' : ' portée') + ' en dépense.');
       });
   });
+}
+
+/* Le chemin d'avant vers la corbeille, depuis la fenêtre. Le montant de la
+   corbeille se lisait dans un champ que la charge n'a pas (« montant ») :
+   elle y entrait à 0 €. */
+function supprimerCharge(c) {
+  if (!c || !confirm('Supprimer « ' + (c.libelle || '') + ' » ?\n\nIl restera récupérable ' +
+    B.JOURS_POUBELLE + ' jours dans ' + B.CHEMIN_CORBEILLE + '.')) return;
+  A.charges = A.charges.filter(function (x) { return x.id !== c.id; });
+  jeterObjet('charge', c, c.libelle || 'Charge', eur(C.nb(c.ttc)))
+    .then(sauverCharges).then(synchroniserDepensesCharges).then(function () {
+      fermerModale();
+      renderCharges(); renderDepenses(); renderFinances(); renderAccueil();
+      toast('Charge mise à la corbeille.');
+    });
 }
 
 /* La case n'existait pas avant la 4.37. Une charge qui porte de la TVA avait

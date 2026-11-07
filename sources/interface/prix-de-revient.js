@@ -801,6 +801,10 @@ window.BCUI = { toast: toast,
   /* La journée d'office ne s'écrit nulle part : les scénarios la lisent dans
      l'état en mémoire, là où le temps des chantiers est refait. */
   _etat: function () { return A; },
+  /* Les anciennes clés de vue d'Argent (lot d1) s'éprouvent par le chemin
+     même des liens internes et des notes de mise à jour. */
+  _allerModule: function (m, v) { allerModule(m, v); },
+  _moduleDeVue: function (v) { return moduleDeVue(v); },
   _ouvrirChantier: function (id, vers) { ouvrirChantier(id, vers); } };
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
 else init();

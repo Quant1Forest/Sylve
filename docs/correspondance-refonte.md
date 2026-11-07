@@ -28,6 +28,8 @@ Statuts :
 - **fait (lot b1)** — en place depuis la 4.90.0 (fiche du chantier en étapes).
 - **fait (lot b2)** — en place depuis la 4.91.0 (liste Chantiers, création courte, Fiche sécurité).
 - **fait (lot r1)** — en place depuis la 4.92.0 (Aujourd'hui et Agenda allégés, journée d'office, Mes notes dans le ☰ ; section 15).
+- **fait (lot d1)** — en place depuis la 4.95.0 (Argent : Mois · TVA · Dépenses · Année).
+- **en partie (lot d1)** — en place depuis la 4.95.0 ; ce qui reste est dit après les deux-points.
 
 ---
 
@@ -60,6 +62,10 @@ Statuts :
 - **Lot r1 (4.92.0)** : retours d'usage des 02-03/11 — Aujourd'hui allégé (plus de Bientôt ni de Mes notes,
   autres rappels repliés), Agenda allégé (trois couleurs, plus d'« À programmer » ni de jours à trancher, appui
   long), journée d'office, Mes notes dans le ☰. Détail : section 15.
+- **Lot d1 (4.95.0)** : Argent en quatre pastilles, Mois · TVA · Dépenses · Année ; les charges fixes
+  sous la liste des Dépenses, les analyses dans Année, les cumuls de l'ancien carnet aussi. Preuve bloc
+  par bloc : `docs/inventaire-ecrans.md`, *Où sont allés les blocs de Finances*. La feuille Dépense
+  (D1-D4) vient au lot d2.
 
 ---
 
@@ -115,10 +121,10 @@ dernière colonne des lignes ci-dessous dit où, et la section 15 le détail.
 | Bulle « journées à planifier » | Bientôt : « À programmer : N j à placer » par chantier engagé (« temps à estimer » s'il n'a pas d'estimation) → Agenda en mode placement, retour à Aujourd'hui à la fin | fait (lot c1) : « Fini de placer » ramène à Aujourd'hui ; « temps à estimer » ouvre la fiche, comme « Estimer » d'À programmer (lot b1 : sur l'étape Devis) — validé (31/10, P1, P2) ; lot r1 : « À programmer » retiré, on place depuis la fiche ▸ Travaux ou par l'appui long (section 15) |
 | Bulle « devis signés » | Même ligne « À programmer » (signé = à programmer) ; liste complète dans Chantiers | fait (lot 5b) — proposé ; lot r1 : « Signé · à programmer » sur la ligne de Chantiers en cours (section 15) |
 | Bulle « chantiers en cours » | Bloc « Chantiers en cours » (points d'étape, montant, situation) | fait (lot 5b) : tous les chantiers non soldés, comme la V2 — validé (V2 ; confirmé le 31/10 : on garde ce titre et ce contenu) ; lot r1 : rangés par étape, le plus ancien en haut (section 15) |
-| Bulle « factures en attente » (+ « N en retard ») | En retard : « Facture impayée » quand l'échéance est dépassée ; total « Facturé, pas encore payé » dans Argent ▸ Mois | en partie (lot 5b) : la ligne est en place ; le total est le « en attente » du Bilan d'Argent (Argent ▸ Mois : lot d), à côté duquel « À facturer : N chantiers · X € » est revenu au 5b2 (appui → carnet filtré « Travaux terminés ») — validé (V2) |
+| Bulle « factures en attente » (+ « N en retard ») | En retard : « Facture impayée » quand l'échéance est dépassée ; total « Facturé, pas encore payé » dans Argent ▸ Mois | fait (lot d1) : la ligne est en place ; le total est dans Argent ▸ Mois ▸ À ce jour, « Facturé, pas encore payé : N factures · X € », toutes périodes, « dont N impayées » quand l'échéance est passée (appui → Chantiers, groupe Facturés · attendent le paiement) ; « À facturer » à côté, « dont N sans montant » pour un terminé sans ligne chiffrée (appui → À faire maintenant) — validé (V2) |
 | Alerte du Carnet « à facturer » | En retard : « Facture à faire » (chantier terminé non facturé) | fait (lot 5b, seuil au 5b2) : dès le lendemain de « Travaux terminés » (1 jour, au lieu de 15), pour la ligne comme pour l'alerte du carnet, qui restent alignées ; l'alerte du carnet reste — validé (V2 ; 31/10) |
-| Bulle « chiffre d'affaires » | Argent ▸ Mois | en partie (lot 5b) : bulle retirée, le même chiffre est dans Argent ▸ Bilan (année) ; Argent ▸ Mois : lot d — validé (30/10) |
-| Bulle « TVA déductible » | Argent ▸ TVA | en partie (lot 5b) : bulle retirée, le même chiffre est dans Argent ▸ Bilan (année) ; Argent ▸ TVA : lot d — validé (30/10) |
+| Bulle « chiffre d'affaires » | Argent ▸ Mois | fait (lot d1) : bulle retirée ; le chiffre du mois en grand dans Argent ▸ Mois, celui de l'année dans Argent ▸ Année ▸ Vue d'ensemble — validé (30/10) |
+| Bulle « TVA déductible » | Argent ▸ TVA | fait (lot d1) : bulle retirée ; Argent ▸ TVA, sur la période (l'année au départ), et la TVA du mois dans Argent ▸ Mois — validé (30/10) |
 | Ligne « Aujourd'hui / Demain / Dans N jours » (travail posé à 7 jours) | Bientôt : « N jours prévus · lun. 2 → mer. 4 » | fait (lot 5b) : une ligne par chantier, avec le donneur d'ordre — validé (V2) ; lot r1 : « posé demain » sur la ligne du chantier, à trois jours (section 15) |
 | (nouveau, issu du déroulé) Devis à faire, Repérage à faire | Bientôt : une seule ligne « Devis à faire » par chantier à l'étape Infos, avec « repéré il y a N j » ou « annoncé il y a N j · pas encore repéré » en petit ; plus de ligne « Repérage à faire » séparée (le repérage n'est pas systématique) | fait (lot b2) : une ligne par chantier « Devis à envoyer » pas encore envoyé ; en petit « repéré il y a N j » ou « annoncé il y a N j · pas encore repéré » (date de repérage du lot b1) — validé (V2 ; 31/10, C1) ; lot r1 : sur la ligne du chantier, étape Infos (section 15) |
 | Mes notes (listes cochables colorées, + note, cocher, modifier le titre, × d'un élément, × de la note → corbeille, ajouter un élément) | Aujourd'hui ▸ Mes notes, juste après Bientôt (N1), toutes ces actions sur place : une carte par note (bande de la couleur à gauche, titre → fenêtre titre / couleur / Supprimer, × → confirmation puis corbeille, « N à faire »), éléments à faire visibles, cochés repliés sous « N faits » (N2 ; un appui les montre, décocher les remet en haut), champ « ajouter… » en bas de chaque note (Entrée ajoute et garde le clavier) ; créer une note : + ▸ Note | en partie (lot 5b) : déplacées avec toutes leurs actions, en cartes ; « + note » retiré (+ ▸ Note) ; cochés repliés (N2) : lot f — validé (31/10, maquette tour 2) ; lot r1 : ☰ ▸ Mes notes (section 15) |
@@ -138,8 +144,8 @@ dernière colonne des lignes ci-dessous dit où, et la section 15 le détail.
 | Accès : Mon entreprise ▸ Chantiers, ou onglet Carnet du Calendrier | Onglet Chantiers de la barre ; pastilles Liste · Carte · Fiche · Fiche sécurité | fait (lot b2) : l'onglet Carnet du Calendrier est parti au lot c1 (R1) ; la pastille « Carnet » s'appelle « Liste » — validé (30/10) |
 | « À traiter (N) » (journées passées, à facturer, facture impayée) | Aujourd'hui ▸ En retard, et groupe « À faire maintenant » de Chantiers | fait (lot b2) : le bandeau « À traiter » est devenu le groupe « À faire maintenant » — validé (V2). Lot r1b : les trois mêmes choses qu'En retard (factures échues, terminés pas facturés, devis arrivés à échéance), une seule liste `TYPES_EN_RETARD` ; le chantier aux jours passés ne relance plus, il reste dans En travaux — tranché (05/11) |
 | Bouton « Nouveau chantier » | + ▸ Chantier | fait (lot b2) : le bouton de la page est retiré — validé (30/10) |
-| Carte Carnet : facturé, encaissé, devis signés, premier donneur d'ordre (tout l'historique) | Argent ▸ Année (facturé, encaissé, par donneur d'ordre, devis signés et taux), avec un cumul « depuis le début » en bas | en partie (lot b2) : en attendant Argent ▸ Année (lot d), les quatre chiffres restent dans « Cumuls du carnet, depuis le début », replié en bas de Chantiers — proposé |
-| Ligne de comptes : ouverts, jours-homme cumulés, à facturer, jours passés | Ouverts et à facturer : compteurs des groupes ; jours passés : Aujourd'hui ▸ En retard ; jours-homme : Agenda (mois) et Argent ▸ Année | en partie (lot b2) : compteurs des groupes en place ; la ligne entière reste aussi dans « Cumuls du carnet » jusqu'au lot d — proposé |
+| Carte Carnet : facturé, encaissé, devis signés, premier donneur d'ordre (tout l'historique) | Argent ▸ Année (facturé, encaissé, par donneur d'ordre, devis signés et taux), avec un cumul « depuis le début » en bas | fait (lot d1) : les quatre chiffres sont dans Argent ▸ Année ▸ Vue d'ensemble ▸ « Depuis le début », replié ; « encaissé » y devient « dont payé » ; le bloc a quitté le bas de Chantiers — proposé |
+| Ligne de comptes : ouverts, jours-homme cumulés, à facturer, jours passés | Ouverts et à facturer : compteurs des groupes ; jours passés : Aujourd'hui ▸ En retard ; jours-homme : Agenda (mois) et Argent ▸ Année | fait (lot d1) : compteurs des groupes en place ; la ligne entière suit les quatre chiffres dans Argent ▸ Année ▸ « Depuis le début » — proposé |
 | Recherche (nom, donneur d'ordre, commune, n° de facture) | Haut de Chantiers (absente de la maquette, à ajouter) | fait (lot b2) : elle regarde tout le carnet, statut compris, et remplace les groupes tant qu'elle est tapée — proposé |
 | Filtre par statut | Groupes : À faire maintenant · En travaux · Facturés · attendent le paiement · Devis · Payés récemment · « Voir les payés plus anciens » · « Sans suite » (replié, en bas) | fait (lot b2) ; lot r1b : un facturé pas encore échu va dans « Facturés · attendent le paiement », après En travaux (tranché le 02/11), échu dans « À faire maintenant » ; « payés récemment » = payés depuis moins de 30 jours ; l'ancien filtre (statuts, familles, à compléter, avec devis) reste replié en bas, « Tout le carnet, par filtre » — validé (V2) ; « Sans suite » : proposé |
 | Où va « Devis signé, à programmer » (et « À programmer » sans devis) | Groupe En travaux, situation « signé · à programmer » | fait (lot b2) : « Signé · à programmer », ou « Sans devis · à programmer » — proposé |
@@ -242,30 +248,36 @@ en bas, discrets : « Corriger l’étape à la main » et « Supprimer ce chant
 Onglets : **Mois · TVA · Dépenses · Année**. Les sélecteurs de période restent
 mémorisés et partagés comme aujourd'hui.
 
+**En place au lot d1 (4.95.0).** Mois a son propre mois (‹ ›), ouvert sur le mois en cours au
+démarrage, qui ne touche pas la période ; TVA, Dépenses et Année partagent la même période
+mémorisée, avec les mêmes trois sélecteurs. Les anciennes clés de vue mènent au nouvel endroit
+(`finances` → Mois, `depenses` → Dépenses, `charges` → Dépenses défilée au bloc Charges fixes,
+`analyses` → Année).
+
 | Ancien | Nouvel endroit | Statut |
 |---|---|---|
-| Finances ▸ Bilan ▸ Période (Mois / Trimestre / Année) | Mois : ‹ mois › ; TVA et Dépenses : mois, trimestre ou année ; Année : ses sélecteurs actuels (section Analyses) | proposé |
-| Bilan ▸ Chiffre d'affaires : facturé HT, encaissé, en attente | Mois : facturé HT (prestation / vente), graphique mois par mois de l'année, encaissé, « Facturé, pas encore payé » | validé (V2) |
-| CA mois par mois pour la déclaration MSA trimestrielle | Mois : ligne « Trimestre en cours (MSA) » | validé (V2) |
-| Bilan ▸ abattements (CA après abattement vente 71 % / prestation 50 %) | Année ▸ Vue d'ensemble et Déclarations | proposé |
-| Bilan ▸ Balance de TVA (collectée, déductible, solde) | Mois : TVA du mois en lignes alignées (taux, base, montant), TVA facturée, déductible, à reverser ; onglet TVA : même présentation sur la période choisie (déclaration annuelle par taux) | validé (30/10) |
-| Bilan ▸ Dépenses et marge (recettes − achats) | Mois : dépenses du mois par catégorie (barres) ; marge → « Pour aller plus loin » | validé (V2) |
-| Bilan ▸ Déplacements et devis perdus | Déplacements : Mois ▸ Pour aller plus loin ; devis perdus : Année ▸ Devis | proposé |
-| Bilan ▸ Par donneur d'ordre | Mois ▸ Pour aller plus loin, et Année | validé (V2) |
-| Bilan ▸ Devis (taux d'acceptation, en attente) | Année ▸ Devis : taux, en attente, perdus et motifs | proposé |
-| (V2) Ce qui rapporte par type de travaux, Marge sur fournitures, Charges fixes prélevées | Mois ▸ Pour aller plus loin (repliés) | validé (V2) |
-| Finances ▸ Dépenses : indicateurs (TTC, HT, TVA déductible, nombre), filtre par catégorie, liste (Modifier, Supprimer) | Argent ▸ Dépenses : indicateurs, filtre et liste intacts ; un appui sur la ligne ouvre la dépense (modifier) ; Supprimer passe dans la feuille de la dépense, comme Ma journée ; une dépense née d'une charge fixe renvoie toujours à sa charge | validé (31/10 ; D5) |
+| Finances ▸ Bilan ▸ Période (Mois / Trimestre / Année) | Mois : ‹ mois › ; TVA et Dépenses : mois, trimestre ou année ; Année : ses sélecteurs actuels (section Analyses) | fait (lot d1) : Mois a son propre mois ; TVA, Dépenses et Année partagent la période d'avant ; Année arrive donc sur la période partagée (l'année en cours au premier lancement), pas toujours sur l'année en cours — c'est le partage qui tranche — proposé |
+| Bilan ▸ Chiffre d'affaires : facturé HT, encaissé, en attente | Mois : facturé HT (prestation / vente), graphique mois par mois de l'année, encaissé, « Facturé, pas encore payé » | fait (lot d1) : « encaissé » se dit « dont payé » (les factures du mois, réglées depuis) ; « en attente » du mois devient « pas encore payé » — validé (V2) |
+| CA mois par mois pour la déclaration MSA trimestrielle | Mois : ligne « Trimestre en cours (MSA) » | fait (lot d1) : « Trimestre (MSA) », le trimestre civil du mois affiché (sur décembre : octobre-décembre), un mois à venir dit « à venir » — validé (V2) |
+| Bilan ▸ abattements (CA après abattement vente 71 % / prestation 50 %) | Année ▸ Vue d'ensemble et Déclarations | fait (lot d1) : Année ▸ Vue d'ensemble ▸ Abattements, replié, sur la période ; Déclarations inchangée — proposé |
+| Bilan ▸ Balance de TVA (collectée, déductible, solde) | Mois : TVA du mois en lignes alignées (taux, base, montant), TVA facturée, déductible, à reverser ; onglet TVA : même présentation sur la période choisie (déclaration annuelle par taux) | fait (lot d1) : « TVA facturée » ; la règle (date de la facture) dite sous l'onglet TVA — validé (30/10) |
+| Bilan ▸ Dépenses et marge (recettes − achats) | Mois : dépenses du mois par catégorie (barres) ; marge → « Pour aller plus loin » | fait (lot d1) : barres en HT, les dépenses nées d'une charge fixe regroupées ; un appui ouvre Dépenses sur ce mois, filtrées — validé (V2) |
+| Bilan ▸ Déplacements et devis perdus | Déplacements : Mois ▸ Pour aller plus loin ; devis perdus : Année ▸ Devis | fait (lot d1) : Déplacements avec le carburant payé du mois — proposé |
+| Bilan ▸ Par donneur d'ordre | Mois ▸ Pour aller plus loin, et Année | fait (lot d1) : sur le mois, et « tous chantiers confondus » comme avant ; Année ▸ Recettes ▸ Par donneur d'ordre, pas doublé — validé (V2) |
+| Bilan ▸ Devis (taux d'acceptation, en attente) | Année ▸ Devis : taux, en attente, perdus et motifs | fait (lot d1) : Année ▸ Vue d'ensemble ▸ Devis, replié — proposé |
+| (V2) Ce qui rapporte par type de travaux, Marge sur fournitures, Charges fixes prélevées | Mois ▸ Pour aller plus loin (repliés) | fait (lot d1) : avec Recettes moins dépenses et Déplacements ; « Ce qui rapporte » sur les prestations seules — validé (V2) |
+| Finances ▸ Dépenses : indicateurs (TTC, HT, TVA déductible, nombre), filtre par catégorie, liste (Modifier, Supprimer) | Argent ▸ Dépenses : indicateurs, filtre et liste intacts ; un appui sur la ligne ouvre la dépense (modifier) ; Supprimer passe dans la feuille de la dépense, comme Ma journée ; une dépense née d'une charge fixe renvoie toujours à sa charge | fait (lot d1) : ligne de la maquette (fournisseur ; date · catégories · charge fixe ; TTC et TVA) ; Supprimer dans la fenêtre actuelle de la dépense, la feuille D1-D4 au lot d2 — validé (31/10 ; D5) |
 | Finances ▸ Dépenses ▸ + Dépense | + ▸ Dépense | fait (lot 5a) ; « + Dépense » reste aussi dans la page — validé (30/10) |
-| Finances ▸ Charges fixes : résumé, liste (Modifier, Supprimer), Échéances (quand, où part l'argent) | Argent ▸ Dépenses, bloc Charges fixes ; « Échéances » devient « Prélèvements à venir » | validé (31/10) |
-| Finances ▸ Charges fixes ▸ + Charge | + ▸ Charge fixe (Plus rare) | fait (lot 5a) ; « + Charge » reste aussi dans la page — validé (31/10, Q1) |
-| Dépenses créées seules à chaque échéance ; bouton « La charge » d'une dépense | Inchangés | proposé (inchangé) |
-| Finances ▸ Analyses ▸ Vue d'ensemble · Recettes · Dépenses · Déclarations (tout leur contenu) | Argent ▸ Année, mêmes quatre pastilles, contenu intact | validé (31/10) |
-| Analyses ▸ sélecteurs de période propres (type et année) | Gardés dans l'onglet Année, qui arrive sur l'année en cours | proposé |
-| Analyses ▸ Déclarations ▸ cotisations et impôt, simulateur | Année ▸ Déclarations | validé (31/10) |
-| Analyses ▸ Déclarations ▸ versements et récupérations, + Mouvement | Année ▸ Déclarations (s'ajoute à une déclaration, reste sur place) | proposé |
-| Taux en double (Réglages ▸ Financier et cases du simulateur) | Réglages = taux de référence ; les cases du simulateur partent de ces taux et servent à essayer sans modifier les Réglages (vérifier le comportement actuel avant de toucher) | proposé |
+| Finances ▸ Charges fixes : résumé, liste (Modifier, Supprimer), Échéances (quand, où part l'argent) | Argent ▸ Dépenses, bloc Charges fixes ; « Échéances » devient « Prélèvements à venir » | fait (lot d1) : « prochain prélèvement » sur chaque ligne ; un appui ouvre la charge, Supprimer dans sa fenêtre (proposé) — validé (31/10) |
+| Finances ▸ Charges fixes ▸ + Charge | + ▸ Charge fixe (Plus rare) | fait (lot 5a) ; « + Charge » reste dans le bloc Charges fixes des Dépenses (lot d1) — validé (31/10, Q1) |
+| Dépenses créées seules à chaque échéance ; bouton « La charge » d'une dépense | Inchangés | fait (lot d1, inchangé) : la ligne d'une dépense née d'une charge dit « La charge » et l'ouvre — proposé (inchangé) |
+| Finances ▸ Analyses ▸ Vue d'ensemble · Recettes · Dépenses · Déclarations (tout leur contenu) | Argent ▸ Année, mêmes quatre pastilles, contenu intact | fait (lot d1) : seconde rangée de pastilles, soulignée, plus discrète — validé (31/10) |
+| Analyses ▸ sélecteurs de période propres (type et année) | Gardés dans l'onglet Année, qui arrive sur l'année en cours | fait (lot d1) : sélecteurs gardés, sur la période partagée — proposé |
+| Analyses ▸ Déclarations ▸ cotisations et impôt, simulateur | Année ▸ Déclarations | fait (lot d1, inchangé) — validé (31/10) |
+| Analyses ▸ Déclarations ▸ versements et récupérations, + Mouvement | Année ▸ Déclarations (s'ajoute à une déclaration, reste sur place) | fait (lot d1, inchangé) — proposé |
+| Taux en double (Réglages ▸ Financier et cases du simulateur) | Réglages = taux de référence ; les cases du simulateur partent de ces taux et servent à essayer sans modifier les Réglages (vérifier le comportement actuel avant de toucher) | en partie (lot d1) : comportement vérifié, rien changé ; les cases du simulateur, de Déclarations, des Hypothèses de la rentabilité et de Réglages ▸ Financier écrivent toutes le même réglage ; essayer un taux dans le simulateur change donc celui des Réglages — à revoir avec lui |
 | Tuile Finances (facturé, TVA à reverser / à récupérer) | Onglet Argent | fait (lot 5a) — validé (30/10) |
-| Bilan ▸ coût du carburant estimé | Mois ▸ Pour aller plus loin ▸ Déplacements | proposé |
+| Bilan ▸ coût du carburant estimé | Mois ▸ Pour aller plus loin ▸ Déplacements | fait (lot d1) — proposé |
 | (plus tard) Vrai résultat comparé à l'abattement, par an et par chantier | Année, et fiche annuelle PDF | idée (après la refonte) |
 
 ---
@@ -421,9 +433,9 @@ fournisseur, entrées de listes (Réglages) · Coller depuis Excel · Importer
 |---|---|
 | Ouverts / en cours | « ouverts » disparaît ; on parle des groupes (À faire maintenant, En travaux, Devis) |
 | Chiffre d'affaires | Seulement dans Argent (Mois, Année), hors débours ; la fiche donne celui du chantier |
-| TVA | Toujours nommée : « TVA facturée », « TVA déductible », « À reverser » / « À récupérer » |
+| TVA | Toujours nommée : « TVA facturée », « TVA déductible », « À reverser » / « À récupérer » — fait dans Argent (lot d1) ; Année garde « collectée » dans son contenu d'avant |
 | Journées passées non tranchées | « À trancher » partout |
-| Factures non payées | « Impayée » si échue ; « Facturé, pas encore payé » sinon ; « en attente » réservé au devis (« en attente de réponse ») |
+| Factures non payées | « Impayée » si échue ; « Facturé, pas encore payé » sinon ; « en attente » réservé au devis (« en attente de réponse ») — fait dans Argent ▸ Mois (lot d1) ; Année ▸ Recettes garde « en attente » |
 | À planifier | « À programmer » (son mot) partout : étape, bloc de l'Agenda, ligne d'Aujourd'hui — fait (lot c1), « À planifier » reste lu à l'import ; « Devis signé, à programmer » validé le 01/11 |
 | Dépenses / achats / acheté | « Dépenses » partout ; « Achats à venir » garde son nom de module |
 | Notes | « Mes notes » = pense-bêtes ; « Note » = celle d'un chantier, d'une journée, d'un achat |
@@ -431,7 +443,7 @@ fournisseur, entrées de listes (Réglages) · Coller depuis Excel · Importer
 | Carnet | Seul celui du véhicule reste |
 | Entreprise | Groupe « Entreprise » du ☰ et pastille « Entreprise » des Réglages (nom et logo y vont) |
 | Terminé | « Travaux terminés » (étape et case de Ma journée) ; fin de placement : « Fini de placer » |
-| Échéances | « Prélèvements » pour les charges fixes ; « Échéances » pour le véhicule ; « échéance » d'une facture |
+| Échéances | « Prélèvements » pour les charges fixes ; « Échéances » pour le véhicule ; « échéance » d'une facture — fait pour les charges fixes (lot d1) |
 | Client / propriétaire | « Facturé à » partout où le champ est saisi ou affiché (création, fenêtre Le chantier, fiche, Fiche sécurité, réglages des listes) ; la donnée garde son nom (`proprietaire`, `proprios`). La feuille imprimée dit « Propriétaire », comme l'arrêté | fait (lot b2) — tranché le 01/11 |
 | Dépenses (onglet) / Dépenses (pastille d'Année) | Gardés : la liste et l'analyse du même sujet |
 
@@ -471,6 +483,13 @@ y est devenue. « Module, après X » : la pastille a changé de module, sous le
 | Chantiers | Carnet | Liste |
 | Chantiers | Fiche de chantier | Fiche sécurité |
 | Calendrier | Carte | Chantiers, après Liste |
+| Finances | Bilan | Mois |
+| Finances | — | TVA, nouvelle après Mois |
+| Finances | Charges fixes | bloc de Dépenses |
+| Finances | Analyses | Année |
+
+Lot d1 : « nouvelle après X » ajoute une pastille qui n'était pas dans l'inventaire ;
+« bloc de X » fond une pastille dans une autre du même module, sous un titre à son nom.
 
 ---
 

@@ -118,7 +118,12 @@ function ouvrir(graines, options) {
         for (const k in graines) w.localStorage.setItem('bordcub.' + k, JSON.stringify(graines[k]));
         w.URL.createObjectURL = () => 'blob:test';
         w.URL.revokeObjectURL = () => {};
-        w.Element.prototype.scrollIntoView = function () {};
+        /* JSDOM ne défile pas : on note ce qui a été amené en vue (lot d1),
+           par son identifiant ou son groupe de Chantiers. */
+        w.__defile = [];
+        w.Element.prototype.scrollIntoView = function () {
+          w.__defile.push(this.id || (this.dataset && this.dataset.groupe) || '?');
+        };
         if (DECALAGE) w.Date = decalerDate(w.Date, DECALAGE);
         /* Un crochet pour poser ce que JSDOM n'a pas — un écran, un capteur —
            AVANT que l'application démarre : elle ne branche que ce qui existe
@@ -189,6 +194,8 @@ async function parMenu(t, cle) {
   return ok;
 }
 const vueActive = t => (t.$('main > .vue.actif') || {}).id || null;
+/* Le dernier élément amené en vue par l'application (scrollIntoView). */
+const defile = t => (t.w.__defile || []).slice(-1)[0] || null;
 const ongletMarque = t => t.$$('#barre [aria-current="page"]').map(b => b.dataset.barre);
 /* L'écran Aujourd'hui (lot 5b) : une ligne d'En retard, de Bientôt ou des
    prélèvements se retrouve par sa clé (« impaye:c1 », « sauvegarde »…), la
@@ -1264,13 +1271,16 @@ scenario('Tuiles : aucune ne parle de marge, et Finances porte le chiffre d’af
     autres.every(b => !/marge/i.test(b.textContent)));
   t.clic('#modale-x'); await t.pause(150);
   await parBarre(t, 'argent');
-  const ca = t.$$('#fi-corps .carte').filter(c => /Chiffre d’affaires/.test(c.textContent))[0];
-  /* 4 ha × 250 € = 1000 € facturés, et non 1000 − 120 d'achats.
-     t.texte() replie les blancs : l'insécable y ressort en espace ordinaire. */
+  /* Lot d1 : Argent s'ouvre sur Mois, au mois en cours ; le chiffre
+     d'affaires y est en grand, le mois et l'année au-dessus.
+     4 ha × 250 € = 1000 € facturés, et non 1000 − 120 d'achats. */
+  const ca = t.$('#fi-corps #mo-ca');
   verifierVrai('Argent porte le chiffre d’affaires',
-    ca && /1 000 €\s*facturé/.test(ca.textContent.replace(/ /g, ' ')));
+    ca && /Chiffre d’affaires facturé HT/.test(ca.textContent) &&
+    sansBlancs(t.texte('#mo-ca [data-mo="ca"]')) === '1000€');
+  const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
   verifierVrai('et dit sur quelle période',
-    ca && new RegExp('Chiffre d’affaires — ' + new Date().getFullYear()).test(ca.textContent));
+    new RegExp(MOIS[new Date().getMonth()] + ' ' + new Date().getFullYear(), 'i').test(t.texte('#mo-titre')));
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -1552,7 +1562,8 @@ scenario('Accueil : ce qui va être prélevé se voit dès l’ouverture', async
   verifier('séparé des tâches : ni En retard ni Bientôt', [null, null],
     [t.$('#aj-retard [data-ajcle^="prelevement"]'), t.$('#aj-bientot [data-ajcle^="prelevement"]')]);
   await appuyerLigne(t, lignesAuj(t, 'prelevement:a:')[0].dataset.ajcle);
-  verifier('un appui mène aux charges fixes', 'vue-charges', vueActive(t));
+  verifier('un appui mène aux Dépenses d’Argent', 'vue-depenses', vueActive(t));
+  verifier('défilées jusqu’au bloc Charges fixes', 'dep-charges', defile(t));
   verifier('aucune erreur', [], t.erreurs.concat(vide.erreurs));
 });
 
@@ -2047,14 +2058,18 @@ scenario('Charges fixes : deux graphiques, et le jour du prélèvement en clair'
         taux: 0, debut: new Date(an, 2, 15, 12).getTime(), jour: 15, moisReference: 2 }
     ]
   }));
-  t.clic('[data-vue="charges"]'); await t.pause(300);
-  const z = t.$('#charges-resume');
-  verifierVrai('le graphique des douze mois est là', /Quand l’argent part/.test(z.textContent));
-  verifierVrai('la répartition par catégorie aussi', /Où il part/.test(z.textContent));
+  /* Lot d1 : Argent ▸ Dépenses, bloc Charges fixes ; les deux graphiques
+     sont dans « Prélèvements à venir », l'ancienne carte Échéances. */
+  await parBarre(t, 'argent');
+  t.clic('[data-vue="depenses"]'); await t.pause(300);
+  const z = t.$('#charges-resume'), zp = t.$('#charges-echeances');
+  verifierVrai('le graphique des douze mois est là', /Quand l’argent part/.test(zp.textContent));
+  verifierVrai('la répartition par catégorie aussi', /Où il part/.test(zp.textContent));
+  verifierVrai('sous le titre Prélèvements à venir', /^Prélèvements à venir/.test(t.texte('#dep-prelevements')));
   verifierVrai('les bâtons sont empilés par catégorie',
-    z.querySelectorAll('svg rect[fill="#8A5A2B"]').length > 1);
+    zp.querySelectorAll('svg rect[fill="#8A5A2B"]').length > 1);
   verifierVrai('l’assurance a sa propre couleur',
-    z.querySelectorAll('svg rect[fill="#1D6FB8"]').length === 1);
+    zp.querySelectorAll('svg rect[fill="#1D6FB8"]').length === 1);
 
   /* Le jour du prélèvement, pas « tous les mois ». */
   verifierVrai('le jour du mois est écrit', /le 5 de chaque mois/.test(z.textContent));
@@ -2123,18 +2138,20 @@ scenario('Entreprise : chaque bulle d’« Où j’en suis » a son endroit, et 
   verifierVrai('« À traiter » le nomme toujours', /Montjoie/.test(at) && /1 800/.test(at) &&
     !/1 800/.test(at) && /70 jours/.test(at) && /Cabinet Dubois/.test(at));
   /* Chiffre d'affaires et TVA déductible : le même calcul que les bulles
-     (année civile), lu dans Argent ▸ Bilan, qui s'ouvre sur l'année. */
+     (année civile), lu dans Argent ▸ TVA et Argent ▸ Année, qui s'ouvrent
+     sur l'année (lot d1 ; Argent ▸ Bilan jusqu'en 4.94). */
   const FIN = t.w.BCF, C = t.w.BCC, E = t.w.BC;
   const b = FIN.bornes('annee', new Date().getFullYear(), 0);
   const ca = FIN.chiffreAffaires(t.stock('chantiers'), b).total;
   const ded = FIN.balanceTva(t.stock('chantiers'), t.stock('depenses'), b, C.tauxLigne).deductible.total;
   const eur = v => E.fmt(C.arr(v, 2), v % 1 ? 2 : 0).replace(/ /g, ' ') + ' €';
   await parBarre(t, 'argent');
-  const bilan = t.texte('#fi-corps').replace(/ /g, ' ');
-  verifierVrai('la TVA déductible de la bulle (' + eur(ded) + ') est dans Argent',
-    ded > 0 && sansBlancs(bilan).indexOf(sansBlancs(eur(ded) + 'déductible')) >= 0);
-  verifierVrai('le chiffre d’affaires de la bulle (' + eur(ca) + ') aussi',
-    !ca || sansBlancs(bilan).indexOf(sansBlancs(eur(ca) + 'facturé (HT)')) >= 0);
+  t.clic('[data-vue="tva"]'); await t.pause(250);
+  verifierVrai('la TVA déductible de la bulle (' + eur(ded) + ') est dans Argent ▸ TVA',
+    ded > 0 && sansBlancs(t.texte('#tva-corps [data-tva="deductible"]')) === sansBlancs('− ' + eur(ded)));
+  t.clic('[data-vue="analyses"]'); await t.pause(250);
+  verifierVrai('le chiffre d’affaires de la bulle (' + eur(ca) + ') dans Argent ▸ Année',
+    !ca || sansBlancs(t.texte('#ana-corps')).indexOf(sansBlancs(eur(ca) + 'facturé HT')) >= 0);
   /* Chaque ligne mène quelque part : l'impayé à sa fiche. */
   await parBarre(t, 'aujourdhui');
   await appuyerLigne(t, 'impaye:c3');
@@ -2292,11 +2309,14 @@ scenario('Onglets : plus aucun module ne se réduit à un onglet solitaire', asy
     verifierVrai(mod + ' : ' + n + ' onglets, jamais un seul', n !== 1);
     verifier(mod + ' : aucune erreur', [], t.erreurs);
   }
+  /* Lot d1 : Mois · TVA · Dépenses · Année ; les charges fixes sont un bloc
+     des Dépenses, les analyses sont devenues Année. */
   const t2 = await ouvrir(Object.assign({}, VIDE, { module: 'finances' }));
-  verifierVrai('l’onglet des charges s’appelle « Charges fixes »',
-    /Charges fixes/.test(t2.$('#onglets').textContent));
-  verifierVrai('et Analyses y a trouvé sa place',
-    /Analyses/.test(t2.$('#onglets').textContent));
+  await parBarre(t2, 'argent');
+  verifier('Argent : Mois, TVA, Dépenses, Année', ['Mois', 'TVA', 'Dépenses', 'Année'],
+    t2.$$('#onglets button').map(b => b.textContent.trim()));
+  verifierVrai('les charges fixes ont leur bloc dans Dépenses',
+    /^Charges fixes/.test(t2.texte('#vue-depenses #dep-charges')));
 });
 
 /* --------------------------------------------------------------------- */
@@ -2336,16 +2356,16 @@ scenario('Réglages : le retour redescend là où on était, pas au menu', async
      dans « Mon entreprise », jamais sur l'écran quitté. */
   const t = await ouvrir(Object.assign({}, VIDE, { module: 'finances' }));
   await parBarre(t, 'argent');
-  t.clic('[data-vue="charges"]'); await t.pause(250);
-  verifierVrai('on part des charges fixes', t.$('#vue-charges').classList.contains('actif'));
+  t.clic('[data-vue="depenses"]'); await t.pause(250);
+  verifierVrai('on part des dépenses et de leurs charges fixes', t.$('#vue-depenses').classList.contains('actif'));
 
   await parMenu(t, 'reglages');
   verifierVrai('les réglages sont ouverts', t.$('#vue-reglages').classList.contains('actif'));
 
   t.clic('#b-retour'); await t.pause(300);
-  verifierVrai('on revient sur les charges fixes', t.$('#vue-charges').classList.contains('actif'));
+  verifierVrai('on revient sur les dépenses', t.$('#vue-depenses').classList.contains('actif'));
   verifierVrai('et pas sur le menu de l’entreprise (parti au lot 5b)',
-    !t.$('#vue-entreprise') && vueActive(t) === 'vue-charges');
+    !t.$('#vue-entreprise') && vueActive(t) === 'vue-depenses');
   verifierVrai('le masque des menus n’est pas posé',
     !t.d.body.classList.contains('accueil-ouvert'));
   /* Entré par le ☰ (lot 5a), on y revient : il se rouvre par-dessus. */
@@ -2826,12 +2846,20 @@ scenario('Carnet : la tête dit le facturé, l’encaissé et qui le fait vivre'
         temps: [], jours: [], maj: Date.now(), lignes: ligne(200) }
     ]
   }));
+  /* Lot d1 : les cumuls ont quitté le bas de Chantiers pour Argent ▸
+     Année ▸ Vue d'ensemble ▸ Depuis le début. */
   t.clic('[data-vue="carnet"]'); await t.pause(350);
+  verifierVrai('ils ne sont plus en bas de Chantiers', !t.$('#vue-carnet #carnet-totaux') && !t.$('#ch-cumuls'));
+  await parBarre(t, 'argent'); t.clic('[data-vue="analyses"]'); await t.pause(300);
+  verifierVrai('ils sont dans Année ▸ Vue d’ensemble, repliés',
+    !!t.$('#ana-corps [data-loin="an-cumuls"] #carnet-totaux') && !t.$('[data-loin="an-cumuls"]').open);
   const tete = t.texte('#carnet-totaux');
   /* Facturé : la facture est partie, réglée ou non — la base des déclarations. */
   verifierVrai('le facturé additionne payé et facturé', /1 700 €facturé/.test(tete));
   verifierVrai('et compte les factures', /3 factures/.test(tete));
-  verifierVrai('l’encaissé ne retient que le réglé', /1 200 €encaissé/.test(tete));
+  /* « Encaissé » ferait croire à l'argent rentré : c'est le facturé réglé
+     depuis (lot d1). */
+  verifierVrai('« dont payé » ne retient que le réglé', /1 200 €dont payé/.test(tete) && !/encaissé/.test(tete));
   /* « En attente » ne voulait rien dire : il cède la place à un compte. */
   verifierVrai('« en attente » a disparu', !/en attente/.test(tete));
   verifierVrai('les devis signés se comptent', /1devis signé · 200 €/.test(tete));
@@ -6809,8 +6837,10 @@ scenario('Bilan : une facture récente attend, elle n’est pas impayée', async
   verifierVrai('et rien ne chauffe pour si peu', !ligneAuj(t, 'impaye:c1') &&
     !t.$('#aj-encours .aj-situ.aj-alerte'));
   await parBarre(t, 'argent');
-  verifierVrai('Argent chiffre ce qui attend',
-    /1 000 €\s*en attente/.test(t.texte('#fi-corps').replace(/ /g, ' ')));
+  /* Lot d1 : Argent ▸ Mois ▸ À ce jour, « Facturé, pas encore payé ». */
+  const att = sansBlancs(t.texte('#mo-attente'));
+  verifierVrai('Argent chiffre ce qui attend, sans le dire impayé : ' + att,
+    att === sansBlancs('Facturé, pas encore payé1 facture1 000 €') && !/impay/.test(att));
   await parBarre(t, 'chantiers');
   verifierVrai('« À faire maintenant » ne réclame rien non plus',
     !t.$('[data-groupe="faire"]') && !!t.$('[data-groupe="factures"] [data-chouvrir="c1"]'));
@@ -9131,7 +9161,7 @@ scenario('Finances : les montants ne passent plus à la ligne', async () => {
       lignes: [{ travail: 'DEGAG', unite: 'ha', quantite: 1, prix: 123456, nature: 'prestation' }] }]
   }));
   await t.pause(300);
-  const l = t.$('#fi-corps .ligne-ca .ca-montants');
+  const l = t.$('#ana-corps .ligne-ca .ca-montants');
   verifierVrai('la ligne est là', !!l);
   verifier('ses montants ne se coupent pas', 'nowrap', t.w.getComputedStyle(l).whiteSpace);
   verifierVrai('le chiffre qui compte, puis d’où il vient',
@@ -9177,7 +9207,9 @@ function ongletsRetires() {
 }
 /* Les pastilles renommées ou déplacées depuis l'inventaire (lot b2), lues
    dans la table de correspondance : « | Chantiers | Carnet | Liste | » renomme,
-   « | Calendrier | Carte | Chantiers, après Liste | » déplace. */
+   « | Calendrier | Carte | Chantiers, après Liste | » déplace. Lot d1 :
+   « | Finances | — | TVA, nouvelle après Mois | » ajoute une pastille,
+   « | Finances | Charges fixes | bloc de Dépenses | » la fond dans une autre. */
 function changementsPastilles() {
   const TABLE = fs.readFileSync(path.join(__dirname, '..', 'docs', 'correspondance-refonte.md'), 'utf8').split(/\r?\n/);
   const debut = TABLE.findIndex(l => /^### Pastilles renommées ou déplacées/.test(l));
@@ -9185,6 +9217,10 @@ function changementsPastilles() {
   for (let i = debut + 1; debut >= 0 && i < TABLE.length && !/^#/.test(TABLE[i]); i++) {
     const m = /^\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|$/.exec(TABLE[i]);
     if (!m || m[1] === 'Module' || /^-+$/.test(m[1])) continue;
+    const nv = /^(.+), nouvelle après (.+)$/.exec(m[3]);
+    if (nv) { out.push({ module: m[1], avant: null, apres: nv[1], vers: null, apresDe: nv[2], nouvelle: true }); continue; }
+    const bl = /^bloc de (.+)$/.exec(m[3]);
+    if (bl) { out.push({ module: m[1], avant: m[2], apres: null, vers: null, apresDe: null, bloc: bl[1] }); continue; }
     const d = /^(\S+), après (.+)$/.exec(m[3]);
     out.push({ module: m[1], avant: m[2], apres: d ? m[2] : m[3], vers: d ? d[1] : null, apresDe: d ? d[2] : null });
   }
@@ -9198,9 +9234,10 @@ function pastillesAttendues(m) {
   let l = [];
   m.onglets.filter(o => partis.indexOf(o) < 0).forEach(o => {
     const c = ch.filter(x => x.module === m.nom && x.avant === o)[0];
-    if (!c) l.push(o); else if (!c.vers) l.push(c.apres);
+    if (!c) l.push(o); else if (!c.vers && !c.bloc) l.push(c.apres);
   });
   ch.filter(x => x.vers === m.nom).forEach(x => { l.splice(l.indexOf(x.apresDe) + 1, 0, x.apres); });
+  ch.filter(x => x.nouvelle && x.module === m.nom).forEach(x => { l.splice(l.indexOf(x.apresDe) + 1, 0, x.apres); });
   return l;
 }
 function arriveeAttendue(m) {
@@ -9456,6 +9493,15 @@ scenario('Cadre : rien de l’inventaire des écrans ne s’est perdu', async ()
     for (const c of changementsPastilles().filter(x => x.module === m.nom && x.vers)) {
       verifierVrai(m.nom + ' ▸ ' + c.avant + ' : passée dans ' + c.vers, pastillesAttendues(mods.filter(x => x.nom === c.vers)[0]).indexOf(c.avant) >= 0);
     }
+    /* Une pastille fondue dans une autre (lot d1) : on ouvre l'autre, et le
+       bloc y porte son nom en titre. */
+    for (const c of changementsPastilles().filter(x => x.module === m.nom && x.bloc)) {
+      const b = t.$$('#onglets button').filter(x => x.textContent.trim() === c.bloc)[0];
+      if (b) { b.click(); await t.pause(200); }
+      const titres = t.$$('main > .vue.actif h2').map(h => h.textContent.trim());
+      verifierVrai(m.nom + ' ▸ ' + c.avant + ' : un bloc de ' + c.bloc, !!b && titres.some(x => x.indexOf(c.avant) === 0));
+      faits.push(m.nom + ' ▸ ' + c.avant);
+    }
     for (const o of pastillesAttendues(m).filter(x => pastillesAttendues(m).length > 1)) {
       const b = t.$$('#onglets button').filter(x => x.textContent.trim() === o)[0];
       if (!b) { verifierVrai(m.nom + ' ▸ ' + o + ' : pastille présente', false); continue; }
@@ -9472,7 +9518,8 @@ scenario('Cadre : rien de l’inventaire des écrans ne s’est perdu', async ()
     else {
       const m = mods.filter(x => x.nom.indexOf(s.module) === 0)[0];
       await allerAuModule(t, m.nom);
-      const p = t.$$('#onglets button').filter(x => x.textContent.trim() === s.onglet)[0];
+      const ren = changementsPastilles().filter(x => x.module === m.nom && x.avant === s.onglet && !x.vers && !x.bloc)[0];
+      const p = t.$$('#onglets button').filter(x => x.textContent.trim() === (ren ? ren.apres : s.onglet))[0];
       if (p) { p.click(); await t.pause(250); }
       ici = 'main > .vue.actif';
     }
@@ -9845,7 +9892,6 @@ scenario('Cadre : chaque élément de l’accueil et de Mon entreprise a son nou
   const menu = async (cle, vue) => { await parMenu(t, cle); return vueActive(t) === vue; };
   const FIN = t.w.BCF, C = t.w.BCC, E = t.w.BC;
   const eur = v => E.fmt(C.arr(v, 2), v % 1 ? 2 : 0).replace(/ /g, ' ') + ' €';
-  const bilan = async () => { await parBarre(t, 'argent'); return t.texte('#fi-corps').replace(/ /g, ' '); };
   const anBornes = () => FIN.bornes('annee', new Date().getFullYear(), 0);
   const PREUVES = {
     'demarrage-marque': async () => !!t.$('#demarrage .dem-logo') && t.texte('.dem-nom') === 'Sylve' && !!t.texte('.dem-sous'),
@@ -9860,7 +9906,8 @@ scenario('Cadre : chaque élément de l’accueil et de Mon entreprise a son nou
       b.click(); await t.pause(450);
       return !!t.$('#fj-preciser') && !!t.$('#fj-nonla') && /Comptée d’office/.test(t.texte('#fj-office')); },
     'prelevements': async () => /Assurance/.test(t.texte('#aj-prelevements')) &&
-      await appuyerLigne(t, lignesAuj(t, 'prelevement:')[0].dataset.ajcle) && vueActive(t) === 'vue-charges',
+      await appuyerLigne(t, lignesAuj(t, 'prelevement:')[0].dataset.ajcle) && vueActive(t) === 'vue-depenses' &&
+      defile(t) === 'dep-charges',
     'retard-relancer': async () => /Relancer le devis/.test(texteLignes(t, 'relancer:c2')) &&
       !!t.$('#aj-retard [data-ajcle="relancer:c2"]') &&
       await appuyerLigne(t, 'relancer:c2') && /Marchand/.test(t.texte('#vue-chantier')),
@@ -9883,12 +9930,22 @@ scenario('Cadre : chaque élément de l’accueil et de Mon entreprise a son nou
       return vueActive(t) === 'vue-chantier' && /Essarts/.test(t.texte('#vue-chantier')); },
     'retard-impaye': async () => /Facture impayée.*Montjoie.*Cabinet Dubois/.test(texteLignes(t, 'impaye:c3')) &&
       await appuyerLigne(t, 'impaye:c3') && /Montjoie/.test(t.texte('#vue-chantier')),
-    'argent-attente': async () => { const a = FIN.chiffreAffaires(t.stock('chantiers'), anBornes()).aEncaisser;
-      return !a || sansBlancs(await bilan()).indexOf(sansBlancs(eur(a) + 'en attente')) >= 0; },
+    /* Lot d1 : Argent ▸ Mois ▸ À ce jour, toutes périodes ; le chiffre
+       d'affaires de l'année dans Année, celui du mois dans Mois ; la TVA
+       déductible dans l'onglet TVA, sur l'année. */
+    'argent-attente': async () => { const a = FIN.chiffreAffaires(t.stock('chantiers')).aEncaisser;
+      await parBarre(t, 'argent');
+      return a > 0 && sansBlancs(t.texte('#mo-attente')).indexOf(sansBlancs('Facturé, pas encore payé')) === 0 &&
+        sansBlancs(t.texte('#mo-attente')).slice(-sansBlancs(eur(a)).length) === sansBlancs(eur(a)); },
     'argent-ca': async () => { const ca = FIN.chiffreAffaires(t.stock('chantiers'), anBornes()).total;
-      return !ca || sansBlancs(await bilan()).indexOf(sansBlancs(eur(ca) + 'facturé (HT)')) >= 0; },
+      const d = new Date(), caM = FIN.chiffreAffaires(t.stock('chantiers'), FIN.bornes('mois', d.getFullYear(), d.getMonth())).total;
+      await parBarre(t, 'argent');
+      const mois = sansBlancs(t.texte('#mo-ca [data-mo="ca"]')) === sansBlancs(eur(caM));
+      t.clic('[data-vue="analyses"]'); await t.pause(200); t.clic('[data-ana="ensemble"]'); await t.pause(200);
+      return mois && (!ca || sansBlancs(t.texte('#ana-corps')).indexOf(sansBlancs(eur(ca) + 'facturé HT')) >= 0); },
     'argent-tva': async () => { const d = FIN.balanceTva(t.stock('chantiers'), t.stock('depenses'), anBornes(), C.tauxLigne).deductible.total;
-      return d > 0 && sansBlancs(await bilan()).indexOf(sansBlancs(eur(d) + 'déductible')) >= 0; },
+      await parBarre(t, 'argent'); t.clic('[data-vue="tva"]'); await t.pause(200);
+      return d > 0 && sansBlancs(t.texte('#tva-corps [data-tva="deductible"]')) === sansBlancs('− ' + eur(d)); },
     'encours-pose': async () => /posé demain/.test(t.texte('#aj-encours [data-ajch="c1"]') || ''),
     'barre-modules': async () => { const vues = [];
       for (const o of ['chantiers', 'agenda', 'argent']) { await parBarre(t, o); vues.push(vueActive(t)); }
@@ -10090,7 +10147,10 @@ scenario('Facture à faire : dès le lendemain de « Terminé », pas le jour m�
 });
 
 /* --------------------------------------------------------------------- */
-scenario('Argent ▸ Bilan : « à facturer » dit combien, et mène au carnet filtré', async () => {
+scenario('Argent ▸ Mois ▸ À ce jour : « à facturer » dit combien, et mène à « À faire maintenant »', async () => {
+  /* Lot d1 : le total du 5b2 passe dans « À ce jour » ; un terminé sans
+     ligne chiffrée se dit « sans montant » au lieu de compter 0 € en
+     silence, et l'appui ouvre le groupe de Chantiers, plus le filtre replié. */
   const lig = p => [{ travail: 'DEGAG', unite: 'ha', quantite: 1, prix: p, nature: 'prestation' }];
   const t = await ouvrir(Object.assign({}, VIDE, {
     chantiers: [
@@ -10098,6 +10158,8 @@ scenario('Argent ▸ Bilan : « à facturer » dit combien, et mène au carnet f
       chA('c2', { nom: 'Marchand', commune: 'Marchand', statut: 'termine', dateFin: JA(-1), lignes: lig(500) }),
       chA('c3', { nom: 'Sans ligne', commune: 'Sans ligne', statut: 'termine', dateFin: JA(-1) }),
       chA('c4', { nom: 'Déjà parti', commune: 'Déjà parti', statut: 'facture', numeroFacture: 'F-1', dateFacture: JA(-5), lignes: lig(900) }),
+      chA('c6', { nom: 'Échue', commune: 'Échue', statut: 'facture', numeroFacture: 'F-2', dateFacture: JA(-40),
+        echeancePaiement: JA(-10), lignes: lig(300) }),
       chA('c5', { nom: 'Encore à faire', commune: 'Encore à faire', statut: 'encours', lignes: lig(700) })]
   }));
   const C = t.w.BCC, E = t.w.BC;
@@ -10105,26 +10167,38 @@ scenario('Argent ▸ Bilan : « à facturer » dit combien, et mène au carnet f
     .reduce((s, c) => s + C.montant(c), 0), 2);
   verifier('la somme attendue (les lignes des terminés)', 1500, somme);
   await parBarre(t, 'argent');
-  const bilan = sansBlancs(t.texte('#fi-corps'));
-  const attendu = sansBlancs(E.fmt(somme, 0) + ' €à facturer · 3 chantiers');
-  verifierVrai('le Bilan dit « ' + attendu + ' » : ' + bilan.slice(0, 200), bilan.indexOf(attendu) >= 0);
-  t.clic('#fi-afacturer'); await t.pause(450);
-  verifier('un appui ouvre le carnet', 'vue-carnet', vueActive(t));
-  verifier('filtré sur les chantiers terminés', 'termine', t.$('#c-filtre').value);
-  verifierVrai('le filtre est déplié', t.$('#ch-filtre-bloc').open);
-  verifier('les trois, et eux seuls', ['Marchand', 'Sans ligne', 'Vaux'],
-    ['Vaux', 'Marchand', 'Sans ligne', 'Déjà parti', 'Encore à faire']
-      .filter(n => new RegExp(n).test(t.texte('#ch-filtre-liste'))).sort());
+  const af = sansBlancs(t.texte('#mo-afacturer'));
+  const attendu = sansBlancs('À facturer3 chantiers · dont 1 sans montant' + E.fmt(somme, 0) + ' €');
+  verifier('À ce jour dit combien, et le sans montant', attendu, af);
+  verifierVrai('sous un titre qui dit qu’il ne suit pas le mois', /^À ce jour · quel que soit le mois affiché/.test(t.texte('#mo-ajour')));
+  /* Facturé, pas encore payé : toutes périodes, l'échue comptée à part. */
+  const FIN = t.w.BCF;
+  const enAtt = FIN.chiffreAffaires(t.stock('chantiers')).aEncaisser;
+  verifier('ce qui attend son paiement, toutes périodes', 1200, enAtt);
+  verifier('Facturé, pas encore payé : deux factures, dont une impayée',
+    sansBlancs('Facturé, pas encore payé2 factures · dont 1 impayée' + E.fmt(enAtt, 0) + ' €'), sansBlancs(t.texte('#mo-attente')));
+  t.clic('#mo-afacturer'); await t.pause(450);
+  verifier('un appui ouvre Chantiers', 'vue-carnet', vueActive(t));
+  verifier('sur « À faire maintenant »', 'faire', defile(t));
+  verifierVrai('qui nomme les terminés d’hier et d’avant', ['Vaux', 'Marchand', 'Sans ligne']
+    .every(n => new RegExp(n).test(t.texte('[data-groupe="faire"]'))));
+  verifierVrai('l’ancien filtre replié n’est plus ouvert pour ça', !t.$('#ch-filtre-bloc').open);
+  await parBarre(t, 'argent');
+  t.clic('#mo-attente'); await t.pause(450);
+  verifier('« pas encore payé » ouvre Chantiers', 'vue-carnet', vueActive(t));
+  verifier('sur « Facturés · attendent le paiement »', 'factures', defile(t));
+  verifierVrai('qui porte la facture pas échue', !!t.$('[data-groupe="factures"] [data-chouvrir="c4"]'));
   verifier('aucune erreur', [], t.erreurs);
 });
 
 /* --------------------------------------------------------------------- */
-scenario('Argent ▸ Bilan : rien à facturer, pas de tuile', async () => {
+scenario('Argent ▸ Mois ▸ À ce jour : rien à facturer, pas de ligne', async () => {
   const t = await ouvrir(Object.assign({}, VIDE, {
     chantiers: [chA('c1', { nom: 'Vaux', statut: 'encours' })]
   }));
   await parBarre(t, 'argent');
-  verifierVrai('pas de « à facturer »', !t.$('#fi-afacturer') && !/à facturer/.test(t.texte('#fi-corps')));
+  verifierVrai('pas de ligne « À facturer »', !t.$('#mo-afacturer') && !/À facturer\d/.test(sansBlancs(t.texte('#mo-ajour'))));
+  verifierVrai('le bloc le dit en clair', /Rien à facturer/.test(t.texte('#mo-ajour')));
   verifier('aucune erreur', [], t.erreurs);
 });
 
@@ -11191,12 +11265,22 @@ function preuvesB2() {
       if (t.$('#c-nouveau')) return false;
       await plusChantier(t);
       const ok = t.texte('#modale-titre') === 'Nouveau chantier'; await fermer(t); return ok; },
+    /* Lot d1 : les cumuls ont quitté le bas de Chantiers pour Argent ▸ Année
+       ▸ Vue d'ensemble ▸ « Depuis le début », replié ; « encaissé » y dit
+       « dont payé ». Mêmes chiffres qu'au lot b2. */
     'Carte Carnet : facturé, encaissé, devis signés, premier donneur d\'ordre (tout l\'historique)': async () => {
-      const t = await voir(), d = t.$('#ch-cumuls'), k = sansBlancs(t.texte('#ch-cumuls'));
-      return !!d && !d.open && t.$$('#ch-cumuls .carte2').length === 4 && /7600€facturé·5factures/.test(k) &&
-        /5500€encaissé/.test(k) && /2devissignés·1550€/.test(k) && /3000€ForêtsetGestion·39%/.test(k); },
+      const t = await voir();
+      if (t.$('#ch-cumuls') || t.$('#vue-carnet #carnet-totaux')) return false;
+      await parBarre(t, 'argent'); t.clic('[data-vue="analyses"]'); await t.pause(200);
+      t.clic('[data-ana="ensemble"]'); await t.pause(200);
+      const d = t.$('#ana-corps [data-loin="an-cumuls"]'), k = sansBlancs(t.texte('#carnet-totaux'));
+      const ok = !!d && !d.open && /^Depuis le début/.test(t.texte('[data-loin="an-cumuls"] summary')) &&
+        t.$$('#carnet-totaux .carte2').length === 4 && /7600€facturé·5factures/.test(k) &&
+        /5500€dontpayé/.test(k) && !/encaissé/.test(k) && /2devissignés·1550€/.test(k) && /3000€ForêtsetGestion·39%/.test(k);
+      await parBarre(t, 'chantiers');
+      return ok; },
     'Ligne de comptes : ouverts, jours-homme cumulés, à facturer, jours passés': async () => { const t = await voir();
-      const k = t.texte('#ch-cumuls');
+      const k = t.texte('#ana-corps [data-loin="an-cumuls"] #carnet-totaux') || '';
       return /12 chantiers ouverts/.test(k) && /jours-homme cumulés/.test(k) && /2 à facturer/.test(k) &&
         /1 avec plus de jour posé/.test(k) && t.texte('[data-groupe="travaux"] .aj-compte') === '6'; },
     'Recherche (nom, donneur d\'ordre, commune, n° de facture)': async () => { const t = await voir();
@@ -11923,6 +12007,436 @@ scenario('Lot r2 : la bulle fermée par OK rend son cran d’historique', async 
   verifier('fermée, elle laisse les crans tels quels', crans, A0.crans);
   t.w.dispatchEvent(new t.w.PopStateEvent('popstate')); await t.pause(350);
   verifier('et un seul retour ramène à Aujourd’hui', 'vue-accueil', vueActive(t));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* ===================================================== lot d1 (4.95.0)
+   Argent : Mois · TVA · Dépenses · Année remplacent Bilan · Dépenses ·
+   Charges fixes · Analyses. Rien ne disparaît, aucun calcul ne change :
+   chaque chiffre se compare à ce que donnait l'ancien endroit (le même
+   calcul de logique/finances.js, sur la même période) et, quand c'est
+   possible, à une valeur calculée à la main ici. */
+const D1_AN = new Date().getFullYear(), D1_MO = new Date().getMonth();
+/* Le 1er du mois à midi : dans le mois quel que soit le jour du passage,
+   même à date figée le 1er (la suite se croit alors à 10 h). */
+const D1_J1 = new Date(D1_AN, D1_MO, 1, 12).getTime();
+const d1Ligne = (travail, q, prix, nature, tva) => ({ travail, unite: travail === 'PLANT' ? 'plant' : (travail === 'DEGAG' ? 'ha' : 'unite'),
+  quantite: q, prix, nature, tva });
+function grainesD1() {
+  const avant = (m, j) => new Date(D1_AN - 1, m, j, 12).getTime();
+  return Object.assign({}, VIDE, {
+    chantiers: [
+      chA('c1', { nom: 'Vaux', donneur: 'Cabinet Sylva', statut: 'paye', dateFacture: D1_J1, datePaiement: D1_J1,
+        lignes: [d1Ligne('PLANT', 1000, 1.15, 'prestation', 10), d1Ligne('PROTEC', 100, 0.85, 'vente', 20),
+          d1Ligne('PROTEC', 1, 37.5, 'debours', 20)] }),
+      chA('c2', { nom: 'Marchand', donneur: 'Forêts et Gestion', statut: 'facture', numeroFacture: 'F-1', dateFacture: D1_J1,
+        echeancePaiement: JA(-3), lignes: [d1Ligne('DEGAG', 2, 812.35, 'prestation', 20)] }),
+      chA('c3', { nom: 'Sans ligne', statut: 'termine', dateFin: JA(-2) }),
+      chA('c4', { nom: 'Essarts', statut: 'termine', dateFin: JA(-2), lignes: [d1Ligne('DEGAG', 1, 500, 'prestation', 20)] }),
+      /* Le dernier trimestre de l'an dernier, pour la ligne MSA. */
+      chA('c5', { nom: 'Octobre', statut: 'paye', dateFacture: avant(9, 15), datePaiement: avant(9, 20),
+        lignes: [d1Ligne('DEGAG', 1, 1000.1, 'prestation', 20)] }),
+      chA('c6', { nom: 'Novembre', statut: 'paye', dateFacture: avant(10, 15), datePaiement: avant(10, 20),
+        lignes: [d1Ligne('DEGAG', 1, 2000.2, 'prestation', 20)] }),
+      chA('c7', { nom: 'Décembre', statut: 'paye', dateFacture: avant(11, 15), datePaiement: avant(11, 20),
+        lignes: [d1Ligne('DEGAG', 1, 3000.3, 'prestation', 20)] }),
+      chA('c8', { nom: 'Perdu', statut: 'sansuite', aDevis: true, dateEnvoi: JA(-30) }),
+      chA('c9', { nom: 'Attend', statut: 'envoye', aDevis: true, dateEnvoi: JA(-3) })],
+    depenses: [
+      { id: 'd1', date: D1_J1, fournisseur: 'Station', lignes: [{ libelle: 'Gasoil', categorie: 'CARB', ttc: 61.37, taux: 20 }] },
+      { id: 'd2', date: D1_J1, fournisseur: 'Motoculture', lignes: [{ libelle: 'Débroussailleuse', categorie: 'IMMO', ttc: 960, taux: 20 }] }],
+    /* Ses prélèvements passés deviennent des dépenses tout seuls, dont celui
+       du 1er de ce mois. */
+    charges: [{ id: 'g1', libelle: 'Logiciel', beneficiaire: 'Éditeur', ttc: 24, periodicite: 'mensuel', categorie: 'ABO',
+      taux: 20, debut: new Date(D1_AN, 0, 1, 12).getTime(), jour: 1, moisReference: 0, dansDepenses: true }]
+  });
+}
+const d1Eur = (t, v) => t.w.BC.fmt(t.w.BCC.arr(v, 2), v % 1 ? 2 : 0) + ' €';
+const d1Mo = (t, k) => sansBlancs(t.texte('#fi-corps [data-mo="' + k + '"]') || '');
+const d1Tva = (t, zone, k) => sansBlancs(t.texte(zone + ' [data-tva="' + k + '"]') || '');
+const D1_MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+const D1_COURTS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+
+/* --------------------------------------------------------------------- */
+scenario('Argent ▸ Mois : au centime de l’ancien Bilan, l’année mois par mois, sans toucher la période', async () => {
+  const t = await ouvrir(grainesD1());
+  const FIN = t.w.BCF, C = t.w.BCC, eur = v => d1Eur(t, v);
+  const bM = FIN.bornes('mois', D1_AN, D1_MO);
+  await parBarre(t, 'argent');
+  verifier('Argent s’ouvre sur Mois', 'vue-finances', vueActive(t));
+  verifier('au mois en cours', D1_MOIS[D1_MO] + ' ' + D1_AN, (t.texte('#mo-titre') || '').toLowerCase());
+  /* Les valeurs calculées à la main, puis le calcul de l'ancien Bilan en vue
+     mois : les deux doivent tomber juste. 1000 × 1,15 + 2 × 812,35 de
+     prestation, 100 × 0,85 de vente ; le débours de 37,50 est dehors. */
+  const ca = FIN.chiffreAffaires(t.stock('chantiers'), bM);
+  verifier('facturé HT, à la main', [2859.7, 2774.7, 85, 37.5], [ca.total, ca.prestation, ca.vente, ca.debours]);
+  verifier('le grand chiffre : le facturé HT du Bilan', sansBlancs(eur(2859.7)), d1Mo(t, 'ca'));
+  verifier('prestation et vente', [sansBlancs(eur(2774.7)), sansBlancs(eur(85))], [d1Mo(t, 'prestation'), d1Mo(t, 'vente')]);
+  verifierVrai('le débours dit à part', /Hors débours \(37,50 €\)/.test(t.texte('#mo-ca').replace(/ /g, ' ')));
+  verifier('dont payé, pas encore payé : l’encaissé et l’en attente du Bilan', [sansBlancs(eur(ca.encaisse)), sansBlancs(eur(ca.aEncaisser))],
+    [d1Mo(t, 'paye'), d1Mo(t, 'attente')]);
+  verifier('qui valent, à la main', [1235, 1624.7], [ca.encaisse, ca.aEncaisser]);
+  verifierVrai('le mot « encaissé » n’y est plus', !/ncaiss/.test(t.texte('#fi-corps')));
+  verifierVrai('« Facturé en <mois> »', new RegExp('^Facturé en ' + D1_MOIS[D1_MO]).test(t.texte('#mo-fact')));
+  /* TVA du mois : la Balance de TVA du Bilan, en lignes. */
+  const bal = FIN.balanceTva(t.stock('chantiers'), t.stock('depenses'), bM, C.tauxLigne);
+  verifier('TVA facturée, déductible, à la main', [464.44, 174.23], [bal.collectee.total, bal.deductible.total]);
+  verifier('TVA du mois : facturée, déductible, solde',
+    [sansBlancs(eur(464.44)), sansBlancs('− ' + eur(174.23)), sansBlancs(eur(290.21))],
+    [d1Tva(t, '#mo-tva', 'facturee'), d1Tva(t, '#mo-tva', 'deductible'), d1Tva(t, '#mo-tva', 'solde')]);
+  verifier('à reverser', 'À reverser', t.texte('#mo-tva [data-tva="sens"]'));
+  verifier('un taux par ligne, base et montant', ['20 %sur 1 747,20 €349,44 €', '10 %sur 1 150 €115 €'].map(sansBlancs),
+    t.$$('#mo-tva [data-tvataux]').map(b => sansBlancs(b.previousElementSibling.previousElementSibling.textContent +
+      b.previousElementSibling.textContent + b.textContent)));
+  verifierVrai('l’immobilisation se dit, avec sa mise en garde', d1Tva(t, '#mo-tva', 'immo') === sansBlancs(eur(160)) &&
+    /un achat exceptionnel gonfle la TVA déductible/.test(t.texte('#mo-tva')));
+  /* Dépenses du mois : le HT du bloc « Dépenses et marge », en barres. */
+  verifier('dépenses du mois, HT, à la main', 871.14, FIN.totalDepenses(t.stock('depenses'), bM).ht);
+  verifier('le total des dépenses du mois', sansBlancs(eur(871.14)), d1Mo(t, 'depenses'));
+  verifier('une barre par catégorie, les charges fixes ensemble',
+    [['IMMO', 'Immobilisation', '800€'], ['CARB', 'Frais de carburant pro', '51,14€'], ['charges', 'Charges fixes', '20€']],
+    t.$$('#mo-dep [data-modep]').map(b => [b.dataset.modep, b.querySelector('.ag-hn').textContent, sansBlancs(b.querySelector('.num').textContent)]));
+  /* L'histogramme : le « facturé » mois par mois d'Année. */
+  const parMois = FIN.recettesParMois(t.stock('chantiers'), D1_AN);
+  const barres = t.$$('#mo-histo rect[data-mois]');
+  verifier('une barre par mois facturé', parMois.map((v, i) => v > 0 ? i : -1).filter(i => i >= 0),
+    barres.map(r => Number(r.getAttribute('data-mois'))));
+  verifierVrai('chacune dit le montant d’Année', barres.every(r => sansBlancs(r.textContent).indexOf(sansBlancs(eur(parMois[r.getAttribute('data-mois')]))) > 0));
+  verifierVrai('le mois affiché en avant', barres.filter(r => r.classList.contains('cur')).map(r => r.getAttribute('data-mois')).join() === String(D1_MO));
+  verifier('le total à fin du mois', sansBlancs(eur(parMois.slice(0, D1_MO + 1).reduce((s, v) => s + v, 0))), d1Mo(t, 'cumul'));
+  verifierVrai('qui dit « à fin <mois> »', new RegExp('à fin ' + D1_COURTS[D1_MO].replace('.', '\\.')).test(t.texte('#mo-histo')));
+  /* Le mois a son propre pas : la période de TVA, Dépenses et Année ne bouge pas. */
+  const periode = JSON.stringify(t.w.BCUI._etat().periode);
+  t.clic('#mo-prec'); await t.pause(200);
+  const prec = new Date(D1_AN, D1_MO - 1, 1);
+  verifier('‹ : le mois d’avant', D1_MOIS[prec.getMonth()] + ' ' + prec.getFullYear(), t.texte('#mo-titre').toLowerCase());
+  verifier('le mois d’avant n’a pas les factures de ce mois', sansBlancs(eur(FIN.chiffreAffaires(t.stock('chantiers'),
+    FIN.bornes('mois', prec.getFullYear(), prec.getMonth())).total)), d1Mo(t, 'ca'));
+  verifier('la période partagée n’a pas bougé', periode, JSON.stringify(t.w.BCUI._etat().periode));
+  t.clic('#mo-suiv'); await t.pause(200);
+  verifier('› : retour au mois en cours', D1_MOIS[D1_MO] + ' ' + D1_AN, t.texte('#mo-titre').toLowerCase());
+  /* Un appui sur une barre : Dépenses sur ce mois, filtrées. */
+  t.clic('#mo-dep [data-modep="CARB"]'); await t.pause(300);
+  verifier('la barre ouvre les Dépenses', 'vue-depenses', vueActive(t));
+  verifier('sur ce mois', ['mois', String(D1_MO), String(D1_AN)], [t.$('#dep-type').value, t.$('#dep-indice').value, t.$('#dep-annee').value]);
+  verifier('filtrées sur la catégorie', 'CARB', t.$('#dep-filtre').value);
+  verifier('qui ne montre que le carburant', ['d1'], t.$$('#liste-depenses [data-depmod]').map(b => b.dataset.depmod));
+  await parBarre(t, 'argent');
+  t.clic('#mo-dep [data-modep="charges"]'); await t.pause(300);
+  verifier('les charges fixes : le bloc des Dépenses', ['vue-depenses', 'dep-charges', 'tous'], [vueActive(t), defile(t), t.$('#dep-filtre').value]);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Argent ▸ Mois : la ligne MSA suit le trimestre du mois affiché, pas celui d’aujourd’hui', async () => {
+  const t = await ouvrir(grainesD1());
+  const FIN = t.w.BCF, eur = v => d1Eur(t, v);
+  await parBarre(t, 'argent');
+  /* Sur le mois en cours : les mois passés du trimestre chiffrés, ceux à
+     venir dits « à venir ». */
+  const q = Math.floor(D1_MO / 3) * 3, now = Date.now();
+  let tot = 0;
+  const parts = [q, q + 1, q + 2].map(i => {
+    if (new Date(D1_AN, i, 1).getTime() > now) return D1_COURTS[i] + ' à venir';
+    const v = FIN.chiffreAffaires(t.stock('chantiers'), FIN.bornes('mois', D1_AN, i)).total;
+    tot += v; return D1_COURTS[i] + ' ' + eur(v);
+  });
+  verifier('le trimestre du mois en cours', sansBlancs('Trimestre (MSA) : ' + parts.join(' · ') + ' · total ' + eur(tot)),
+    sansBlancs(t.texte('#mo-msa')));
+  verifierVrai('un mois à venir est dit « à venir », jamais 0 €', q + 2 === D1_MO || /à venir/.test(t.texte('#mo-msa')));
+  /* En janvier, il déclare octobre-décembre en allant sur décembre : le
+     trimestre de l'an dernier, à la main. */
+  for (let i = 0; i <= D1_MO; i++) { t.clic('#mo-prec'); await t.pause(120); }
+  verifier('on est sur décembre de l’an dernier', 'décembre ' + (D1_AN - 1), t.texte('#mo-titre').toLowerCase());
+  verifier('octobre, novembre, décembre, à la main',
+    sansBlancs('Trimestre (MSA) : oct. 1 000,10 € · nov. 2 000,20 € · déc. 3 000,30 € · total 6 000,60 €'),
+    sansBlancs(t.texte('#mo-msa')));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Argent ▸ TVA : mois, trimestre, année, au centime de l’ancienne balance', async () => {
+  const t = await ouvrir(grainesD1());
+  const FIN = t.w.BCF, C = t.w.BCC, eur = v => d1Eur(t, v);
+  await parBarre(t, 'argent');
+  t.clic('[data-vue="tva"]'); await t.pause(250);
+  verifier('l’onglet TVA s’ouvre', 'vue-tva', vueActive(t));
+  const cas = [['mois', D1_MO], ['trimestre', Math.floor(D1_MO / 3)], ['annee', 0]];
+  for (const [type, indice] of cas) {
+    t.choisir('#fi-type', type); await t.pause(150);
+    if (type !== 'annee') { t.choisir('#fi-indice', String(indice)); await t.pause(150); }
+    const bal = FIN.balanceTva(t.stock('chantiers'), t.stock('depenses'), FIN.bornes(type, D1_AN, indice), C.tauxLigne);
+    verifier(type + ' : facturée, déductible, solde de la balance',
+      [sansBlancs(eur(bal.collectee.total)), sansBlancs('− ' + eur(bal.deductible.total)), sansBlancs(eur(bal.montant))],
+      [d1Tva(t, '#tva-corps', 'facturee'), d1Tva(t, '#tva-corps', 'deductible'), d1Tva(t, '#tva-corps', 'solde')]);
+    verifier(type + ' : chaque taux', Object.keys(bal.collectee.parTaux).sort((x, y) => y - x).map(k => sansBlancs(eur(bal.collectee.parTaux[k]))),
+      t.$$('#tva-corps [data-tvataux]').map(b => sansBlancs(b.textContent)));
+    verifier(type + ' : le sens', bal.sens === 'a_recuperer' ? 'À récupérer' : (bal.sens === 'a_payer' ? 'À reverser' : 'Équilibre'),
+      t.texte('#tva-corps [data-tva="sens"]'));
+  }
+  /* Le mois choisi ici est celui de Mois : même balance, même mise en page. */
+  t.choisir('#fi-type', 'mois'); await t.pause(150); t.choisir('#fi-indice', String(D1_MO)); await t.pause(150);
+  verifier('le mois de l’onglet TVA vaut la TVA du mois', ['facturee', 'deductible', 'solde'].map(k => d1Tva(t, '#mo-tva', k)),
+    ['facturee', 'deductible', 'solde'].map(k => d1Tva(t, '#tva-corps', k)));
+  verifierVrai('la règle suivie est dite', /La TVA facturée est comptée à la date de la facture/.test(t.texte('#tva-corps')));
+  verifier('la période est partagée avec Dépenses et Année', ['mois', 'mois'], [t.$('#dep-type').value, t.$('#an-type').value]);
+  verifierVrai('la TVA de l’année reste dans Déclarations', (() => { t.clic('[data-vue="analyses"]'); return true; })());
+  await t.pause(200); t.clic('[data-ana="declarations"]'); await t.pause(200);
+  verifierVrai('« TVA — année » dans Année ▸ Déclarations', new RegExp('TVA — année ' + D1_AN).test(t.texte('#ana-corps')));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Argent ▸ Dépenses : un appui ouvre, Supprimer dans la fenêtre, la corbeille la rend', async () => {
+  const t = await ouvrir(grainesD1());
+  const FIN = t.w.BCF, eur = v => d1Eur(t, v);
+  t.w.confirm = () => true;
+  await parBarre(t, 'argent');
+  t.clic('[data-vue="depenses"]'); await t.pause(250);
+  /* Les indicateurs, intacts : ceux de l'ancien onglet, sur la période. */
+  const tot = FIN.totalDepenses(t.stock('depenses'), FIN.bornes('annee', D1_AN, 0));
+  verifier('indicateurs : TTC, HT, TVA déductible, nombre', ['TTC sur ' + D1_AN, 'HT', 'TVA déductible', 'achats saisis'],
+    t.$$('#dep-totaux .carte2 small').map(s => s.textContent));
+  verifier('aux chiffres de l’ancien onglet', [eur(tot.ttc), eur(tot.ht), eur(tot.tva), String(tot.n)].map(sansBlancs),
+    t.$$('#dep-totaux .carte2 b').map(b => sansBlancs(b.textContent)));
+  verifierVrai('« + Dépense » reste dans la page', !!t.$('#vue-depenses #dep-nouvelle'));
+  verifierVrai('le filtre par catégorie aussi', t.$$('#dep-filtre option').length > 2);
+  verifier('plus de Modifier ni de Supprimer sur les lignes', [0, 0],
+    [t.$$('#liste-depenses .btn-min').length, t.$$('#liste-depenses [data-depsup]').length]);
+  /* La ligne de la maquette : fournisseur ; date · catégorie ; TTC et TVA. */
+  const l1 = t.$('#liste-depenses [data-depmod="d1"]');
+  verifier('la ligne : fournisseur, date et catégorie, TTC et TVA',
+    sansBlancs('Station' + new Date(D1_J1).toLocaleDateString('fr-FR') + ' · Frais de carburant pro61,37 €TVA 10,23 €'), sansBlancs(l1.textContent));
+  const auto = t.$$('#liste-depenses [data-depmod]').map(b => b.dataset.depmod).filter(id => (t.stock('depenses').filter(d => d.id === id)[0] || {}).auto)[0];
+  verifierVrai('une dépense née de la charge dit « charge fixe » et « La charge »',
+    !!auto && /charge fixe/.test(t.texte('[data-depmod="' + auto + '"]')) && /La charge$/.test(t.texte('[data-depmod="' + auto + '"]')));
+  /* Un appui ouvre la dépense ; Supprimer est dans sa fenêtre. */
+  l1.click(); await t.pause(250);
+  verifierVrai('un appui ouvre la dépense, en modification', t.texte('#modale-titre') === 'Modifier la dépense' && t.$('#dp-four').value === 'Station');
+  verifierVrai('avec Supprimer', !!t.$('#dp-sup'));
+  t.clic('#dp-sup'); await t.pause(400);
+  verifierVrai('la dépense est partie, la fenêtre fermée', !t.stock('depenses').some(d => d.id === 'd1') && t.$('#modale').hidden);
+  verifierVrai('et la liste ne la montre plus', !t.$('#liste-depenses [data-depmod="d1"]'));
+  await parMenu(t, 'corbeille');
+  const rep = t.$$('#s-recup [data-repecher]').filter(b => /Station/.test(b.closest('.liste-item').textContent))[0];
+  verifierVrai('elle est dans la corbeille, à son montant',
+    !!rep && /61,37/.test(rep.closest('.liste-item').textContent));
+  rep.click(); await t.pause(500);
+  verifierVrai('restaurée, elle revient', t.stock('depenses').some(d => d.id === 'd1'));
+  /* Une nouvelle dépense n'a rien à supprimer. */
+  await parBarre(t, 'argent'); t.clic('[data-vue="depenses"]'); await t.pause(200);
+  t.clic('#dep-nouvelle'); await t.pause(250);
+  verifierVrai('une nouvelle dépense n’a pas de Supprimer', t.texte('#modale-titre') === 'Nouvelle dépense' && !t.$('#dp-sup'));
+  t.clic('#modale-x'); await t.pause(150);
+  /* Née d'une charge : c'est la charge qui s'ouvre, comme son ancien bouton. */
+  t.clic('[data-depmod="' + auto + '"]'); await t.pause(300);
+  verifier('la dépense d’une charge ouvre la charge', 'Modifier la charge', t.texte('#modale-titre'));
+  verifier('sur le bloc Charges fixes', ['vue-depenses', 'dep-charges'], [vueActive(t), defile(t)]);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Argent ▸ Dépenses ▸ Charges fixes : le même contenu, un appui ouvre, Supprimer dans la fenêtre', async () => {
+  const t = await ouvrir(grainesD1());
+  const FIN = t.w.BCF, C = t.w.BCC;
+  t.w.confirm = () => true;
+  await parBarre(t, 'argent');
+  t.clic('[data-vue="depenses"]'); await t.pause(250);
+  verifierVrai('le bloc Charges fixes, sous la liste', t.$('#liste-depenses').compareDocumentPosition(t.$('#dep-charges')) & 4);
+  verifierVrai('avec « + Charge »', !!t.$('#dep-charges #chg-nouvelle'));
+  verifier('le résumé : par an, par mois, combien', ['288 €', '24 €', '1'].map(sansBlancs),
+    t.$$('#charges-resume .kpi .carte2 b').map(b => sansBlancs(b.textContent)));
+  const l = t.$('#charges-resume [data-chgmod="g1"]');
+  /* Le prélèvement du jour compte encore comme « prochain » toute la journée. */
+  const proch = new Date(D1_AN, D1_MO + (new Date().getDate() === 1 ? 0 : 1), 1, 12);
+  verifierVrai('la ligne : quand, prochain prélèvement, catégorie, montants',
+    /Logiciel/.test(l.textContent) && /le 1 de chaque mois/.test(l.textContent) &&
+    new RegExp('prochain prélèvement \\S+ 1 ' + D1_COURTS[proch.getMonth()].replace('.', '\\.')).test(l.textContent.replace(/ /g, ' ')) &&
+    /Abonnement, logiciel · payé à Éditeur · TVA 20/.test(l.textContent) && /288 €\/an/.test(l.textContent.replace(/ /g, ' ')));
+  verifier('plus de Modifier ni de Supprimer sur la ligne', 0, t.$$('#charges-resume .btn-min, #charges-resume [data-chgsup]').length);
+  /* Prélèvements à venir : l'ancienne carte Échéances, contenu intact. */
+  const b = FIN.bornes('annee', D1_AN, 0), dues = FIN.chargesDues(t.stock('charges'), t.stock('depenses'), b);
+  verifierVrai('Prélèvements à venir : quand l’argent part, où il part', /^Prélèvements à venir/.test(t.texte('#dep-prelevements')) &&
+    /Quand l’argent part/.test(t.texte('#charges-echeances')) && /Où il part/.test(t.texte('#charges-echeances')));
+  verifier('et les prélèvements de la période', dues.length, t.$$('#charges-periode .liste-item').length);
+  verifierVrai('dits par leur nom', new RegExp(D1_AN + ' — ' + dues.length + ' prélèvements').test(t.texte('#charges-periode')));
+  /* Même geste qu'une dépense. */
+  l.click(); await t.pause(250);
+  verifierVrai('un appui ouvre la charge', t.texte('#modale-titre') === 'Modifier la charge' && t.$('#cg-lib').value === 'Logiciel');
+  verifierVrai('qui dit « prélèvements », plus « échéances »', /Enregistrer les prélèvements dans les dépenses/.test(t.texte('#modale-corps')) &&
+    !/échéances/.test(t.texte('#modale-corps')));
+  t.clic('#cg-sup'); await t.pause(500);
+  verifierVrai('Supprimer, dans la fenêtre : la charge part', !(t.stock('charges') || []).length && t.$('#modale').hidden);
+  verifierVrai('ses dépenses automatiques avec elle', !(t.stock('depenses') || []).some(d => d.auto));
+  await parMenu(t, 'corbeille');
+  verifierVrai('elle est dans la corbeille, à son montant', /Logiciel/.test(t.texte('#s-recup')) && /24 €/.test(t.texte('#s-recup').replace(/ /g, ' ')));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Argent : les anciennes clés de vue mènent au nouvel endroit', async () => {
+  const t = await ouvrir(Object.assign({}, grainesD1(), { module: 'analyses' }));
+  verifier('« analyses » en mémoire mène à Argent', 'finances', t.stock('module'));
+  t.w.BCUI._allerModule('finances', 'charges'); await t.pause(250);
+  verifier('« charges » : les Dépenses, défilées au bloc Charges fixes', ['vue-depenses', 'dep-charges'], [vueActive(t), defile(t)]);
+  verifier('la pastille Dépenses est la pastille ouverte', ['Dépenses'], pastilleOuverte(t));
+  t.w.BCUI._allerModule('finances', 'analyses'); await t.pause(250);
+  verifier('« analyses » : Année', ['vue-analyses', ['Année']], [vueActive(t), pastilleOuverte(t)]);
+  t.w.BCUI._allerModule('finances', 'finances'); await t.pause(250);
+  verifier('« finances » : Mois', ['vue-finances', ['Mois']], [vueActive(t), pastilleOuverte(t)]);
+  t.w.BCUI._allerModule('finances', 'depenses'); await t.pause(250);
+  verifier('« depenses » : Dépenses, en haut', ['vue-depenses', ['Dépenses']], [vueActive(t), pastilleOuverte(t)]);
+  verifier('une note de mise à jour sur « charges » trouve son module', 'finances', t.w.BCUI._moduleDeVue('charges'));
+  /* ☰ ▸ Réglages depuis chaque pastille d'Argent : Financier. */
+  /* Les zones des réglages n'ont pas d'identifiant : on garde l'élément
+     amené en vue, comme le scénario des zones d'arrivée. */
+  let vus = [];
+  const garde = t.w.Element.prototype.scrollIntoView;
+  t.w.Element.prototype.scrollIntoView = function () { vus.push(this); garde.call(this); };
+  for (const v of ['finances', 'tva', 'depenses', 'analyses']) {
+    await parBarre(t, 'argent'); t.clic('[data-vue="' + v + '"]'); await t.pause(200);
+    vus = [];
+    await parMenu(t, 'reglages');
+    const ong = t.$$('#regl-nav .chip').filter(b => b.getAttribute('aria-pressed') === 'true')[0];
+    verifier(v + ' : ☰ ▸ Réglages arrive sur Entreprise ▸ Financier', ['ent', 'fin'],
+      [ong && ong.dataset.regl, vus.map(e => e.dataset && e.dataset.sous).filter(Boolean).slice(-1)[0] || null]);
+  }
+  verifier('l’écran s’appelle Argent', 'Argent', (await parBarre(t, 'argent'), t.texte('#b-ecran')));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+/* Le tableau « Où sont allés les blocs de Finances (lot d1) » de
+   l'inventaire : élément, nouvel endroit, clé de preuve. */
+function retraitsD1() {
+  const debut = INVENTAIRE.findIndex(l => /^### Où sont allés les blocs de Finances/.test(l));
+  const lignes = [];
+  for (let i = debut + 1; debut >= 0 && i < INVENTAIRE.length && !/^###/.test(INVENTAIRE[i]); i++) {
+    const m = /^\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*`([a-z0-9-]+)`\s*\|$/.exec(INVENTAIRE[i]);
+    if (m) lignes.push({ element: m[1], endroit: m[2], cle: m[3] });
+  }
+  return lignes;
+}
+scenario('Inventaire d1 : chaque bloc de Finances a sa place, au centime', async () => {
+  const t = await ouvrir(grainesD1());
+  t.w.confirm = () => true;
+  const FIN = t.w.BCF, C = t.w.BCC, eur = v => d1Eur(t, v), sb = sansBlancs;
+  const ch = () => t.stock('chantiers'), dp = () => t.stock('depenses');
+  const bM = FIN.bornes('mois', D1_AN, D1_MO), bA = FIN.bornes('annee', D1_AN, 0);
+  const vers = async (v, ana) => {
+    if (!t.$('#modale').hidden) { t.clic('#modale-x'); await t.pause(120); }
+    await parBarre(t, 'argent');
+    if (v) { t.clic('[data-vue="' + v + '"]'); await t.pause(200); }
+    if (ana) { t.clic('[data-ana="' + ana + '"]'); await t.pause(200); }
+  };
+  const pli = (zone, cle) => t.$(zone + ' [data-loin="' + cle + '"]');
+  const contient = (txt, v) => sb(txt || '').indexOf(sb(eur(v))) >= 0;
+  const PREUVES = {
+    'd1-periode': async () => { await vers();
+      const p0 = JSON.stringify(t.w.BCUI._etat().periode);
+      t.clic('#mo-prec'); await t.pause(150); const bouge = t.texte('#mo-titre'); t.clic('#mo-suiv'); await t.pause(150);
+      const memePeriode = p0 === JSON.stringify(t.w.BCUI._etat().periode);
+      await vers('tva'); t.choisir('#fi-type', 'trimestre'); await t.pause(150);
+      const partage = t.$('#dep-type').value === 'trimestre' && t.$('#an-type').value === 'trimestre';
+      t.choisir('#an-type', 'annee'); await t.pause(150);
+      return bouge !== t.texte('#mo-titre') && memePeriode && partage && t.$('#fi-type').value === 'annee'; },
+    'd1-ca': async () => { await vers(); const ca = FIN.chiffreAffaires(ch(), bM);
+      return d1Mo(t, 'ca') === sb(eur(ca.total)) && d1Mo(t, 'prestation') === sb(eur(ca.prestation)) &&
+        d1Mo(t, 'vente') === sb(eur(ca.vente)) && t.$$('#mo-histo rect[data-mois]').length > 0 && /Trimestre \(MSA\)/.test(t.texte('#mo-msa')); },
+    'd1-paye': async () => { await vers(); const ca = FIN.chiffreAffaires(ch(), bM);
+      return d1Mo(t, 'paye') === sb(eur(ca.encaisse)) && d1Mo(t, 'attente') === sb(eur(ca.aEncaisser)); },
+    'd1-ajour': async () => { await vers(); const tt = C.totaux(ch(), t.stock('cfg') || {});
+      const ok = /dont 1 sans montant/.test(t.texte('#mo-afacturer')) && contient(t.texte('#mo-afacturer'), tt.aFacturer) &&
+        contient(t.texte('#mo-attente'), FIN.chiffreAffaires(ch()).aEncaisser) && /dont 1 impayée/.test(t.texte('#mo-attente'));
+      t.clic('#mo-afacturer'); await t.pause(300); const g1 = vueActive(t) === 'vue-carnet' && defile(t) === 'faire';
+      await vers(); t.clic('#mo-attente'); await t.pause(300);
+      /* Sa seule facture en attente est échue : elle est dans « À faire
+         maintenant », et c'est là que l'appui mène (le cas d'une facture
+         pas encore échue est joué par « À ce jour : à facturer »). */
+      return ok && g1 && vueActive(t) === 'vue-carnet' && defile(t) === 'faire'; },
+    'd1-abattements': async () => { await vers('analyses', 'ensemble'); const ca = FIN.chiffreAffaires(ch(), bA);
+      const ok = !!pli('#ana-corps', 'an-abattements') && sb(t.texte('[data-an="apres"]')) === sb(eur(ca.totalApres)) &&
+        /abattement 50/.test(t.texte('[data-loin="an-abattements"]')) && /abattement 71/.test(t.texte('[data-loin="an-abattements"]'));
+      t.clic('[data-ana="declarations"]'); await t.pause(200);
+      return ok && !!t.$('#ana-corps .ligne-ca'); },
+    'd1-tva': async () => { await vers(); const bal = FIN.balanceTva(ch(), dp(), bM, C.tauxLigne);
+      const mois = d1Tva(t, '#mo-tva', 'solde') === sb(eur(bal.montant)) && d1Tva(t, '#mo-tva', 'facturee') === sb(eur(bal.collectee.total));
+      await vers('tva'); const balA = FIN.balanceTva(ch(), dp(), bA, C.tauxLigne);
+      return mois && d1Tva(t, '#tva-corps', 'deductible') === sb('− ' + eur(balA.deductible.total)) && d1Tva(t, '#tva-corps', 'solde') === sb(eur(balA.montant)); },
+    'd1-depenses-marge': async () => { await vers();
+      const ok = d1Mo(t, 'depenses') === sb(eur(FIN.totalDepenses(dp(), bM).ht)) && t.$$('#mo-dep [data-modep]').length >= 2;
+      return ok && !!pli('#mo-loin', 'marge') && d1Mo(t, 'marge') === sb(eur(FIN.resultat(ch(), dp(), bM).marge)); },
+    'd1-deplacements': async () => { await vers(); const carb = FIN.parCategorie(dp(), bM).filter(x => x.categorie === 'CARB')[0];
+      const ok = !!pli('#mo-loin', 'deplacements') && /Kilomètres du mois/.test(t.texte('[data-loin="deplacements"]')) &&
+        contient(t.texte('[data-loin="deplacements"]'), carb.ttc);
+      await vers('analyses', 'ensemble'); const refus = C.analyseRefus(ch());
+      return ok && refus.total === 1 && /Pourquoi les devis n’aboutissent pas/.test(t.texte('[data-loin="an-devis"]')) &&
+        t.texte('[data-loin="an-devis"]').indexOf(refus.motifs[0].nom) >= 0; },
+    'd1-donneurs': async () => { await vers(); const pd = FIN.caParDonneur(ch(), bM), z = t.texte('[data-loin="donneurs"]');
+      const ok = pd.length === 2 && pd.every(x => z.indexOf(x.donneur) >= 0 && contient(z, x.ht)) && /Tous chantiers confondus/.test(z);
+      await vers('analyses', 'recettes');
+      return ok && /Par donneur d’ordre/.test(t.texte('#ana-corps')); },
+    'd1-devis': async () => { await vers('analyses', 'ensemble'); const tr = FIN.tauxReussite(ch(), C.aDevis), z = sb(t.texte('[data-loin="an-devis"]'));
+      return tr.proposes === 2 && z.indexOf(sb(tr.gagnes + 'gagnés')) >= 0 && z.indexOf(sb(tr.perdus + 'sans suite')) >= 0 &&
+        z.indexOf(sb(tr.enAttente + 'en attente')) >= 0 && z.indexOf(sb(tr.taux + ' %acceptés')) >= 0; },
+    'd1-plusloin': async () => { await vers();
+      const dues = FIN.chargesDues(t.stock('charges'), dp(), bM);
+      const fourn = /Refacturé/.test(t.texte('[data-loin="fournitures"]')) ||
+        /Aucune fourniture refacturée/.test(t.texte('[data-loin="fournitures"]'));
+      return ['donneurs', 'rapporte', 'fournitures', 'marge', 'charges', 'deplacements'].every(k => pli('#mo-loin', k) && !pli('#mo-loin', k).open) &&
+        /Prestations seules/.test(t.texte('[data-loin="rapporte"]')) && !/Pose de protections/.test(t.texte('[data-loin="rapporte"]')) &&
+        contient(t.texte('[data-loin="rapporte"]'), 1624.7) && dues.length === 1 &&
+        contient(t.texte('[data-loin="charges"]'), dues.reduce((s, d) => s + d.ttc, 0)) && fourn; },
+    'd1-dep-ind': async () => { await vers('depenses'); const tot = FIN.totalDepenses(dp(), bA);
+      return !!t.$('#dep-nouvelle') && !!t.$('#dep-type') && t.$$('#dep-totaux .carte2 b').map(b => sb(b.textContent)).join('|') ===
+        [eur(tot.ttc), eur(tot.ht), eur(tot.tva), String(tot.n)].map(sb).join('|') && t.$$('#dep-filtre option').length > 2; },
+    'd1-dep-liste': async () => { await vers('depenses'); t.clic('[data-depmod="d2"]'); await t.pause(250);
+      const ok = t.texte('#modale-titre') === 'Modifier la dépense' && !!t.$('#dp-sup') && !t.$('#liste-depenses [data-depsup]');
+      t.clic('#modale-x'); await t.pause(120);
+      const auto = dp().filter(d => d.auto)[0];
+      t.clic('[data-depmod="' + auto.id + '"]'); await t.pause(300);
+      return ok && t.texte('#modale-titre') === 'Modifier la charge'; },
+    'd1-charges': async () => { await vers('depenses');
+      const ok = /^Charges fixes/.test(t.texte('#dep-charges')) && !!t.$('#chg-nouvelle') && /prochain prélèvement/.test(t.texte('#charges-resume')) &&
+        !t.$('#charges-resume [data-chgsup]');
+      t.clic('[data-chgmod="g1"]'); await t.pause(250);
+      return ok && t.texte('#modale-titre') === 'Modifier la charge' && !!t.$('#cg-sup'); },
+    'd1-prelevements': async () => { await vers('depenses');
+      return /^Prélèvements à venir/.test(t.texte('#dep-prelevements')) && /Quand l’argent part/.test(t.texte('#charges-echeances')) &&
+        /Où il part/.test(t.texte('#charges-echeances')) && t.$$('#charges-periode .liste-item').length === FIN.chargesDues(t.stock('charges'), dp(), bA).length; },
+    'd1-annee': async () => { await vers('analyses');
+      const ok = pastilleOuverte(t).join() === 'Année' && t.$$('#ana-onglets .chip').map(b => b.textContent).join('|') ===
+        'Vue d\'ensemble|Recettes|Dépenses|Déclarations' && !!t.$('#an-type') && !!t.$('#an-indice') && !!t.$('#an-annee');
+      t.clic('[data-ana="depenses"]'); await t.pause(200);
+      const dep = /TVA payée sur ces achats/.test(t.texte('#ana-corps'));
+      t.clic('[data-ana="declarations"]'); await t.pause(200);
+      return ok && dep && !!t.$('#sim-cot, #decl-cot') && !!t.$('#decl-vers'); },
+    'd1-cumuls': async () => { await vers('analyses', 'ensemble'); const tt = C.totaux(ch(), t.stock('cfg') || {});
+      const z = t.texte('[data-loin="an-cumuls"] #carnet-totaux');
+      const ok = !!z && contient(z, tt.caFacture) && /dont payé/.test(z) && /jours-homme cumulés/.test(z);
+      await parBarre(t, 'chantiers');
+      return ok && !t.$('#vue-carnet #carnet-totaux') && !/Cumuls du carnet/.test(t.texte('#vue-carnet')); }
+  };
+  const lignes = retraitsD1();
+  verifierVrai('le tableau du lot d1 est lu (' + lignes.length + ' lignes)', lignes.length >= 15);
+  verifier('chaque ligne a sa preuve', [], lignes.filter(l => !PREUVES[l.cle]).map(l => l.cle));
+  verifier('chaque preuve a sa ligne', [], Object.keys(PREUVES).filter(k => !lignes.some(l => l.cle === k)));
+  for (const l of lignes) {
+    if (!PREUVES[l.cle]) continue;
+    verifierVrai(l.element + ' → ' + l.endroit, await PREUVES[l.cle]());
+  }
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Argent ▸ Année : la seconde rangée de pastilles se distingue de celle d’Argent', async () => {
+  const t = await ouvrir(grainesD1());
+  await parBarre(t, 'argent'); t.clic('[data-vue="analyses"]'); await t.pause(250);
+  const css = t.d.documentElement.outerHTML;
+  verifierVrai('elle porte sa propre classe', t.$('#ana-onglets').classList.contains('ana-onglets'));
+  verifierVrai('soulignée, sans fond plein quand elle est choisie',
+    /\.chips\.ana-onglets \.chip\[aria-pressed=true\]\{background:none;[^}]*border-bottom-color:var\(--accent\)/.test(css));
+  verifierVrai('et passe à la ligne plutôt que d’élargir la page', !/\.chips\.ana-onglets\{[^}]*nowrap/.test(css) && /\.chips\{display:flex;flex-wrap:wrap/.test(css));
   verifier('aucune erreur', [], t.erreurs);
 });
 

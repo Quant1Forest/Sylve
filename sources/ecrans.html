@@ -510,7 +510,8 @@
 
     <!-- ====================================================== chantiers -->
     <!-- La liste du lot b2 : recherche, puis les groupes (maquette V2) ; en
-         bas, repliés, le filtre de l'ancien carnet et ses cumuls. -->
+         bas, replié, le filtre de l'ancien carnet. Ses cumuls sont passés
+         dans Argent ▸ Année ▸ Vue d'ensemble (lot d1). -->
     <section class="vue" id="vue-carnet" role="tabpanel">
       <div class="ch-liste">
         <input type="search" id="c-rech" autocomplete="off" aria-label="Chercher un chantier"
@@ -524,15 +525,34 @@
             <div class="aj-zone" id="ch-filtre-liste"></div>
           </div>
         </details>
-        <details class="ch-replie" id="ch-cumuls">
-          <summary>Cumuls du carnet, depuis le début</summary>
-          <div class="ch-replie-corps">
-            <div id="carnet-totaux"></div>
-          </div>
-        </details>
       </div>
     </section>
 
+    <!-- La carte de Chantiers (lot b2), rangée à côté de sa liste (lot d1) :
+         elle dormait entre les charges fixes et les analyses. -->
+    <section class="vue" id="vue-carte" role="tabpanel">
+      <div class="carte">
+        <div class="carte-titre"><h2>Carte des chantiers</h2>
+          <button class="btn btn-min" id="carte-ici">Ma position</button></div>
+        <div style="display:flex;gap:7px;margin:0 0 8px">
+          <input type="search" id="carte-rech" autocomplete="off" placeholder="Aller à une commune…"
+                 style="flex:1;min-width:0;width:auto">
+          <button class="btn btn-min" id="carte-chercher">Chercher</button></div>
+        <div id="carte-resultats"></div>
+        <div id="carte-svg"></div>
+        <div class="btn-rang" style="margin-top:9px">
+          <button class="btn btn-min" id="carte-moins">−</button>
+          <button class="btn btn-min" id="carte-plus">+</button>
+          <button class="btn btn-min" id="carte-tout">Tout voir</button>
+          <button class="btn btn-min" id="carte-poser">Poser un chantier</button>
+        </div>
+        <div class="chips" id="carte-fonds" style="margin-top:8px"></div>
+        <p class="muted" style="font-size:11.5px;margin:7px 0 0" id="carte-aide"></p>
+        <div id="carte-liste"></div>
+      </div>
+    </section>
+
+    <!-- ========================================================== stock -->
     <section class="vue" id="vue-stock2" role="tabpanel">
       <div class="carte">
         <div class="carte-titre"><h2>Inventaire</h2>
@@ -581,44 +601,84 @@
       <div class="carte"><div id="liste-commandes"></div></div>
     </section>
 
-    <section class="vue" id="vue-charges" role="tabpanel">
+    <!-- ========================================================= argent -->
+    <!-- Lot d1 : Mois · TVA · Dépenses · Année remplacent Bilan · Dépenses ·
+         Charges fixes · Analyses. Les identifiants de vue d'avant restent
+         (« finances » est Mois, « analyses » est Année) : les liens internes,
+         les notes de mise à jour et la mémoire des téléphones y mènent sans
+         détour ; « charges » mène au bloc Charges fixes des Dépenses. -->
+
+    <!-- Mois (maquette V2) : son propre mois, qui ne touche pas la période
+         des trois autres pastilles. -->
+    <section class="vue" id="vue-finances" role="tabpanel">
+      <div class="carte ag-mois">
+        <button class="btn btn-min" id="mo-prec" aria-label="Mois précédent">‹</button>
+        <b id="mo-titre"></b>
+        <button class="btn btn-min" id="mo-suiv" aria-label="Mois suivant">›</button>
+      </div>
+      <div id="fi-corps"></div>
+    </section>
+
+    <section class="vue" id="vue-tva" role="tabpanel">
       <div class="carte">
+        <div class="carte-titre"><h2>Période</h2></div>
+        <div class="grille g3">
+          <div class="champ"><label class="eyebrow" for="fi-type">Vue</label>
+            <select id="fi-type"><option value="mois">Mois</option>
+              <option value="trimestre">Trimestre</option>
+              <option value="annee" selected>Année</option></select></div>
+          <div class="champ"><label class="eyebrow" for="fi-indice">Période</label>
+            <select id="fi-indice"></select></div>
+          <div class="champ"><label class="eyebrow" for="fi-annee">Année</label>
+            <select id="fi-annee"></select></div>
+        </div>
+      </div>
+      <div id="tva-corps"></div>
+    </section>
+
+    <!-- Dépenses (maquette tour 2) : la période, les indicateurs, le filtre
+         et la liste, puis les charges fixes et leurs prélèvements. -->
+    <section class="vue" id="vue-depenses" role="tabpanel">
+      <div class="carte">
+        <div class="carte-titre"><h2>Période</h2></div>
+        <div class="grille g3">
+          <div class="champ"><label class="eyebrow" for="dep-type">Vue</label>
+            <select id="dep-type"><option value="mois">Mois</option>
+              <option value="trimestre">Trimestre</option>
+              <option value="annee" selected>Année</option></select></div>
+          <div class="champ"><label class="eyebrow" for="dep-indice">Période</label>
+            <select id="dep-indice"></select></div>
+          <div class="champ"><label class="eyebrow" for="dep-annee">Année</label>
+            <select id="dep-annee"></select></div>
+        </div>
+      </div>
+      <div class="carte">
+        <div class="carte-titre"><h2>Dépenses</h2>
+          <button class="btn primaire btn-min" id="dep-nouvelle">+ Dépense</button></div>
+        <div id="dep-totaux"></div>
+      </div>
+      <div class="carte">
+        <div class="champ" style="max-width:230px;margin-bottom:11px">
+          <select id="dep-filtre"><option value="tous">Toutes les catégories</option></select>
+        </div>
+        <div id="liste-depenses"></div>
+      </div>
+      <div class="carte" id="dep-charges">
         <div class="carte-titre"><h2>Charges fixes</h2>
           <button class="btn primaire btn-min" id="chg-nouvelle">+ Charge</button></div>
         <p class="muted" style="font-size:12.5px;margin:0 0 10px">
-          Prêt, assurances, logiciels : décrits une fois, leurs échéances se suivent toutes seules.
+          Prêt, assurances, logiciels : décrits une fois, leurs prélèvements se suivent tout seuls.
         </p>
         <div id="charges-resume"></div>
       </div>
-      <div class="carte"><h2>Échéances</h2><div id="charges-echeances"></div></div>
+      <div class="carte" id="dep-prelevements"><h2>Prélèvements à venir</h2><div id="charges-echeances"></div></div>
     </section>
 
-    <section class="vue" id="vue-carte" role="tabpanel">
-      <div class="carte">
-        <div class="carte-titre"><h2>Carte des chantiers</h2>
-          <button class="btn btn-min" id="carte-ici">Ma position</button></div>
-        <div style="display:flex;gap:7px;margin:0 0 8px">
-          <input type="search" id="carte-rech" autocomplete="off" placeholder="Aller à une commune…"
-                 style="flex:1;min-width:0;width:auto">
-          <button class="btn btn-min" id="carte-chercher">Chercher</button></div>
-        <div id="carte-resultats"></div>
-        <div id="carte-svg"></div>
-        <div class="btn-rang" style="margin-top:9px">
-          <button class="btn btn-min" id="carte-moins">−</button>
-          <button class="btn btn-min" id="carte-plus">+</button>
-          <button class="btn btn-min" id="carte-tout">Tout voir</button>
-          <button class="btn btn-min" id="carte-poser">Poser un chantier</button>
-        </div>
-        <div class="chips" id="carte-fonds" style="margin-top:8px"></div>
-        <p class="muted" style="font-size:11.5px;margin:7px 0 0" id="carte-aide"></p>
-        <div id="carte-liste"></div>
-      </div>
-    </section>
-
+    <!-- Année : les quatre pastilles des anciennes Analyses, contenu intact ;
+         une seconde rangée, plus discrète que celle d'Argent. -->
     <section class="vue" id="vue-analyses" role="tabpanel">
       <div class="carte">
-        <div class="carte-titre"><h2>Analyses</h2></div>
-        <div class="chips" id="ana-onglets">
+        <div class="chips ana-onglets" id="ana-onglets">
           <button class="chip" data-ana="ensemble" aria-pressed="true">Vue d'ensemble</button>
           <button class="chip" data-ana="recettes" aria-pressed="false">Recettes</button>
           <button class="chip" data-ana="depenses" aria-pressed="false">Dépenses</button>
@@ -638,37 +698,7 @@
       <div id="ana-corps"></div>
     </section>
 
-    <section class="vue" id="vue-finances" role="tabpanel">
-      <div class="carte">
-        <div class="carte-titre"><h2>Période</h2></div>
-        <div class="grille g3">
-          <div class="champ"><label class="eyebrow" for="fi-type">Vue</label>
-            <select id="fi-type"><option value="mois">Mois</option>
-              <option value="trimestre">Trimestre</option>
-              <option value="annee" selected>Année</option></select></div>
-          <div class="champ"><label class="eyebrow" for="fi-indice">Période</label>
-            <select id="fi-indice"></select></div>
-          <div class="champ"><label class="eyebrow" for="fi-annee">Année</label>
-            <select id="fi-annee"></select></div>
-        </div>
-      </div>
-      <div id="fi-corps"></div>
-    </section>
-
-    <section class="vue" id="vue-depenses" role="tabpanel">
-      <div class="carte">
-        <div class="carte-titre"><h2>Dépenses</h2>
-          <button class="btn primaire btn-min" id="dep-nouvelle">+ Dépense</button></div>
-        <div id="dep-totaux"></div>
-      </div>
-      <div class="carte">
-        <div class="champ" style="max-width:230px;margin-bottom:11px">
-          <select id="dep-filtre"><option value="tous">Toutes les catégories</option></select>
-        </div>
-        <div id="liste-depenses"></div>
-      </div>
-    </section>
-
+    <!-- ===================================================== calendrier -->
     <section class="vue" id="vue-calendrier" role="tabpanel">
       <div class="carte">
         <div class="carte-titre">

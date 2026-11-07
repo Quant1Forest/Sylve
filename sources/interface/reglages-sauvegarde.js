@@ -795,6 +795,11 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.95', quoi: [
+    { t: 'Argent s’ouvre sur le mois : le chiffre d’affaires en grand, l’année mois par mois, le trimestre pour la MSA, la TVA et les dépenses du mois', vue: 'finances' },
+    { t: 'Quatre pastilles : Mois, TVA, Dépenses (les charges fixes sont dessous) et Année, qui reprend les anciennes analyses', vue: 'tva' },
+    { t: 'Un appui sur une dépense ou une charge l’ouvre ; Supprimer est dans sa fenêtre', vue: 'depenses' }
+  ] },
   { v: '4.94', quoi: [
     { t: 'Les durées se tapent en heures et minutes ; Ma journée demande le temps productif, et les heures par prestation deviennent facultatives' },
     { t: 'Le trajet ne compte plus dans les journées du chantier : il se dit à côté, et se règle sur la fiche du chantier', vue: 'carnet' },

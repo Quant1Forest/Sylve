@@ -2,13 +2,21 @@
    Lot b2, maquette V2 : la recherche en haut, puis les groupes — À faire
    maintenant · En travaux · Devis · Payés récemment · les payés plus anciens
    et « Sans suite », repliés. En bas, repliés aussi, le filtre de l'ancien
-   carnet (familles, à compléter, avec devis : rien n'en a disparu) et ses
-   cumuls, qui attendent Argent ▸ Année (lot d). */
+   carnet (familles, à compléter, avec devis : rien n'en a disparu). Ses
+   cumuls sont dans Argent ▸ Année ▸ Vue d'ensemble (lot d1) : ils se
+   refont avec la liste, comme avant. */
 function renderCarnet() {
-  var z = $('#carnet-totaux'); if (!z) return;
+  renderFiltreChantiers();
+  renderListeChantiers();
+  renderAujourdhui();
+  renderAnalyses();
+}
+/* Les cumuls de l'ancien carnet, depuis le début. « Encaissé » y devient
+   « dont payé » : ce sont les chantiers facturés et réglés depuis. */
+function htmlCumulsCarnet() {
   var t = C.totaux(A.chantiers, A.cfg);
   if (!A.chantiers.length) {
-    z.innerHTML = '<p class="muted" style="margin:0">Rien à cumuler : aucun chantier.</p>';
+    return '<p class="muted" style="margin:0">Rien à cumuler : aucun chantier.</p>';
   } else {
     /* Un seul chiffre par tuile, le compte en légende : deux nombres côte à
        côte et on ne sait plus lequel on lit. */
@@ -16,10 +24,10 @@ function renderCarnet() {
       return x ? ' · ' + x + ' ' + mot + (x > 1 && !invariable ? 's' : '') : '';
     };
     var pd = premierDonneur(A.chantiers, A.cfg, t.caFacture);
-    z.innerHTML = '<div class="kpi kpi2">' +
+    return '<div class="kpi kpi2">' +
       '<div class="carte2"><b class="num">' + eur(t.caFacture) + '</b><small>facturé' +
       n(t.nFactures, 'facture') + '</small></div>' +
-      '<div class="carte2"><b class="num">' + eur(t.encaisse) + '</b><small>encaissé</small></div>' +
+      '<div class="carte2"><b class="num">' + eur(t.encaisse) + '</b><small>dont payé</small></div>' +
       '<div class="carte2"><b class="num">' + (t.nSignes || '—') + '</b><small>devis signé' +
       (t.nSignes > 1 ? 's' : '') + (t.nSignes ? ' · ' + eur(t.signes) : ', à programmer') +
       '</small></div>' +
@@ -40,9 +48,6 @@ function renderCarnet() {
       /* Un fait, pas une relance (lot r2) : le mot de la ligne d'Aujourd'hui. */
       (t.retard ? ' · ' + t.retard + ' avec plus de jour posé' : '') + '</p>';
   }
-  renderFiltreChantiers();
-  renderListeChantiers();
-  renderAujourdhui();
 }
 function premierDonneur(chantiers, cfg, total) {
   var l = C.parDonneur(chantiers, cfg)
@@ -184,6 +189,20 @@ function renderListeChantiers() {
     pliListe('sansuite', 'Sans suite', '<div class="aj-zone">' +
       g.sansuite.map(function (c) { return ligneChantierListe(c, null, now); }).join('') + '</div>',
       g.sansuite.length);
+}
+/* Ouvrir Chantiers sur un groupe (Argent ▸ Mois ▸ À ce jour, lot d1) : la
+   liste en groupes, recherche vidée, défilée jusqu'au premier des groupes
+   donnés qui existe. Une facture échue n'est plus dans « Facturés · attendent
+   le paiement » mais dans « À faire maintenant » : c'est là qu'on la cherche
+   quand elles le sont toutes. */
+function ouvrirGroupeChantiers(cles) {
+  A.rechCh = '';
+  if ($('#c-rech')) $('#c-rech').value = '';
+  allerModule('chantiers', 'carnet');
+  for (var i = 0; i < cles.length; i++) {
+    var g = $('#liste-chantiers [data-groupe="' + cles[i] + '"]');
+    if (g) { g.scrollIntoView(); return; }
+  }
 }
 /* L'ancien filtre du carnet, gardé replié : ses familles, « à compléter » et
    « avec devis » n'ont pas d'autre place. Même ordre que les payés anciens,

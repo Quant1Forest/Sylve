@@ -159,7 +159,43 @@ function htmlEnsemble(an, b) {
       '<div class="carte2"><b class="num">' + eur(C.coutCarburant(km, A.cfg)) + '</b><small>carburant estimé</small></div>' +
       '</div></div>' : '') +
 
-    htmlSimulation(sim);
+    htmlSimulation(sim) +
+
+    /* Ce qui vient d'ailleurs (lot d1), replié : les devis et les abattements
+       de l'ancien Bilan, et les cumuls de l'ancien carnet. */
+    '<h2 class="ag-sous">Pour aller plus loin</h2><div class="ag-loin" id="an-loin">' +
+    pliArgent('an-devis', 'Devis', htmlDevisAnnee()) +
+    pliArgent('an-abattements', 'Abattements', htmlAbattements(ca)) +
+    pliArgent('an-cumuls', 'Depuis le début', '<div id="carnet-totaux">' + htmlCumulsCarnet() + '</div>') +
+    '</div>';
+}
+/* Les blocs « Devis » et « devis perdus » de l'ancien Bilan : ils regardent
+   tous les devis, quelle que soit la période. */
+function htmlDevisAnnee() {
+  var tr = FIN.tauxReussite(A.chantiers, C.aDevis), refus = C.analyseRefus(A.chantiers);
+  if (!tr.proposes && !refus.total) return '<p class="ag-petit">Aucun devis pour l’instant.</p>';
+  return (tr.proposes ? '<div class="kpi">' +
+      (tr.taux != null ? '<div class="carte2"><b class="num">' + tr.taux + ' %</b><small>acceptés</small></div>' : '') +
+      '<div class="carte2"><b class="num">' + tr.gagnes + '</b><small>gagnés</small></div>' +
+      '<div class="carte2"><b class="num">' + tr.perdus + '</b><small>sans suite</small></div>' +
+      '<div class="carte2"><b class="num">' + tr.enAttente + '</b><small>en attente</small></div>' +
+      '</div><p class="ag-petit">Taux calculé sur les devis tranchés ' +
+      '(les devis en attente n’entrent pas dans le calcul) ; tous les devis, quelle que soit la période.</p>' : '') +
+    (refus.total ? '<p class="eyebrow" style="margin:14px 0 6px">Pourquoi les devis n’aboutissent pas</p>' +
+      refus.motifs.map(function (m) {
+        return '<div style="display:flex;justify-content:space-between;gap:10px;padding:3px 0;font-size:13px">' +
+          '<span>' + esc(m.nom) + '</span><span class="muted">' + m.n + ' · ' + m.part + ' %</span></div>';
+      }).join('') : '');
+}
+/* Le chiffre d'affaires après abattement de l'ancien Bilan, sur la période
+   choisie en haut ; il est aussi dans Déclarations. */
+function htmlAbattements(ca) {
+  if (!ca.total) return '<p class="ag-petit">Aucune facture sur cette période.</p>';
+  return ligneCA('Prestation de service', ca.prestation, ca.prestationApres, '50 %') +
+    ligneCA('Vente de fournitures', ca.vente, ca.venteApres, '71 %') +
+    '<div style="display:flex;justify-content:space-between;padding-top:9px;margin-top:5px;border-top:2px solid var(--encre)">' +
+    '<b>Base après abattement</b><b class="num" style="font-size:18px" data-an="apres">' + eur(ca.totalApres) + '</b></div>' +
+    '<p class="ag-petit">Abattements du micro-BIC. Ce calcul prépare la déclaration, il ne la remplace pas.</p>';
 }
 
 function htmlSimulation(sim) {
