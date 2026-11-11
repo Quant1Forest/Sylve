@@ -109,7 +109,7 @@ function htmlEnsemble(an, b) {
   var dep = FIN.totalDepenses(A.depenses, b);
   var res = FIN.resultat(A.chantiers, A.depenses, b);
   var charges = FIN.totalChargesAnnuel(A.charges);
-  var sim = FIN.simulation(A.chantiers, b, A.cfg);
+  var sim = FIN.simulation(A.chantiers, b, cfgSimulation());
   var km = C.kmTotal(A.chantiers, b.debut, b.fin);
   var mgFourn = ST.margeGlobale(A.articles, A.chantiers, C.montantLigne, function (ch) {
     return ['facture', 'paye'].indexOf(ch.statut) >= 0 && FIN.dansPeriode(FIN.dateRecette(ch), b);
@@ -198,21 +198,92 @@ function htmlAbattements(ca) {
     '<p class="ag-petit">Abattements du micro-BIC. Ce calcul prépare la déclaration, il ne la remplace pas.</p>';
 }
 
+/* Le simulateur est un essai (lot d2, tranché le 11/11). Il écrivait le
+   réglage partagé : essayer 30 % ici changeait Réglages ▸ Financier,
+   Déclarations et les Hypothèses du stock. Ce qu'on y tape ne sert plus qu'à
+   lui, le temps de l'écran (A.essaiSim, effacé en le quittant) ; « Garder »
+   est le seul geste qui écrit. */
+function etatSimulation() {
+  var c = A.cfg || {}, e = A.essaiSim;
+  var regle = { cot: FIN.nb(c.tauxCotisations), imp: FIN.nb(c.tauxImpot),
+    base: c.baseCotisations === 'brut' ? 'brut' : 'abattu' };
+  return { regle: regle, cot: e ? e.cot : regle.cot, imp: e ? e.imp : regle.imp, base: e ? e.base : regle.base };
+}
+function ecartsSimulation() {
+  var s = etatSimulation();
+  return ['cot', 'imp', 'base'].filter(function (k) { return s[k] !== s.regle[k]; });
+}
+/* Sans essai, le calcul lit les réglages tels quels : aucun chiffre ne bouge
+   pour qui ne touche à rien. */
+function cfgSimulation() {
+  if (!A.essaiSim) return A.cfg;
+  var s = etatSimulation(), c = {}, k;
+  for (k in A.cfg) { if (Object.prototype.hasOwnProperty.call(A.cfg, k)) c[k] = A.cfg[k]; }
+  c.tauxCotisations = s.cot || null;
+  c.tauxImpot = s.imp || null;
+  if (s.base !== s.regle.base) { c.baseCotisations = s.base; c.baseImpot = s.base; }
+  return c;
+}
+function motTauxSim(v) { return v ? String(v).replace('.', ',') + ' %' : 'aucun taux'; }
+function motBaseSim(b) { return b === 'brut' ? 'le chiffre d’affaires brut' : 'le montant après abattement'; }
+function essayerSimulation(cot, imp, base) {
+  A.essaiSim = { cot: FIN.nb(cot), imp: FIN.nb(imp), base: base === 'brut' ? 'brut' : 'abattu' };
+  if (!ecartsSimulation().length) A.essaiSim = null;
+  renderAnalyses();
+}
+function garderEssaiSimulation(k) {
+  var s = etatSimulation(), dit;
+  if (k === 'cot') {
+    A.cfg.tauxCotisations = s.cot || null;
+    dit = 'C’est gardé : vos réglages disent maintenant ' + motTauxSim(s.cot) + ' de cotisations.';
+  } else if (k === 'imp') {
+    A.cfg.tauxImpot = s.imp || null;
+    dit = 'C’est gardé : vos réglages disent maintenant ' + motTauxSim(s.imp) + ' d’impôt.';
+  } else if (k === 'base') {
+    A.cfg.baseCotisations = s.base;
+    A.cfg.baseImpot = s.base;
+    dit = 'C’est gardé : vos réglages appliquent maintenant les taux sur ' + motBaseSim(s.base) + '.';
+  } else { return; }
+  if (!ecartsSimulation().length) A.essaiSim = null;
+  sauverCfg();
+  /* Réglages ▸ Financier ne remplit ses cases qu'au démarrage : sans ceci
+     il montrerait encore l'ancien taux, et le réécrirait au premier
+     changement d'une case voisine. */
+  renderReglagesAlertes();
+  renderAnalyses();
+  toast(dit);
+}
+function htmlEssaisSimulation() {
+  var s = etatSimulation(), ecarts = ecartsSimulation();
+  if (!ecarts.length) return '';
+  var NOMS = { cot: 'Cotisations', imp: 'Impôt', base: 'Appliqués sur' };
+  return '<div class="sim-essais" id="sim-essais">' + ecarts.map(function (k) {
+    var mot = k === 'base' ? motBaseSim : motTauxSim;
+    return '<div class="sim-essai" data-simessai="' + k + '"><span><small>' + NOMS[k] + '</small>' +
+      '<b>Essai : ' + esc(mot(s[k])) + '</b> · vos réglages : ' + esc(mot(s.regle[k])) + '</span>' +
+      '<button type="button" class="btn-min" data-simgarder="' + k + '">' +
+      (k === 'base' ? 'Garder ce choix' : 'Garder ce taux') + '</button></div>';
+  }).join('') +
+    '<p class="muted">Un essai ne change rien à vos réglages : il s’efface quand vous quittez cet écran.</p></div>';
+}
+
 function htmlSimulation(sim) {
   var pose = sim.tauxCotisations || sim.tauxImpot;
-  return '<div class="carte"><h2>Cotisations et impôt</h2>' +
+  var s = etatSimulation();
+  return '<div class="carte" id="sim-carte"><h2>Cotisations et impôt</h2>' +
     '<div class="grille g2">' +
     '<div class="champ"><label class="eyebrow" for="sim-cot">Taux de cotisations (%)</label>' +
     '<input type="text" id="sim-cot" inputmode="decimal" value="' +
-    (A.cfg && A.cfg.tauxCotisations != null ? String(A.cfg.tauxCotisations).replace('.', ',') : '') + '"></div>' +
+    (s.cot ? String(s.cot).replace('.', ',') : '') + '"></div>' +
     '<div class="champ"><label class="eyebrow" for="sim-imp">Taux d’impôt (%)</label>' +
     '<input type="text" id="sim-imp" inputmode="decimal" value="' +
-    (A.cfg && A.cfg.tauxImpot != null ? String(A.cfg.tauxImpot).replace('.', ',') : '') + '"></div>' +
+    (s.imp ? String(s.imp).replace('.', ',') : '') + '"></div>' +
     '<div class="champ"><label class="eyebrow" for="sim-base">Appliqués sur</label>' +
     '<select id="sim-base">' +
-    '<option value="abattu"' + ((A.cfg && A.cfg.baseCotisations) === 'brut' ? '' : ' selected') + '>le montant après abattement</option>' +
-    '<option value="brut"' + ((A.cfg && A.cfg.baseCotisations) === 'brut' ? ' selected' : '') + '>le chiffre d’affaires brut</option>' +
+    '<option value="abattu"' + (s.base === 'brut' ? '' : ' selected') + '>le montant après abattement</option>' +
+    '<option value="brut"' + (s.base === 'brut' ? ' selected' : '') + '>le chiffre d’affaires brut</option>' +
     '</select></div></div>' +
+    htmlEssaisSimulation() +
     (pose ? '<div class="kpi" style="margin-top:11px">' +
       '<div class="carte2"><b class="num">' + eur(sim.baseCotisations) + '</b><small>base retenue</small></div>' +
       (sim.cotisations ? '<div class="carte2"><b class="num">' + eur(sim.cotisations) + '</b><small>cotisations</small></div>' : '') +

@@ -205,3 +205,67 @@ Le scénario, lui, comptait les échéances passées avec « le numéro du mois 
 et n’était juste que du 5 au 31. Il sème désormais une charge **calée sur le
 quantième du jour**, quel que soit ce jour : une garde écrite « si on est le
 1er » ne mordrait qu’une fois par mois.
+
+## La feuille Dépense (lot d2, 4.96.0)
+
+La fenêtre d’une dépense est une feuille, sur la maquette du tour 2
+(`maquettes/refonte-5b-tour2.html`, validée le 31/10), à la forme de Ma
+journée : blocs titrés, pied fixe, rien ne se reconstruit pendant la frappe.
+Tout est dans `interface/finances.js`.
+
+- **Trois portes, une feuille** : + ▸ Dépense, « + Dépense » d’Argent ▸
+  Dépenses, l’appui sur une ligne de la liste. Toutes passent par
+  `ouvrirDepense(id)`. Une dépense née d’une charge fixe ouvre toujours sa
+  charge.
+- **D1** — la catégorie en tête de chaque ligne, en puces (`PUCES_DEP` : six
+  codes et leur nom court, qui ne sert qu’ici). « Autre… » ouvre la liste des
+  dix-neuf ; une catégorie prise là s’affiche en puce sur la ligne.
+- **D2** — `tauxFigeDep` : une catégorie `sansTva` pose « sans » et bloque les
+  quatre boutons ; revenir à une catégorie avec TVA remet 20 %. **Une ligne
+  ancienne saisie avec un taux sur une telle catégorie garde son taux** tant
+  qu’on ne la passe pas à « sans » : la feuille ne corrige rien en s’ouvrant.
+- **D3** — « Comme la dernière » : `derniereDepense()` (la plus récente sans
+  `charge`), `lignesCommeLaDerniere()`. Repris : le fournisseur, une ligne par
+  couple catégorie-taux. Pas repris : date, montants, litres, désignations,
+  n° de pièce, chantier, véhicule, ni le lien d’une commande ou d’une
+  intervention.
+- **D4** — `fournisseursConnus()` remplit la liste proposée sous le champ,
+  d’après les dépenses déjà saisies.
+- **La frappe** met à jour sur place le pied, le prix du litre et l’offre du
+  carnet. Changer de catégorie ou de taux ne refait que sa ligne
+  (`renderLigneDep`) ; ajouter ou retirer une ligne les refait toutes
+  (`renderDepLignes`). La catégorie et le taux vivent dans `depLignes`, pas
+  dans le formulaire : un code ou un taux que les boutons ne proposent pas
+  (2,1 %) ne se perd plus à l’enregistrement.
+- **Rien ne bouge qui n’a pas été touché** (`ligneDepEcrite`, et le bloc
+  d’enregistrement) : une ligne repart de sa ligne d’origine, donc une TVA
+  relevée sur le ticket (`tva`) reste tant que ni le montant ni le taux ne
+  changent ; la date garde son heure si le jour est le même ; un champ vide
+  n’est pas créé là où il n’existait pas ; `maj` ne change que si la dépense a
+  changé. Le scénario « ressort identique » compare la dépense avant et après,
+  caractère pour caractère.
+
+### Le simulateur d’Année est un essai
+
+Année ▸ Vue d’ensemble ▸ « Cotisations et impôt » écrivait le réglage
+partagé : y essayer 30 % changeait Réglages ▸ Financier, Déclarations et les
+Hypothèses de la rentabilité. Tranché le 11/11 : ce qu’on y change (les deux
+taux, et « Appliqués sur ») vit dans `A.essaiSim`, n’est écrit nulle part, et
+s’efface en quittant l’écran (`aller()`, et le changement de pastille
+d’Année). Chaque écart avec les réglages a sa ligne — « Essai : 30 % · vos
+réglages : 25 % » — et son bouton « Garder ce taux » (`garderEssaiSimulation`),
+seul geste qui écrit. Sans essai, le calcul lit `A.cfg` tel quel.
+
+Réglages ▸ Financier, Déclarations et les Hypothèses écrivent toujours le
+même réglage, comme avant. **Réglages ▸ Financier ne remplit ses cases qu’au
+démarrage** (`renderReglagesAlertes`) : « Garder ce taux » les rafraîchit,
+Déclarations et les Hypothèses ne le font pas — voir le rapport du lot d2.
+
+### Le débours hors des barres
+
+`recettesParMois` et `encaissementsParMois` (`logique/finances.js`) écartent
+le débours : une barre vaut le chiffre d’affaires facturé HT du mois, celui
+du grand chiffre d’Argent ▸ Mois. Elles ne nourrissent que des barres (Mois,
+Année ▸ Vue d’ensemble, Année ▸ Recettes), le « total à fin <mois> » et
+« Plus haut mois ». `lignesFacturees`, que lisent la TVA et les répartitions,
+n’est pas touchée : la TVA facturée porte toujours sur le débours.

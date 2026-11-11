@@ -96,7 +96,9 @@ function htmlCaMois(ca) {
     '</div>';
 }
 /* Les douze mois de l'année du mois affiché : le même « facturé » mois par
-   mois qu'Année ▸ Recettes et Vue d'ensemble. */
+   mois qu'Année ▸ Recettes et Vue d'ensemble — hors débours depuis le lot d2,
+   donc la barre du mois vaut le grand chiffre, et le total à fin de mois est
+   la somme des barres. */
 function htmlHistoMois(m) {
   var v = FIN.recettesParMois(A.chantiers, m.annee), cumul = 0;
   for (var i = 0; i <= m.indice; i++) cumul += v[i];
@@ -453,6 +455,23 @@ function renderDepenses() {
 
 var depLignes = [];
 
+/* La feuille Dépense (lot d2, maquette du tour 2). D1 : les six catégories
+   de tous les jours en puces, sous le pouce ; leur nom court ne sert qu'ici,
+   « Autre… » ouvre la liste entière avec les noms complets. */
+var PUCES_DEP = [['CONSO', 'Consommable'], ['REPAS', 'Repas'], ['CARB', 'Carburant'],
+  ['EPI', 'EPI'], ['PETITMAT', 'Petit outillage'], ['FOURN', 'Fournitures']];
+function nomPuceDep(c) {
+  for (var i = 0; i < PUCES_DEP.length; i++) if (PUCES_DEP[i][0] === c) return PUCES_DEP[i][1];
+  return '';
+}
+function ligneDepVide() { return { libelle: '', categorie: 'PETITMAT', ttc: '', taux: 20, litres: '' }; }
+/* D2 : une catégorie sans TVA (assurance, banque, prêt, cotisations) pose
+   « sans » et le bloque. Une ligne ancienne saisie avec un taux sur une telle
+   catégorie garde son taux tant qu'on ne la passe pas à « sans » : la feuille
+   ne corrige rien dans le dos de celui qui l'ouvre. */
+function tauxFigeDep(l) { return FIN.sansTvaDe(l.categorie) && !FIN.nb(l.taux); }
+function motTauxDep(t) { return t ? String(t).replace('.', ',') + ' %' : 'sans'; }
+
 /* Le prix au litre de la ligne, réécrit seul à chaque frappe : redessiner le
    bloc entier ferait perdre le curseur au milieu du nombre. Même raison que
    les conversions du stock. */
@@ -479,67 +498,167 @@ function majOffreCarnet() {
   if (!offrable && $('#dp-hist')) { $('#dp-hist').checked = false; $('#dp-histkm').hidden = true; }
 }
 
+/* Une ligne du ticket : la catégorie en tête, le montant, la TVA en quatre
+   boutons, puis ce que la catégorie appelle (litres, mention). */
+function htmlLigneDep(l, i) {
+  var cat = l.categorie, libre = !nomPuceDep(cat), ouvert = !!l.autre || libre;
+  var def = FIN.CATEGORIES.filter(function (x) { return x.c === cat; })[0] || {};
+  var fige = tauxFigeDep(l);
+  var nombre = function (v) { return v != null && v !== '' ? esc(String(v).replace('.', ',')) : ''; };
+  return (depLignes.length > 1
+      ? '<div class="dp-haut"><span class="dp-num">Ligne ' + (i + 1) + '</span>' +
+        '<button type="button" class="btn-min" data-dlsup="' + i + '" aria-label="Retirer la ligne ' + (i + 1) + '">✕</button></div>'
+      : '') +
+    '<div class="champ"><span class="eyebrow lab">Catégorie</span>' +
+    '<div class="chips dp-cats" role="group" aria-label="Catégorie">' +
+    PUCES_DEP.map(function (p) {
+      return '<button type="button" class="chip" data-dlpuce="' + i + '" data-cat="' + p[0] + '" aria-pressed="' +
+        (cat === p[0]) + '">' + p[1] + '</button>';
+    }).join('') +
+    /* Une catégorie prise dans « Autre… » se voit sur la ligne. */
+    (libre ? '<button type="button" class="chip" data-dlpuce="' + i + '" data-cat="' + esc(cat) +
+      '" aria-pressed="true">' + esc(FIN.nomCategorie(cat)) + '</button>' : '') +
+    '<button type="button" class="chip plus" data-dlautre="' + i + '" aria-expanded="' + ouvert + '">Autre…</button></div>' +
+    (ouvert ? '<select class="dp-sel" data-dlsel="' + i + '" aria-label="Toutes les catégories">' +
+      FIN.CATEGORIES.map(function (c2) {
+        return '<option value="' + c2.c + '"' + (cat === c2.c ? ' selected' : '') + '>' + esc(c2.n) + '</option>';
+      }).join('') + '</select>' : '') +
+    '<small class="mj-aide">' + esc(FIN.nomCategorie(cat) + (def.aide ? ' · ' + def.aide : '')) + '</small></div>' +
+    '<div class="champ"><label class="eyebrow" for="dl-ttc-' + i + '">Montant TTC (€)</label>' +
+    '<input type="text" id="dl-ttc-' + i + '" data-dlttc="' + i + '" class="gros" inputmode="decimal" autocomplete="off" ' +
+    'placeholder="0" value="' + nombre(l.ttc) + '"></div>' +
+    '<div class="champ"><span class="eyebrow lab">TVA</span>' +
+    '<div class="dp-seg' + (fige ? ' fige' : '') + '" role="group" aria-label="Taux de TVA">' +
+    FIN.TAUX_TVA.map(function (t) {
+      return '<button type="button" data-dltx="' + i + '" data-taux="' + t + '" aria-pressed="' +
+        (FIN.nb(l.taux) === t) + '"' + (fige ? ' disabled' : '') + '>' + motTauxDep(t) + '</button>';
+    }).join('') + '</div>' +
+    (fige
+      ? '<small class="mj-aide">Pas de TVA sur cette catégorie : rien à récupérer, « sans » est posé d’office.</small>'
+      : FIN.sansTvaDe(cat)
+        ? '<small class="mj-aide">D’ordinaire sans TVA : cette ligne a été saisie à ' + motTauxDep(FIN.nb(l.taux)) +
+          '. « sans » la corrige.</small>'
+        : '') + '</div>' +
+    /* Le prix du litre change tous les mois : le relever dans un réglage
+       demandait de penser à le corriger. Noté ici, il se calcule tout seul
+       en moyenne pondérée par les quantités. Facultatif — un plein sans
+       litres est écarté de la moyenne, jamais compté pour zéro. */
+    (FIN.estCarburant(cat)
+      ? '<div class="dp-litres"><div class="champ">' +
+        '<label class="eyebrow" for="dl-l-' + i + '">Litres</label>' +
+        '<input type="text" id="dl-l-' + i + '" data-dllitres="' + i + '" inputmode="decimal" autocomplete="off" ' +
+        'placeholder="—" value="' + nombre(l.litres) + '"></div>' +
+        '<p class="muted" data-dlprix="' + i + '">' + textePrixLitre(l) + '</p></div>'
+      : '') +
+    '<div class="champ"><label class="eyebrow" for="dl-lib-' + i + '">Désignation ' +
+    '<span class="dp-fac">(facultatif)</span></label>' +
+    '<input type="text" id="dl-lib-' + i + '" data-dl="' + i + '" autocomplete="off" placeholder="' +
+    (FIN.estCarburant(cat) ? 'gazole' : 'ce qui est écrit sur le ticket') + '" value="' + esc(l.libelle || '') + '"></div>' +
+    (FIN.estImmo(cat) ? '<small class="mj-aide">Immobilisation — isolée dans la balance de TVA.</small>' : '');
+}
+/* Toutes les lignes : à l'ouverture, et quand on en ajoute ou en retire une.
+   Jamais pendant la frappe — le clavier du téléphone se refermerait. */
 function renderDepLignes() {
   var z = $('#dp-lignes'); if (!z) return;
   z.innerHTML = depLignes.map(function (l, i) {
-    return '<div class="carte2" style="margin-bottom:7px;padding:9px 10px">' +
-      '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">' +
-      '<input type="text" data-dl="' + i + '" placeholder="désignation" value="' + esc(l.libelle || '') + '" style="flex:1">' +
-      (depLignes.length > 1 ? '<button type="button" class="btn-min" data-dlsup="' + i + '">✕</button>' : '') +
-      '</div>' +
-      '<div class="grille g3">' +
-      '<div class="champ"><label class="eyebrow">Montant TTC</label>' +
-      '<input type="text" data-dlttc="' + i + '" class="gros" inputmode="decimal" value="' +
-      (l.ttc != null && l.ttc !== '' ? esc(String(l.ttc).replace('.', ',')) : '') + '"></div>' +
-      '<div class="champ"><label class="eyebrow">TVA</label>' +
-      '<select data-dltaux="' + i + '">' + FIN.TAUX_TVA.map(function (t) {
-        return '<option value="' + t + '"' + (FIN.nb(l.taux) === t ? ' selected' : '') + '>' +
-          (t ? String(t).replace('.', ',') + ' %' : 'sans') + '</option>';
-      }).join('') + '</select></div>' +
-      '<div class="champ"><label class="eyebrow">Catégorie</label>' +
-      '<select data-dlcat="' + i + '">' + FIN.CATEGORIES.map(function (c2) {
-        return '<option value="' + c2.c + '"' + (l.categorie === c2.c ? ' selected' : '') + '>' + c2.n + '</option>';
-      }).join('') + '</select></div></div>' +
-      (FIN.estImmo(l.categorie) ? '<p class="muted" style="font-size:11.5px;margin:5px 0 0">Immobilisation — isolée dans la balance de TVA.</p>' : '') +
-      /* Le prix du litre change tous les mois : le relever dans un réglage
-         demandait de penser à le corriger. Noté ici, il se calcule tout seul
-         en moyenne pondérée par les quantités. Facultatif — un plein sans
-         litres est écarté de la moyenne, jamais compté pour zéro. */
-      (FIN.estCarburant(l.categorie)
-        ? '<div style="display:flex;gap:9px;align-items:flex-end;margin-top:7px">' +
-          '<div class="champ" style="margin:0;width:8em;flex:none">' +
-          '<label class="eyebrow">Litres</label>' +
-          '<input type="text" data-dllitres="' + i + '" inputmode="decimal" placeholder="—" value="' +
-          (l.litres != null && l.litres !== '' ? esc(String(l.litres).replace('.', ',')) : '') + '"></div>' +
-          '<p class="muted" style="font-size:11.5px;margin:0 0 9px;flex:1" data-dlprix="' + i + '">' +
-          textePrixLitre(l) + '</p></div>'
-        : '') +
-      '</div>';
-  }).join('') +
-    '<button type="button" class="btn-min" id="dp-plusligne">+ une ligne</button>';
+    return '<div class="dp-l" data-dli="' + i + '">' + htmlLigneDep(l, i) + '</div>';
+  }).join('');
   majApercuDep();
   majOffreCarnet();
 }
+/* Une catégorie ou un taux changé ne refait que sa ligne. */
+function renderLigneDep(i) {
+  var z = $('#dp-lignes [data-dli="' + i + '"]');
+  if (z && depLignes[i]) z.innerHTML = htmlLigneDep(depLignes[i], i);
+  majApercuDep();
+  majOffreCarnet();
+}
+/* Les montants restent tels qu'ils sont tapés (« 12,50 ») : la ligne qui se
+   redessine les rend à l'identique. La catégorie et le taux ne se lisent pas
+   ici, ils vivent dans depLignes. */
 function lireDepLignes() {
   $$('#dp-lignes [data-dl]').forEach(function (i) { depLignes[Number(i.dataset.dl)].libelle = i.value; });
-  $$('#dp-lignes [data-dlttc]').forEach(function (i) { depLignes[Number(i.dataset.dlttc)].ttc = FIN.nb(i.value); });
-  $$('#dp-lignes [data-dltaux]').forEach(function (i) { depLignes[Number(i.dataset.dltaux)].taux = FIN.nb(i.value); });
-  $$('#dp-lignes [data-dlcat]').forEach(function (i) { depLignes[Number(i.dataset.dlcat)].categorie = i.value; });
-  $$('#dp-lignes [data-dllitres]').forEach(function (i) {
-    depLignes[Number(i.dataset.dllitres)].litres = i.value.trim() ? FIN.nb(i.value) : '';
-  });
+  $$('#dp-lignes [data-dlttc]').forEach(function (i) { depLignes[Number(i.dataset.dlttc)].ttc = i.value.trim(); });
+  $$('#dp-lignes [data-dllitres]').forEach(function (i) { depLignes[Number(i.dataset.dllitres)].litres = i.value.trim(); });
 }
+function choisirCategorieDep(i, code) {
+  var l = depLignes[i]; if (!l || !code) return;
+  var avant = FIN.sansTvaDe(l.categorie);
+  l.categorie = code;
+  if (FIN.sansTvaDe(code)) l.taux = 0; else if (avant) l.taux = 20;
+  renderLigneDep(i);
+}
+/* Ce qui sera écrit pour une ligne. On repart de la ligne d'origine : ce que
+   la feuille ne montre pas — une TVA relevée sur le ticket, un champ venu
+   d'une sauvegarde plus ancienne — ressort tel quel, tant que ni le montant
+   ni le taux n'ont bougé. Une dépense rouverte et enregistrée sans rien
+   toucher doit ressortir identique. */
+function ligneDepEcrite(l) {
+  var o = {}, src = l.src || null, k;
+  if (src) { for (k in src) { if (Object.prototype.hasOwnProperty.call(src, k)) o[k] = src[k]; } }
+  var ttc = FIN.nb(l.ttc), taux = FIN.nb(l.taux);
+  var bouge = !src || FIN.nb(src.ttc) !== ttc || FIN.nb(src.taux) !== taux;
+  o.libelle = String(l.libelle || '').trim();
+  o.categorie = l.categorie;
+  o.ttc = ttc;
+  o.taux = taux;
+  if (bouge || o.tva == null || o.tva === '') delete o.tva;
+  /* Les litres ne vivent que sur une ligne de carburant : les garder après
+     un changement de catégorie fausserait le prix moyen. */
+  if (FIN.estCarburant(l.categorie) && FIN.nb(l.litres) > 0) o.litres = FIN.nb(l.litres);
+  else delete o.litres;
+  return o;
+}
+function lignesDepEcrites() {
+  return depLignes.filter(function (l) { return FIN.nb(l.ttc) > 0; }).map(ligneDepEcrite);
+}
+/* Le pied : le TTC en grand, puis ce qu'il recouvre. Calculé sur ce qui
+   sera écrit, pour que le pied et la liste disent le même chiffre. */
 function majApercuDep() {
   var z = $('#dp-apercu'); if (!z) return;
-  var faux = { lignes: depLignes.filter(function (l) { return FIN.nb(l.ttc) > 0; }) };
+  var ecrites = lignesDepEcrites();
+  var faux = { lignes: ecrites };
   var ttc = FIN.ttcDe(faux), ht = FIN.htDe(faux), tva = FIN.tvaDe(faux);
-  var immo = depLignes.filter(function (l) { return FIN.estImmo(l.categorie) && FIN.nb(l.ttc) > 0; })
-    .reduce(function (s, l) { return s + FIN.htLigne(l); }, 0);
-  z.innerHTML = ttc
-    ? '<b class="num" style="font-size:20px">' + eur(ttc) + '</b> TTC' +
-      '<div class="muted" style="font-size:12.5px;margin-top:2px">' + eur(ht) + ' HT · TVA ' + eur(tva) +
-      (immo ? ' · dont ' + eur(immo) + ' immobilisé' : '') + '</div>'
+  var immo = FIN.arr(ecrites.reduce(function (s, l) {
+    return s + (FIN.estImmo(l.categorie) ? FIN.htLigne(l) : 0);
+  }, 0), 2);
+  z.innerHTML = ecrites.length
+    ? '<div class="mj-tot"><b class="num" data-dp="ttc">' + eur(ttc) + '</b><span>TTC</span></div>' +
+      '<small><span class="num" data-dp="ht">' + eur(ht) + '</span> HT · TVA déductible <span class="num" data-dp="tva">' +
+      eur(tva) + '</span>' + (immo ? ' · dont <span class="num" data-dp="immo">' + eur(immo) + '</span> immobilisé' : '') +
+      '</small>'
     : '<span class="muted">Saisissez au moins un montant.</span>';
+}
+
+/* D3 : la dernière dépense qui ne vient pas d'une charge fixe. Une dépense
+   née d'une commande ou d'une intervention du carnet compte : c'est bien la
+   dernière chose achetée. */
+function derniereDepense() {
+  var l = A.depenses.filter(function (x) { return !x.charge; });
+  l.sort(function (a, b) { return (b.date || 0) - (a.date || 0) || (b.maj || 0) - (a.maj || 0); });
+  return l[0] || null;
+}
+/* Ce qu'on en reprend : une ligne par nature d'achat, donc une par couple
+   catégorie-taux. Ni montant, ni litres, ni désignation. */
+function lignesCommeLaDerniere(d) {
+  var vus = {}, out = [];
+  FIN.lignesDepense(d).forEach(function (l) {
+    var cat = l.categorie || 'PETITMAT', taux = FIN.nb(l.taux), k = cat + '|' + taux;
+    if (vus[k]) return;
+    vus[k] = 1;
+    out.push({ libelle: '', categorie: cat, ttc: '', taux: taux, litres: '' });
+  });
+  return out;
+}
+/* D4 : les fournisseurs déjà saisis, proposés sous le champ. */
+function fournisseursConnus() {
+  var vus = {}, out = [];
+  A.depenses.forEach(function (d) {
+    var f = String(d.fournisseur || '').trim(), k = f.toLowerCase();
+    if (!f || vus[k]) return;
+    vus[k] = 1; out.push(f);
+  });
+  return out.sort(function (a, b) { return a.localeCompare(b, 'fr'); });
 }
 
 function ouvrirDepense(id) {
@@ -549,39 +668,52 @@ function ouvrirDepense(id) {
     ? FIN.lignesDepense(d).map(function (l) {
       return { libelle: l.libelle || '', categorie: l.categorie || 'PETITMAT',
         ttc: l.ttc != null ? l.ttc : '', taux: FIN.nb(l.taux),
-        litres: l.litres != null ? l.litres : '' };
+        litres: l.litres != null ? l.litres : '', src: l };
     })
     : [];
-  if (!depLignes.length) depLignes = [{ libelle: '', categorie: 'PETITMAT', ttc: '', taux: 20 }];
+  if (!depLignes.length) depLignes = [ligneDepVide()];
   depDejaAuCarnet = depenseLieeAuCarnet(d);
   var chOuv = A.chantiers.slice().sort(function (x, y) { return (y.maj || 0) - (x.maj || 0); });
+  /* Un chantier rattaché puis supprimé : le lien reste proposé, pour ne pas
+     le perdre en enregistrant. */
+  var chPerdu = d.chantier && !chOuv.some(function (c2) { return c2.id === d.chantier; });
+  var der = id ? null : derniereDepense();
+  var derCats = der ? FIN.lignesDepense(der).map(function (l) {
+    return nomPuceDep(l.categorie) || FIN.nomCategorie(l.categorie);
+  }).filter(function (v, i, t) { return v && t.indexOf(v) === i; }) : [];
 
-  modale(id ? 'Modifier la dépense' : 'Nouvelle dépense',
-    '<div class="grille g2">' +
-    '<div class="champ"><label class="eyebrow" for="dp-date">Date</label>' +
+  modale(id ? 'Modifier la dépense' : 'Dépense',
+    (der ? '<button type="button" class="mj-copie" id="dp-comme">' +
+      '<b>Comme la dernière — ' + esc([der.fournisseur || '', derCats.join(', ')].filter(Boolean).join(' · ')) + '</b>' +
+      '<small>reprend le fournisseur et les catégories ; ni la date ni les montants</small></button>' : '') +
+    '<p class="fj-sous">Quand, où</p><div class="mj-zone"><div class="grille g2">' +
+    '<div class="champ" style="margin:0"><label class="eyebrow" for="dp-date">Date</label>' +
     '<input type="date" id="dp-date" value="' + versChamp(d.date) + '"></div>' +
-    '<div class="champ"><label class="eyebrow" for="dp-four">Fournisseur</label>' +
-    '<input type="text" id="dp-four" autocomplete="off" value="' + esc(d.fournisseur || '') + '"></div>' +
-    '</div>' +
-    '<label class="eyebrow" style="margin-top:12px;display:block">Ce qui est sur le ticket ' +
-    '<span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">(une ligne par nature d’achat)</span></label>' +
+    '<div class="champ" style="margin:0"><label class="eyebrow" for="dp-four">Fournisseur</label>' +
+    '<input type="text" id="dp-four" list="dp-fours" autocomplete="off" value="' + esc(d.fournisseur || '') + '">' +
+    '<datalist id="dp-fours">' + fournisseursConnus().map(function (f) {
+      return '<option value="' + esc(f) + '">';
+    }).join('') + '</datalist></div>' +
+    '</div></div>' +
+    '<p class="fj-sous">Le ticket <small class="dp-fac">une ligne par nature d’achat</small></p>' +
     '<div id="dp-lignes"></div>' +
-    '<div class="carte2" id="dp-apercu" style="margin:11px 0"></div>' +
-    '<div class="grille g2">' +
+    '<button type="button" class="btn-min" id="dp-plusligne">+ une autre nature sur ce ticket</button>' +
+    '<p class="fj-sous">Pour s’y retrouver</p><div class="mj-zone">' +
     '<div class="champ"><label class="eyebrow" for="dp-num">N° de pièce</label>' +
     '<input type="text" id="dp-num" autocomplete="off" placeholder="pour retrouver le papier" value="' +
     esc(d.numero || '') + '"></div>' +
+    (chOuv.length || chPerdu ? '<div class="champ" style="margin:0"><label class="eyebrow" for="dp-ch">Rattacher à un chantier</label>' +
+      '<select id="dp-ch"><option value="">— aucun —</option>' +
+      (chPerdu ? '<option value="' + esc(d.chantier) + '" selected>(chantier supprimé)</option>' : '') +
+      chOuv.map(function (c2) {
+        return '<option value="' + c2.id + '"' + (d.chantier === c2.id ? ' selected' : '') + '>' + esc(c2.nom || 'Chantier') + '</option>';
+      }).join('') + '</select></div>' : '') +
     /* Une dépense du véhicule qui n'est pas du carburant : carte grise,
        assurance, péage. Sans elle, ces frais restaient invisibles dans le
        coût au kilomètre — et une carte grise, c'est cinq cents euros. */
-    '<label class="ligne-check" style="display:flex;align-items:center;gap:8px;' +
-    'font-size:13.5px;margin:0 0 11px"><input type="checkbox" id="dp-veh"' +
-    (d.vehicule ? ' checked' : '') + '> Cette dépense concerne le véhicule</label>' +
-    (chOuv.length ? '<div class="champ"><label class="eyebrow" for="dp-ch">Rattacher à un chantier</label>' +
-      '<select id="dp-ch"><option value="">— aucun —</option>' + chOuv.map(function (c2) {
-        return '<option value="' + c2.id + '"' + (d.chantier === c2.id ? ' selected' : '') + '>' + esc(c2.nom || 'Chantier') + '</option>';
-      }).join('') + '</select></div>' : '') +
-    '</div>' +
+    '<label class="mj-case" for="dp-veh"><input type="checkbox" id="dp-veh"' + (d.vehicule ? ' checked' : '') + '>' +
+    '<span><b>Cette dépense concerne le véhicule</b>' +
+    '<small>carte grise, assurance, péage : compte dans le coût au kilomètre</small></span></label>' +
     /* Une facture de garage a deux vies : une dépense, et une ligne du carnet
        qui fait repartir les échéances. La saisir deux fois est le meilleur
        moyen de n'en saisir qu'une. Elle se verse donc d'une case — et le lien
@@ -590,47 +722,85 @@ function ouvrirDepense(id) {
        carte grise n'a rien à faire dans un carnet d'entretien. D'où la case
        plutôt qu'un automatisme. */
     '<div id="dp-carnet" hidden>' +
-    '<label class="ligne-check" style="display:flex;align-items:center;gap:8px;' +
-    'font-size:13.5px;margin:0 0 9px"><input type="checkbox" id="dp-hist"> ' +
-    'Noter aussi dans le carnet d’entretien</label>' +
-    '<div id="dp-histkm" hidden><div class="champ" style="width:11em">' +
+    '<label class="mj-case" for="dp-hist"><input type="checkbox" id="dp-hist">' +
+    '<span><b>Noter aussi dans le carnet d’entretien</b>' +
+    '<small>l’intervention est créée pour son montant hors taxes</small></span></label>' +
+    '<div id="dp-histkm" hidden><div class="champ dp-km">' +
     '<label class="eyebrow" for="dp-km">Kilométrage</label>' +
-    '<input type="text" id="dp-km" inputmode="numeric" value="' +
+    '<input type="text" id="dp-km" inputmode="numeric" autocomplete="off" value="' +
     (kmVehicule() || '') + '"></div>' +
-    '<p class="muted" style="font-size:11.5px;margin:0 0 11px">L’intervention sera créée ' +
-    'pour son montant hors taxes. Cochez ensuite dans le carnet ce qu’elle couvre, ' +
+    '<p class="mj-aide">Cochez ensuite dans le carnet ce qu’elle couvre, ' +
     'pour que les échéances repartent d’ici.</p></div></div>' +
-    '<div class="btn-rang" style="margin-top:11px">' +
-    '<button class="btn primaire" id="dp-ok">Enregistrer</button>' +
-    /* Supprimer a quitté la ligne de la liste pour la fenêtre (lot d1, D5),
-       comme dans Ma journée. Une dépense née d'une charge fixe ne s'ouvre
-       jamais ici : c'est sa charge qu'on ouvre. */
-    (id && !d.auto ? '<button class="btn danger btn-min" id="dp-sup">Supprimer</button>' : '') + '</div>');
+    '</div>' +
+    /* Le pied reste en vue pendant qu'on remplit, comme dans Ma journée.
+       Supprimer est dans la feuille (lot d1, D5). Une dépense née d'une
+       charge fixe ne s'ouvre jamais ici : c'est sa charge qu'on ouvre. */
+    '<div class="mj-pied"><div id="dp-apercu"></div>' +
+    '<div class="btn-rang" style="margin:0">' +
+    (id && !d.auto ? '<button class="btn danger btn-min" id="dp-sup">Supprimer</button>' : '') +
+    '<button class="btn primaire plein" id="dp-ok">Enregistrer</button></div></div>');
   if ($('#dp-sup')) $('#dp-sup').addEventListener('click', function () { supprimerDepense(d); });
 
   renderDepLignes();
-  majOffreCarnet();
-  if ($('#dp-hist')) {
-    $('#dp-hist').addEventListener('change', function () {
-      $('#dp-histkm').hidden = !$('#dp-hist').checked;
+  $('#dp-hist').addEventListener('change', function () {
+    $('#dp-histkm').hidden = !$('#dp-hist').checked;
+  });
+  if (der) {
+    $('#dp-comme').addEventListener('click', function () {
+      if (der.fournisseur) $('#dp-four').value = der.fournisseur;
+      depLignes = lignesCommeLaDerniere(der);
+      renderDepLignes();
+      var premier = $('#dp-lignes [data-dlttc="0"]');
+      if (premier) premier.focus();
+      toast('Repris de la dépense du ' + dateCourte(der.date) + ' : fournisseur et catégories. La date reste le ' +
+        dateCourte(versDate($('#dp-date').value) || Date.now()) + '.');
     });
   }
 
+  /* La frappe ne refait rien : elle met à jour le pied, le prix du litre et
+     l'offre du carnet, sur place. */
   $('#dp-lignes').addEventListener('input', function () {
     lireDepLignes(); majApercuDep(); majPrixLitres(); majOffreCarnet();
   });
   $('#dp-lignes').addEventListener('change', function (e) {
+    var s = e.target.closest('[data-dlsel]');
+    if (!s) return;
     lireDepLignes();
-    if (e.target.closest('[data-dlcat]')) renderDepLignes(); else majApercuDep();
+    choisirCategorieDep(Number(s.dataset.dlsel), s.value);
   });
   $('#dp-lignes').addEventListener('click', function (e) {
-    var plus = e.target.closest('#dp-plusligne'), sup = e.target.closest('[data-dlsup]');
-    if (plus) { lireDepLignes(); depLignes.push({ libelle: '', categorie: 'PETITMAT', ttc: '', taux: 20 }); renderDepLignes(); }
-    else if (sup) { lireDepLignes(); depLignes.splice(Number(sup.dataset.dlsup), 1); renderDepLignes(); }
+    var b = e.target.closest('[data-dlpuce]'), i;
+    if (b) { lireDepLignes(); choisirCategorieDep(Number(b.dataset.dlpuce), b.dataset.cat); return; }
+    b = e.target.closest('[data-dlautre]');
+    if (b) {
+      i = Number(b.dataset.dlautre);
+      lireDepLignes();
+      depLignes[i].autre = !depLignes[i].autre;
+      renderLigneDep(i);
+      return;
+    }
+    b = e.target.closest('[data-dltx]');
+    if (b) {
+      i = Number(b.dataset.dltx);
+      if (!depLignes[i] || tauxFigeDep(depLignes[i])) return;
+      lireDepLignes();
+      depLignes[i].taux = FIN.nb(b.dataset.taux);
+      renderLigneDep(i);
+      return;
+    }
+    b = e.target.closest('[data-dlsup]');
+    if (b) { lireDepLignes(); depLignes.splice(Number(b.dataset.dlsup), 1); renderDepLignes(); }
+  });
+  $('#dp-plusligne').addEventListener('click', function () {
+    lireDepLignes();
+    depLignes.push(ligneDepVide());
+    renderDepLignes();
+    var m = $('#dl-ttc-' + (depLignes.length - 1));
+    if (m) m.focus();
   });
   $('#dp-ok').addEventListener('click', function () {
     lireDepLignes();
-    var lignes = depLignes.filter(function (l) { return FIN.nb(l.ttc) > 0; });
+    var lignes = lignesDepEcrites();
     if (!lignes.length) { toast('Au moins un montant est attendu.'); return; }
     var x = {
       date: versDate($('#dp-date').value) || Date.now(),
@@ -639,20 +809,23 @@ function ouvrirDepense(id) {
       chantier: $('#dp-ch') ? ($('#dp-ch').value || null) : null,
       /* Cochée à la main, la case vaut true ; venue du carnet, elle porte
          l'identifiant de l'intervention. On ne l'écrase pas. */
-      vehicule: $('#dp-veh') && $('#dp-veh').checked ? (d.vehicule || true) : null,
-      lignes: lignes.map(function (l) {
-        var o = { libelle: l.libelle.trim(), categorie: l.categorie, ttc: FIN.nb(l.ttc), taux: FIN.nb(l.taux) };
-        /* Les litres ne vivent que sur une ligne de carburant : les garder
-           après un changement de catégorie fausserait le prix moyen. */
-        if (FIN.estCarburant(l.categorie) && FIN.nb(l.litres) > 0) o.litres = FIN.nb(l.litres);
-        return o;
-      })
+      vehicule: $('#dp-veh').checked ? (d.vehicule || true) : null,
+      lignes: lignes
     };
-    /* on retire les anciens champs à plat pour éviter un double comptage */
     if (id) {
+      var avant = JSON.stringify(d);
+      /* on retire les anciens champs à plat pour éviter un double comptage */
       ['ttc', 'taux', 'tva', 'categorie', 'libelle', 'photo'].forEach(function (k) { delete d[k]; });
-      Object.keys(x).forEach(function (k) { d[k] = x[k]; });
-      d.maj = Date.now();
+      /* Rien ne bouge qui n'a pas été touché : la date garde son heure si le
+         jour est le même, un champ vide n'est pas créé là où il n'existait
+         pas, et « maj » ne change que si la dépense a changé. */
+      if (versChamp(d.date) !== $('#dp-date').value) d.date = x.date;
+      ['fournisseur', 'numero', 'chantier', 'vehicule'].forEach(function (k) {
+        if (!(k in d) && (x[k] == null || x[k] === '')) return;
+        d[k] = x[k];
+      });
+      d.lignes = x.lignes;
+      if (JSON.stringify(d) !== avant) d.maj = Date.now();
     } else { x.id = uid(); x.maj = Date.now(); A.depenses.push(x); }
     var cible = id ? d : x;
     /* Le versement dans le carnet : le montant retenu est le hors taxes des
@@ -660,7 +833,7 @@ function ouvrirDepense(id) {
        raisonne en HT, comme l'historique repris de ses factures, et le même
        ticket peut porter du gasoil à côté de la réparation. */
     var versaCarnet = false;
-    if ($('#dp-hist') && $('#dp-hist').checked && !depDejaAuCarnet) {
+    if ($('#dp-hist').checked && !depDejaAuCarnet) {
       var htVeh = 0, quoi = '';
       (x.lignes || []).forEach(function (l2) {
         if (l2.categorie !== 'VEHIC') return;
@@ -686,7 +859,7 @@ function ouvrirDepense(id) {
         ? 'Dépense enregistrée, et notée dans le carnet — cochez ce qu’elle couvre.'
         : entretien
           ? 'Dépense enregistrée. Pensez à noter l’intervention dans le carnet du véhicule.'
-          : (id ? 'Dépense modifiée.' : 'Dépense enregistrée.'));
+          : (id ? 'Dépense modifiée.' : 'Dépense enregistrée : elle est dans Argent ▸ Dépenses.'));
     };
     sauverDepenses().then(function () {
       if (versaCarnet) sauverVehicule().then(fini); else fini();

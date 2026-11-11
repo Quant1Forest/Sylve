@@ -432,3 +432,23 @@ node outils/tests.js index.html "--motif=fiche du jour|placement"
 
 Vu crier : sans `caseDuJour`, les dix vérifications d'origine tombent à la
 date du 1er ; avec, elles passent aux trois dates.
+
+## La largeur comptait ses écrans sans les nommer (lot d2)
+
+`outils/largeur.js` garde presque chaque mesure par un « si l'écran est là »
+(`if (bouton) { … mesurer(…) }`). Au lot d2, trois passages de suite ont donné
+178, 178 puis **174 mesures, tous au vert** : selon la charge du poste, deux
+à quatre écrans sautaient sans bruit (la fiche d'un jour en pointillés, entre
+autres). Le seul garde-fou était « au moins 40 écrans ».
+
+Deux réponses, sans refaire l'outil :
+
+- **`ATTENDUS`** : les mesures qu'un lot a promises sont exigées par leur nom.
+  Absente, la mesure fait échouer l'étape (« écran non mesuré »). Vu crier en
+  cassant le sélecteur qui ouvre la feuille Dépense. Un lot qui ajoute une
+  mesure l'inscrit là.
+- **`--liste`** nomme chaque écran mesuré : `node outils/largeur.js --liste`,
+  pour comparer deux passages et voir lequel a sauté.
+
+Les mesures plus anciennes ne sont pas dans `ATTENDUS` : elles peuvent encore
+sauter en silence.

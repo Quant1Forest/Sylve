@@ -378,6 +378,40 @@ body:not(.m-ent) .mod-ent{display:none}
   border:1px solid var(--tiede-trait);color:var(--tiede);font-size:13px;overflow-wrap:anywhere}
 .mj-doublon{margin:6px 0 0;font-size:12.5px;color:var(--alerte);overflow-wrap:anywhere}
 .mj-doublon:empty{display:none}
+/* La feuille Dépense (lot d2) reprend les blocs et le pied de Ma journée.
+   Une carte par ligne du ticket : la catégorie en puces, la TVA en quatre
+   boutons qui tiennent la largeur à 320 px. */
+.dp-l{background:var(--carte2);border-radius:10px;padding:10px;margin-bottom:8px;display:grid;gap:10px;min-width:0}
+.dp-l .champ{margin:0;min-width:0}
+.dp-l input,.dp-l select{min-width:0;max-width:100%}
+.dp-haut{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.dp-num{font-size:12px;font-weight:700;color:var(--gris)}
+.dp-cats .chip{background:var(--carte);white-space:normal;text-align:left;max-width:100%;font-weight:500}
+.dp-cats .chip[aria-pressed=true]{background:var(--accent);font-weight:600}
+.dp-cats .chip.plus{background:none}
+.dp-cats .chip.plus[aria-expanded=true]{border-style:solid;color:var(--encre)}
+.dp-sel{margin-top:7px}
+.dp-seg{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--trait-fort);
+  border-radius:var(--r-s);overflow:hidden;background:var(--carte)}
+.dp-seg button{padding:10px 0;text-align:center;font-size:14px;font-weight:600;border-left:1px solid var(--trait);white-space:nowrap}
+.dp-seg button:first-child{border-left:0}
+.dp-seg button[aria-pressed=true]{background:var(--accent);color:var(--accent-texte)}
+.dp-seg.fige{opacity:.55}
+.dp-seg button:disabled{cursor:not-allowed}
+.dp-litres{display:flex;gap:9px;align-items:flex-end;min-width:0}
+.dp-litres .champ{width:8em;flex:none}
+.dp-litres p{flex:1;min-width:0;margin:0 0 9px;font-size:11.5px}
+.dp-fac{font-weight:400;text-transform:none;letter-spacing:0;font-size:12px;color:var(--gris)}
+.dp-km{width:11em;max-width:100%;margin:10px 0 0}
+#dp-plusligne{margin-top:2px}
+/* Le simulateur d'Année est un essai (lot d2) : ce qui diffère des réglages
+   se dit sur une ligne, avec le bouton qui l'y écrit. */
+.sim-essais{margin-top:11px;padding:9px 11px;border-radius:10px;background:var(--tiede-fond);border:1px solid var(--tiede-trait)}
+.sim-essai{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 10px;padding:4px 0;font-size:13.5px;min-width:0}
+.sim-essai > span{min-width:0;overflow-wrap:anywhere;flex:1 1 150px}
+.sim-essai small{display:block;font-size:11.5px;color:var(--gris)}
+.sim-essais p{font-size:11.5px;margin:5px 0 0}
+#dp-apercu small{display:block;font-size:12.5px;margin-top:2px}
 .fj-etat small{display:block;font-size:11.5px;color:var(--gris)}
 /* La fiche de chantier. Le même dessin sert à l'aperçu et à l'impression :
    deux feuilles de style auraient fini par diverger, et c'est justement

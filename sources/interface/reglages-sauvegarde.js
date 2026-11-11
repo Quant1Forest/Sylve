@@ -795,6 +795,11 @@ function brancherReglagesMarque() {
    plus, et la liste devient un journal qu'on ne lit pas.
    « vue » rend la ligne cliquable et mène à l'écran concerné. */
 var NOTES_MAJ = [
+  { v: '4.96', quoi: [
+    { t: 'La dépense se saisit sur une feuille : la catégorie en puces, la TVA en quatre boutons (« sans » d’office pour une assurance), le total toujours en vue', vue: 'depenses' },
+    { t: '« Comme la dernière » reprend le fournisseur et les catégories de votre dernière dépense ; les fournisseurs déjà saisis sont proposés', vue: 'depenses' },
+    { t: 'Année : le simulateur de cotisations et d’impôt devient un essai, vos réglages ne changent que par « Garder ce taux » ; le débours ne gonfle plus les barres mois par mois', vue: 'analyses' }
+  ] },
   { v: '4.95', quoi: [
     { t: 'Argent s’ouvre sur le mois : le chiffre d’affaires en grand, l’année mois par mois, le trimestre pour la MSA, la TVA et les dépenses du mois', vue: 'finances' },
     { t: 'Quatre pastilles : Mois, TVA, Dépenses (les charges fixes sont dessous) et Année, qui reprend les anciennes analyses', vue: 'tva' },

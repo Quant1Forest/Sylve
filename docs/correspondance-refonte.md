@@ -30,6 +30,7 @@ Statuts :
 - **fait (lot r1)** — en place depuis la 4.92.0 (Aujourd'hui et Agenda allégés, journée d'office, Mes notes dans le ☰ ; section 15).
 - **fait (lot d1)** — en place depuis la 4.95.0 (Argent : Mois · TVA · Dépenses · Année).
 - **en partie (lot d1)** — en place depuis la 4.95.0 ; ce qui reste est dit après les deux-points.
+- **fait (lot d2)** — en place depuis la 4.96.0 (feuille Dépense ; simulateur d’Année en essai ; débours hors des barres mois par mois).
 
 ---
 
@@ -66,6 +67,9 @@ Statuts :
   sous la liste des Dépenses, les analyses dans Année, les cumuls de l'ancien carnet aussi. Preuve bloc
   par bloc : `docs/inventaire-ecrans.md`, *Où sont allés les blocs de Finances*. La feuille Dépense
   (D1-D4) vient au lot d2.
+- **Lot d2 (4.96.0)** : la fenêtre d’une dépense devient une feuille (D1-D4), ouverte par + ▸ Dépense, « + Dépense »
+  d’Argent ▸ Dépenses et l’appui sur une ligne. Deux corrections venues du lot d1, tranchées le 11/11 : le simulateur
+  d’Année ▸ Vue d’ensemble devient un essai, et le débours sort des barres mois par mois.
 
 ---
 
@@ -257,7 +261,7 @@ mémorisée, avec les mêmes trois sélecteurs. Les anciennes clés de vue mène
 | Ancien | Nouvel endroit | Statut |
 |---|---|---|
 | Finances ▸ Bilan ▸ Période (Mois / Trimestre / Année) | Mois : ‹ mois › ; TVA et Dépenses : mois, trimestre ou année ; Année : ses sélecteurs actuels (section Analyses) | fait (lot d1) : Mois a son propre mois ; TVA, Dépenses et Année partagent la période d'avant ; Année arrive donc sur la période partagée (l'année en cours au premier lancement), pas toujours sur l'année en cours — c'est le partage qui tranche — proposé |
-| Bilan ▸ Chiffre d'affaires : facturé HT, encaissé, en attente | Mois : facturé HT (prestation / vente), graphique mois par mois de l'année, encaissé, « Facturé, pas encore payé » | fait (lot d1) : « encaissé » se dit « dont payé » (les factures du mois, réglées depuis) ; « en attente » du mois devient « pas encore payé » — validé (V2) |
+| Bilan ▸ Chiffre d'affaires : facturé HT, encaissé, en attente | Mois : facturé HT (prestation / vente), graphique mois par mois de l'année, encaissé, « Facturé, pas encore payé » | fait (lot d1) : « encaissé » se dit « dont payé » (les factures du mois, réglées depuis) ; « en attente » du mois devient « pas encore payé » — validé (V2) ; fait (lot d2) : les barres ne comptent plus le débours — la barre du mois vaut le grand chiffre, « à fin <mois> » est la somme des barres (tranché le 11/11) |
 | CA mois par mois pour la déclaration MSA trimestrielle | Mois : ligne « Trimestre en cours (MSA) » | fait (lot d1) : « Trimestre (MSA) », le trimestre civil du mois affiché (sur décembre : octobre-décembre), un mois à venir dit « à venir » — validé (V2) |
 | Bilan ▸ abattements (CA après abattement vente 71 % / prestation 50 %) | Année ▸ Vue d'ensemble et Déclarations | fait (lot d1) : Année ▸ Vue d'ensemble ▸ Abattements, replié, sur la période ; Déclarations inchangée — proposé |
 | Bilan ▸ Balance de TVA (collectée, déductible, solde) | Mois : TVA du mois en lignes alignées (taux, base, montant), TVA facturée, déductible, à reverser ; onglet TVA : même présentation sur la période choisie (déclaration annuelle par taux) | fait (lot d1) : « TVA facturée » ; la règle (date de la facture) dite sous l'onglet TVA — validé (30/10) |
@@ -266,16 +270,16 @@ mémorisée, avec les mêmes trois sélecteurs. Les anciennes clés de vue mène
 | Bilan ▸ Par donneur d'ordre | Mois ▸ Pour aller plus loin, et Année | fait (lot d1) : sur le mois, et « tous chantiers confondus » comme avant ; Année ▸ Recettes ▸ Par donneur d'ordre, pas doublé — validé (V2) |
 | Bilan ▸ Devis (taux d'acceptation, en attente) | Année ▸ Devis : taux, en attente, perdus et motifs | fait (lot d1) : Année ▸ Vue d'ensemble ▸ Devis, replié — proposé |
 | (V2) Ce qui rapporte par type de travaux, Marge sur fournitures, Charges fixes prélevées | Mois ▸ Pour aller plus loin (repliés) | fait (lot d1) : avec Recettes moins dépenses et Déplacements ; « Ce qui rapporte » sur les prestations seules — validé (V2) |
-| Finances ▸ Dépenses : indicateurs (TTC, HT, TVA déductible, nombre), filtre par catégorie, liste (Modifier, Supprimer) | Argent ▸ Dépenses : indicateurs, filtre et liste intacts ; un appui sur la ligne ouvre la dépense (modifier) ; Supprimer passe dans la feuille de la dépense, comme Ma journée ; une dépense née d'une charge fixe renvoie toujours à sa charge | fait (lot d1) : ligne de la maquette (fournisseur ; date · catégories · charge fixe ; TTC et TVA) ; Supprimer dans la fenêtre actuelle de la dépense, la feuille D1-D4 au lot d2 — validé (31/10 ; D5) |
-| Finances ▸ Dépenses ▸ + Dépense | + ▸ Dépense | fait (lot 5a) ; « + Dépense » reste aussi dans la page — validé (30/10) |
+| Finances ▸ Dépenses : indicateurs (TTC, HT, TVA déductible, nombre), filtre par catégorie, liste (Modifier, Supprimer) | Argent ▸ Dépenses : indicateurs, filtre et liste intacts ; un appui sur la ligne ouvre la dépense (modifier) ; Supprimer passe dans la feuille de la dépense, comme Ma journée ; une dépense née d'une charge fixe renvoie toujours à sa charge | fait (lot d1) : ligne de la maquette (fournisseur ; date · catégories · charge fixe ; TTC et TVA) ; Supprimer dans la fenêtre de la dépense ; fait (lot d2) : cette fenêtre est la feuille D1-D4 — validé (31/10 ; D5) |
+| Finances ▸ Dépenses ▸ + Dépense | + ▸ Dépense | fait (lot 5a) ; « + Dépense » reste aussi dans la page ; fait (lot d2) : les deux portes, et l’appui sur une ligne de la liste, ouvrent la feuille du tour 2 (D1-D4) — validé (30/10) |
 | Finances ▸ Charges fixes : résumé, liste (Modifier, Supprimer), Échéances (quand, où part l'argent) | Argent ▸ Dépenses, bloc Charges fixes ; « Échéances » devient « Prélèvements à venir » | fait (lot d1) : « prochain prélèvement » sur chaque ligne ; un appui ouvre la charge, Supprimer dans sa fenêtre (proposé) — validé (31/10) |
 | Finances ▸ Charges fixes ▸ + Charge | + ▸ Charge fixe (Plus rare) | fait (lot 5a) ; « + Charge » reste dans le bloc Charges fixes des Dépenses (lot d1) — validé (31/10, Q1) |
 | Dépenses créées seules à chaque échéance ; bouton « La charge » d'une dépense | Inchangés | fait (lot d1, inchangé) : la ligne d'une dépense née d'une charge dit « La charge » et l'ouvre — proposé (inchangé) |
-| Finances ▸ Analyses ▸ Vue d'ensemble · Recettes · Dépenses · Déclarations (tout leur contenu) | Argent ▸ Année, mêmes quatre pastilles, contenu intact | fait (lot d1) : seconde rangée de pastilles, soulignée, plus discrète — validé (31/10) |
+| Finances ▸ Analyses ▸ Vue d'ensemble · Recettes · Dépenses · Déclarations (tout leur contenu) | Argent ▸ Année, mêmes quatre pastilles, contenu intact | fait (lot d1) : seconde rangée de pastilles, soulignée, plus discrète ; fait (lot d2) : les barres mois par mois de Vue d’ensemble et de Recettes (facturé, encaissé) ne comptent plus le débours, comme leurs carreaux (tranché le 11/11) — validé (31/10) |
 | Analyses ▸ sélecteurs de période propres (type et année) | Gardés dans l'onglet Année, qui arrive sur l'année en cours | fait (lot d1) : sélecteurs gardés, sur la période partagée — proposé |
 | Analyses ▸ Déclarations ▸ cotisations et impôt, simulateur | Année ▸ Déclarations | fait (lot d1, inchangé) — validé (31/10) |
 | Analyses ▸ Déclarations ▸ versements et récupérations, + Mouvement | Année ▸ Déclarations (s'ajoute à une déclaration, reste sur place) | fait (lot d1, inchangé) — proposé |
-| Taux en double (Réglages ▸ Financier et cases du simulateur) | Réglages = taux de référence ; les cases du simulateur partent de ces taux et servent à essayer sans modifier les Réglages (vérifier le comportement actuel avant de toucher) | en partie (lot d1) : comportement vérifié, rien changé ; les cases du simulateur, de Déclarations, des Hypothèses de la rentabilité et de Réglages ▸ Financier écrivent toutes le même réglage ; essayer un taux dans le simulateur change donc celui des Réglages — à revoir avec lui |
+| Taux en double (Réglages ▸ Financier et cases du simulateur) | Réglages = taux de référence ; les cases du simulateur partent de ces taux et servent à essayer sans modifier les Réglages (vérifier le comportement actuel avant de toucher) | fait (lot d2) : le simulateur de Vue d’ensemble est un essai — un taux (ou « Appliqués sur ») qu’on y change ne sert qu’à lui, le temps de l’écran ; une ligne « Essai : 30 % · vos réglages : 25 % » et le bouton « Garder ce taux », seul geste qui écrit le réglage. Réglages ▸ Financier, Déclarations et les Hypothèses de la rentabilité écrivent toujours le même réglage, comme avant (les Hypothèses seront revues au lot Stock) — tranché (11/11) |
 | Tuile Finances (facturé, TVA à reverser / à récupérer) | Onglet Argent | fait (lot 5a) — validé (30/10) |
 | Bilan ▸ coût du carburant estimé | Mois ▸ Pour aller plus loin ▸ Déplacements | fait (lot d1) — proposé |
 | (plus tard) Vrai résultat comparé à l'abattement, par an et par chantier | Année, et fiche annuelle PDF | idée (après la refonte) |
@@ -391,7 +395,7 @@ fournisseur, entrées de listes (Réglages) · Coller depuis Excel · Importer
 | Que s'est-il passé ? | Fondue dans la fiche du jour (état « à trancher ») | fait (lot c1) — retrait accepté (31/10, R8) |
 | Déplacer la journée · Jour non travaillé · Poser un chantier | Depuis la fiche du jour | fait (lot c1) — validé (31/10) |
 | Placer un chantier sur la carte | Étape Infos ; Chantiers ▸ Carte | en partie (lot b1) : étape Infos ; Chantiers ▸ Carte au lot b2 — proposé |
-| Dépense | + ▸ Dépense ; liste Argent ▸ Dépenses (modifier, supprimer dans la feuille) | validé (31/10, D1-D5) |
+| Dépense | + ▸ Dépense ; liste Argent ▸ Dépenses (modifier, supprimer dans la feuille) | fait (lot d2) : la feuille du tour 2, mêmes champs en base — validé (31/10, D1-D5) |
 | Charge fixe | + ▸ Charge fixe ; liste Charges fixes (modifier) | validé (31/10) |
 | Mouvement (versement / récupération) | Année ▸ Déclarations | proposé |
 | Hypothèses (rentabilité) | Stock ▸ Rentabilité | proposé (inchangé) |
@@ -513,11 +517,11 @@ Lot d1 : « nouvelle après X » ajoute une pastille qui n'était pas dans l'inv
 
 ### Étape 5b, tour 2 (maquette `maquettes/refonte-5b-tour2.html`, validée le 31/10)
 
-- **D1** — Dépense : catégorie en tête de ligne, en puces (Consommable, Repas, Carburant, EPI, Petit outillage, Fournitures) + « Autre… » qui ouvre la liste des 19.
-- **D2** — TVA « sans » d'office et bloquée pour Assurance, Frais bancaires, Prêt, Cotisations (catégories `sansTva`, comme déjà dans les charges fixes) ; retour à 20 % si on change pour une catégorie avec TVA.
-- **D3** — « Comme la dernière » : reprend le fournisseur et les catégories (et taux) de la dernière dépense hors charges fixes ; ni la date ni les montants ni les litres.
-- **D4** — Fournisseur proposé d'après les dépenses passées (liste qui se remplit seule, rien à régler).
-- **D5** — Supprimer une dépense : dans sa feuille ; la ligne de la liste s'ouvre d'un appui.
+- **D1** — Dépense : catégorie en tête de ligne, en puces (Consommable, Repas, Carburant, EPI, Petit outillage, Fournitures) + « Autre… » qui ouvre la liste des 19. Fait (lot d2) : une catégorie prise dans « Autre… » s’affiche en puce sur la ligne.
+- **D2** — TVA « sans » d'office et bloquée pour Assurance, Frais bancaires, Prêt, Cotisations (catégories `sansTva`, comme déjà dans les charges fixes) ; retour à 20 % si on change pour une catégorie avec TVA. Fait (lot d2) : une ligne ancienne saisie avec un taux sur une de ces catégories garde son taux tant qu’on ne la passe pas à « sans » (rien n’est corrigé en l’ouvrant).
+- **D3** — « Comme la dernière » : reprend le fournisseur et les catégories (et taux) de la dernière dépense hors charges fixes ; ni la date ni les montants ni les litres. Fait (lot d2) : ni la désignation, ni le n° de pièce, ni le chantier, ni le véhicule ; une ligne par couple catégorie-taux ; une dépense née d’une commande ou d’une intervention compte comme « la dernière », sans son lien.
+- **D4** — Fournisseur proposé d'après les dépenses passées (liste qui se remplit seule, rien à régler). Fait (lot d2).
+- **D5** — Supprimer une dépense : dans sa feuille ; la ligne de la liste s'ouvre d'un appui. Fait (lot d1) ; dans le pied de la feuille au lot d2.
 - **C1** — Chantier à l'étape Infos : une ligne « Devis à faire » dans Bientôt, « pas encore repéré » en petit ; plus de « Repérage à faire ». Fait (lot b2) : « repéré il y a N j » quand la date de repérage est notée.
 - **C1, confirmé le 31/10 (5b2)** — « Devis à faire » = statut « Devis à envoyer », même si le devis est rédigé, tant qu'il n'est pas envoyé. Rien à changer.
 - **Chantier « en retard », confirmé le 31/10 (5b2)** — reste seulement dans « À traiter » du carnet, pas dans Aujourd'hui.

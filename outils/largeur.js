@@ -30,6 +30,9 @@ const ARGS = process.argv.slice(2);
 const FICHIER = path.resolve(ARGS.filter(a => a.indexOf('--') !== 0)[0] || path.join(__dirname, '..', 'index.html'));
 const opt = ARGS.filter(a => a.indexOf('--largeurs=') === 0)[0];
 const LARGEURS = (opt ? opt.slice(11) : '320,360').split(',').map(Number);
+/* « --liste » nomme chaque écran mesuré : pour voir lequel a sauté. */
+const LISTE = ARGS.indexOf('--liste') >= 0;
+const ATTENDUS = ['+ depense › trois lignes, Autre ouvert', 'argent › année › simulateur, trois essais'];
 
 function trouverChrome() {
   const candidats = [
@@ -345,6 +348,48 @@ function parcours() {
       mesurer('+ journee › répartie, cases h et min');
       await fermer();
     }
+    /* Lot d2 : la feuille Dépense avec trois lignes — un carburant et ses
+       litres, une catégorie au nom long prise dans « Autre… » ouvert, des
+       frais de véhicule qui déplient le carnet et le kilométrage — puis la
+       ligne d'essai du simulateur d'Année. */
+    $('#barre [data-barre="plus"]').click(); await pause(250);
+    const pd = $('#modale [data-plus="depense"]');
+    if (pd) {
+      pd.click(); await pause(500);
+      const plusL = $('#dp-plusligne');
+      if (plusL) { plusL.click(); await pause(150); plusL.click(); await pause(150); }
+      const appui = async function (sel) { const b = $(sel); if (b) { b.click(); await pause(150); } };
+      const taper = function (sel, v) { const c = $(sel); if (c) { c.value = v; c.dispatchEvent(new Event('input', { bubbles: true })); } };
+      await appui('[data-dlpuce="0"][data-cat="CARB"]');
+      taper('#dl-ttc-0', '1234,56'); taper('#dl-l-0', '812,5');
+      await appui('[data-dlautre="1"]');
+      const se = $('[data-dlsel="1"]');
+      if (se) { se.value = 'CARBPERSO'; se.dispatchEvent(new Event('change', { bubbles: true })); await pause(150); }
+      taper('#dl-ttc-1', '98765,43');
+      await appui('[data-dlautre="2"]');
+      const s2 = $('[data-dlsel="2"]');
+      if (s2) { s2.value = 'VEHIC'; s2.dispatchEvent(new Event('change', { bubbles: true })); await pause(150); }
+      taper('#dl-ttc-2', '360');
+      const hist = $('#dp-hist');
+      if (hist) { hist.checked = true; hist.dispatchEvent(new Event('change', { bubbles: true })); await pause(150); }
+      const complet = document.querySelectorAll('#dp-lignes .dp-l').length === 3 && !!$('[data-dlsel="1"]') &&
+        !!$('#dl-l-0') && $('#dp-histkm') && !$('#dp-histkm').hidden;
+      if (complet) mesurer('+ depense › trois lignes, Autre ouvert');
+      else relevés.push({ ecran: '+ depense › trois lignes, Autre ouvert', page: 0, ecranLargeur: 0, trop: true, barre: true,
+        fautifs: ['la feuille n’a pas pu être remplie : rien n’a été mesuré'] });
+      await fermer();
+    }
+    $('#barre [data-barre="argent"]').click(); await pause(400);
+    const an2 = $('#onglets [data-vue="analyses"]');
+    if (an2) {
+      an2.click(); await pause(350);
+      const ens = $('#ana-onglets [data-ana="ensemble"]'); if (ens) { ens.click(); await pause(300); }
+      const essai = function (sel, v) { const c = $(sel); if (c) { c.value = v; c.dispatchEvent(new Event('change', { bubbles: true })); } };
+      essai('#sim-cot', '31,5'); await pause(200); essai('#sim-imp', '7,5'); await pause(200); essai('#sim-base', 'brut'); await pause(200);
+      if (document.querySelectorAll('[data-simessai]').length === 3) mesurer('argent › année › simulateur, trois essais');
+      else relevés.push({ ecran: 'argent › année › simulateur, trois essais', page: 0, ecranLargeur: 0, trop: true, barre: true,
+        fautifs: ['les lignes d’essai ne sont pas là : rien n’a été mesuré'] });
+    }
     parent.postMessage({ releves: relevés, erreurs: erreurs }, '*');
   })();
 }
@@ -395,6 +440,13 @@ for (const largeur of LARGEURS) {
     if (e.trop) { ko++; console.log('  ✕ ' + largeur + ' px · ' + e.ecran + ' : la page fait ' + e.page + ' px pour un écran de ' + e.ecranLargeur + (e.fautifs.length ? ' (' + e.fautifs.join(', ') + ')' : '')); }
     if (!e.barre) { ko++; console.log('  ✕ ' + largeur + ' px · ' + e.ecran + ' : la barre du bas n’est pas entière dans l’écran'); }
   }
+  /* Une mesure gardée par un « si l'écran est là » peut sauter sans bruit
+     (lot d2 : 174 mesures un jour, 178 le lendemain, toujours au vert). Celles
+     qu'un lot a promises sont donc exigées par leur nom. */
+  for (const nom of ATTENDUS) {
+    if (!res.releves.some(e => e.ecran === nom)) { ko++; console.log('  ✕ ' + largeur + ' px · ' + nom + ' : écran non mesuré'); }
+  }
+  if (LISTE) res.releves.forEach(e => console.log('      ' + e.ecran));
   if (res.erreurs.length) { ko++; console.log('  ✕ ' + largeur + ' px : erreurs dans la page : ' + res.erreurs.slice(0, 2).join(' ; ')); }
   console.log('  ' + largeur + ' px : ' + res.releves.length + ' écrans parcourus');
 }

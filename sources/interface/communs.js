@@ -19,7 +19,7 @@ function ecrire(k, o) { return Store.set(k, JSON.stringify(o)); }
 var A = {
   cfg: null, index: [], bord: null, piles: [], chantiers: [], module: 'cubage', ici: null,
   vuePiles: 'stock', triRend: 'alpha', carte: null, cartePose: null, filtreCh: 'ouverts', rechCh: '', triAncien: false, triCh: 'auto', chOuvert: null, clients: [], proprios: [], estim: null, imp: null, articles: [], charges: [], fournisseurs: [], commandes: [], sorties: [], mvt: 'achats', journees: [], lieuxRegles: [], listeReglee: 'clients', revient: null, calMois: null, calJour: null, nbAlertes: 0, planifie: null,
-  depenses: [], periode: null, filtreDep: 'tous', vueAna: 'ensemble', secReglages: 'general',
+  depenses: [], periode: null, filtreDep: 'tous', vueAna: 'ensemble', essaiSim: null, secReglages: 'general',
   achats: [], fch: null, fchFiltre: 'ouverts',
   versements: [], vehicule: null,
   vue: 'saisie', sousVue: 'synthese', edition: null,

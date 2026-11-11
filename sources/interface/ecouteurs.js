@@ -53,6 +53,8 @@ function aller(v) {
   /* Le chemin d'un écran libre se note avant de changer d'écran : il faut
      savoir d'où l'on vient pour savoir où revenir. */
   noterParcours(v);
+  /* L'essai du simulateur d'Année dure le temps de l'écran (lot d2). */
+  if (v !== 'analyses') A.essaiSim = null;
   A.vue = v;
   $$('.onglets button').forEach(function (b) { b.setAttribute('aria-selected', String(b.dataset.vue === v)); });
   amenerPastilleEnVue();
@@ -533,7 +535,8 @@ function brancher() {
   /* --- analyses --- */
   $('#ana-onglets').addEventListener('click', function (e) {
     var b = e.target.closest('[data-ana]');
-    if (b) { A.vueAna = b.dataset.ana; renderAnalyses(); }
+    /* L'essai du simulateur ne vit que sur Vue d'ensemble. */
+    if (b) { A.vueAna = b.dataset.ana; if (A.vueAna !== 'ensemble') A.essaiSim = null; renderAnalyses(); }
   });
   /* TVA, Dépenses et Année portent chacune les mêmes trois sélecteurs, qui
      écrivent la même période : celle qu'on choisit dans l'une se retrouve
@@ -548,6 +551,8 @@ function brancher() {
     });
   });
   $('#ana-corps').addEventListener('click', function (e) {
+    var gs = e.target.closest('[data-simgarder]');
+    if (gs) { garderEssaiSimulation(gs.dataset.simgarder); return; }
     if (e.target.closest('#decl-vers')) { ouvrirVersement(null); return; }
     var vm = e.target.closest('[data-versmod]');
     if (vm) ouvrirVersement(vm.dataset.versmod);
@@ -578,11 +583,8 @@ function brancher() {
       sauverCfg(); renderAnalyses(); return;
     }
     if (!e.target.closest('#sim-cot') && !e.target.closest('#sim-imp') && !e.target.closest('#sim-base')) return;
-    A.cfg.tauxCotisations = FIN.nb($('#sim-cot').value) || null;
-    A.cfg.tauxImpot = FIN.nb($('#sim-imp').value) || null;
-    A.cfg.baseCotisations = $('#sim-base').value === 'brut' ? 'brut' : 'abattu';
-    A.cfg.baseImpot = A.cfg.baseCotisations;
-    sauverCfg(); renderAnalyses();
+    /* Un essai (lot d2) : rien n'est écrit dans les réglages. */
+    essayerSimulation($('#sim-cot').value, $('#sim-imp').value, $('#sim-base').value);
   });
 
   /* --- fiche de chantier --- */

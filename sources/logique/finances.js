@@ -454,11 +454,16 @@ function caParDonneur(chantiers, b) {
    Répartitions et séries mensuelles. Tout est calculé à la demande à partir
    des chantiers et des dépenses : rien n'est stocké en double. */
 
-/* Recettes mois par mois sur une année (12 valeurs, index 0 = janvier). */
+/* Recettes mois par mois sur une année (12 valeurs, index 0 = janvier).
+   Hors débours (lot d2, tranché le 11/11) : une barre vaut le chiffre
+   d'affaires facturé du mois, celui que chiffreAffaires() donne en total.
+   Ces deux séries ne nourrissent que des barres ; lignesFacturees(), que
+   lisent la TVA et les répartitions, n'est pas touchée. */
 function recettesParMois(chantiers, annee) {
   var t = [];
   for (var i = 0; i < 12; i++) t.push(0);
   lignesFacturees(chantiers, bornes('annee', annee)).forEach(function (x) {
+    if (estHorsCA(x.nature)) return;
     t[new Date(x.date).getMonth()] += x.ht;
   });
   return t.map(function (v) { return arr(v, 2); });
@@ -472,12 +477,14 @@ function depensesParMois(depenses, annee) {
   });
   return t.map(function (v) { return arr(v, 2); });
 }
-/* Encaissements mois par mois : ce qui est réellement rentré. */
+/* Encaissements mois par mois : ce qui est réellement rentré — hors débours
+   lui aussi, pour que ses barres se comparent à celles du facturé et au
+   carreau « encaissé » d'Année ▸ Recettes, qui l'a toujours écarté. */
 function encaissementsParMois(chantiers, annee) {
   var t = [];
   for (var i = 0; i < 12; i++) t.push(0);
   lignesFacturees(chantiers, bornes('annee', annee)).forEach(function (x) {
-    if (x.paye) t[new Date(x.date).getMonth()] += x.ht;
+    if (x.paye && !estHorsCA(x.nature)) t[new Date(x.date).getMonth()] += x.ht;
   });
   return t.map(function (v) { return arr(v, 2); });
 }

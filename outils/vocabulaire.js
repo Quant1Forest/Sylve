@@ -77,8 +77,12 @@ module.exports = {
   versements: ['id', 'maj', 'date', 'type', 'montant', 'periode', 'note',
     'rembourse'],
 
+  /* `numero` et `chantier` : la feuille Dépense les écrit depuis toujours
+     (ouvrirDepense), et la commande pose `numero` sur sa dépense ; relevés au
+     lot d2, pour semer une dépense ancienne complète. */
   depenses: ['id', 'maj', 'date', 'fournisseur', 'categorie', 'ttc', 'taux',
-    'lignes', 'note', 'auto', 'charge', 'echeance', 'commande', 'vehicule'],
+    'lignes', 'note', 'auto', 'charge', 'echeance', 'commande', 'vehicule',
+    'numero', 'chantier'],
 
   piles: ['id', 'maj', 'nom', 'lieu', 'cotes', 'buche', 'essences', 'hauteurs',
     'lat', 'lon', 'note', 'mouvements', 'humidite', 'etat', 'secheVers']

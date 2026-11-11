@@ -5817,7 +5817,7 @@ scenario('Véhicule : une dépense d’entretien suggère le carnet, pas deux fo
   t.clic('#dep-nouvelle'); await t.pause(400);
   t.saisir('[data-dl="0"]', 'Vidange');
   t.saisir('[data-dlttc="0"]', '250');
-  t.choisir('[data-dlcat="0"]', 'ENTRETIEN'); await t.pause(200);
+  await categorieDep(t, 0, 'ENTRETIEN'); await t.pause(200);
   t.clic('#dp-ok'); await t.pause(500);
   verifierVrai('la suggestion est faite',
     /carnet du véhicule/.test(t.$('#toast').textContent));
@@ -6146,7 +6146,7 @@ scenario('Véhicule : la dépense se verse dans le carnet', async () => {
     t.$('#dp-carnet').hidden);
   t.saisir('[data-dl="0"]', 'Plaquettes avant');
   t.saisir('[data-dlttc="0"]', '360');
-  t.choisir('[data-dlcat="0"]', 'VEHIC'); await t.pause(250);
+  await categorieDep(t, 0, 'VEHIC'); await t.pause(250);
   verifierVrai('elle apparaît sur une ligne « Frais véhicule »', !t.$('#dp-carnet').hidden);
   verifierVrai('le kilométrage reste caché tant qu’on ne coche pas', t.$('#dp-histkm').hidden);
 
@@ -6204,7 +6204,7 @@ scenario('Dépense : la case « concerne le véhicule » la rattache', async () 
   verifier('décochée par défaut', false, t.$('#dp-veh').checked);
   t.saisir('[data-dl="0"]', 'Carte grise');
   t.saisir('[data-dlttc="0"]', '498');
-  t.choisir('[data-dlcat="0"]', 'COTIS'); await t.pause(200);
+  await categorieDep(t, 0, 'COTIS'); await t.pause(200);
   cocher(t, '#dp-veh', true);
   t.clic('#dp-ok'); await t.pause(500);
   const d = (t.stock('depenses') || [])[0];
@@ -12096,8 +12096,10 @@ scenario('Argent ▸ Mois : au centime de l’ancien Bilan, l’année mois par 
   verifier('une barre par catégorie, les charges fixes ensemble',
     [['IMMO', 'Immobilisation', '800€'], ['CARB', 'Frais de carburant pro', '51,14€'], ['charges', 'Charges fixes', '20€']],
     t.$$('#mo-dep [data-modep]').map(b => [b.dataset.modep, b.querySelector('.ag-hn').textContent, sansBlancs(b.querySelector('.num').textContent)]));
-  /* L'histogramme : le « facturé » mois par mois d'Année. */
+  /* L'histogramme : le « facturé » mois par mois d'Année — hors débours
+     depuis le lot d2, donc la barre du mois vaut le grand chiffre. */
   const parMois = FIN.recettesParMois(t.stock('chantiers'), D1_AN);
+  verifier('la barre du mois : le facturé hors débours, à la main', 2859.7, parMois[D1_MO]);
   const barres = t.$$('#mo-histo rect[data-mois]');
   verifier('une barre par mois facturé', parMois.map((v, i) => v > 0 ? i : -1).filter(i => i >= 0),
     barres.map(r => Number(r.getAttribute('data-mois'))));
@@ -12226,7 +12228,7 @@ scenario('Argent ▸ Dépenses : un appui ouvre, Supprimer dans la fenêtre, la 
   /* Une nouvelle dépense n'a rien à supprimer. */
   await parBarre(t, 'argent'); t.clic('[data-vue="depenses"]'); await t.pause(200);
   t.clic('#dep-nouvelle'); await t.pause(250);
-  verifierVrai('une nouvelle dépense n’a pas de Supprimer', t.texte('#modale-titre') === 'Nouvelle dépense' && !t.$('#dp-sup'));
+  verifierVrai('une nouvelle dépense n’a pas de Supprimer', t.texte('#modale-titre') === 'Dépense' && !t.$('#dp-sup'));
   t.clic('#modale-x'); await t.pause(150);
   /* Née d'une charge : c'est la charge qui s'ouvre, comme son ancien bouton. */
   t.clic('[data-depmod="' + auto + '"]'); await t.pause(300);
@@ -12437,6 +12439,492 @@ scenario('Argent ▸ Année : la seconde rangée de pastilles se distingue de ce
   verifierVrai('soulignée, sans fond plein quand elle est choisie',
     /\.chips\.ana-onglets \.chip\[aria-pressed=true\]\{background:none;[^}]*border-bottom-color:var\(--accent\)/.test(css));
   verifierVrai('et passe à la ligne plutôt que d’élargir la page', !/\.chips\.ana-onglets\{[^}]*nowrap/.test(css) && /\.chips\{display:flex;flex-wrap:wrap/.test(css));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* ===================================================== lot d2 (4.96.0)
+   La fenêtre d'une dépense devient une feuille (D1 à D4) ; le simulateur
+   d'Année devient un essai ; le débours sort des barres mois par mois. */
+/* La catégorie d'une ligne de dépense : sa puce, ou « Autre… » puis la
+   liste entière. */
+async function categorieDep(t, i, code) {
+  const puce = t.$('#dp-lignes [data-dlpuce="' + i + '"][data-cat="' + code + '"]');
+  if (puce) { puce.click(); await t.pause(120); return true; }
+  if (!t.$('[data-dlsel="' + i + '"]')) { t.clic('[data-dlautre="' + i + '"]'); await t.pause(120); }
+  const ok = t.choisir('[data-dlsel="' + i + '"]', code);
+  await t.pause(120);
+  return ok;
+}
+async function plusDepense(t) {
+  t.clic('#barre [data-barre="plus"]'); await t.pause(200);
+  t.clic('#modale [data-plus="depense"]'); await t.pause(300);
+}
+const puceChoisie = (t, i) => t.$$('#dp-lignes [data-dli="' + i + '"] [data-dlpuce][aria-pressed="true"]').map(b => b.textContent);
+const tauxChoisi = (t, i) => t.$$('#dp-lignes [data-dltx="' + i + '"][aria-pressed="true"]').map(b => b.dataset.taux);
+const tauxBloques = (t, i) => t.$$('#dp-lignes [data-dltx="' + i + '"]').map(b => b.disabled);
+const piedDep = (t, k) => sansBlancs(t.texte('#dp-apercu [data-dp="' + k + '"]') || '');
+const insecables = s => String(s || '').replace(/ /g, ' ');
+/* Le 1er du mois à 8 h 30 : une date qui n'est pas à midi, comme en posent
+   la commande et l'intervention. */
+const D2_MATIN = new Date(D1_AN, D1_MO, 1, 8, 30).getTime();
+
+/* --------------------------------------------------------------------- */
+scenario('Dépense : la catégorie en puces, « Autre… » ouvre les dix-neuf (D1)', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'finances' }));
+  const FIN = t.w.BCF;
+  await plusDepense(t);
+  verifier('+ ▸ Dépense ouvre la feuille « Dépense »', 'Dépense', t.texte('#modale-titre'));
+  verifier('trois blocs titrés', ['Quand, où', 'Le ticket une ligne par nature d’achat', 'Pour s’y retrouver'],
+    t.$$('#modale-corps .fj-sous').map(p => p.textContent.replace(/\s+/g, ' ').trim()));
+  verifier('la date : aujourd’hui d’office', jourISO(Date.now()), t.$('#dp-date').value);
+  verifier('six puces et « Autre… », dans l’ordre',
+    ['Consommable', 'Repas', 'Carburant', 'EPI', 'Petit outillage', 'Fournitures', 'Autre…'],
+    t.$$('#dp-lignes .dp-cats button').map(b => b.textContent));
+  verifier('leurs codes', ['CONSO', 'REPAS', 'CARB', 'EPI', 'PETITMAT', 'FOURN'],
+    t.$$('#dp-lignes [data-dlpuce]').map(b => b.dataset.cat));
+  verifierVrai('la catégorie est en tête de la ligne, avant le montant',
+    t.$('.dp-cats').compareDocumentPosition(t.$('#dl-ttc-0')) & 4);
+  verifierVrai('pas de litres tant que ce n’est pas du carburant', !t.$('[data-dllitres]'));
+  verifierVrai('une seule ligne ne se retire pas', !t.$('[data-dlsup]'));
+  verifierVrai('le pied attend un montant', /Saisissez au moins un montant/.test(t.texte('#dp-apercu')));
+  t.saisir('#dl-ttc-0', '80');
+  await categorieDep(t, 0, 'CARB');
+  verifier('puce Carburant : choisie, seule', ['Carburant'], puceChoisie(t, 0));
+  verifierVrai('les litres paraissent', !!t.$('#dl-l-0'));
+  verifier('le montant tapé est resté', '80', t.$('#dl-ttc-0').value);
+  t.saisir('#dl-l-0', '50');
+  verifierVrai('le prix du litre se calcule sous le champ', /1,600 € le litre/.test(insecables(t.texte('[data-dlprix="0"]'))));
+  /* « Autre… » : la liste entière, aux noms complets. */
+  verifierVrai('la liste est fermée au départ', !t.$('[data-dlsel="0"]'));
+  t.clic('[data-dlautre="0"]'); await t.pause(120);
+  verifier('« Autre… » ouvre toutes les catégories de Sylve', FIN.CATEGORIES.map(c => c.n), options(t, '[data-dlsel="0"]'));
+  verifier('les dix-neuf', 19, t.$$('[data-dlsel="0"] option').length);
+  t.choisir('[data-dlsel="0"]', 'ASSUR'); await t.pause(120);
+  verifier('Assurance, prise dans la liste, est affichée sur la ligne', ['Assurance'], puceChoisie(t, 0));
+  verifierVrai('les litres sont repartis', !t.$('#dl-l-0'));
+  t.clic('#dp-ok'); await t.pause(400);
+  const d = t.stock('depenses')[0];
+  verifier('enregistrée en Assurance, sans litres', ['ASSUR', 80, false],
+    [d.lignes[0].categorie, d.lignes[0].ttc, 'litres' in d.lignes[0]]);
+  verifierVrai('le message dit où elle est', /elle est dans Argent ▸ Dépenses/.test(t.texte('#toast')));
+  /* Un plein garde ses litres. */
+  await plusDepense(t);
+  await categorieDep(t, 0, 'CARB');
+  t.saisir('#dl-ttc-0', '90'); t.saisir('#dl-l-0', '50');
+  t.clic('#dp-ok'); await t.pause(400);
+  const plein = t.stock('depenses')[1].lignes[0];
+  verifier('un plein : catégorie, montant, litres, taux', ['CARB', 90, 50, 20], [plein.categorie, plein.ttc, plein.litres, plein.taux]);
+  /* Les autres portes ouvrent la même feuille. */
+  await parBarre(t, 'argent'); t.clic('[data-vue="depenses"]'); await t.pause(250);
+  t.clic('#dep-nouvelle'); await t.pause(300);
+  verifierVrai('« + Dépense » de la page : la même feuille', t.texte('#modale-titre') === 'Dépense' && t.$$('#dp-lignes [data-dlpuce]').length === 6);
+  t.clic('#modale-x'); await t.pause(150);
+  t.clic('#liste-depenses [data-depmod="' + d.id + '"]'); await t.pause(300);
+  verifierVrai('un appui sur la ligne : la même feuille, en modification',
+    t.texte('#modale-titre') === 'Modifier la dépense' && puceChoisie(t, 0).join() === 'Assurance' && !!t.$('[data-dlsel="0"]'));
+  verifierVrai('sans « Comme la dernière »', !t.$('#dp-comme'));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Dépense : sans TVA posé d’office et bloqué, retour à 20 % (D2)', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'finances',
+    depenses: [{ id: 'v1', date: D1_J1, fournisseur: 'Mutuelle', maj: 5,
+      lignes: [{ libelle: 'Responsabilité civile', categorie: 'ASSUR', ttc: 120, taux: 20 }] }] }));
+  await plusDepense(t);
+  t.saisir('#dl-ttc-0', '120');
+  verifier('au départ : 20 %, libre', [['20'], [false, false, false, false]], [tauxChoisi(t, 0), tauxBloques(t, 0)]);
+  verifier('les quatre boutons', ['20 %', '10 %', '5,5 %', 'sans'], t.$$('[data-dltx="0"]').map(b => insecables(b.textContent)));
+  for (const code of ['ASSUR', 'BANQUE', 'PRET', 'COTIS']) {
+    await categorieDep(t, 0, 'CONSO');
+    await categorieDep(t, 0, code);
+    verifier(code + ' : « sans », les quatre boutons bloqués', [['0'], [true, true, true, true]], [tauxChoisi(t, 0), tauxBloques(t, 0)]);
+  }
+  verifierVrai('la ligne dit pourquoi', /Pas de TVA sur cette catégorie/.test(t.texte('[data-dli="0"]')));
+  /* Même en forçant le bouton, le taux ne bouge pas. */
+  const b20 = t.$('[data-dltx="0"][data-taux="20"]');
+  b20.disabled = false; b20.click(); await t.pause(100);
+  verifier('un bouton forcé ne change rien', ['0'], tauxChoisi(t, 0));
+  verifier('le pied : pas de TVA déductible', sansBlancs('0 €'), piedDep(t, 'tva'));
+  await categorieDep(t, 0, 'CARB');
+  verifier('puis Carburant : retour à 20 %, libre', [['20'], [false, false, false, false]], [tauxChoisi(t, 0), tauxBloques(t, 0)]);
+  t.clic('[data-dltx="0"][data-taux="10"]'); await t.pause(100);
+  verifier('un taux se choisit d’un appui', ['10'], tauxChoisi(t, 0));
+  verifier('le montant tapé est resté', '120', t.$('#dl-ttc-0').value);
+  await categorieDep(t, 0, 'REPAS');
+  verifier('d’une catégorie avec TVA à une autre, le taux choisi reste', ['10'], tauxChoisi(t, 0));
+  t.clic('#dp-ok'); await t.pause(400);
+  const neuve = t.stock('depenses').filter(d => d.id !== 'v1')[0];
+  verifier('enregistrée à 10 %', ['REPAS', 120, 10], [neuve.lignes[0].categorie, neuve.lignes[0].ttc, neuve.lignes[0].taux]);
+  /* Une ligne ancienne, saisie à 20 % sur une assurance : rien n'est corrigé
+     dans son dos ; « sans » la corrige, et se bloque alors. */
+  await parBarre(t, 'argent'); t.clic('[data-vue="depenses"]'); await t.pause(250);
+  t.clic('#liste-depenses [data-depmod="v1"]'); await t.pause(300);
+  verifier('l’ancienne garde son taux, pas bloqué', [['20'], [false, false, false, false]], [tauxChoisi(t, 0), tauxBloques(t, 0)]);
+  verifierVrai('et la ligne le signale', /D’ordinaire sans TVA : cette ligne a été saisie à 20 %/.test(insecables(t.texte('[data-dli="0"]'))));
+  t.clic('[data-dltx="0"][data-taux="0"]'); await t.pause(100);
+  verifier('« sans » la corrige et se bloque', [['0'], [true, true, true, true]], [tauxChoisi(t, 0), tauxBloques(t, 0)]);
+  t.clic('#dp-ok'); await t.pause(400);
+  verifier('enregistrée sans TVA', 0, t.stock('depenses').filter(d => d.id === 'v1')[0].lignes[0].taux);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Dépense : « Comme la dernière » reprend fournisseur et catégories (D3), le fournisseur est proposé (D4)', async () => {
+  /* La charge fixe a des prélèvements plus récents que la dépense « Brico » :
+     aucun n'est « la dernière ». */
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'finances',
+    chantiers: [chA('c1', { nom: 'Vaux', statut: 'encours' })],
+    depenses: [
+      { id: 'b1', date: JA(-40), fournisseur: 'Brico', numero: 'T-88', chantier: 'c1', vehicule: true, maj: 5,
+        lignes: [{ libelle: 'Chaînes', categorie: 'CONSO', ttc: 48.6, taux: 20 },
+          { libelle: 'Lime ronde', categorie: 'PETITMAT', ttc: 12.5, taux: 10 }] },
+      { id: 's1', date: JA(-60), fournisseur: 'Station', maj: 4,
+        lignes: [{ libelle: 'Gasoil', categorie: 'CARB', ttc: 80, taux: 20, litres: 50 }] }],
+    charges: [{ id: 'g1', libelle: 'Logiciel', beneficiaire: 'Éditeur', ttc: 24, periodicite: 'mensuel', categorie: 'ABO',
+      taux: 20, debut: new Date(D1_AN - 1, 0, 1, 12).getTime(), jour: 1, moisReference: 0, dansDepenses: true }]
+  }));
+  const C = t.w.BCC;
+  const autos = t.stock('depenses').filter(d => d.auto);
+  verifierVrai('une charge fixe a été prélevée depuis la dépense Brico', autos.some(d => d.date > JA(-40)));
+  const avant = JSON.stringify(t.stock('depenses').filter(d => d.id === 'b1')[0]);
+  await plusDepense(t);
+  /* D4 : la liste des fournisseurs se remplit seule. */
+  verifier('le champ Fournisseur propose ceux des dépenses passées', ['Brico', 'Éditeur', 'Station'],
+    t.$$('#dp-fours option').map(o => o.value));
+  verifier('la liste est branchée sur le champ', 'dp-fours', t.$('#dp-four').getAttribute('list'));
+  /* D3. */
+  verifier('le bouton nomme la dernière dépense, hors charge fixe', 'Comme la dernière — Brico · Consommable, Petit outillage',
+    t.texte('#dp-comme b'));
+  verifierVrai('et dit ce qu’il reprend', /reprend le fournisseur et les catégories ; ni la date ni les montants/.test(t.texte('#dp-comme')));
+  t.clic('#dp-comme'); await t.pause(200);
+  verifier('le fournisseur est repris', 'Brico', t.$('#dp-four').value);
+  verifier('deux lignes : leurs catégories', [['Consommable'], ['Petit outillage']], [puceChoisie(t, 0), puceChoisie(t, 1)]);
+  verifier('et leurs taux', [['20'], ['10']], [tauxChoisi(t, 0), tauxChoisi(t, 1)]);
+  verifier('les montants sont vides', ['', ''], t.$$('#dp-lignes [data-dlttc]').map(i => i.value));
+  verifier('les désignations aussi', ['', ''], t.$$('#dp-lignes [data-dl]').map(i => i.value));
+  verifier('la date reste celle du jour', jourISO(Date.now()), t.$('#dp-date').value);
+  verifier('ni n° de pièce, ni chantier, ni véhicule', ['', '', false], [t.$('#dp-num').value, t.$('#dp-ch').value, t.$('#dp-veh').checked]);
+  verifierVrai('le message le dit, au « vous » près',
+    new RegExp('^Repris de la dépense du ' + new Date(JA(-40)).toLocaleDateString('fr-FR') +
+      ' : fournisseur et catégories\\. La date reste le ' + new Date().toLocaleDateString('fr-FR') + '\\.$').test(insecables(t.texte('#toast'))));
+  verifierVrai('le pied attend toujours un montant', /Saisissez au moins un montant/.test(t.texte('#dp-apercu')));
+  t.saisir('#dl-ttc-0', '10'); t.saisir('#dl-ttc-1', '22');
+  t.clic('#dp-ok'); await t.pause(400);
+  const neuve = t.stock('depenses').filter(d => !d.auto && d.id !== 'b1' && d.id !== 's1')[0];
+  verifier('la nouvelle : fournisseur, catégories, taux, montants',
+    ['Brico', ['CONSO', 20, 10, ''], ['PETITMAT', 10, 22, '']],
+    [neuve.fournisseur].concat(neuve.lignes.map(l => [l.categorie, l.taux, l.ttc, l.libelle])));
+  verifier('datée du jour', C.jourCle(Date.now()), C.jourCle(neuve.date));
+  verifier('sans n° de pièce, sans chantier, sans véhicule', ['', null, null], [neuve.numero, neuve.chantier, neuve.vehicule]);
+  verifier('et la dépense d’origine n’a pas bougé', avant, JSON.stringify(t.stock('depenses').filter(d => d.id === 'b1')[0]));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Dépense : « Comme la dernière » après une commande ou une intervention ne reprend aucun lien', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'finances',
+    depenses: [
+      { id: 'k9', date: JA(-3), fournisseur: 'Pépinière du Mont', numero: 'K1', commande: 'k1', maj: 5,
+        lignes: [{ libelle: 'Fournitures K1', categorie: 'FOURN', ttc: 600, taux: 20 },
+          { libelle: 'Livraison', categorie: 'FOURN', ttc: 60, taux: 20 }] }]
+  }));
+  await plusDepense(t);
+  verifier('née d’une commande : elle est « la dernière »', 'Comme la dernière — Pépinière du Mont · Fournitures', t.texte('#dp-comme b'));
+  t.clic('#dp-comme'); await t.pause(200);
+  verifier('une ligne par nature d’achat : une seule, Fournitures à 20 %', [1, ['Fournitures'], ['20']],
+    [t.$$('#dp-lignes .dp-l').length, puceChoisie(t, 0), tauxChoisi(t, 0)]);
+  verifier('le n° de la commande n’est pas repris', '', t.$('#dp-num').value);
+  t.saisir('#dl-ttc-0', '55'); t.clic('#dp-ok'); await t.pause(400);
+  const n1 = t.stock('depenses').filter(d => d.id !== 'k9')[0];
+  verifier('la nouvelle ne porte pas le lien de la commande', [false, 'Pépinière du Mont', 55], ['commande' in n1, n1.fournisseur, n1.lignes[0].ttc]);
+  /* Née d'une intervention du carnet : pas de fournisseur, un lien vers elle. */
+  const etat = t.w.BCUI._etat();
+  etat.depenses.push({ id: 'i9', date: JA(1), fournisseur: '', vehicule: 'vi1', maj: 6,
+    lignes: [{ libelle: 'Révision', categorie: 'VEHIC', ttc: 360, taux: 20 }] });
+  await plusDepense(t);
+  verifier('née d’une intervention : le bouton ne nomme que la catégorie', 'Comme la dernière — Frais véhicule', t.texte('#dp-comme b'));
+  t.saisir('#dp-four', 'Garage du Pont');
+  t.clic('#dp-comme'); await t.pause(200);
+  verifier('le fournisseur déjà tapé reste, la ligne est en Frais véhicule', ['Garage du Pont', ['Frais véhicule']], [t.$('#dp-four').value, puceChoisie(t, 0)]);
+  verifier('la case du véhicule n’est pas cochée', false, t.$('#dp-veh').checked);
+  t.saisir('#dl-ttc-0', '90'); t.clic('#dp-ok'); await t.pause(400);
+  const n2 = t.stock('depenses').filter(d => d.fournisseur === 'Garage du Pont')[0];
+  verifier('la nouvelle n’est liée à aucune intervention', null, n2.vehicule);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Dépense : un ticket à trois lignes dont une immobilisation, le pied et la liste disent les mêmes chiffres', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'finances' }));
+  const FIN = t.w.BCF, eur = v => d1Eur(t, v);
+  t.w.confirm = () => true;
+  await parBarre(t, 'argent'); t.clic('[data-vue="depenses"]'); await t.pause(250);
+  t.clic('#dep-nouvelle'); await t.pause(300);
+  t.saisir('#dp-four', 'Motoculture du Val');
+  await categorieDep(t, 0, 'CONSO'); t.saisir('#dl-ttc-0', '48,60'); t.saisir('#dl-lib-0', 'Chaînes');
+  t.clic('#dp-plusligne'); await t.pause(150);
+  verifierVrai('« + une autre nature sur ce ticket » ajoute une ligne', t.$$('#dp-lignes .dp-l').length === 2 &&
+    /une autre nature sur ce ticket/.test(t.texte('#dp-plusligne')));
+  verifier('la première n’a rien perdu', ['48,60', 'Chaînes', ['Consommable']], [t.$('#dl-ttc-0').value, t.$('#dl-lib-0').value, puceChoisie(t, 0)]);
+  await categorieDep(t, 1, 'IMMO'); t.saisir('#dl-ttc-1', '960');
+  verifierVrai('la mention immobilisation paraît sur sa ligne, pas sur l’autre',
+    /Immobilisation — isolée dans la balance de TVA/.test(t.texte('[data-dli="1"]')) && !/isolée dans la balance/.test(t.texte('[data-dli="0"]')));
+  t.clic('#dp-plusligne'); await t.pause(150);
+  await categorieDep(t, 2, 'REPAS'); t.saisir('#dl-ttc-2', '18,50');
+  t.clic('[data-dltx="2"][data-taux="10"]'); await t.pause(100);
+  verifier('le montant survit au changement de taux, tel que tapé', '18,50', t.$('#dl-ttc-2').value);
+  /* Une quatrième, retirée : les trois autres restent. */
+  t.clic('#dp-plusligne'); await t.pause(150);
+  t.saisir('#dl-ttc-3', '5');
+  verifier('chaque ligne a son ✕ quand il y en a plusieurs', 4, t.$$('#dp-lignes [data-dlsup]').length);
+  t.clic('[data-dlsup="3"]'); await t.pause(150);
+  verifier('retirer une ligne garde les autres', ['48,60', '960', '18,50'], t.$$('#dp-lignes [data-dlttc]').map(i => i.value));
+  /* Le pied, à la main : 48,60 et 960 à 20 %, 18,50 à 10 %.
+     HT 40,50 + 800 + 16,82 ; TVA 8,10 + 160 + 1,68. */
+  verifier('pied : TTC, HT, TVA déductible, immobilisé', [eur(1027.1), eur(857.32), eur(169.78), eur(800)].map(sansBlancs),
+    ['ttc', 'ht', 'tva', 'immo'].map(k => piedDep(t, k)));
+  verifierVrai('le TTC est le chiffre en grand, le reste dessous',
+    !!t.$('#dp-apercu .mj-tot b[data-dp="ttc"]') && /HT · TVA déductible .* · dont .* immobilisé/.test(t.texte('#dp-apercu small')));
+  verifierVrai('le pied est celui de la feuille, avec Enregistrer', !!t.$('.mj-pied #dp-apercu') && !!t.$('.mj-pied #dp-ok') && !t.$('#dp-sup'));
+  t.clic('#dp-ok'); await t.pause(400);
+  const d = t.stock('depenses')[0];
+  verifier('enregistrée : trois lignes', [['CONSO', 48.6, 20, 'Chaînes'], ['IMMO', 960, 20, ''], ['REPAS', 18.5, 10, '']],
+    d.lignes.map(l => [l.categorie, l.ttc, l.taux, l.libelle]));
+  verifier('le calcul de Sylve donne les mêmes chiffres qu’à la main', [1027.1, 857.32, 169.78], [FIN.ttcDe(d), FIN.htDe(d), FIN.tvaDe(d)]);
+  /* La liste et les indicateurs d'Argent ▸ Dépenses. */
+  verifier('la ligne de la liste : TTC et TVA', sansBlancs(eur(1027.1) + 'TVA ' + eur(169.78)),
+    sansBlancs(t.texte('#liste-depenses [data-depmod="' + d.id + '"] .aj-droite')));
+  verifier('les indicateurs : TTC, HT, TVA déductible, nombre', [eur(1027.1), eur(857.32), eur(169.78), '1'].map(sansBlancs),
+    t.$$('#dep-totaux .carte2 b').map(b => sansBlancs(b.textContent)));
+  /* Rouverte : le même pied. Puis Supprimer, la corbeille, et retour. */
+  t.clic('#liste-depenses [data-depmod="' + d.id + '"]'); await t.pause(300);
+  verifier('rouverte, le pied redit les mêmes chiffres', [eur(1027.1), eur(857.32), eur(169.78), eur(800)].map(sansBlancs),
+    ['ttc', 'ht', 'tva', 'immo'].map(k => piedDep(t, k)));
+  verifierVrai('Supprimer est dans le pied, en modification', !!t.$('.mj-pied #dp-sup'));
+  t.clic('#dp-sup'); await t.pause(400);
+  verifierVrai('supprimée : plus dans les dépenses, la feuille fermée', !t.stock('depenses').length && t.$('#modale').hidden);
+  await parMenu(t, 'corbeille');
+  const rep = t.$$('#s-recup [data-repecher]').filter(b => /Motoculture du Val/.test(b.closest('.liste-item').textContent))[0];
+  verifierVrai('elle est dans la corbeille, à son montant', !!rep && /1 027,10/.test(insecables(rep.closest('.liste-item').textContent).replace(/ /g, ' ')));
+  rep.click(); await t.pause(500);
+  verifier('restaurée, elle revient identique', JSON.stringify(d), JSON.stringify(t.stock('depenses')[0]));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Dépense : une ancienne dépense rouverte et enregistrée sans rien toucher ressort identique', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'finances',
+    chantiers: [chA('c1', { nom: 'Vaux', statut: 'encours' })],
+    depenses: [
+      /* Tout ce que la feuille sait porter. */
+      { id: 'a1', date: D2_MATIN, fournisseur: 'Station du Col', numero: 'T-4471', chantier: 'c1', vehicule: true, maj: 111,
+        lignes: [{ libelle: 'Gasoil', categorie: 'CARB', ttc: 61.37, taux: 20, litres: 35.2 },
+          { libelle: 'Bidon d’huile', categorie: 'CONSO', ttc: 14.9, taux: 20 }] },
+      /* Née d'une intervention du carnet. */
+      { id: 'a2', date: D2_MATIN, fournisseur: '', vehicule: 'vi1', maj: 112,
+        lignes: [{ libelle: 'Révision', categorie: 'VEHIC', ttc: 360, taux: 20 }] },
+      /* Née d'une commande. */
+      { id: 'a3', date: D2_MATIN, fournisseur: 'Pépinière du Mont', numero: 'K1', commande: 'k1', maj: 113,
+        lignes: [{ libelle: 'Fournitures K1', categorie: 'FOURN', ttc: 600, taux: 20 },
+          { libelle: 'Livraison', categorie: 'FOURN', ttc: 60, taux: 20 }] },
+      /* Une TVA relevée sur le ticket, un taux hors des quatre boutons, une
+         assurance saisie à 20 %. */
+      { id: 'a4', date: D1_J1, fournisseur: 'Coopérative', maj: 114,
+        lignes: [{ libelle: 'Ticket de caisse', categorie: 'CONSO', ttc: 100, taux: 20, tva: 16.5 },
+          { libelle: 'Livre', categorie: 'ADMIN', ttc: 21, taux: 2.1 },
+          { libelle: 'Assurance du matériel', categorie: 'ASSUR', ttc: 48, taux: 20 }] },
+      /* Rattachée à un chantier supprimé depuis. */
+      { id: 'a5', date: D1_J1, fournisseur: 'Scierie', numero: '', chantier: 'parti', vehicule: null, maj: 115,
+        lignes: [{ libelle: 'Piquets', categorie: 'FOURN', ttc: 240, taux: 20 }] },
+      /* Le format d'avant les lignes : un montant à plat. */
+      { id: 'a6', date: D1_J1, fournisseur: 'Quincaillerie', categorie: 'PETITMAT', ttc: 60, taux: 20, maj: 116 }]
+  }));
+  const FIN = t.w.BCF;
+  const de = id => t.stock('depenses').filter(d => d.id === id)[0];
+  await parBarre(t, 'argent'); t.clic('[data-vue="depenses"]'); await t.pause(250);
+  const rouvrir = async id => { t.clic('#liste-depenses [data-depmod="' + id + '"]'); await t.pause(300); };
+  for (const [id, quoi] of [['a1', 'n° de pièce, chantier, véhicule, désignations, litres, heure de la date'],
+    ['a2', 'née d’une intervention : son lien'], ['a3', 'née d’une commande : son lien et son numéro'],
+    ['a4', 'TVA du ticket, taux hors boutons, assurance à 20 %'], ['a5', 'chantier supprimé']]) {
+    const avant = JSON.stringify(de(id));
+    await rouvrir(id);
+    verifier(id + ' s’ouvre en modification', 'Modifier la dépense', t.texte('#modale-titre'));
+    t.clic('#dp-ok'); await t.pause(400);
+    verifier(id + ' — ' + quoi + ' : identique en base', avant, JSON.stringify(de(id)));
+  }
+  /* Ce que la feuille montre de a1. */
+  await rouvrir('a1');
+  verifier('a1 à l’écran : n° de pièce, chantier, véhicule', ['T-4471', 'c1', true], [t.$('#dp-num').value, t.$('#dp-ch').value, t.$('#dp-veh').checked]);
+  verifier('ses désignations, ses montants, ses litres', [['Gasoil', 'Bidon d’huile'], ['61,37', '14,9'], '35,2'],
+    [t.$$('#dp-lignes [data-dl]').map(i => i.value), t.$$('#dp-lignes [data-dlttc]').map(i => i.value), t.$('#dl-l-0').value]);
+  /* Un vrai changement ne touche que ce qui est changé, et date la modification. */
+  t.saisir('#dl-ttc-1', '15,90');
+  t.clic('#dp-ok'); await t.pause(400);
+  const a1 = de('a1');
+  verifier('a1 modifiée : le montant change, le reste non', [15.9, 'T-4471', 'c1', true, D2_MATIN, 35.2],
+    [a1.lignes[1].ttc, a1.numero, a1.chantier, a1.vehicule, a1.date, a1.lignes[0].litres]);
+  verifierVrai('et « maj » a bougé', a1.maj !== 111);
+  /* La TVA relevée ne vaut que pour son montant : on le change, elle tombe. */
+  await rouvrir('a4');
+  verifier('a4 à l’écran : le pied suit la TVA du ticket', sansBlancs(d1Eur(t, 16.5 + FIN.tvaLigne({ ttc: 21, taux: 2.1 }) + 8)), piedDep(t, 'tva'));
+  t.saisir('#dl-ttc-0', '120');
+  t.clic('#dp-ok'); await t.pause(400);
+  verifier('a4 : montant changé, la TVA relevée est retirée ; les autres lignes intactes',
+    [false, 120, 2.1, 20], ['tva' in de('a4').lignes[0], de('a4').lignes[0].ttc, de('a4').lignes[1].taux, de('a4').lignes[2].taux]);
+  /* Le format d'avant passe en lignes, aux mêmes montants. */
+  const plat = de('a6');
+  await rouvrir('a6');
+  t.clic('#dp-ok'); await t.pause(400);
+  const a6 = de('a6');
+  verifier('a6 : une ligne, mêmes catégorie, montant et taux', [['PETITMAT', 60, 20]], a6.lignes.map(l => [l.categorie, l.ttc, l.taux]));
+  verifier('a6 : TTC, HT et TVA inchangés', [FIN.ttcDe(plat), FIN.htDe(plat), FIN.tvaDe(plat)], [FIN.ttcDe(a6), FIN.htDe(a6), FIN.tvaDe(a6)]);
+  verifier('a6 : fournisseur et date gardés, plus de montant à plat', ['Quincaillerie', D1_J1, false], [a6.fournisseur, a6.date, 'ttc' in a6]);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Dépense : la frappe ne refait aucun champ, le clavier reste ouvert', async () => {
+  const t = await ouvrir(Object.assign({}, VIDE, { module: 'finances' }));
+  await plusDepense(t);
+  await categorieDep(t, 0, 'CARB');
+  t.clic('#dp-plusligne'); await t.pause(150);
+  await categorieDep(t, 1, 'VEHIC');
+  t.clic('#dp-plusligne'); await t.pause(150);
+  t.saisir('#dl-ttc-1', '100');
+  verifierVrai('la ligne Frais véhicule offre le carnet', !t.$('#dp-carnet').hidden);
+  cocher(t, '#dp-hist', true); await t.pause(100);
+  const SEL = ['#dl-ttc-0', '#dl-l-0', '#dl-lib-0', '#dl-ttc-1', '#dl-lib-1', '#dl-ttc-2', '#dl-lib-2', '#dp-four', '#dp-num', '#dp-km'];
+  const avant = SEL.map(s => t.$(s));
+  verifierVrai('trois lignes ouvertes, et le kilométrage', avant.every(Boolean) && !t.$('#dp-histkm').hidden);
+  const taper = (n, v) => {
+    n.focus(); n.value = v;
+    n.dispatchEvent(new t.w.Event('input', { bubbles: true }));
+    /* Ce qui part quand le doigt passe au champ suivant. */
+    n.dispatchEvent(new t.w.Event('change', { bubbles: true }));
+  };
+  const gardes = [];
+  avant.forEach((n, i) => {
+    taper(n, ['80', '50', 'gazole', '360', 'Plaquettes', '12,50', 'Vis', 'Garage', 'F-12', '231415'][i]);
+    gardes.push(t.$(SEL[i]) === n && t.d.activeElement === n);
+  });
+  verifier('chaque champ reste le même, et garde le doigt', SEL.map(() => true), gardes);
+  verifierVrai('le pied a suivi la frappe', piedDep(t, 'ttc') === sansBlancs(d1Eur(t, 452.5)));
+  verifierVrai('le prix du litre aussi, sur place', /1,600 € le litre/.test(insecables(t.texte('[data-dlprix="0"]'))));
+  /* Changer la catégorie ou le taux d'une ligne ne refait qu'elle. */
+  await categorieDep(t, 2, 'EPI');
+  verifier('changer la catégorie de la 3e ligne ne refait pas les deux autres', [true, true, true, true, true, false],
+    ['#dl-ttc-0', '#dl-l-0', '#dl-lib-0', '#dl-ttc-1', '#dl-lib-1', '#dl-ttc-2'].map(s => t.$(s) === avant[SEL.indexOf(s)]));
+  verifier('et la 3e garde ce qui était tapé, tel quel', ['12,50', 'Vis'], [t.$('#dl-ttc-2').value, t.$('#dl-lib-2').value]);
+  t.clic('[data-dltx="1"][data-taux="10"]'); await t.pause(100);
+  verifier('changer le taux de la 2e ne refait pas la 1re', [true, true, true], ['#dl-ttc-0', '#dl-l-0', '#dl-lib-0'].map(s => t.$(s) === avant[SEL.indexOf(s)]));
+  verifier('ni les champs du bas', [true, true, true], ['#dp-four', '#dp-num', '#dp-km'].map(s => t.$(s) === avant[SEL.indexOf(s)]));
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Argent ▸ Année : le simulateur est un essai, « Garder ce taux » écrit le réglage', async () => {
+  const t = await ouvrir(Object.assign(grainesD1(), { cfg: { tauxCotisations: 25, tauxImpot: 2 } }));
+  const FIN = t.w.BCF, eur = v => d1Eur(t, v);
+  const bA = FIN.bornes('annee', D1_AN, 0);
+  const carreau = nom => sansBlancs((t.$$('#sim-carte .kpi .carte2').filter(c => c.querySelector('small').textContent === nom)[0] || { querySelector: () => ({ textContent: '' }) })
+    .querySelector('b').textContent);
+  const annee = async () => { await parBarre(t, 'argent'); t.clic('[data-vue="analyses"]'); await t.pause(250); t.clic('[data-ana="ensemble"]'); await t.pause(200); };
+  const attendu = cfg => FIN.simulation(t.stock('chantiers'), bA, cfg);
+  await annee();
+  verifier('le simulateur part des réglages', ['25', '2', 'abattu'], [t.$('#sim-cot').value, t.$('#sim-imp').value, t.$('#sim-base').value]);
+  verifierVrai('sans essai, aucune ligne d’essai', !t.$('#sim-essais'));
+  /* La base à la main : 2 774,70 de prestation à 50 %, 85 de vente à 71 %. */
+  verifier('la base après abattement, à la main', 1412, attendu({ tauxCotisations: 25 }).baseCotisations);
+  verifier('cotisations aux réglages : 25 % de 1 412', sansBlancs(eur(353)), carreau('cotisations'));
+  /* Un taux tapé ne sert qu'au simulateur. */
+  t.choisir('#sim-cot', '30'); await t.pause(200);
+  verifier('rien n’est écrit dans les réglages', [25, 2], [t.stock('cfg').tauxCotisations, t.stock('cfg').tauxImpot]);
+  verifier('ni dans l’état de l’application', 25, t.w.BCUI._etat().cfg.tauxCotisations);
+  verifier('le simulateur calcule avec le taux essayé : 30 % de 1 412', sansBlancs(eur(423.6)), carreau('cotisations'));
+  verifier('le champ garde le taux essayé', '30', t.$('#sim-cot').value);
+  verifier('une ligne le dit', 'CotisationsEssai : 30 % · vos réglages : 25 %', insecables(t.texte('[data-simessai="cot"] span')));
+  verifier('avec son bouton', 'Garder ce taux', t.texte('[data-simgarder="cot"]'));
+  verifierVrai('seul le taux essayé a sa ligne', t.$$('[data-simessai]').length === 1);
+  /* La période choisie en haut ne défait pas l'essai : c'est le même écran. */
+  t.choisir('#an-type', 'trimestre'); await t.pause(200);
+  verifier('changer de période garde l’essai', '30', t.$('#sim-cot').value);
+  t.choisir('#an-type', 'annee'); await t.pause(200);
+  /* Déclarations et Réglages ▸ Financier n'ont rien vu. */
+  t.clic('[data-ana="declarations"]'); await t.pause(200);
+  verifier('Déclarations garde le taux des réglages', '25', t.$('#decl-cot').value);
+  verifierVrai('et calcule avec lui', sansBlancs(t.texte('#ana-corps')).indexOf(sansBlancs(eur(353))) >= 0 &&
+    sansBlancs(t.texte('#ana-corps')).indexOf(sansBlancs(eur(423.6))) < 0);
+  t.clic('[data-ana="ensemble"]'); await t.pause(200);
+  verifier('revenu de Déclarations, le simulateur repart des réglages', ['25', null], [t.$('#sim-cot').value, t.$('#sim-essais')]);
+  t.choisir('#sim-cot', '30'); await t.pause(200);
+  await parMenu(t, 'reglages');
+  verifier('Réglages ▸ Financier garde 25', '25', String(t.$('#r-cot').value));
+  await annee();
+  verifier('en quittant l’écran, l’essai s’efface', ['25', null], [t.$('#sim-cot').value, t.$('#sim-essais')]);
+  /* « Garder ce taux » est le seul geste qui écrit. */
+  t.choisir('#sim-cot', '30'); await t.pause(200);
+  t.choisir('#sim-imp', '5'); await t.pause(200);
+  verifier('deux essais, deux lignes', ['cot', 'imp'], t.$$('[data-simessai]').map(e => e.dataset.simessai));
+  t.clic('[data-simgarder="cot"]'); await t.pause(300);
+  verifier('« Garder ce taux » écrit ce taux, et lui seul', [30, 2], [t.stock('cfg').tauxCotisations, t.stock('cfg').tauxImpot]);
+  verifierVrai('et le confirme au « vous »', /^C’est gardé : vos réglages disent maintenant 30 % de cotisations\.$/.test(insecables(t.texte('#toast'))));
+  verifier('l’autre essai reste un essai', ['imp'], t.$$('[data-simessai]').map(e => e.dataset.simessai));
+  verifier('qui dit', 'ImpôtEssai : 5 % · vos réglages : 2 %', insecables(t.texte('[data-simessai="imp"] span')));
+  /* « Appliqués sur » est un essai, lui aussi. */
+  t.choisir('#sim-base', 'brut'); await t.pause(200);
+  verifier('la base essayée n’est pas écrite', undefined, t.stock('cfg').baseCotisations);
+  verifier('cotisations sur le brut : 30 % de 2 859,70', sansBlancs(eur(857.91)), carreau('cotisations'));
+  verifier('sa ligne, son bouton', ['Appliqués surEssai : le chiffre d’affaires brut · vos réglages : le montant après abattement', 'Garder ce choix'],
+    [t.texte('[data-simessai="base"] span'), t.texte('[data-simgarder="base"]')]);
+  t.choisir('#sim-base', 'abattu'); await t.pause(200);
+  /* Déclarations et Réglages reprennent le taux gardé. */
+  t.clic('[data-ana="declarations"]'); await t.pause(200);
+  verifier('Déclarations reprend le taux gardé', '30', t.$('#decl-cot').value);
+  verifierVrai('et calcule avec lui', sansBlancs(t.texte('#ana-corps')).indexOf(sansBlancs(eur(423.6))) >= 0);
+  await parMenu(t, 'reglages');
+  verifier('Réglages ▸ Financier aussi', ['30', '2'], [String(t.$('#r-cot').value), String(t.$('#r-imp').value)]);
+  verifier('aucune erreur', [], t.erreurs);
+});
+
+/* --------------------------------------------------------------------- */
+scenario('Argent ▸ Mois : le débours ne compte plus dans les barres, dans Mois comme dans Année', async () => {
+  /* 2 000 € de prestation et 300 € de débours, facturés et payés ce mois-ci :
+     la barre vaut 2 000 €, comme le grand chiffre. */
+  const t = await ouvrir(Object.assign({}, VIDE, {
+    chantiers: [chA('c1', { nom: 'Vaux', donneur: 'Cabinet Sylva', statut: 'paye', dateFacture: D1_J1, datePaiement: D1_J1,
+      lignes: [d1Ligne('DEGAG', 1, 2000, 'prestation', 20), d1Ligne('PROTEC', 1, 300, 'debours', 20)] })]
+  }));
+  const FIN = t.w.BCF, C = t.w.BCC, eur = v => d1Eur(t, v);
+  const bM = FIN.bornes('mois', D1_AN, D1_MO);
+  const duMois = new RegExp('^' + D1_MOIS[D1_MO] + ' : ', 'i');
+  const titres = zone => t.$$(zone + ' rect title').map(x => x.textContent).filter(x => duMois.test(x)).map(sansBlancs);
+  const dit = v => sansBlancs(D1_MOIS[D1_MO] + ' : ' + eur(v)).toLowerCase();
+  verifier('les données portent bien le débours', [2000, 300], [FIN.chiffreAffaires(t.stock('chantiers'), bM).total, FIN.chiffreAffaires(t.stock('chantiers'), bM).debours]);
+  verifier('ce que le mois a facturé, débours compris : 2 300', 2300, FIN.lignesFacturees(t.stock('chantiers'), bM).reduce((s, x) => s + x.ht, 0));
+  await parBarre(t, 'argent');
+  verifier('Mois : le grand chiffre, hors débours', sansBlancs(eur(2000)), d1Mo(t, 'ca'));
+  verifier('Mois : la barre du mois vaut le grand chiffre', [dit(2000)], titres('#mo-histo').map(x => x.toLowerCase()));
+  verifier('Mois : le total à fin de mois est la somme des barres', sansBlancs(eur(2000)), d1Mo(t, 'cumul'));
+  verifierVrai('Mois : la ligne MSA n’a pas bougé', sansBlancs(t.texte('#mo-msa')).indexOf(sansBlancs('total ' + eur(2000))) >= 0);
+  verifierVrai('Mois : le débours reste dit à part', /Hors débours \(300 €\)/.test(insecables(t.texte('#mo-ca'))));
+  /* La TVA, elle, porte toujours sur tout ce qui est facturé. */
+  verifier('la TVA facturée n’a pas bougé : 20 % de 2 300', 460, FIN.balanceTva(t.stock('chantiers'), [], bM, C.tauxLigne).collectee.total);
+  verifier('et l’écran la donne', sansBlancs(eur(460)), d1Tva(t, '#mo-tva', 'facturee'));
+  /* Année ▸ Vue d'ensemble. */
+  t.clic('[data-vue="analyses"]'); await t.pause(250); t.clic('[data-ana="ensemble"]'); await t.pause(200);
+  verifier('Année ▸ Vue d’ensemble : la barre « facturé HT »', [dit(2000)], titres('#ana-corps').map(x => x.toLowerCase()));
+  verifierVrai('et « Plus haut mois »', sansBlancs(t.texte('#ana-corps')).indexOf(sansBlancs('Plus haut mois : ' + eur(2000))) >= 0);
+  /* Année ▸ Recettes : facturé et encaissé, hors débours tous les deux. */
+  t.clic('[data-ana="recettes"]'); await t.pause(200);
+  verifier('Année ▸ Recettes : les barres « facturé » et « encaissé »', [dit(2000), dit(2000)], titres('#ana-corps').map(x => x.toLowerCase()));
+  verifier('qui valent leurs carreaux', [eur(2000), eur(2000)].map(sansBlancs),
+    t.$$('#ana-corps .kpi .carte2 b').slice(0, 2).map(b => sansBlancs(b.textContent)));
+  verifierVrai('le débours y reste dit à part', /Débours client — hors chiffre d’affaires\s*300 €/.test(insecables(t.texte('#ana-corps'))));
+  /* Déclarations : inchangée. */
+  t.clic('[data-ana="declarations"]'); await t.pause(200);
+  verifierVrai('Déclarations : à déclarer 2 000 €, le débours écarté',
+    sansBlancs(t.texte('#ana-corps')).indexOf(sansBlancs('À déclarer' + eur(2000))) >= 0 && /Le débours \(300 €\) est déjà écarté/.test(insecables(t.texte('#ana-corps'))));
   verifier('aucune erreur', [], t.erreurs);
 });
 

@@ -4,7 +4,7 @@ Application de gestion pour un entrepreneur de travaux forestiers. Un seul
 fichier HTML servi, recollé depuis `sources/` sans rien transformer ; aucune
 dépendance, tout fonctionne hors ligne.
 
-Version courante : **4.95.0-20261107-1800**
+Version courante : **4.96.0-20261111-1300**
 
 ---
 
@@ -76,11 +76,11 @@ npm run controle -- --dates   # en plus : les scénarios du temps au 1er et au d
 
 Doit afficher **« index.html fabriqué »**, puis **« Bon pour livraison »**,
 puis **« le service worker tient »** (33 vérifications), puis la suite au
-vert — 3061 à ce jour — puis **« largeur : … aucune page plus large que l’écran »** (mesure dans un vrai Chrome à 320 et 360 px, `outils/largeur.js` ; sans Chrome elle le dit et passe), puis **« Sylve.html est conforme »**.
+vert — 3228 à ce jour — puis **« largeur : … aucune page plus large que l’écran »** (mesure dans un vrai Chrome à 320 et 360 px, `outils/largeur.js` ; sans Chrome elle le dit et passe), puis **« Sylve.html est conforme »**.
 
-Compter **trois minutes** : 187 à 260 s aux lots 4b, 5b et c1 (selon la charge du poste ;
-17 minutes avant, en séquentiel). **Avec `--dates`, sept minutes** : les scénarios du
-temps rejoués le 1er puis le dernier jour d'un mois (879 vérifications chacun au lot d1 ;
+Compter **trois à six minutes** : 187 à 260 s aux lots 4b, 5b et c1, 342 s au lot d2 (selon la charge du poste ;
+17 minutes avant, en séquentiel). **Avec `--dates`, sept à dix minutes** : les scénarios du
+temps rejoués le 1er puis le dernier jour d'un mois (896 vérifications chacun au lot d2 ;
 `SYLVE_DATE` et `--motif=`, `docs/tests-et-pieges.md`). À lancer **sur demande**, et
 avant de livrer un lot qui touche à l'Agenda, aux journées ou à Aujourd'hui (décidé le
 01/11), ou à Argent ▸ Mois (lot d1 : « argent ▸ mois » est dans le motif). Les scénarios se jouent en
@@ -207,7 +207,7 @@ Débordements à connaître : `prix-de-revient.js` finit par les réglages
 Chantiers, Veille et Démarrage, puis l'appel d'`init` ; `carte.js` par les
 fenêtres « numéro de facture » et « motif de refus ».
 
-**La navigation (lots 5a, 5b, 5b2, 5b3, c1, c2, b1, b2, r1, r1b, r2 et d1, 4.86.0 à 4.95.0)** — détail dans
+**La navigation (lots 5a, 5b, 5b2, 5b3, c1, c2, b1, b2, r1, r1b, r2, d1 et d2, 4.86.0 à 4.96.0)** — détail dans
 `docs/design-navigation.md`, *Le cadre du lot 5a*, *L'écran Aujourd'hui* et *Aujourd'hui allégé* :
 
 - Démarrage → **Aujourd'hui** (vue `accueil`) : saisie · En retard · Chantiers
@@ -232,6 +232,7 @@ fenêtres « numéro de facture » et « motif de refus ».
 - **r1b (suites de r1, 4.93.0)** : devis en jours (`validiteJours`, 30 du réglage `joursValiditeDevis` ; les mois `validiteDevis` relus ; `C.echeanceDevis`), en retard le jour de l'échéance, plus de préavis ; journée d'office **par jour** (toute journée saisie ce jour-là l'efface) ; jours en pointillés passés (`C.joursEnPointilles`) : « J'y ai travaillé » (marque `fait` sur la pose) ou « Je n'y étais pas » ; **bulle d'Aujourd'hui** (`montrerBulleAuj`, à chaque `aller('accueil')`, masque du jour `bulle:pointilles`) ; fiche du jour une ligne par chantier (`data-fjch`, ✕ `data-fjsupch`) ; Chantiers : « À faire maintenant » = `C.TYPES_EN_RETARD`, groupe `factures`. Détail : `docs/calendrier-journees.md`, *Le lot r1b*.
 - **r2 (fiche, durées, trajet, 4.94.0)** : durées en deux cases h + min (`champDuree`, `lireDuree`, `poserDuree` dans `journee.js` ; `C.ditHeures`, `C.enHeuresMinutes`), gardées en heures décimales ; Ma journée : `productif` tapé à part, heures par prestation facultatives (`#pst-rep`, `data-psth` / `data-pstm`), une prestation sans heures entre dans `c.temps` avec `sansTemps` (quantité gardée), le productif non réparti avec `nonReparti` — ni l'un ni l'autre dans les rendements ; **le trajet sort du temps du chantier** (`heuresJournee` sans `trajet`, `t.trajet` porté à côté, `C.trajetChantier`) ; trajet du chantier `trajetKm` / `trajetHeures` (fiche ▸ Infos, proposé dans Ma journée, « Retenir ») ; une journée par chantier et par jour (`journeesDe`, `ouvrirJourneesParmi`) ; `sansReperage` ; fiche ▸ Travaux : `data-fjour` → `ouvrirJourDeFiche` ; pastille Fiche sans chantier → `renderChoixChantier` ; « plus de jour posé » en gris ; la bulle d'Aujourd'hui rend son cran (`A.avalerRetour`). Détail : `docs/calendrier-journees.md`, *Le trajet à part (lot r2)*.
 - **d1 (Argent, 4.95.0)** : pastilles Mois · TVA · Dépenses · Année, vues `finances` · `tva` · `depenses` · `analyses` (les clés d'avant). **Mois** a son mois à lui (`A.moisArgent`, ‹ ›), ne touche pas `A.periode` ; TVA, Dépenses et Année partagent `A.periode` par trois jeux de sélecteurs (`fi-*`, `dep-*`, `an-*`). La vue `charges` n'existe plus : `VUES_DEPLACEES` (`navigation.js`) la mène à `depenses`, défilée au bloc `#dep-charges` (`aller()` s'en charge). Supprimer d'une dépense ou d'une charge : dans sa fenêtre (`#dp-sup`, `#cg-sup`). Les cumuls de l'ancien carnet : `htmlCumulsCarnet()`, dans Année ▸ Vue d'ensemble (pli `an-cumuls`, `#carnet-totaux`). Plis d'Argent : `pliArgent`, ouverts gardés dans `A.agPlis`. Preuve bloc par bloc : `docs/inventaire-ecrans.md`, *Où sont allés les blocs de Finances*. Dans les tests, `defile(t)` dit ce qui a été amené en vue ; `BCUI._allerModule`.
+- **d2 (feuille Dépense, 4.96.0)** : `ouvrirDepense` (`finances.js`) = « Comme la dernière » (`#dp-comme`, `derniereDepense`) · Quand, où (fournisseur proposé, `#dp-fours`) · Le ticket (une carte `.dp-l` par ligne : puces `data-dlpuce` de `PUCES_DEP`, « Autre… » `data-dlautre` → liste `data-dlsel`, TVA en boutons `data-dltx`, bloqués par `tauxFigeDep`) · Pour s'y retrouver · pied fixe (`#dp-apercu`, `data-dp`). La catégorie et le taux vivent dans `depLignes`, pas dans le formulaire ; la frappe ne refait rien, catégorie ou taux ne refont que leur ligne (`renderLigneDep`). Enregistrer repart de la ligne d'origine (`ligneDepEcrite`) : une dépense rouverte sans rien toucher ressort identique. **Simulateur d'Année** : un essai (`A.essaiSim`, `etatSimulation`, « Garder ce taux » = `garderEssaiSimulation`), effacé par `aller()`. **Barres mois par mois** : `recettesParMois` et `encaissementsParMois` hors débours. Détail : `docs/finances-tva.md`, *La feuille Dépense*. Dans les tests : `categorieDep(t, i, code)`, `plusDepense(t)`, `piedDep(t, 'ttc')`.
 
 ---
 
@@ -284,6 +285,8 @@ mention d'un autre fichier.
 - **Une durée tapée a deux cases** (`#x` et `#x-m`) : la lire par `lireDuree('x')`, jamais par `C.nb($('#x').value)`.
 - **La journée d'office n'existe que dans `c.temps`** : qui lit `A.journees` seul ne la voit pas (Derniers jours et « Ce mois-ci » passent par `journeesDOffice()`) — `docs/calendrier-journees.md`, *Le lot r1*.
 - **Aujourd'hui peut s'ouvrir sous une bulle** (lot r1b) : un scénario semé avec une journée d'office pas vue ou un jour en pointillés passé la voit au démarrage ; elle est hors de `#vue-accueil`, et n'empêche pas les `click()`.
+- **La largeur saute des écrans sans bruit** selon la charge du poste : une mesure promise par un lot s'inscrit dans `ATTENDUS` (`outils/largeur.js`) ; `--liste` nomme les écrans mesurés.
+- **Réglages ▸ Financier ne remplit ses cases qu'au démarrage** (`renderReglagesAlertes`) : qui écrit un taux ailleurs doit les rafraîchir, sinon la case périmée le réécrit — `docs/finances-tva.md`, *Le simulateur d'Année est un essai*.
 - **Un champ que rien n'écrit ne se lit plus** : `outils/vocabulaire.js` est un cliquet — `docs/tests-et-pieges.md`.
 - **Deux gardes qui se couvrent ne s'éprouvent pas** : placer le cas où une seule tient.
 - **L'Agenda n'affiche qu'un mois** : un jour « il y a deux jours » n'y est pas le 1er ni le 2 ; viser par `caseDuJour`, et nommer un scénario du temps avec un mot du motif des passes datées.
@@ -300,7 +303,7 @@ mention d'un autre fichier.
 | `docs/fiche-de-chantier.md` | Le document obligatoire imprimé : risques, réseau, croquis |
 | `docs/calendrier-journees.md` | Ma journée, statuts des jours, rappels, validation, planification, « jours passés » |
 | `docs/rendements.md` | Le chantier des rendements (garé), lignes de rendement, cadences |
-| `docs/finances-tva.md` | Nomenclatures du carnet, charges fixes, dépenses et TVA, déclarations, reprise du carnet |
+| `docs/finances-tva.md` | Nomenclatures du carnet, charges fixes, dépenses et TVA, déclarations, reprise du carnet, feuille Dépense, simulateur en essai, débours hors des barres |
 | `docs/stock.md` | Unités, totaux, facture → stock, rentabilité, achats à venir |
 | `docs/vehicule.md` | Carnet du véhicule, coût au kilomètre, frais véhicule |
 | `docs/carte.md` | Fonds IGN, tuiles hors ligne, Mercator, gestes |
